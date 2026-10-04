@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
@@ -287,7 +288,7 @@ function WorkOrderPosting({
           className="shrink-0 whitespace-nowrap border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-2 py-1 font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-work-order-payout
         >
-          {`${posting.payoutCredits} Cr`}
+          <CreditsAmount amount={posting.payoutCredits} unit="Cr" />
         </p>
       </div>
 

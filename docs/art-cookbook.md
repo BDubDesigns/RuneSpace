@@ -173,6 +173,18 @@ Examples from the current set:
 Keep larger approved masters when useful for future reveals or edits, but judge
 the game-ready result at actual inventory scale before accepting it.
 
+### Currency art
+
+Credits have a full battered-chip raster for confirmed Mission payout reveals and
+a simplified SVG that accompanies structured amounts in the UI (#290). It is
+ordinary currency, not an inventory item, so it lives in `public/currency/` and
+never in the item registry. The SVG is the owner-supplied companion, not a
+shrunken raster. Both are judged at their real sizes: the chip at the 80 px
+reward-tile artwork zone and the icon at `1em` beside `text-xs` through heading
+text. The chip's derivative is a trimmed 320 px-wide transparent WebP (see
+`assets/currency/README.md` for the recipe). Show the same art regardless of
+amount until tiered art is approved.
+
 ### Public Update hero images
 
 Public Updates should use a relevant hero when there is an obvious existing
@@ -488,6 +500,8 @@ Current production conventions:
 - environment and conversation backgrounds -> `public/location-scenes/`
 - NPC expressions -> `public/npc-art/`
 - item/equipment art -> `public/item-art/`
+- currency art (the Credits chip and inline icon) -> `public/currency/`; the
+  owner-supplied chip master is kept in `assets/currency/`
 - map identifiers -> `public/map-icons/`
 - Update-specific heroes -> `public/updates/`
 

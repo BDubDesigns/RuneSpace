@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { getLocation } from "@/game/content/locations";
@@ -87,7 +88,10 @@ export function CrewHaulerRideControl({ localPlaceId }: { localPlaceId?: string 
               loading={pending === destinationLocationId}
               onClick={() => board(destinationLocationId)}
             >
-              {`Ride to ${destination?.displayName ?? "destination"} · ${route.fareCredits} Credits`}
+              <span>
+                {`Ride to ${destination?.displayName ?? "destination"} · `}
+                <CreditsAmount amount={route.fareCredits} />
+              </span>
             </ActionButton>
             {!affordable ? (
               <Feedback tone="danger">

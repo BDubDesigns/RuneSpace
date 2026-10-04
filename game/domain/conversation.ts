@@ -480,6 +480,91 @@ export function getMissionCapacityRefusalDialogue(
   return dialogueId ? getDialogue(dialogueId) : undefined;
 }
 
+/**
+ * A confirmed Credits payout, presented as a reward tile in front of (`leads`)
+ * or instead of (`stands_alone`) an authored scene (#290). It is built only from
+ * the `creditsPaid` receipt of a successful Mission command, never from content.
+ */
+export type CreditsReceipt = {
+  /** The Credits the server reports it actually paid. */
+  amount: number;
+  /**
+   * `leads`: the tile opens the conversation that follows the payment (an
+   * accepted continuation, or the completion presentation). `stands_alone`: the
+   * payment has no authored scene after it, so the tile is the whole scene.
+   */
+  placement: "leads" | "stands_alone";
+};
+
+/** The view a conversation moves to after a Mission command succeeds. */
+export type MissionSuccessView =
+  | { kind: "hub" }
+  | {
+      kind: "dialogue";
+      dialogueId: DialogueId;
+      action?: MissionConversationAction;
+      creditsReceipt?: CreditsReceipt;
+    };
+
+/**
+ * Decides what the conversation presents after the server reported a Mission
+ * command that was neither refused nor failed. Pure so the payment boundary is
+ * provable without a browser.
+ *
+ * A Credits tile is returned only when the result carries `creditsPaid` — the
+ * receipt of a payment that committed in THAT call. `already_accepted`,
+ * `already_completed`, acknowledgements, free Missions and every refusal carry
+ * none, so a replay, retry, or revisit can never present a payout. Existing
+ * sequencing is preserved: an accepted continuation and a completion
+ * presentation still play in full, with the tile placed in front of them; with
+ * no scene to follow, the tile stands alone against the scene just played.
+ */
+export function resolveMissionSuccessView(input: {
+  actionKind: MissionConversationAction["kind"];
+  missionId: string;
+  /** The sequence the command was run from. */
+  dialogueId: DialogueId;
+  acceptedContinuation?: MissionConversationContinuation;
+  mission: { status: string; creditsPaid?: number };
+}): MissionSuccessView {
+  const { mission } = input;
+  const paid =
+    mission.creditsPaid !== undefined && mission.creditsPaid > 0 ? mission.creditsPaid : 0;
+  const receipt = (placement: CreditsReceipt["placement"]) =>
+    paid ? { creditsReceipt: { amount: paid, placement } } : {};
+
+  if (mission.status === "accepted") {
+    // An offer may author an immediate continuation (e.g. the remote acceptance
+    // follow-up that leads straight to the Cutter claim).
+    const continuation = input.acceptedContinuation;
+    if (continuation) {
+      return {
+        kind: "dialogue",
+        dialogueId: continuation.dialogueId,
+        ...(continuation.action ? { action: continuation.action } : {}),
+        ...receipt("leads"),
+      };
+    }
+    return paid
+      ? { kind: "dialogue", dialogueId: input.dialogueId, ...receipt("stands_alone") }
+      : { kind: "hub" };
+  }
+
+  if (input.actionKind === "complete_mission" && mission.status === "completed") {
+    // Only the authoritative success reveals the reward presentation. Any
+    // authored continuation mission is already accepted server-side, so the hub
+    // behind this presentation already reflects the next assignment.
+    const presentation = getMissionCompletionPresentation(input.missionId);
+    if (presentation) {
+      return { kind: "dialogue", dialogueId: presentation.id, ...receipt("leads") };
+    }
+    if (paid) {
+      return { kind: "dialogue", dialogueId: input.dialogueId, ...receipt("stands_alone") };
+    }
+  }
+  return { kind: "hub" };
+}
+
 /** Authored presentation-only completion beats revealed after authoritative success. */
 export function getMissionCompletionPresentation(missionId: string): DialogueSequence | undefined {
   const definition = getMission(missionId);

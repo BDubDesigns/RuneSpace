@@ -62,7 +62,19 @@ import { repairMaterialItemIds, repairTargetObservations } from "@/server/missio
 import { loadRepairTargetStates } from "@/server/welding";
 
 export type MissionAcceptance =
-  | { status: "accepted" | "already_accepted" | "already_completed" }
+  | {
+      status: "accepted";
+      /**
+       * The Credits THIS acceptance transaction actually paid, present only when
+       * the authored acceptance effect was Credits and it committed in this very
+       * call. It is the receipt the conversation surface presents the Credits
+       * reward tile from (#290): a repeat, refusal, or any non-paying acceptance
+       * never carries it, so presentation cannot imply an award that did not
+       * happen.
+       */
+      creditsPaid?: number;
+    }
+  | { status: "already_accepted" | "already_completed" }
   | {
       status: "refused";
       message: string;
@@ -90,6 +102,12 @@ export type MissionCompletion =
   | {
       status: "completed" | "already_completed";
       reward?: { itemId: string; quantity: 1; itemInstanceId?: string };
+      /**
+       * The Credits this completion transaction actually paid (#290). Present
+       * only on `completed` for a Credits reward, never on `already_completed`,
+       * so a replayed turn-in cannot present a second payout.
+       */
+      creditsPaid?: number;
     }
   | {
       status: "refused";
@@ -396,7 +414,9 @@ export async function acceptMission(
       // concurrent request, which blocks on that same lock and then sees the
       // accepted row. The balance is incremented in SQL rather than from a
       // read value, so no in-memory total can go stale.
+      let creditsPaid: number | undefined;
       if (offer.acceptEffect?.kind === "credits") {
+        creditsPaid = offer.acceptEffect.amount;
         await transaction
           .update(characters)
           .set({ credits: sql`${characters.credits} + ${offer.acceptEffect.amount}` })
@@ -411,7 +431,10 @@ export async function acceptMission(
           now,
         });
       }
-      return stateFor({ status: "accepted" });
+      return stateFor({
+        status: "accepted",
+        ...(creditsPaid !== undefined ? { creditsPaid } : {}),
+      });
     },
   );
 }
@@ -940,6 +963,7 @@ async function completeMissionForDefinition(input: {
   }
 
   let rewardInfo: { itemId: string; quantity: 1; itemInstanceId?: string } | undefined;
+  let creditsPaid: number | undefined;
   if (!definition.reward) {
     // A mission whose real outcome is world/social state authors no completion
     // reward; the completion stamp below is the whole commit.
@@ -975,6 +999,7 @@ async function completeMissionForDefinition(input: {
     // is exactly-once under retries and concurrency without a second mechanism.
     // The balance is incremented in SQL rather than from a read value, so no
     // in-memory total can go stale (#190).
+    creditsPaid = definition.reward.amount;
     await transaction
       .update(characters)
       .set({ credits: sql`${characters.credits} + ${definition.reward.amount}` })
@@ -1022,7 +1047,11 @@ async function completeMissionForDefinition(input: {
       await ensureMissionProgressRows(transaction, context.character.id, continuation, now);
     }
   }
-  return stateFor({ status: "completed", reward: rewardInfo });
+  return stateFor({
+    status: "completed",
+    reward: rewardInfo,
+    ...(creditsPaid !== undefined ? { creditsPaid } : {}),
+  });
 }
 
 /**

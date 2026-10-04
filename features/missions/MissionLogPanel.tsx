@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   UtilitySurface,
   type DockedUtilityRegion,
   type UtilityPresentation,
 } from "@/components/ui/UtilitySurface";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
 import type { MissionProjection } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
@@ -153,12 +154,12 @@ function MissionEntry({
  * A bundle lists its items rather than collapsing to a count, because "Reward
  * earned: 2 items" tells the player nothing they wanted to know.
  */
-function earnedRewardSummary(reward: NonNullable<MissionProjection["earnedReward"]>): string {
+function earnedRewardSummary(reward: NonNullable<MissionProjection["earnedReward"]>): ReactNode {
   switch (reward.kind) {
     case "item":
       return reward.itemName;
     case "credits":
-      return `+${reward.amount} Credits`;
+      return <CreditsAmount amount={reward.amount} prefix="+" />;
     case "stack_bundle":
       return reward.items.map((entry) => `${entry.itemName} x${entry.quantity}`).join(", ");
     default:

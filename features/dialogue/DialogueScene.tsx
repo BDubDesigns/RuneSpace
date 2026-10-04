@@ -9,6 +9,8 @@ import {
 } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
 import { VisualTile } from "@/components/items/VisualTile";
+import { CREDITS_CHIP_SRC, CreditsAmount } from "@/components/ui/CreditsAmount";
+import type { PresentedDialogueBeat } from "./credits-receipt";
 
 /**
  * Shared RuneSpace dialogue presentation. Gameplay/player state belongs to
@@ -19,6 +21,11 @@ import { VisualTile } from "@/components/items/VisualTile";
  * background: an NPC portrait, an item reveal, or a skill-XP reward tile.
  * Item and skill-XP beats are presentation only — this scene never grants,
  * removes, or mutates inventory or progression.
+ *
+ * The one runtime-only subject is the confirmed Credits receipt (#290). It is
+ * not an authored `DialogueBeat`: only the conversation surface builds it, from
+ * a payout the server reported, so the Studio preview (which renders authored
+ * beats) cannot express an unconditional payout.
  */
 export function DialogueScene({
   beat,
@@ -31,7 +38,7 @@ export function DialogueScene({
   actionMessage,
   controls,
 }: {
-  beat: DialogueBeat;
+  beat: PresentedDialogueBeat;
   visibleText?: string;
   fullText?: string;
   isComplete?: boolean;
@@ -48,16 +55,17 @@ export function DialogueScene({
   actionMessage?: string;
   controls?: ReactNode;
 }) {
-  const resolvedSpeaker = resolveDialogueSpeaker(beat);
-  const resolvedItem = resolveDialogueItem(beat);
-  const resolvedSkillXp = resolveDialogueSkillXp(beat);
+  const authoredBeat: DialogueBeat | undefined = beat.kind === "credits_receipt" ? undefined : beat;
+  const resolvedSpeaker = authoredBeat ? resolveDialogueSpeaker(authoredBeat) : undefined;
+  const resolvedItem = authoredBeat ? resolveDialogueItem(authoredBeat) : undefined;
+  const resolvedSkillXp = authoredBeat ? resolveDialogueSkillXp(authoredBeat) : undefined;
   const background = getConversationBackground(beat.backgroundId);
   if (!background) return null;
   if (beat.kind === "npc" && !resolvedSpeaker) return null;
   if (beat.kind === "item" && !resolvedItem) return null;
   if (beat.kind === "skill_xp" && !resolvedSkillXp) return null;
   const sceneLocation = getLocation(background.locationId);
-  // Item and XP reveals are local-scene presentations; they have no comms variant.
+  // Item, XP and Credits reveals are local-scene presentations; they have no comms variant.
   const presentationMode = beat.kind === "npc" ? beat.presentationMode : "local";
 
   return (
@@ -158,6 +166,23 @@ export function DialogueScene({
             />
           </div>
         ) : null}
+        {beat.kind === "credits_receipt" ? (
+          <div
+            key={`credits:${beatIndex}:${portraitGeneration}`}
+            className="absolute bottom-[10%] left-1/2 z-20 w-44 max-w-[70%] -translate-x-1/2"
+            data-credits-amount={beat.amount}
+            data-dialogue-credits-tile
+            data-portrait-transition="fade-in"
+          >
+            <VisualTile
+              accessibleLabel={`${beat.amount} Credits received`}
+              artworkSrc={CREDITS_CHIP_SRC}
+              badge={`+${beat.amount}`}
+              fallbackText="CR"
+              name="Credits"
+            />
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4 sm:p-5">
         <div>
@@ -169,14 +194,20 @@ export function DialogueScene({
               ? "Item"
               : resolvedSkillXp && beat.kind === "skill_xp"
                 ? "Skill XP"
-                : (resolvedSpeaker?.npc.displayName ?? "")}
+                : beat.kind === "credits_receipt"
+                  ? "Credits"
+                  : (resolvedSpeaker?.npc.displayName ?? "")}
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]" data-dialogue-speaker-role>
-            {resolvedItem && beat.kind === "item"
-              ? `${resolvedItem.presentation.displayName}${resolvedItem.quantity > 1 ? ` ×${resolvedItem.quantity}` : ""}`
-              : resolvedSkillXp && beat.kind === "skill_xp"
-                ? `${resolvedSkillXp.presentation.displayName} +${resolvedSkillXp.amount} XP`
-                : (resolvedSpeaker?.npc.role ?? "")}
+            {resolvedItem && beat.kind === "item" ? (
+              `${resolvedItem.presentation.displayName}${resolvedItem.quantity > 1 ? ` ×${resolvedItem.quantity}` : ""}`
+            ) : resolvedSkillXp && beat.kind === "skill_xp" ? (
+              `${resolvedSkillXp.presentation.displayName} +${resolvedSkillXp.amount} XP`
+            ) : beat.kind === "credits_receipt" ? (
+              <CreditsAmount amount={beat.amount} prefix="+" />
+            ) : (
+              (resolvedSpeaker?.npc.role ?? "")
+            )}
           </p>
         </div>
         <button
@@ -192,6 +223,9 @@ export function DialogueScene({
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {fullText}
           </span>
+          {beat.kind === "credits_receipt" ? (
+            <span className="sr-only">{beat.amount} Credits received</span>
+          ) : null}
           {resolvedItem && beat.kind === "item" ? (
             <span className="sr-only">
               {resolvedItem.presentation.accessibleDescription}

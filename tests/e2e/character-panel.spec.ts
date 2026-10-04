@@ -5,6 +5,7 @@ import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/co
 import { SKILL_IDS } from "@/game/config/foundations";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { expect, openTestCharacter, resolvedCssVarColor, test } from "./fixtures";
+import { expectCreditsIconTracksText } from "./credits-icon";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -64,6 +65,7 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   await expect(dialog.locator("[data-character-portrait] img")).toBeVisible();
   await expect(dialog.getByText("Character level 5")).toBeVisible();
   await expect(dialog.locator("[data-character-credits]")).toContainText("42 Credits");
+  await expectCreditsIconTracksText(dialog.locator("[data-character-credits]"));
 
   // Every skill the game defines with an approved curve, discovered through
   // the canonical source rather than a list this screen keeps.

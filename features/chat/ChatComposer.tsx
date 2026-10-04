@@ -61,7 +61,7 @@ export function ChatComposer({
   pressure: ComposerPressure;
   now: number;
   sending: boolean;
-  sendLabel?: string;
+  sendLabel?: ReactNode;
   /** Extra reasons Send is unavailable (for example an ad cooldown). */
   sendBlocked?: boolean;
   /**

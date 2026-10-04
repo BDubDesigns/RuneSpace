@@ -198,6 +198,8 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
         const before = await credits(character.id);
         const refused = await accept(userId, character.id);
         expect(refused.mission.status).toBe("refused");
+        // A refusal paid nothing, so it carries no receipt (#290).
+        expect(refused.mission).not.toHaveProperty("creditsPaid");
         expect(await credits(character.id)).toBe(before);
         expect(
           await db
@@ -234,7 +236,10 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       const { userId, character } = await makeCharacter();
       await completeChainThroughHoldItTogether(character.id);
       const before = await credits(character.id);
-      expect((await accept(userId, character.id)).mission.status).toBe("accepted");
+      const accepted = await accept(userId, character.id);
+      expect(accepted.mission.status).toBe("accepted");
+      // The receipt reports the Credits this very acceptance paid (#290).
+      expect(accepted.mission).toMatchObject({ creditsPaid: KEEP_THE_CHANGE_BUDGET_CREDITS });
       expect(await credits(character.id)).toBe((before ?? 0) + KEEP_THE_CHANGE_BUDGET_CREDITS);
     });
 
@@ -244,6 +249,7 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       expect((await accept(userId, character.id)).mission.status).toBe("accepted");
       const retried = await accept(userId, character.id);
       expect(retried.mission.status).toBe("already_accepted");
+      expect(retried.mission).not.toHaveProperty("creditsPaid");
       expect(await credits(character.id)).toBe(
         rune.STARTING_CREDITS + KEEP_THE_CHANGE_BUDGET_CREDITS,
       );
@@ -259,6 +265,8 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       ]);
       const statuses = results.map((result) => result.mission.status).sort();
       expect(statuses).toEqual(["accepted", "already_accepted", "already_accepted"]);
+      // Exactly one caller is told it was paid.
+      expect(results.filter((result) => "creditsPaid" in result.mission)).toHaveLength(1);
       expect(await credits(character.id)).toBe(
         rune.STARTING_CREDITS + KEEP_THE_CHANGE_BUDGET_CREDITS,
       );
