@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { CHAT_POLICY, type ChatChannel } from "@/game/domain/chat";
@@ -626,7 +627,15 @@ export function PublicChat({
           pressure={pressure}
           sendBlocked={promoting && (adWaitMs > 0 || !canAfford)}
           socialRestricted={socialRestricted}
-          sendLabel={promoting ? `Post ad · ${adPrice} Credits` : "Send"}
+          sendLabel={
+            promoting ? (
+              <span>
+                Post ad · <CreditsAmount amount={adPrice} />
+              </span>
+            ) : (
+              "Send"
+            )
+          }
           sending={sending}
         >
           {mentionLimitReached ? (
@@ -636,11 +645,20 @@ export function PublicChat({
           ) : null}
           {promoting ? (
             <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-promote-note="">
-              {adWaitMs > 0
-                ? `You can post another promoted ad in ${formatWait(adWaitMs)}.`
-                : !canAfford
-                  ? `A promoted ad costs ${adPrice} Credits. You have ${credits}.`
-                  : `Shown in General and Trade. Costs ${adPrice} Credits (you have ${credits}); one ad every ${Math.round(CHAT_POLICY.promotedAd.cooldownMs / 60_000)} minutes.`}
+              {adWaitMs > 0 ? (
+                `You can post another promoted ad in ${formatWait(adWaitMs)}.`
+              ) : !canAfford ? (
+                <>
+                  A promoted ad costs <CreditsAmount amount={adPrice} />. You have{" "}
+                  <CreditsAmount amount={credits} unit={null} />.
+                </>
+              ) : (
+                <>
+                  Shown in General and Trade. Costs <CreditsAmount amount={adPrice} /> (you have{" "}
+                  <CreditsAmount amount={credits} unit={null} />
+                  ); one ad every {Math.round(CHAT_POLICY.promotedAd.cooldownMs / 60_000)} minutes.
+                </>
+              )}
             </p>
           ) : null}
         </ChatComposer>

@@ -886,6 +886,8 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         at(0),
       );
       expect(accepted.mission.status).toBe("accepted");
+      // Cutting Costs pays on completion only (#290).
+      expect(accepted.mission).not.toHaveProperty("creditsPaid");
       expect(rennEntry(accepted.state)).toMatchObject({
         role: "active",
         dialogueId: DIALOGUE_IDS.rennCuttingCostsReminder,
@@ -908,6 +910,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         at(2),
       );
       expect(refused.mission.status).toBe("refused");
+      expect(refused.mission).not.toHaveProperty("creditsPaid");
       expect(await instancesOf(character.id, ITEM_IDS.loadsteelCutter)).toHaveLength(1);
       expect(await credits(character.id)).toBe(creditsBefore);
 
@@ -927,6 +930,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         at(4),
       );
       expect(completed.mission.status).toBe("completed");
+      expect(completed.mission).toMatchObject({ creditsPaid: 500 });
       expect((await credits(character.id)) - creditsBefore).toBe(500);
       const remaining = await instancesOf(character.id, ITEM_IDS.loadsteelCutter);
       expect(remaining.map((row) => row.id)).toEqual([inHand.id]);
@@ -941,6 +945,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         at(5),
       );
       expect(retried.mission.status).toBe("already_completed");
+      expect(retried.mission).not.toHaveProperty("creditsPaid");
       expect((await credits(character.id)) - creditsBefore).toBe(500);
     });
   });

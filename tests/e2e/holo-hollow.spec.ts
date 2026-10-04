@@ -25,6 +25,7 @@ import {
   openTestCharacter,
   test,
 } from "./fixtures";
+import { expectCreditsIconTracksText } from "./credits-icon";
 
 /**
  * Holo Hollow's first settlement slice (#159): Local Place navigation, the
@@ -551,6 +552,10 @@ test("buys and sells against the authoritative balance without leaving the shop"
   const cellRow = trade.locator(`[data-trade-row="${ITEM_IDS.powerCell}"]`);
   await expect(trade.locator("[data-trade-row]")).toHaveCount(1);
   await expect(cellRow.locator("[data-trade-unit-price]")).toHaveText("12");
+  // The icon follows the text size in the balance header and in the tight rows.
+  await expectCreditsIconTracksText(trade.locator("[data-trade-credits]"));
+  await expectCreditsIconTracksText(cellRow.locator("[data-trade-unit-price]").locator(".."));
+  await expectCreditsIconTracksText(cellRow.locator("[data-trade-total]").locator(".."));
   await expect(cellRow.locator("[data-trade-daily-allowance]")).toHaveText("12 of 12 left today");
   await expect(cellRow.locator("[data-trade-quantity]")).toHaveText("1");
   await expect(cellRow.locator("[data-trade-total]")).toHaveText("12");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -244,7 +245,7 @@ export function InventoryPanel({
           className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-inventory-credits
         >
-          {state.credits} Credits
+          <CreditsAmount amount={state.credits} />
         </p>
       </div>
       {message ? (

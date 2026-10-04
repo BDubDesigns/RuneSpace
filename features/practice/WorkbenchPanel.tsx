@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { usePlay } from "@/features/play/PlayContext";
 import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
 import { WorkOrderBenchPanel } from "@/features/practice/WorkOrderBenchPanel";
@@ -81,7 +82,7 @@ export function WorkbenchPanel() {
             {`${completed.title} complete`}
           </p>
           <p className="mt-1 text-sm font-semibold text-[color:var(--rs-accent-success)]">
-            {`Paid ${completed.payoutCredits} Credits`}
+            Paid <CreditsAmount amount={completed.payoutCredits} />
           </p>
         </div>
       ) : null}

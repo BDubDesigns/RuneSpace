@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { CreditsAmount, CreditsIcon } from "@/components/ui/CreditsAmount";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
@@ -157,7 +158,7 @@ export function TradePanel({
           className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-trade-credits
         >
-          {state.credits} Credits
+          <CreditsAmount amount={state.credits} />
         </p>
       </div>
 
@@ -235,6 +236,7 @@ export function TradePanel({
                   {presentation.displayName}
                 </p>
                 <p className="mt-0.5 text-xs text-[color:var(--rs-text-secondary)]">
+                  <CreditsIcon />
                   <span data-trade-unit-price>{unitPrice}</span> Credits each · carried{" "}
                   <span data-trade-owned>{owned}</span>
                 </p>
@@ -258,7 +260,8 @@ export function TradePanel({
                     also keeps it out of the quantity cluster so that cluster fits
                     one line at 390px. */}
                 <p className="mt-0.5 font-display text-xs font-bold text-[color:var(--rs-text-primary)]">
-                  Total <span data-trade-total>{total}</span> Credits
+                  Total <CreditsIcon />
+                  <span data-trade-total>{total}</span> Credits
                 </p>
               </div>
               <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-2">

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" width="24" height="18" fill="none" aria-hidden="true">
+  <!-- RuneSpace Credits: compact companion to the battered credit-chip item art. -->
+  <!-- Outer worn metal chassis and its dark recessed face. -->
+  <path d="M16 8 76 6 90 17 92 49 80 62 18 65 5 53 4 23Z" fill="#776c60" stroke="#d1c6b6" stroke-width="2" stroke-linejoin="bevel"/>
+  <path d="M17 13 74 11 85 20 86 47 77 56 19 59 10 51 10 25Z" fill="#282c2d" stroke="#131719" stroke-width="1.5" stroke-linejoin="bevel"/>
+  <!-- Orange industrial identification stripe: deliberately flat and bold. -->
+  <path d="M37 12 48 12 21 58 11 53Z" fill="#dd6627"/>
+  <path d="m32 24 5-8M22 43l4-7" stroke="#8d451f" stroke-width="1.6" stroke-linecap="square"/>
+  <!-- Metal corner reinforcement, simplified from the full artwork. -->
+  <path d="m74 10 11 9-1 8-11-4-6-6Z" fill="#92928c" stroke="#d0cbc0" stroke-width="1.5" stroke-linejoin="bevel"/>
+  <circle cx="78" cy="18" r="2.6" fill="#282c2d" stroke="#b5a58e" stroke-width="1.2"/>
+  <!-- Oversized light CR emblem stays the focal mark at UI scale. -->
+  <path d="M48.5 28.7C45 25.3 38.9 26.6 37.1 32.6c-2 7.1 2.6 12.7 10.5 10.6" stroke="#f0e9db" stroke-width="6.2" stroke-linecap="butt"/>
+  <path d="M54 46V27h7.7c8 0 8.3 10 0 10H54m7.1 0 8.1 9" stroke="#f0e9db" stroke-width="5.3" stroke-linejoin="round"/>
+  <!-- Four brass contacts survive where tiny decorative etching would not. -->
+  <g fill="#e1b660" stroke="#72502d" stroke-width=".6">
+    <rect x="77" y="28" width="7" height="5" rx=".8"/>
+    <rect x="77" y="34.5" width="7" height="5" rx=".8"/>
+    <rect x="77" y="41" width="7" height="5" rx=".8"/>
+    <rect x="77" y="47.5" width="7" height="5" rx=".8"/>
+  </g>
+  <!-- Frayed canvas corner wrap represented as one quiet shape. -->
+  <path d="m8.1 47.5 20.7 10.8 5.4 7.3-17-1.1L5.4 53Z" fill="#887459" stroke="#b39e81" stroke-width="1.4" stroke-linejoin="bevel"/>
+  <path d="M10 51.2 30.2 61" stroke="#c2ae92" stroke-width=".9" stroke-dasharray="2 2.2"/>
+</svg>

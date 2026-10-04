@@ -1,6 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { ActionLink } from "@/components/ui/ActionLink";
 import {
   UtilitySurface,
@@ -77,7 +78,7 @@ export function CharacterPanel({
             className="mt-1 font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
             data-character-credits
           >
-            {state.credits} Credits
+            <CreditsAmount amount={state.credits} />
           </p>
         </div>
       </div>

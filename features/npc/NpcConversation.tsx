@@ -12,7 +12,8 @@ import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import {
   getMissionCapacityRefusalDialogue,
-  getMissionCompletionPresentation,
+  resolveMissionSuccessView,
+  type CreditsReceipt,
   type MissionConversationAction,
   type NpcConversationEntry,
 } from "@/game/domain/conversation";
@@ -33,6 +34,13 @@ type OpenConversation = {
   missionId?: string;
   action?: MissionConversationAction;
   acceptedContinuation?: { dialogueId: string; action?: MissionConversationAction };
+  /**
+   * The Credits payout the server confirmed for the command that opened this
+   * view (#290). Set only from a `creditsPaid` receipt in a successful result,
+   * and gone as soon as the conversation is left, so reopening a conversation,
+   * replaying a topic, or a refused command can never present one.
+   */
+  creditsReceipt?: CreditsReceipt;
 };
 
 function fromEntry(entry: NpcConversationEntry): OpenConversation {
@@ -87,14 +95,16 @@ export function NpcConversation({
   // trap keeps a valid anchor and keyboard users are never dropped onto the
   // page behind the modal. The initial mount is left to the drawer itself.
   useEffect(() => {
-    const view = open?.dialogueId ?? "hub";
+    // A Credits receipt replaces the control that was just activated even when
+    // it is shown against the same dialogue, so it is its own view.
+    const view = open ? `${open.dialogueId}${open.creditsReceipt ? ":receipt" : ""}` : "hub";
     const changed = previousView.current !== undefined && previousView.current !== view;
     previousView.current = view;
     if (!changed) return;
     content.current
       ?.querySelector<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])')
       ?.focus();
-  }, [open?.dialogueId]);
+  }, [open?.dialogueId, open?.creditsReceipt]);
 
   const missionEntries = entries.filter(
     (entry): entry is Extract<NpcConversationEntry, { kind: "mission" }> =>
@@ -118,7 +128,7 @@ export function NpcConversation({
     const conversation = open;
     const action = conversation?.action;
     const missionId = conversation?.missionId;
-    if (!action || !missionId) {
+    if (!conversation || !action || !missionId) {
       setMessage("This conversation is not driving a mission command.");
       return;
     }
@@ -174,34 +184,24 @@ export function NpcConversation({
           }
           return;
         }
-        if (result.mission.status === "accepted") {
-          // An offer may author an immediate continuation (e.g. the remote
-          // acceptance follow-up that leads straight to the Cutter claim);
-          // otherwise the conversation returns to the freshly derived hub.
-          const continuation = conversation?.acceptedContinuation;
-          if (continuation) {
-            setOpen({
-              dialogueId: continuation.dialogueId,
-              missionId,
-              ...(continuation.action ? { action: continuation.action } : {}),
-            });
-            setMessage(undefined);
-            return;
-          }
-          returnToHub();
+        const next = resolveMissionSuccessView({
+          actionKind: action.kind,
+          missionId,
+          dialogueId: conversation.dialogueId,
+          ...(conversation.acceptedContinuation
+            ? { acceptedContinuation: conversation.acceptedContinuation }
+            : {}),
+          mission: result.mission,
+        });
+        if (next.kind === "dialogue") {
+          setOpen({
+            dialogueId: next.dialogueId,
+            missionId,
+            ...(next.action ? { action: next.action } : {}),
+            ...(next.creditsReceipt ? { creditsReceipt: next.creditsReceipt } : {}),
+          });
+          setMessage(undefined);
           return;
-        }
-        if (action.kind === "complete_mission" && result.mission.status === "completed") {
-          // Only the authoritative success reveals the reward presentation. Any
-          // authored continuation mission is already accepted server-side, so
-          // the hub behind this presentation already reflects the next
-          // assignment — there is no second acceptance click.
-          const presentation = getMissionCompletionPresentation(missionId);
-          if (presentation) {
-            setOpen({ dialogueId: presentation.id, missionId });
-            setMessage(undefined);
-            return;
-          }
         }
         returnToHub();
       } catch (error) {
@@ -233,6 +233,7 @@ export function NpcConversation({
             onBack={returnToHub}
             onFinish={returnToHub}
             sequence={sequence}
+            {...(open?.creditsReceipt ? { receipt: open.creditsReceipt } : {})}
             {...(venueBackgroundId ? { venueBackgroundId } : {})}
           />
         ) : (

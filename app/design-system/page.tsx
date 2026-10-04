@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
 import { FormField } from "@/components/ui/FormField";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { DialogueScene } from "@/features/dialogue/DialogueScene";
+import { creditsReceiptBeat } from "@/features/dialogue/credits-receipt";
+import { CONVERSATION_BACKGROUND_IDS } from "@/game/config/foundations";
 
 export const metadata = { title: "Design system preview — RuneSpace" };
 
@@ -78,6 +82,49 @@ export default function DesignSystemPage() {
               <Feedback>Empty state: no development fixture selected.</Feedback>
               <Feedback tone="danger">Error state: example validation message.</Feedback>
             </div>
+          </div>
+        </Panel>
+        <Panel id="credits" tone="raised">
+          <h2 className="font-display text-lg font-bold">Credits</h2>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            The inline icon is 1em tall and follows the surrounding text. Static amounts only.
+          </p>
+          <div className="mt-4 space-y-2" data-credits-specimens>
+            <p className="font-display text-xl font-bold">
+              Heading <CreditsAmount amount={1234} />
+            </p>
+            <p className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]">
+              <CreditsAmount amount={42} />
+            </p>
+            <p className="text-base">
+              Body text <CreditsAmount amount={42} /> in a sentence.
+            </p>
+            <p className="text-xs text-[color:var(--rs-text-secondary)]">
+              Tight row <CreditsAmount amount={12} /> each · carried 3
+            </p>
+            <p className="flex items-center gap-2 text-xs">
+              Flex row <CreditsAmount amount={5} unit="Cr" />
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <ActionButton intent="secondary">
+                <span>
+                  Ride to The Jag · <CreditsAmount amount={5} />
+                </span>
+              </ActionButton>
+              <ActionButton className="px-3 text-xs" intent="secondary">
+                <span>
+                  Post ad · <CreditsAmount amount={50} />
+                </span>
+              </ActionButton>
+            </div>
+          </div>
+          <div className="mt-4 max-w-xl" data-credits-reward-specimen>
+            <DialogueScene
+              beat={creditsReceiptBeat(
+                500,
+                CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior,
+              )}
+            />
           </div>
         </Panel>
         <Panel id="states">
