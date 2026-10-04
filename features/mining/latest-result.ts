@@ -6,6 +6,49 @@ export function latestMiningAttempt(
   return attempts.at(-1);
 }
 
+/** One visible reward on a successful attempt's result (#308). */
+export type MiningRewardCard =
+  | { kind: "item"; key: string; itemId: string; quantity: number; rareFind: boolean }
+  | { kind: "xp"; key: string; amount: number };
+
+/**
+ * The reward cards a resolved attempt actually has, in their semantic order:
+ * the source's own ore, then each Secondary Find in resolved order, then the
+ * attempt's combined Mining XP last. It maps over whatever exists — nothing
+ * here knows how many finds today's content can award — and a failed attempt
+ * has none.
+ */
+export function miningRewardCards(
+  attempt: Pick<MiningRunAttempt, "success" | "itemId" | "quantityAwarded" | "secondaryFinds"> & {
+    xpAwarded: number;
+  },
+): readonly MiningRewardCard[] {
+  if (!attempt.success) return [];
+  return [
+    ...(attempt.quantityAwarded > 0
+      ? [
+          {
+            kind: "item" as const,
+            key: `primary-${attempt.itemId}`,
+            itemId: attempt.itemId,
+            quantity: attempt.quantityAwarded,
+            rareFind: false,
+          },
+        ]
+      : []),
+    ...attempt.secondaryFinds.map((find, index) => ({
+      kind: "item" as const,
+      key: `find-${index}-${find.itemId}`,
+      itemId: find.itemId,
+      quantity: find.quantity,
+      rareFind: true,
+    })),
+    ...(attempt.xpAwarded > 0
+      ? [{ kind: "xp" as const, key: "xp", amount: attempt.xpAwarded }]
+      : []),
+  ];
+}
+
 export function resolvedAttemptCount(previousAttempts: number, currentAttempts: number): number {
   return Math.max(0, currentAttempts - previousAttempts);
 }

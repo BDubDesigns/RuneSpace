@@ -14,6 +14,11 @@ type ItemVisualProps = {
    */
   additionalDescription?: string;
   mutedArtwork?: boolean;
+  /**
+   * Presents the item as a RARE FIND reward (#308): the shared rare-find outline
+   * and a RARE FIND tag. Only a reward surface sets it; Inventory never does.
+   */
+  rareFind?: boolean;
   background?: React.ReactNode;
   className?: string;
   /** Render as a selectable native button (occupied Inventory tiles). */
@@ -33,6 +38,7 @@ export function ItemVisual({
   accessibleLabel,
   additionalDescription,
   mutedArtwork,
+  rareFind = false,
   background,
   className,
   interactive,
@@ -43,6 +49,8 @@ export function ItemVisual({
   const presentation = resolveItemPresentation(itemId, name);
   return (
     <VisualTile
+      accentColor={rareFind ? "var(--rs-rare-find-accent)" : undefined}
+      tag={rareFind ? "RARE FIND" : undefined}
       accessibleDescription={
         additionalDescription
           ? `${presentation.accessibleDescription}. ${additionalDescription}`

@@ -12,6 +12,11 @@ type VisualTileProps = {
   artworkSrc?: string;
   /** Omit to render no corner plate (unique items carry no fake stack quantity). */
   badge?: string;
+  /**
+   * A short label on the tile's top-left corner, for a reward that is itself a
+   * special event (the RARE FIND treatment, #308). Presentation only.
+   */
+  tag?: string;
   background?: ReactNode;
   className?: string;
   fallbackText: string;
@@ -41,6 +46,7 @@ export function VisualTile({
   accentColor,
   artworkSrc,
   badge,
+  tag,
   background,
   className = "",
   fallbackText,
@@ -103,6 +109,14 @@ export function VisualTile({
       >
         <span className="line-clamp-2 break-words">{name}</span>
       </span>
+      {tag !== undefined ? (
+        <span
+          className="absolute left-2 top-2 z-20 border border-current bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[0.625rem] uppercase leading-none tracking-wide text-[color:var(--rs-rare-find-accent)]"
+          data-tile-tag=""
+        >
+          {tag}
+        </span>
+      ) : null}
       {badge !== undefined ? (
         <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
           {badge}

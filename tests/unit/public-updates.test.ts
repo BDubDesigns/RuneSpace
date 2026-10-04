@@ -117,9 +117,41 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Curly Must-Stash Update as the newest", () => {
+  it("publishes the rare finds Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("rare-finds");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("curly-must-stash")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    // Player-facing: names the finds, the mark, the prices and the announcements,
+    // and never the internal term or the authored odds.
+    const text = JSON.stringify(latest);
+    for (const label of [
+      "Uncut Quartz",
+      "Uncut Topaz",
+      "Uncut Sapphire",
+      "RARE FIND",
+      "8 Credits",
+      "18",
+      "35",
+      "System line",
+    ]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toMatch(/secondary find/i);
+    expect(text).not.toMatch(/\bquests?\b/i);
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Mining & Refining", articleSlug: "mining-and-refining" });
+  });
+
+  it("publishes the Curly Must-Stash Update", () => {
+    // A newer Update has shipped since (#308), so it is found by slug.
+    const latest = getPublicUpdate("curly-must-stash")!;
     expect(latest.slug).toBe("curly-must-stash");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("a-stash-of-your-own")!.publishedAt),

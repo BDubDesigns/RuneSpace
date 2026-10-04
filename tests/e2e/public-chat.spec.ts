@@ -472,3 +472,42 @@ eachWidth(
   "older history loads, deliveries arrive live, and a reconnect catches up once",
   historyJourney,
 );
+
+test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free of player actions", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize(WIDTHS[0]);
+  const player = await signInFreshPlayer(context);
+  const tag = randomUUID().slice(0, 8);
+  const body = `Finder ${tag} just found Uncut Topaz at The Jag!`;
+  await db.insert(rune.chatMessages).values({
+    kind: "rare_find",
+    channel: "general",
+    body,
+    createdAt: new Date(Date.now() - 5_000),
+  });
+  try {
+    const dialog = await openChat(page, player.character.id);
+    const line = log(dialog, "General").locator('[data-chat-system="rare_find"]', {
+      hasText: tag,
+    });
+    await expect(line).toBeVisible();
+    await expect(line).toContainText("System");
+    await expect(line).toContainText("RARE FIND");
+    await expect(line).toContainText(body);
+    // No sender to open: no name button, no actions toggle, and so no
+    // Whisper, Report, or Block.
+    await expect(line.getByRole("button")).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Whisper" })).toHaveCount(0);
+    // It is not a send: this account's budget is untouched.
+    await expect(dialog.locator("[data-chat-pressure]")).toHaveAttribute(
+      "data-chat-pressure",
+      "clear",
+    );
+    await expectNoHorizontalOverflow(page, dialog);
+    await captureReviewScreenshot(page, "chat-rare-find-system-line.png");
+  } finally {
+    await db.delete(rune.chatMessages).where(eq(rune.chatMessages.body, body));
+  }
+});

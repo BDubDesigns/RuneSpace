@@ -124,6 +124,26 @@ slightly larger text on `--rs-chat-promoted-surface` with a
 `--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
 "Promoted ad" — brighter than ordinary chat, never an alert.
 
+A System line (#308) — today a Mining RARE FIND announcement — is RuneSpace's own
+output and reads that way: the sender is the word "System" (never a player
+name), with a "RARE FIND" label in `--rs-rare-find-accent` and a 4px
+`--rs-rare-find-accent` left rim on `--rs-rare-find-surface`. It has no name
+button, no "…" toggle, and no Whisper / Report / Block. Those two tokens are the
+one home of the RARE FIND treatment: the same accent outlines a found item's
+reward card, which also carries a small "RARE FIND" tag (`VisualTile`'s `tag`,
+set through `ItemVisual`'s `rareFind`). RARE FIND is a rare-event marker, not
+success or a warning, so it never borrows `--rs-accent-success`.
+
+**Reward cards (#308).** A result's rewards sit in `RewardGrid`
+(`components/ui/RewardGrid.tsx`): every card keeps the one normal width
+(`--rs-reward-card-width`), as many equal columns as the surface allows are
+filled, and the rest wrap left to right. Fixed-width tracks keep a short last
+row left-aligned and unstretched, and no decorative empty cells are drawn — so
+two across, three across, 2 + 1, 2 + 2, 3 + 1 and four across all come from
+mapping over the rewards that exist. A Mining result lists the ore, then each
+Secondary Find in resolved order, then one skill-XP card with the *combined*
+amount last; the XP card is never promoted above the loot.
+
 Whispers (#247) are the third tab. Unread Whispers use the News unread
 language on both the launcher and the tab (count badge plus
 `--rs-glow-news-unread`, count in the accessible name). The tab opens with a

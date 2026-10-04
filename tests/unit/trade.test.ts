@@ -56,6 +56,10 @@ describe("issue #159 Bix merchant catalog", () => {
         ITEM_IDS.slag,
         ITEM_IDS.galvanite,
         ITEM_IDS.galvanicStock,
+        // Mining Secondary Finds (#308): Bix buys all three, Wade none.
+        ITEM_IDS.uncutQuartz,
+        ITEM_IDS.uncutTopaz,
+        ITEM_IDS.uncutSapphire,
       ].sort(),
     );
   });

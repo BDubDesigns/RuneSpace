@@ -65,6 +65,7 @@
      covers art the first line did not. */
   --rs-item-label-line-height: 0.9rem;
   --rs-item-label-block: 1.875rem;
+  --rs-reward-card-width: 7.5rem;
   /* Hybrid plated-signage: smoked industrial placard tokens (shared) */
   --rs-plate-surface-top: rgb(18 32 46 / 0.74);
   --rs-plate-surface-bottom: rgb(10 22 34 / 0.62);
@@ -133,6 +134,11 @@
   /* Public @mentions (#261) reuse the unread-attention accent: a rim and label
      on a message that mentions you, and the accent on each resolved @Name. */
   --rs-chat-mention-accent: var(--rs-accent-primary);
+  /* RARE FIND (#308): the one restrained treatment for a Mining Secondary Find,
+     on its reward card and on its System line in General. Not success, not a
+     warning — a rare-event marker, so it never borrows --rs-accent-success. */
+  --rs-rare-find-accent: var(--rs-accent-arcane);
+  --rs-rare-find-surface: var(--rs-accent-arcane-subtle);
   --rs-chat-mention-other: var(--rs-accent-secondary);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a
@@ -798,6 +804,15 @@ body {
 
 .rs-result-feedback-danger {
   animation: rs-result-danger 3.6s ease-out;
+}
+
+/* Reward cards (#308): one normal card width, as many columns as fit, wrapping
+   left to right. Fixed tracks keep a short last row left-aligned and unstretched. */
+.rs-reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--rs-reward-card-width));
+  justify-content: start;
+  gap: 0.5rem;
 }
 
 .rs-reward-feedback {

@@ -38,8 +38,12 @@ import { scaledAttemptDurationTicks } from "@/game/domain/timing";
  */
 
 const balance = getEffectiveGameBalance();
-const ferrite = balance.mining.sources.ferriteShale;
-const galvanite = balance.mining.sources.galvanite;
+// Both sources are used with no Secondary Finds authored (#308): this file is
+// about the Cutter's own yield and capacity rules, which a source without finds
+// must leave exactly as they were. Finds beside a charged Cutter are covered in
+// mining-secondary-finds.test.ts.
+const ferrite = { ...balance.mining.sources.ferriteShale, secondaryFinds: [] };
+const galvanite = { ...balance.mining.sources.galvanite, secondaryFinds: [] };
 const salvage = getMiningToolDefinition(ITEM_IDS.salvageCutter, balance)!;
 const loadsteel = getMiningToolDefinition(ITEM_IDS.loadsteelCutter, balance)!;
 

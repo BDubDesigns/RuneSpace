@@ -192,16 +192,23 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const dueAt = new Date("2026-01-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    const successRandom: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    // Roll 0 of The Jag's Secondary Find table is its Uncut Quartz (#308), so the
+    // due success keeps BOTH a Shale stack and a Quartz stack.
+    const successRandom: MiningRandom = {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+      nextInteger: () => 0,
+    };
     await miningCommands.startMining(userId, character.id, startedAt, successRandom);
     const cutter = await cutterInstance(character.id);
     await db
       .update(rune.itemInstances)
       .set({ currentCharge: 7 })
       .where(eq(rune.itemInstances.id, cutter.id));
-    // Seven FULL stacks leave one slot free: the due successful attempt creates
-    // the eighth stack, so the refused unequip must roll back resolved work.
-    await fillSlots(character.id, 7, 10);
+    // Six FULL stacks leave two slots free, which Mining needs to start (its ore
+    // plus any one possible find). The due success uses both, so the refused
+    // unequip must roll back resolved work.
+    await fillSlots(character.id, 6, 10);
 
     async function snapshotState() {
       const [assignments, stacks, instances, action, miningState, skillXp] = await Promise.all([
@@ -263,17 +270,21 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     )[0]!;
     expect(action.resolvedThroughAt.toISOString()).toBe(startedAt.toISOString());
 
-    // The rolled-back attempts are neither lost nor duplicated: the boosted
-    // Cutter resolves both due attempts exactly once when retried at the same
-    // due time, filling the eighth stack.
+    // The rolled-back attempt is neither lost nor duplicated: retried at the same
+    // due time it resolves exactly once, filling the last two stacks with Shale
+    // and the Quartz it found. A second attempt is then refused — no slot is
+    // left for a Topaz it could have found — rather than risking a find that
+    // could not be kept.
     const retried = await play.getPlayGameplayState(userId, character.id, dueAt, successRandom);
     expect(retried.run).toMatchObject({
-      attempts: 2,
-      successes: 2,
-      itemsGained: { [ITEM_IDS.ferriteShale]: 2 },
-      xpGained: 30,
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1, [ITEM_IDS.uncutQuartz]: 1 },
+      xpGained: 25,
     });
+    expect(retried.stop).toEqual({ activity: "mining", reason: "inventory_slots_full" });
     expect(retried.inventory.stacks).toHaveLength(8);
-    expect(retried.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(72);
+    expect(retried.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(61);
+    expect(retried.carriedByItemId[ITEM_IDS.uncutQuartz] ?? 0).toBe(1);
   });
 });

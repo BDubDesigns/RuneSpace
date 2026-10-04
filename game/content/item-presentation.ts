@@ -11,6 +11,11 @@ export type ItemPresentation = {
   accessibleDescription: string;
   textFallback: string;
   artworkSrc?: string;
+  /**
+   * Player-facing flavour for the item's details (#308). Optional: items
+   * authored before descriptions existed present without one.
+   */
+  description?: string;
 };
 
 const itemPresentations = {
@@ -110,6 +115,34 @@ const itemPresentations = {
       "Strapped freight harness frame with shoulder straps and hip belt carrying a rugged rear cargo box",
     textFallback: "FH",
     artworkSrc: "/item-art/freight-harness.webp",
+  },
+  // Mining Secondary Finds (#308).
+  [ITEM_IDS.uncutQuartz]: {
+    displayName: "Uncut Quartz",
+    accessibleDescription:
+      "Rough translucent smoky quartz crystals chipped free of a little dark host rock",
+    textFallback: "UQ",
+    artworkSrc: "/item-art/uncut-quartz.webp",
+    description:
+      "A rough translucent crystal chipped free from the rock. Common enough to recognize, valuable enough to keep.",
+  },
+  [ITEM_IDS.uncutTopaz]: {
+    displayName: "Uncut Topaz",
+    accessibleDescription:
+      "Rough warm amber topaz crystals pulled from the rock with a little host matrix still clinging",
+    textFallback: "UT",
+    artworkSrc: "/item-art/uncut-topaz.webp",
+    description:
+      "A warm amber crystal pulled from the rock intact. Valuable even in its rough state.",
+  },
+  [ITEM_IDS.uncutSapphire]: {
+    displayName: "Uncut Sapphire",
+    accessibleDescription:
+      "Rough deep blue sapphire crystals with fractured faces rising from a little dark host rock",
+    textFallback: "US",
+    artworkSrc: "/item-art/uncut-sapphire.webp",
+    description:
+      "A dense blue crystal with a rough, fractured surface. Rare, heavy-looking, and unmistakably valuable.",
   },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 

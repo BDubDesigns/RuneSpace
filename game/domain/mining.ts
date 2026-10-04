@@ -3,7 +3,12 @@ import type {
   MiningSourceBalance,
   MiningToolDefinition,
 } from "@/game/config/balance";
-import { planStackAddition, type StackState } from "@/game/domain/inventory";
+import {
+  planExactStackAdditions,
+  type StackAdditionPlan,
+  type StackBundleEntry,
+  type StackState,
+} from "@/game/domain/inventory";
 import { effectiveAttemptDurationTicks, scaledAttemptDurationTicks } from "@/game/domain/timing";
 
 export const MINING_STOP_REASONS = [
@@ -16,7 +21,17 @@ export const MINING_STOP_REASONS = [
 ] as const;
 export type MiningStopReason = (typeof MINING_STOP_REASONS)[number];
 
-export type MiningRandom = { nextBasisPoints(): number; nextUnit(): number };
+export type MiningRandom = {
+  nextBasisPoints(): number;
+  nextUnit(): number;
+  /**
+   * A uniform integer in [0, exclusiveMaximum). A Secondary Find table is
+   * authored in exact fractions (1 / 40, 1 / 60, ...) that basis points cannot
+   * express, so its one roll is drawn here (#308). A random that omits it
+   * simply never finds anything; both production sources provide it.
+   */
+  nextInteger?(exclusiveMaximum: number): number;
+};
 
 /**
  * The authoritative award facts for one Mining attempt at one authored source:
@@ -27,6 +42,10 @@ export type MiningRandom = { nextBasisPoints(): number; nextUnit(): number };
  *
  * The source is a parameter rather than a constant (#209): The Jag yields
  * Ferrite Shale and an opened Deep Jag yields Galvanite, from this one path.
+ *
+ * `secondaryFinds` is the source's authored table (#308), each entry joined
+ * to the item facts it needs and to the bonus Mining XP the ITEM owns — never
+ * restated on the source — so every consumer sees one definition of a find.
  */
 export function miningAwardFacts(balance: EffectiveGameBalance, source: MiningSourceBalance) {
   const item = Object.values(balance.items).find((candidate) => candidate.itemId === source.itemId);
@@ -41,6 +60,107 @@ export function miningAwardFacts(balance: EffectiveGameBalance, source: MiningSo
     massGrams: item.massGrams,
     yieldMinimum: source.yieldMinimum,
     yieldMaximum: source.yieldMaximum,
+    secondaryFinds: miningSecondaryFindFacts(balance, source),
+  };
+}
+
+/** One authored Secondary Find with the item facts resolution needs (#308). */
+export type MiningSecondaryFindFacts = {
+  itemId: string;
+  /** Absolute chance per successful extraction is 1 / oneIn. */
+  oneIn: number;
+  announce: boolean;
+  stackLimit: number;
+  massGrams: number;
+  /** Bonus Mining XP the item itself is worth, wherever it is found. */
+  bonusXp: number;
+  /** Units one find yields. Always one today; a future effect may change it. */
+  quantity: number;
+};
+
+/** A source's Secondary Find table, in authored order, joined to its items. */
+export function miningSecondaryFindFacts(
+  balance: EffectiveGameBalance,
+  source: MiningSourceBalance,
+): readonly MiningSecondaryFindFacts[] {
+  return source.secondaryFinds.map((entry) => {
+    const item = Object.values(balance.items).find(
+      (candidate) => candidate.itemId === entry.itemId,
+    );
+    if (!item || !("stackLimit" in item) || !("secondaryFindMiningXp" in item)) {
+      throw new Error(
+        `Mining source "${source.actionId}" authors Secondary Find "${entry.itemId}", which is not a stackable find item`,
+      );
+    }
+    return {
+      itemId: entry.itemId,
+      oneIn: entry.oneIn,
+      announce: entry.announce,
+      stackLimit: item.stackLimit,
+      massGrams: item.massGrams,
+      bonusXp: item.secondaryFindMiningXp,
+      quantity: 1,
+    };
+  });
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
+
+/**
+ * The size of the one roll a Secondary Find table is drawn from: the least
+ * common multiple of its entries' denominators, so every entry's 1 / oneIn is
+ * a whole number of equally likely outcomes (#308). The Jag's 1 / 40 and 1 / 60
+ * share a roll of 120; Deep Jag's 1 / 35 and 1 / 55 share one of 385. Exact
+ * integers, so the authored odds are the real odds — no rounding to basis points.
+ */
+export function secondaryFindRollSize(entries: readonly Pick<MiningSecondaryFindFacts, "oneIn">[]) {
+  return entries.reduce((size, entry) => {
+    if (!Number.isInteger(entry.oneIn) || entry.oneIn < 1)
+      throw new RangeError("A Secondary Find denominator must be a positive integer");
+    return (size * entry.oneIn) / greatestCommonDivisor(size, entry.oneIn);
+  }, 1);
+}
+
+/**
+ * The find one roll selects, or undefined for none. Entries own consecutive,
+ * non-overlapping spans of the roll in authored order, so the table is
+ * mutually exclusive by construction: one roll can never select two finds.
+ */
+export function selectSecondaryFind<Entry extends Pick<MiningSecondaryFindFacts, "oneIn">>(
+  entries: readonly Entry[],
+  roll: number,
+): Entry | undefined {
+  const size = secondaryFindRollSize(entries);
+  if (!Number.isInteger(roll) || roll < 0 || roll >= size)
+    throw new RangeError("Secondary Find roll is outside the table");
+  let upperBound = 0;
+  for (const entry of entries) {
+    upperBound += size / entry.oneIn;
+    if (roll < upperBound) return entry;
+  }
+  return undefined;
+}
+
+/** Draw a source's Secondary Find for one successful extraction, if any. */
+function drawSecondaryFind(
+  entries: readonly MiningSecondaryFindFacts[],
+  random: MiningRandom,
+): MiningSecondaryFindFacts | undefined {
+  if (entries.length === 0 || !random.nextInteger) return undefined;
+  return selectSecondaryFind(entries, random.nextInteger(secondaryFindRollSize(entries)));
+}
+
+function stackBundleEntry(
+  facts: { itemId: string; stackLimit: number; massGrams: number },
+  quantity: number,
+): StackBundleEntry {
+  return {
+    itemId: facts.itemId as StackBundleEntry["itemId"],
+    quantity,
+    stackLimit: facts.stackLimit,
+    itemWeight: facts.massGrams,
   };
 }
 
@@ -90,6 +210,9 @@ export type MiningResolution<Id = string> = {
   stopReason?: MiningStopReason;
 };
 
+/** One Secondary Find an attempt actually awarded (#308). */
+export type MiningSecondaryFindAward = { itemId: string; quantity: number };
+
 /**
  * One resolved attempt. `itemId` and `quantityAwarded` replaced the original
  * `shaleAwarded` (#209): a run at Deep Jag awards Galvanite, so neither the
@@ -102,6 +225,12 @@ export type MiningResolvedAttempt = {
   thresholdBasisPoints: number;
   itemId: string;
   quantityAwarded: number;
+  /**
+   * Bonus items this success turned up beside the source's own ore (#308).
+   * Always empty for a failure and, today, at most one entry.
+   */
+  secondaryFinds: readonly MiningSecondaryFindAward[];
+  /** The attempt's COMBINED Mining XP: the source's own plus any finds'. */
   xpAwarded: number;
   boosted: boolean;
   durationTicks: number;
@@ -202,7 +331,17 @@ export function miningNearMissBasisPoints(
   return Math.max(0, rolledBasisPoints - thresholdBasisPoints + 1);
 }
 
-/** Shared preflight for starting and resolving a Mining attempt. */
+/**
+ * Shared preflight for starting and resolving a Mining attempt.
+ *
+ * The inventory must be able to keep the source's MINIMUM primary yield plus
+ * ANY ONE of its possible Secondary Finds (#308). Finds are mutually exclusive,
+ * so each candidate is planned against the same snapshot rather than one after
+ * another: a single free slot satisfies whichever find turns up, and no slot is
+ * demanded per possible find. A find that rolls is therefore never one the
+ * inventory could not keep. When candidates fail for different reasons, the
+ * mass limit is reported, being the more actionable.
+ */
 export function miningPreflightStopReason<Id>(
   snapshot: MiningSnapshot<Id>,
   balance: EffectiveGameBalance,
@@ -213,19 +352,23 @@ export function miningPreflightStopReason<Id>(
   if (!snapshot.tool || !miningToolUsable(snapshot.tool, snapshot.miningLevel))
     return "compatible_mining_tool_missing";
   const award = miningAwardFacts(balance, source);
-  const plan = planStackAddition(
-    snapshot.existingStacks,
-    award.itemId,
-    award.yieldMinimum,
-    award.stackLimit,
-    snapshot.slotsAvailable,
-    snapshot.massAvailableGrams,
-    award.massGrams,
-  );
-  if (plan.remainingQuantity === 0) return undefined;
-  return snapshot.massAvailableGrams < award.massGrams
-    ? "carried_mass_capacity_reached"
-    : "inventory_slots_full";
+  const primary = stackBundleEntry(award, award.yieldMinimum);
+  const candidates =
+    award.secondaryFinds.length > 0
+      ? award.secondaryFinds.map((find) => [primary, stackBundleEntry(find, find.quantity)])
+      : [[primary]];
+  let failure: "slots" | "mass" | undefined;
+  for (const entries of candidates) {
+    const plan = planExactStackAdditions(
+      snapshot.existingStacks,
+      entries,
+      snapshot.slotsAvailable,
+      snapshot.massAvailableGrams,
+    );
+    if (!plan.ok && (failure === undefined || plan.reason === "mass")) failure = plan.reason;
+  }
+  if (failure === undefined) return undefined;
+  return failure === "mass" ? "carried_mass_capacity_reached" : "inventory_slots_full";
 }
 
 /**
@@ -286,7 +429,7 @@ export function resolveMining<Id>(input: {
         consumedTicks,
         successes,
         failures,
-        awardedXp: successes * source.successXp,
+        awardedXp: totalAwardedXp(resolvedAttempts),
         stackUpdates: stacks
           .filter((stack) => stack.persisted)
           .map(({ id, quantity }) => ({ id, quantity })),
@@ -313,6 +456,7 @@ export function resolveMining<Id>(input: {
         thresholdBasisPoints,
         itemId: source.itemId,
         quantityAwarded: 0,
+        secondaryFinds: [],
         xpAwarded: 0,
         boosted,
         durationTicks,
@@ -323,62 +467,63 @@ export function resolveMining<Id>(input: {
     }
     const award = miningAwardFacts(balance, source);
     const rolledQuantity = random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
-    let quantity = rolledQuantity;
-    let plan = planStackAddition(
-      stacks,
-      award.itemId,
-      quantity,
-      award.stackLimit,
-      slotsAvailable,
-      massAvailableGrams,
-      award.massGrams,
-    );
-    // The minimum-fit check authorizes this success. At a final partial stack or
-    // mass boundary, retain a valid one-unit yield rather than partially adding a two-unit roll.
-    if (plan.remainingQuantity > 0) {
-      quantity = award.yieldMinimum;
-      plan = planStackAddition(
+    // One roll over the source's whole Secondary Find table, only on a success
+    // (#308). The preflight above proved the minimum yield fits beside ANY find,
+    // so whatever this draws can be kept; it is never rolled and then dropped.
+    const find = drawSecondaryFind(award.secondaryFinds, random);
+    const findEntries = find ? [stackBundleEntry(find, find.quantity)] : [];
+    const placement = (primaryQuantity: number) =>
+      planExactStackAdditions(
         stacks,
-        award.itemId,
-        quantity,
-        award.stackLimit,
+        [stackBundleEntry(award, primaryQuantity), ...findEntries],
         slotsAvailable,
         massAvailableGrams,
-        award.massGrams,
       );
+    let quantity = rolledQuantity;
+    let placed = placement(quantity);
+    // The minimum-fit check authorizes this success. At a final partial stack or
+    // mass boundary, retain the valid minimum yield rather than partially adding
+    // a two-unit roll. A find that rolled keeps its place: it is part of every
+    // plan, so tight capacity shrinks the primary ore, never the find.
+    if (!placed.ok) {
+      quantity = award.yieldMinimum;
+      placed = placement(quantity);
     }
+    if (!placed.ok)
+      throw new Error("Mining preflight admitted an attempt whose minimum yield cannot be kept");
     // A charged tool's extra ore comes on top of that ordinarily resolved yield
     // (#233), and only when it fits too: no room for the bonus keeps the
-    // ordinary result rather than falling back any further.
+    // ordinary result rather than falling back any further. It is PRIMARY ore
+    // only; a Secondary Find is never duplicated by it (#308).
     const extra = miningChargedExtraYield(tool, boosted);
     if (extra > 0) {
-      const withExtra = planStackAddition(
-        stacks,
-        award.itemId,
-        quantity + extra,
-        award.stackLimit,
-        slotsAvailable,
-        massAvailableGrams,
-        award.massGrams,
-      );
-      if (withExtra.remainingQuantity === 0) {
+      const withExtra = placement(quantity + extra);
+      if (withExtra.ok) {
         quantity += extra;
-        plan = withExtra;
+        placed = withExtra;
       }
     }
-    for (const update of plan.updatedStacks) {
-      const stack = stacks.find((candidate) => candidate.id === update.id);
-      if (stack) stack.quantity = update.quantity;
-    }
-    for (const created of plan.createdStacks)
-      stacks.push({
-        // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
-        id: Symbol(`mining-stack-${resolvedAttempts.length}-${stacks.length}`) as unknown as Id,
-        ...created,
-        persisted: false,
-      });
-    slotsAvailable -= plan.createdStacks.length;
-    massAvailableGrams -= quantity * award.massGrams;
+    const applyPlan = (
+      plan: StackAdditionPlan<Id>,
+      facts: { massGrams: number },
+      awardedQuantity: number,
+    ) => {
+      for (const update of plan.updatedStacks) {
+        const stack = stacks.find((candidate) => candidate.id === update.id);
+        if (stack) stack.quantity = update.quantity;
+      }
+      for (const created of plan.createdStacks)
+        stacks.push({
+          // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
+          id: Symbol(`mining-stack-${resolvedAttempts.length}-${stacks.length}`) as unknown as Id,
+          ...created,
+          persisted: false,
+        });
+      slotsAvailable -= plan.createdStacks.length;
+      massAvailableGrams -= awardedQuantity * facts.massGrams;
+    };
+    applyPlan(placed.plans[0]!, award, quantity);
+    if (find) applyPlan(placed.plans[1]!, find, find.quantity);
     successes += 1;
     if (boosted) remainingCutterCharge -= 1;
     resolvedAttempts.push({
@@ -387,7 +532,8 @@ export function resolveMining<Id>(input: {
       thresholdBasisPoints,
       itemId: award.itemId,
       quantityAwarded: quantity,
-      xpAwarded: source.successXp,
+      secondaryFinds: find ? [{ itemId: find.itemId, quantity: find.quantity }] : [],
+      xpAwarded: source.successXp + (find ? find.bonusXp * find.quantity : 0),
       boosted,
       durationTicks,
       chargeConsumed: boosted,
@@ -398,7 +544,7 @@ export function resolveMining<Id>(input: {
     consumedTicks,
     successes,
     failures,
-    awardedXp: successes * source.successXp,
+    awardedXp: totalAwardedXp(resolvedAttempts),
     stackUpdates: stacks
       .filter((stack) => stack.persisted)
       .map(({ id, quantity }) => ({ id, quantity })),
@@ -408,4 +554,9 @@ export function resolveMining<Id>(input: {
     attempts: resolvedAttempts,
     remainingCutterCharge,
   };
+}
+
+/** A resolution's Mining XP is whatever its attempts awarded, finds included. */
+function totalAwardedXp(attempts: readonly MiningResolvedAttempt[]): number {
+  return attempts.reduce((total, attempt) => total + attempt.xpAwarded, 0);
 }

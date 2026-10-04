@@ -44,6 +44,8 @@ export function normalizePersistedMiningAttempts(
         ...rest,
         itemId: balance.items.ferriteShale.itemId,
         quantityAwarded: shaleAwarded,
+        // Written before Secondary Finds (#308) existed: it found none.
+        secondaryFinds: [],
       } as unknown as MiningRunAttempt,
     ];
   });

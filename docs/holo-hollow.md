@@ -372,6 +372,11 @@ Bix's initial approved playtest prices are:
 | Slag | 1 Credit | Not initially stocked |
 | Power Cell | 4 Credits | 12 Credits (at most 12 per character per Pacific day) |
 
+Bix's later buy lines live in `game/content/merchants.ts`; among them, the
+uncut gemstones Mining can turn up as Secondary Finds (#308) sell to him for
+8 (Uncut Quartz), 18 (Uncut Topaz) and 35 (Uncut Sapphire) Credits, and Wade
+does not buy them.
+
 These values are approved **initial playtest balance**, not permanent sacred
 economy constants. They should be authored centrally and tuned after real
 playtesting when the wider item economy is visible.

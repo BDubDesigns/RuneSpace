@@ -1575,3 +1575,86 @@ test("selected details stay open through actions and dismiss deliberately", asyn
   expect(drawerOverflow).toBeLessThanOrEqual(1);
   await captureReviewScreenshot(page, "mining-mobile-inventory-dossier.png");
 });
+
+test("a Secondary Find reads as a RARE FIND beside the ore, under one combined XP total", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  const attempt = {
+    sequence: 1,
+    resolvedAt: new Date().toISOString(),
+    success: true,
+    rolledBasisPoints: 0,
+    thresholdBasisPoints: 3_500,
+    itemId: ITEM_IDS.ferriteShale,
+    quantityAwarded: 1,
+    secondaryFinds: [{ itemId: ITEM_IDS.uncutTopaz, quantity: 1 }],
+    // 15 Ferrite Shale XP + 20 Uncut Topaz XP, never two XP cards.
+    xpAwarded: 35,
+    boosted: false,
+    durationTicks: 10,
+    chargeConsumed: false,
+    remainingCharge: 0,
+  };
+  const run = {
+    runAttempts: 1,
+    runSuccesses: 1,
+    runItemsGained: { [ITEM_IDS.ferriteShale]: 1, [ITEM_IDS.uncutTopaz]: 1 },
+    runXpGained: 35,
+    recentAttempts: [attempt],
+  };
+  await db
+    .insert(characterMiningState)
+    .values({ characterId, ...run })
+    .onConflictDoUpdate({ target: characterMiningState.characterId, set: run });
+  await page.reload();
+
+  const result = page.getByRole("region", { name: "Latest mining attempt", exact: true });
+  const cards = result.locator("[data-reward-grid] > *");
+  // The ore, then the find, then the combined XP last.
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("Ferrite Shale");
+  await expect(cards.nth(0).locator("[data-tile-tag]")).toHaveCount(0);
+  await expect(cards.nth(1)).toContainText("Uncut Topaz");
+  await expect(cards.nth(1)).toHaveAccessibleName("Rare find: 1 Uncut Topaz found");
+  await expect(cards.nth(1).locator("[data-tile-tag]")).toHaveText("RARE FIND");
+  await expect(cards.nth(2)).toContainText("Mining");
+  await expect(cards.nth(2)).toContainText("+35");
+  await expect(cards.nth(2)).toHaveAccessibleName("35 Mining XP earned");
+  await expect(cards.nth(1).getByTestId("item-artwork")).toBeVisible();
+  await expect
+    .poll(() =>
+      evaluateImage(
+        cards.nth(1).getByTestId("item-artwork"),
+        (image) =>
+          image.complete &&
+          image.naturalWidth > 0 &&
+          new URL(image.currentSrc).searchParams.get("url") === "/item-art/uncut-topaz.webp",
+      ),
+    )
+    .toBe(true);
+
+  // The run summary stays item-keyed and honest, with one combined XP total.
+  await expect(page.getByText("1 Ferrite Shale gained", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 Uncut Topaz found", { exact: true })).toBeVisible();
+  await expect(page.getByText("35 Mining XP", { exact: true })).toBeVisible();
+
+  // Every card is the same normal width at every viewport, however they wrap.
+  async function boxes() {
+    return Promise.all([0, 1, 2].map(async (index) => (await cards.nth(index).boundingBox())!));
+  }
+  await page.setViewportSize({ width: 1_400, height: 900 });
+  const wide = await boxes();
+  expect(new Set(wide.map((box) => Math.round(box.width)))).toEqual(new Set([120]));
+  // Room for all three: one row.
+  expect(new Set(wide.map((box) => Math.round(box.y))).size).toBe(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrow = await boxes();
+  expect(new Set(narrow.map((box) => Math.round(box.width)))).toEqual(new Set([120]));
+  // Two fit across; the third wraps beneath the first, left-aligned and unstretched.
+  expect(Math.round(narrow[1]!.y)).toBe(Math.round(narrow[0]!.y));
+  expect(narrow[2]!.y).toBeGreaterThan(narrow[0]!.y + narrow[0]!.height - 1);
+  expect(Math.round(narrow[2]!.x)).toBe(Math.round(narrow[0]!.x));
+});

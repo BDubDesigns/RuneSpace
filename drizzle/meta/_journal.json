@@ -288,6 +288,13 @@
       "when": 1790923772404,
       "tag": "0040_site_stash_mounts",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791152324576,
+      "tag": "0041_mining_secondary_finds",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,10 @@ const merchantDefinitions = [
       // finished alloy is Wade's trade, not his.
       { itemId: ITEM_IDS.galvanite, buyPrice: 4 },
       { itemId: ITEM_IDS.galvanicStock, buyPrice: 18 },
+      // Mining Secondary Finds (#308). Bix buys all three rough gems; Wade does not.
+      { itemId: ITEM_IDS.uncutQuartz, buyPrice: 8 },
+      { itemId: ITEM_IDS.uncutTopaz, buyPrice: 18 },
+      { itemId: ITEM_IDS.uncutSapphire, buyPrice: 35 },
     ],
   },
   {

@@ -29,7 +29,13 @@ const balance = getEffectiveGameBalance();
  * Everything in this file is about Ferrite Shale specifically, and asserting it
  * through the generic boundary is what proves the generalization left it alone.
  */
-const ferriteShale = miningSourceForActionId(ACTION_IDS.ferriteShaleMining, balance)!;
+const ferriteShale = {
+  ...miningSourceForActionId(ACTION_IDS.ferriteShaleMining, balance)!,
+  // Authored here with NO Secondary Finds (#308): everything in this file
+  // proves that a source without any resolves exactly as it always did. The
+  // real Jag table is covered in mining-secondary-finds.test.ts.
+  secondaryFinds: [],
+};
 
 /** Ferrite Shale mining, with the source supplied for every call. */
 function resolveFerriteShaleMining(
@@ -119,6 +125,7 @@ describe("Ferrite Shale Mining resolution", () => {
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
         quantityAwarded: 1,
+        secondaryFinds: [],
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,
@@ -133,6 +140,7 @@ describe("Ferrite Shale Mining resolution", () => {
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
         quantityAwarded: 0,
+        secondaryFinds: [],
         xpAwarded: 0,
         boosted: false,
         durationTicks: 10,
@@ -156,6 +164,7 @@ describe("Ferrite Shale Mining resolution", () => {
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
         quantityAwarded: 1,
+        secondaryFinds: [],
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,
@@ -168,6 +177,7 @@ describe("Ferrite Shale Mining resolution", () => {
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
         quantityAwarded: 0,
+        secondaryFinds: [],
         xpAwarded: 0,
         boosted: false,
         durationTicks: 10,
@@ -180,6 +190,7 @@ describe("Ferrite Shale Mining resolution", () => {
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
         quantityAwarded: 2,
+        secondaryFinds: [],
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,

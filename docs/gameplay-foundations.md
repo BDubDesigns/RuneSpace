@@ -110,6 +110,57 @@ The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
 summaries are retained. Starting a genuinely new Mining action resets this run.
 
+### Secondary Finds (#308)
+
+A source may author a **Secondary Find table** (`secondaryFinds` on its
+`balance.mining.sources` entry): bonus items a successful extraction can turn
+up *beside* the source's own ore, never instead of it. "Secondary Find" is the
+design and system term, "Secondary Find Chance" the stat/modifier term, and
+**RARE FIND** is the player-facing treatment shown when one actually drops.
+
+| Source | Find | Chance per success | Bonus XP | Announced in General |
+| --- | --- | ---: | ---: | --- |
+| The Jag | Uncut Quartz | 1 / 40 | +10 | no |
+| The Jag | Uncut Topaz | 1 / 60 | +20 | **yes** |
+| Deep Jag | Uncut Topaz | 1 / 35 | +20 | no |
+| Deep Jag | Uncut Sapphire | 1 / 55 | +30 | **yes** |
+
+- **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
+  over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
+  is an integer drawn from the least common multiple of the table's
+  denominators (120 at The Jag, 385 at Deep Jag), and each entry owns a
+  consecutive span of it. One roll can therefore never award two finds, and no
+  authored chance is rounded to basis points. Current content awards at most one
+  find per success; the resolver does not encode that limit.
+- **XP.** The source still owns its primary XP. Each find *item* owns one
+  intrinsic bonus Mining XP (`secondaryFindMiningXp` on its item definition),
+  so Topaz is +20 wherever it appears and no source restates it. A Jag Topaz hit
+  is 15 + 20 = **35** Mining XP, a Deep Jag Topaz hit 25 + 20 = **45**. An
+  attempt records one combined `xpAwarded`.
+- **Items.** Uncut Quartz, Topaz and Sapphire are 100 g, stack to **2**, and Bix
+  buys them at **8 / 18 / 35** Credits. Wade does not. Their flavour text is
+  authored in `game/content/item-presentation.ts` and shown in Inventory details.
+- **Capacity.** Before an attempt begins, the inventory must be able to keep the
+  source's *minimum* primary yield **plus any one possible find**. Finds are
+  mutually exclusive, so each candidate is planned independently against the
+  same snapshot: one free slot can serve whichever find turns up (no slot per
+  possible item), and an existing partial stack satisfies either side. A rolled
+  find is **never rolled and then discarded**: on a hit with tight capacity the
+  find and the minimum ore are kept, and only the optional ore above the minimum
+  (and a charged tool's extra ore) is reduced.
+- **Charged tools.** A charged Loadsteel Cutter's +1 is *primary ore only*; it
+  never duplicates a find. A future cutter may modify Secondary Find Chance or
+  yield explicitly, but that is not coupled to the primary-yield bonus.
+- **Run history.** A run's totals stay item-keyed ("Ferrite Shale gained",
+  "Uncut Topaz found") with one combined Mining XP total.
+- **Announcements.** An entry's `announce` flag is authored per source and per
+  find. When it is set, a successful find posts a public **System** line to
+  General — see "Public System messages" in `docs/architecture.md` and
+  "Chat" in `docs/design-system.md`.
+- **Presentation.** The result's rewards are the ore, each find in resolved
+  order, then the combined XP last, in a wrapping equal-width reward grid
+  (`components/ui/RewardGrid.tsx`); a find carries the RARE FIND tag.
+
 ## Bounded runs (issue #229)
 
 Where the player chooses how long a repeatable run should be before starting,
