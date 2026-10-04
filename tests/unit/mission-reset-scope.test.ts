@@ -60,6 +60,8 @@ describe("missionChainResetScope", () => {
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
+      // Curly Must-Stash hangs off Keep the Change (#292).
+      "curly_must_stash",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -82,6 +84,8 @@ describe("missionChainResetScope", () => {
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
+      // Curly Must-Stash hangs off Keep the Change (#292).
+      "curly_must_stash",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -95,6 +99,7 @@ describe("missionChainResetScope", () => {
       "brace_yourself",
       "a_cut_above",
       "cutting_costs",
+      "curly_must_stash",
     ]);
   });
 });

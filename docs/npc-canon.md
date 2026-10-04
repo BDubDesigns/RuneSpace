@@ -34,7 +34,7 @@ silently change shipped behavior to match Canon.
   publishing test, locked canon versus player reveal state, the Visual identity
   rule, and the Public-Wiki projection rules.
 - **NPCs** — one page per named recurring character (Wade Rusk, Tansy Rusk, Bix
-  Weller, Renn Calder, Mara Kells), plus cast-wide rules: encounter chronology,
+  Weller, Renn Calder, Mara Kells, Curly), plus cast-wide rules: encounter chronology,
   Work Order client eligibility, background clients, and the cast-wide open
   questions.
 - **Locations**, **Organizations & Companies**, and **World & History**.

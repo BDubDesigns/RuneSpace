@@ -150,6 +150,22 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.wadeForceSalesTopic,
     availability: { kind: "work_orders_refresh_unlocked" },
   },
+  {
+    // Curly (#292) is reachable exactly when HH B&B is, like Mara, so his
+    // first topic needs no gate of its own and is there before his Mission is.
+    id: CONVERSATION_TOPIC_IDS.curlySeeingTheWorlds,
+    npcId: NPC_IDS.curly,
+    label: "Seeing the Worlds",
+    dialogueId: DIALOGUE_IDS.curlySeeingTheWorldsTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.curlyBackHome,
+    npcId: NPC_IDS.curly,
+    label: "Back Home",
+    dialogueId: DIALOGUE_IDS.curlyBackHomeTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.curlyMustStash },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(

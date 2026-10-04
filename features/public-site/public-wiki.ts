@@ -908,7 +908,7 @@ const authoredWikiArticles = [
     title: "Missions",
     category: "getting-started",
     summary:
-      "The jobs Wade Rusk, Tansy Rusk and Renn Calder hand out, and how the Mission Log tracks them.",
+      "The jobs Wade Rusk, Tansy Rusk, Renn Calder and Curly hand out, and how the Mission Log tracks them.",
     sections: [
       {
         paragraphs: [
@@ -990,6 +990,13 @@ const authoredWikiArticles = [
             "Cutting Costs — once Brace Yourself is done, Renn Calder in Holo Hollow will pay 500 Credits for a ",
             { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
             ". He doesn't care where it came from: one you made, one you were given or traded for, any you are carrying and not wearing. You don't need any Fabrication level or A Cut Above for it. He keeps the Cutter — he's buying it.",
+          ],
+          [
+            "Curly Must-Stash — once the HH B&B is open to you after Keep the Change, ",
+            { text: "Curly", articleSlug: "curly" },
+            " will hire you to build a mount for his storage container. He pays 150 Credits when you take the job and another 150 when you come back to tell him it's done. The mount takes 6 Refined Ferrite and 3 Slag and six ",
+            { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
+            ", which you do right there in the B&B; the passes earn their own Welding XP as you go. The container stays his, in his room — it isn't storage for you.",
           ],
         ],
       },
@@ -1192,7 +1199,9 @@ const authoredWikiArticles = [
             { text: "Renn Calder", articleSlug: "renn-calder" },
             ", a ferrite miner, is usually at the Community Assistance Center. ",
             { text: "Mara Kells", articleSlug: "mara-kells" },
-            " owns the HH B&B, and you'll meet her in town before its door is open to you.",
+            " owns the HH B&B, and you'll meet her in town before its door is open to you. Once you're inside, you'll also find one of her guests, ",
+            { text: "Curly", articleSlug: "curly" },
+            ", an offworld backpacker.",
           ],
           "Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
           "This is an early, playable build — check the Updates page for what's new in Holo Hollow.",
@@ -1260,9 +1269,11 @@ const authoredWikiArticles = [
             { text: "A Cut Above", articleSlug: "missions" },
             " +500. Not every mission pays in XP — ",
             { text: "10,000 Hours", articleSlug: "missions" },
-            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them, and Renn pays 500 Credits for the Loadsteel Cutter in ",
+            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them, Renn pays 500 Credits for the Loadsteel Cutter in ",
             { text: "Cutting Costs", articleSlug: "missions" },
-            ".",
+            ", and Curly pays 150 Credits when you take on ",
+            { text: "Curly Must-Stash", articleSlug: "missions" },
+            " and 150 more when it's done.",
           ],
         ],
       },
@@ -1517,6 +1528,51 @@ const authoredWikiArticles = [
             " have known each other since they were children running between their two buildings, and it shows in about four seconds of conversation.",
           ],
           "She is the practical half of that pair. It was never the business her parents built — she is clear about that — but it is the one this town needed, and she would rather run that than keep a museum.",
+        ],
+      },
+    ],
+  },
+  {
+    // Issue #292 — written only from the Public-Wiki-safe facts on Curly's
+    // Notion Canon page.
+    slug: "curly",
+    title: "Curly",
+    category: "people",
+    summary:
+      "A young offworld backpacker staying at HH B&B, who travels to see how people live on other planets — with rather more luggage than that requires.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Curly is a young adult backpacker from offworld, staying at the HH B&B in ",
+            { text: "Holo Hollow", articleSlug: "holo-hollow" },
+            ". He is travelling to experience how people live on other planets, and he is enthusiastic, outgoing and genuinely generous about it.",
+          ],
+          "He also overpacks, magnificently, and has an endearingly oblivious relationship with his own privilege. What fascinates him most about Holo Hollow is that people here make and repair things for themselves.",
+        ],
+      },
+      {
+        heading: "Finding him",
+        paragraphs: [
+          [
+            "Curly is his own contact inside the HH B&B, alongside ",
+            { text: "Mara Kells", articleSlug: "mara-kells" },
+            ", so you can talk to him once ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " has opened the B&B to you.",
+          ],
+        ],
+      },
+      {
+        heading: "Curly Must-Stash",
+        paragraphs: [
+          [
+            "His first optional job, ",
+            { text: "Curly Must-Stash", articleSlug: "missions" },
+            ", is to build a mount for the MYKEA SCHLEPPRAUM-8 he already owns, so it has somewhere to go in his room. It needs ",
+            { text: "Welding", articleSlug: "cargo-hold-and-welding" },
+            " level 1, and the Missions page has the details.",
+          ],
         ],
       },
     ],

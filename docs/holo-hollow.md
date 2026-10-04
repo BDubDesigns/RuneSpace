@@ -469,7 +469,9 @@ records the product-level shipped state.
 
 Holo Hollow's early residents are Bix, Mara, and Renn. Do not add a fourth NPC
 merely to hit a number. Add future residents when a distinct character need
-exists.
+exists. #292 is that case: **Curly**, an offworld guest at HH B&B, is a second
+contact there beside Mara, with his own optional paid Mission (Curly
+Must-Stash). His character canon lives on his Notion Canon page.
 
 ### Shipped art
 

@@ -12,6 +12,7 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
+import type { RepairProjection } from "@/server/play";
 
 /**
  * The primary activity at wherever the player is standing (#193).
@@ -61,7 +62,16 @@ export function LocationActivity({
   });
 
   if (activePlace) {
-    return activePlace.id === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : null;
+    switch (activePlace.id) {
+      case LOCAL_PLACE_IDS.holoHollowCrewStop:
+        return <CrewStopPanel />;
+      case LOCAL_PLACE_IDS.hhBnb:
+        return (
+          <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />
+        );
+      default:
+        return null;
+    }
   }
 
   return (
@@ -113,4 +123,28 @@ function primaryActivity(
     default:
       return null;
   }
+}
+
+/**
+ * Curly's commission at HH B&B (#292): building the mount for the container he
+ * already owns.
+ *
+ * It exists only while the work is genuinely open — the repair is authorized
+ * by Curly Must-Stash's acceptance and not yet finished. Before that there is
+ * nothing to build, and the moment the last section lands the job is done and
+ * the activity goes: the mount is Curly's, in Curly's room, so there is no
+ * finished-state panel and no storage to open. Mission guidance then points the
+ * player back to Curly for the rest of their payment.
+ */
+function CurlyStashMountActivity({ repair }: { repair: RepairProjection | undefined }) {
+  if (!repair?.repairAvailable || repair.complete) return null;
+  return (
+    <RepairWorkPanel
+      eyebrow="Curly's room"
+      materialsPrompt="Curly's container is ready to go up. The mount needs its frame stock before there is anything to weld; hand over what you are carrying and bring the rest when you come back."
+      targetId={REPAIR_TARGET_IDS.curlyStashMount}
+      title="Build Stash Mount"
+      weldingPrompt="The frame stock is all here. What is left is welding the mount to the wall."
+    />
+  );
 }

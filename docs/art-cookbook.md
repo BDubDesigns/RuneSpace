@@ -515,6 +515,11 @@ Current production conventions:
   owner-supplied chip master is kept in `assets/currency/`
 - skill XP art (the shared XP medallion) -> `public/xp/`; the owner-supplied
   master is kept in `assets/xp/`
+- Curly's approved portrait and guest-room masters (#292) are kept in
+  `assets/npc-art/curly/` and `assets/location-scenes/curly-room/`; their game
+  derivatives are `public/npc-art/curly-*.png` (one shared 1086x1448 canvas,
+  the neutral master scaled down to match, never up) and
+  `public/location-scenes/curly-room-{before,after}.webp` (a 15:8 centre crop)
 - map identifiers -> `public/map-icons/`
 - Update-specific heroes -> `public/updates/`
 

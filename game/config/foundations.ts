@@ -67,6 +67,8 @@ const npcIds = {
   bixWeller: asContentId("bix_weller"),
   maraKells: asContentId("mara_kells"),
   rennCalder: asContentId("renn_calder"),
+  // An offworld guest at HH B&B (#292), a second contact there beside Mara.
+  curly: asContentId("curly"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -95,6 +97,9 @@ const missionIds = {
   // whoever brings him one.
   aCutAbove: asContentId("a_cut_above"),
   cuttingCosts: asContentId("cutting_costs"),
+  // Curly's optional paid commission at HH B&B (#292): weld a mount for the
+  // storage container he already owns. The mount is his, never the player's.
+  curlyMustStash: asContentId("curly_must_stash"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -232,6 +237,15 @@ const dialogueIds = {
   rennCuttingCostsReminder: asContentId("renn_calder_cutting_costs_reminder"),
   rennCuttingCostsTurnIn: asContentId("renn_calder_cutting_costs_turn_in"),
   rennCuttingCostsCompletion: asContentId("renn_calder_cutting_costs_completion"),
+  // Curly Must-Stash (#292): Curly's offer and paid acceptance, the reminder
+  // while the mount is unfinished, the turn-in once it is installed, the paid
+  // completion, and his follow-up once it is all settled.
+  curlyMustStashOffer: asContentId("curly_curly_must_stash_offer"),
+  curlyMustStashAccepted: asContentId("curly_curly_must_stash_accepted"),
+  curlyMustStashRepairReminder: asContentId("curly_curly_must_stash_repair_reminder"),
+  curlyMustStashTurnIn: asContentId("curly_curly_must_stash_turn_in"),
+  curlyMustStashCompletion: asContentId("curly_curly_must_stash_completion"),
+  curlyPostCurlyMustStash: asContentId("curly_post_curly_must_stash"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -254,6 +268,9 @@ const dialogueIds = {
   // (#170). Her Bix-shop appearance is authored Mission dialogue, not a topic.
   maraTheBnbTopic: asContentId("mara_kells_topic_the_bnb"),
   maraBixTopic: asContentId("mara_kells_topic_bix"),
+  // Curly's replayable topics (#292).
+  curlySeeingTheWorldsTopic: asContentId("curly_topic_seeing_the_worlds"),
+  curlyBackHomeTopic: asContentId("curly_topic_back_home"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -275,6 +292,8 @@ const conversationTopicIds = {
   rennLifeHere: asContentId("renn_calder_life_here"),
   maraTheBnb: asContentId("mara_kells_the_bnb"),
   maraBix: asContentId("mara_kells_bix"),
+  curlySeeingTheWorlds: asContentId("curly_seeing_the_worlds"),
+  curlyBackHome: asContentId("curly_back_home"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -303,6 +322,10 @@ const conversationBackgroundIds = {
   // Wade's own yard (#190). Dedicated approved dialogue art rather than the
   // reused 4:1 location scene.
   ruskRecoveryYard: asContentId("rusk_recovery_yard"),
+  // Curly's guest room at HH B&B (#292), before and after his storage mount is
+  // welded in. The room is conversation scenery, never a navigable place.
+  curlyRoomBefore: asContentId("curly_room_before"),
+  curlyRoomAfter: asContentId("curly_room_after"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -345,6 +368,8 @@ export const ACTION_IDS = {
   siteStashRuskRecoveryWelding: asContentId("site_stash_rusk_recovery_welding"),
   siteStashProcessingYardWelding: asContentId("site_stash_abandoned_processing_yard_welding"),
   siteStashDeepJagWelding: asContentId("site_stash_deep_jag_welding"),
+  // Welding Curly's storage mount at HH B&B (#292).
+  curlyStashMountWelding: asContentId("curly_stash_mount_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -430,6 +455,9 @@ export const REPAIR_TARGET_IDS = {
   siteStashRuskRecovery: asContentId("site_stash_rusk_recovery"),
   siteStashProcessingYard: asContentId("site_stash_abandoned_processing_yard"),
   siteStashDeepJag: asContentId("site_stash_deep_jag"),
+  // Curly's storage mount in his room at HH B&B (#292). NPC-owned: completing
+  // it is a commission finished for him, never a stash the player owns.
+  curlyStashMount: asContentId("curly_stash_mount"),
 } as const satisfies Record<string, ContentId>;
 
 /**

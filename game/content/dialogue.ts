@@ -91,6 +91,14 @@ export type DialogueSequence = {
    * stand (`resolveNpcVenueBackgroundId`).
    */
   presentsAtCurrentVenue?: true;
+  /**
+   * How many opening beats play before a confirmed Credits receipt that leads
+   * this sequence (#292). Placement only: it can never create a payout tile,
+   * which still exists solely from the server's `creditsPaid` receipt (#290).
+   * Absent means the tile opens the sequence. Curly hands the money over in
+   * his first line, so his tile follows it.
+   */
+  creditsReceiptAfterBeats?: number;
   beats: readonly DialogueBeat[];
 };
 
@@ -114,6 +122,11 @@ const bixShop = CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior;
 const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior;
 const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
 const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
+// Curly's room before and after his mount is installed (#292). The unfinished
+// room resolves to the finished one from the mount's own completion, so a beat
+// authored against it always shows the room as it currently is.
+const curlyRoom = CONVERSATION_BACKGROUND_IDS.curlyRoomBefore;
+const curlyRoomFinished = CONVERSATION_BACKGROUND_IDS.curlyRoomAfter;
 
 function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
@@ -244,6 +257,25 @@ function maraLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     presentationMode: "local",
     text,
   };
+}
+
+function curlyLocal(
+  expressionId: ExpressionId,
+  text: string,
+  backgroundId: ConversationBackgroundId = curlyRoom,
+): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.curly,
+    expressionId,
+    backgroundId,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function curlyFinished(expressionId: ExpressionId, text: string): DialogueBeat {
+  return curlyLocal(expressionId, text, curlyRoomFinished);
 }
 
 function rennLocal(expressionId: ExpressionId, text: string): DialogueBeat {
@@ -2188,6 +2220,162 @@ const dialogue = {
       ),
       maraLocal(EXPRESSION_IDS.neutral, "I love him dearly. He's a dingdong."),
       maraLocal(EXPRESSION_IDS.amused, "Don't tell him I said the first part."),
+    ],
+  },
+  // Curly Must-Stash (#292). The offer, acceptance, and reminder happen in the
+  // unfinished room; the turn-in, payment, and follow-up in the finished one.
+  [DIALOGUE_IDS.curlyMustStashOffer]: {
+    id: DIALOGUE_IDS.curlyMustStashOffer,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyLocal(EXPRESSION_IDS.neutral, "Oh! Hello! You must be one of the locals. I'm Curly."),
+      curlyLocal(
+        EXPRESSION_IDS.smile,
+        "I'm backpacking, actually. Taking a year off to see how people live on other planets. Really immerse myself in the culture.",
+      ),
+      curlyLocal(EXPRESSION_IDS.neutral, "I promised myself I'd travel light this time."),
+      curlyLocal(EXPRESSION_IDS.smile, "The backpack's in there somewhere."),
+      curlyLocal(
+        EXPRESSION_IDS.concerned,
+        "Mara's been wonderful. Although she did say I couldn't keep the rest of my luggage in the hallway.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.neutral,
+        "I've already got a perfectly good storage container. The trouble is, there's nowhere to mount it.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.smile,
+        "She mentioned you know your way around a welder. Think you could build me something?",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.neutral,
+        "Three hundred Credits? Half now, half when you're finished. Is that fair? I wouldn't want to shortchange you.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.curlyMustStashAccepted]: {
+    id: DIALOGUE_IDS.curlyMustStashAccepted,
+    npcId: NPC_IDS.curly,
+    // The confirmed first payment is shown right after he hands it over.
+    creditsReceiptAfterBeats: 1,
+    beats: [
+      curlyLocal(
+        EXPRESSION_IDS.smile,
+        "Brilliant! Here's the first hundred and fifty. That should get you started.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.neutral,
+        "I've already got the container, so it's just the mount you need to build. I'll leave the technical details to you.",
+      ),
+      curlyLocal(EXPRESSION_IDS.concerned, "Right. I'll get this lot out of your way."),
+      curlyLocal(EXPRESSION_IDS.neutral, "...Some of it, anyway."),
+    ],
+  },
+  [DIALOGUE_IDS.curlyMustStashRepairReminder]: {
+    id: DIALOGUE_IDS.curlyMustStashRepairReminder,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyLocal(EXPRESSION_IDS.smile, "How's the mount coming along?"),
+      curlyLocal(
+        EXPRESSION_IDS.concerned,
+        "Mara says the luggage pile is becoming a structural concern. I'm fairly sure she's exaggerating.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.neutral,
+        "Take your time, though. You've already got the first half, and I meant it.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.curlyMustStashTurnIn]: {
+    id: DIALOGUE_IDS.curlyMustStashTurnIn,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyFinished(EXPRESSION_IDS.smile, "You did it! Look at that. An entire patch of floor!"),
+      curlyFinished(
+        EXPRESSION_IDS.neutral,
+        "That mount looks fantastic. Mara's going to think I've checked out.",
+      ),
+      curlyFinished(
+        EXPRESSION_IDS.smile,
+        "I've got the other hundred and fifty ready for you. A deal's a deal!",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.curlyMustStashCompletion]: {
+    id: DIALOGUE_IDS.curlyMustStashCompletion,
+    npcId: NPC_IDS.curly,
+    // The confirmed second payment is shown right after he hands it over.
+    creditsReceiptAfterBeats: 1,
+    beats: [
+      curlyFinished(
+        EXPRESSION_IDS.smile,
+        "There you go! Honestly, I feel like I got the better end of this deal.",
+      ),
+      curlyFinished(
+        EXPRESSION_IDS.neutral,
+        "Now, if I can work out which suitcase has my toothbrush...",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.curlyPostCurlyMustStash]: {
+    id: DIALOGUE_IDS.curlyPostCurlyMustStash,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyFinished(EXPRESSION_IDS.smile, "Good news! I found my toothbrush."),
+      curlyFinished(EXPRESSION_IDS.neutral, "It was in the emergency toothbrush case."),
+      curlyFinished(
+        EXPRESSION_IDS.smile,
+        "The mount's brilliant, by the way. I'm thinking of taking up a hobby now that I have floor space.",
+      ),
+    ],
+  },
+  // Curly's replayable topics (#292). Seeing the Worlds is authored against
+  // the unfinished room, which resolves to the finished one once the mount is
+  // in, so replaying it never shows a room the player has already changed.
+  [DIALOGUE_IDS.curlySeeingTheWorldsTopic]: {
+    id: DIALOGUE_IDS.curlySeeingTheWorldsTopic,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyLocal(
+        EXPRESSION_IDS.smile,
+        "I've been traveling for months! The idea is to get away from all the luxury and experience how real people live.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.neutral,
+        "Everyone told me to pack light. I did. I had my winter equipment shipped separately.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.smile,
+        "Back home, everything just sort of arrives when you need it. Here, people actually make things. Fix things. It's fascinating.",
+      ),
+      curlyLocal(
+        EXPRESSION_IDS.concerned,
+        "Mara's already taught me quite a bit. Apparently a room reservation doesn't include someone to unpack your luggage.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.curlyBackHomeTopic]: {
+    id: DIALOGUE_IDS.curlyBackHomeTopic,
+    npcId: NPC_IDS.curly,
+    beats: [
+      curlyFinished(
+        EXPRESSION_IDS.neutral,
+        "My parents weren't exactly thrilled about the gap year. Dad thought I should try working for a change.",
+      ),
+      curlyFinished(
+        EXPRESSION_IDS.smile,
+        "So I bought an expedition kit and booked passage offworld. Seemed like a reasonable compromise.",
+      ),
+      curlyFinished(
+        EXPRESSION_IDS.neutral,
+        "I've seen some incredible places, but usually from hotel balconies. This is the first place I've actually gotten to know anyone.",
+      ),
+      curlyFinished(
+        EXPRESSION_IDS.smile,
+        "And look! I've already commissioned a construction project. Dad can't say I'm doing nothing productive.",
+      ),
+      curlyFinished(EXPRESSION_IDS.concerned, "He keeps asking when I'm coming home, though."),
+      curlyFinished(EXPRESSION_IDS.neutral, "Honestly? I think I'd rather stay a little longer."),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;

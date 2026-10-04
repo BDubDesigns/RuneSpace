@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import type { ConversationBackgroundId } from "@/game/config/foundations";
+import { resolveConversationBackgroundId } from "@/game/content/conversation-backgrounds";
 import type { DialogueSequence } from "@/game/content/dialogue";
 import type { CreditsReceipt } from "@/game/domain/conversation";
 import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
@@ -28,10 +29,17 @@ const CHARACTER_REVEAL_MS = 20;
  * so an authored comms call and every scene that happened somewhere specific
  * keep the background they were written against (#190).
  *
+ * `completedRepairTargetIds` is the other: a background authored with a
+ * `repaired` variant is shown as that variant once its repair is finished
+ * (#292), so a room the player rebuilt is presented as rebuilt in every beat
+ * set there, replayable topics included. It is applied after the venue, so
+ * the two never undo each other.
+ *
  * `receipt` is the confirmed Credits payout the server just reported for the
  * command that opened this sequence (#290). It is presented as a runtime-only
- * reward tile in front of the authored beats (`leads`) or as the whole scene
- * (`stands_alone`), against the neighbouring authored beat's background so the
+ * reward tile in front of the authored beats (`leads`, after the sequence's
+ * `creditsReceiptAfterBeats` opening lines when it authors any) or as the
+ * whole scene (`stands_alone`), against the neighbouring authored beat's background so the
  * tile never changes where the conversation is. The authored beats themselves
  * are never replaced or reordered.
  */
@@ -44,6 +52,7 @@ export function DialoguePlayer({
   onBack,
   onFinish,
   venueBackgroundId,
+  completedRepairTargetIds,
   receipt,
 }: {
   sequence: DialogueSequence;
@@ -56,6 +65,8 @@ export function DialoguePlayer({
   onFinish: () => void;
   /** Where this NPC is standing now; only read by `presentsAtCurrentVenue`. */
   venueBackgroundId?: ConversationBackgroundId;
+  /** Repairs this character has finished; only read by `repaired` backgrounds. */
+  completedRepairTargetIds?: ReadonlySet<string>;
   receipt?: CreditsReceipt;
 }) {
   const [beatIndex, setBeatIndex] = useState(0);
@@ -93,8 +104,9 @@ export function DialoguePlayer({
           ? { amount: receiptAmount, placement: receiptPlacement }
           : undefined,
         venueBackgroundId,
+        completedRepairTargetIds,
       ),
-    [sequence, receiptAmount, receiptPlacement, venueBackgroundId],
+    [sequence, receiptAmount, receiptPlacement, venueBackgroundId, completedRepairTargetIds],
   );
   const beat = beats[beatIndex] ?? beats[0];
 
@@ -232,22 +244,36 @@ export function DialoguePlayer({
  * leads, the last when it stands alone — so it is always shown where that
  * conversation is happening.
  */
-function presentedBeats(
+export function presentedBeats(
   sequence: DialogueSequence,
   receipt: CreditsReceipt | undefined,
   venueBackgroundId: ConversationBackgroundId | undefined,
+  completedRepairTargetIds: ReadonlySet<string> = new Set(),
 ): readonly PresentedDialogueBeat[] {
-  const authored = sequence.beats.map((beat) =>
-    sequence.presentsAtCurrentVenue &&
-    venueBackgroundId &&
-    beat.kind === "npc" &&
-    beat.presentationMode === "local"
-      ? { ...beat, backgroundId: venueBackgroundId }
-      : beat,
-  );
+  const authored = sequence.beats.map((beat) => {
+    const placed =
+      sequence.presentsAtCurrentVenue &&
+      venueBackgroundId &&
+      beat.kind === "npc" &&
+      beat.presentationMode === "local"
+        ? { ...beat, backgroundId: venueBackgroundId }
+        : beat;
+    const backgroundId = resolveConversationBackgroundId(
+      placed.backgroundId,
+      completedRepairTargetIds,
+    );
+    return backgroundId === placed.backgroundId ? placed : { ...placed, backgroundId };
+  });
   if (!receipt) return authored;
-  const neighbour = receipt.placement === "leads" ? authored[0] : authored[authored.length - 1];
+  if (receipt.placement === "stands_alone") {
+    const last = authored[authored.length - 1];
+    return last ? [creditsReceiptBeat(receipt.amount, last.backgroundId)] : authored;
+  }
+  // A leading tile normally opens the sequence; a sequence whose speaker hands
+  // the money over in an opening line places it right after that line (#292).
+  const at = Math.min(sequence.creditsReceiptAfterBeats ?? 0, authored.length);
+  const neighbour = at > 0 ? authored[at - 1] : authored[0];
   if (!neighbour) return authored;
   const tile = creditsReceiptBeat(receipt.amount, neighbour.backgroundId);
-  return receipt.placement === "leads" ? [tile, ...authored] : [tile];
+  return [...authored.slice(0, at), tile, ...authored.slice(at)];
 }

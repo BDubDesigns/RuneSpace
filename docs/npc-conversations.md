@@ -122,6 +122,15 @@ that decides where the person is standing. An NPC who never moves resolves the
 background they were already authored against, so this changes nothing for
 anybody else.
 
+**A room the player changed is shown changed (#292).** A conversation
+background may name a `repaired` variant: the matching art the same backdrop
+becomes once a named repair target is complete. Curly's unfinished guest room
+names the finished one, his mount being the repair. `DialoguePlayer` resolves
+it per beat from the character's completed repairs, after any
+`presentsAtCurrentVenue` override, so the two never undo each other; nothing is
+persisted, and a beat authored against the finished room is simply that room.
+Curly's sequences never use the venue override.
+
 **A conversation outlives its speaker's move (#232).** Completing a Mission can
 move the very person the player is talking to — Tansy walks home the moment
 Break It Down completes. Her card leaves the place at once, but the open
@@ -180,7 +189,8 @@ Consequences that must stay true:
 Current authored labels include `Claim Cutter` (Walk It Off), `SHOW SHALE` (Cut
 Your Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together),
 `HAND OVER THE CUTTER` (Return the Favor, Cutting Costs), `SHOW HER THE CUTTER`
-(A Cut Above), and `TELL TANSY` (Break It Down, Brace Yourself).
+(A Cut Above), `TELL TANSY` (Break It Down, Brace Yourself), and `COLLECT PAYMENT`
+(Curly Must-Stash).
 Offers fall back to `Accept mission`; a turn-in without authored copy falls back
 to `Turn in`.
 
@@ -279,6 +289,8 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Renn Calder | The Assistance Center | always |
 | Renn Calder | Ferrite | always |
 | Renn Calder | Life here | always |
+| Curly | Seeing the Worlds | always |
+| Curly | Back Home | after **Curly Must-Stash** is completed |
 
 Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,
@@ -289,6 +301,12 @@ Renn has no merchant function. He is no longer social-only: #172 gave him
 His three topics remain ordinary replayable conversation and still carry no
 Mission command — the Mission is resolved by Mission content, not by the topic
 hub, exactly as for every other NPC.
+
+Curly's **Seeing the Worlds** needs no gate for the same reason (#292): he shares
+Mara's place, so it is there whether or not his Mission is on offer yet.
+It is authored against his unfinished room, which resolves to the finished one
+once his mount is installed (below), so replaying it never shows a room the
+player has already changed.
 
 Mara's topics carry no availability gate of their own because she is only
 reachable inside HH B&B, and that Local Place's access already derives from Keep

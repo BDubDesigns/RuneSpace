@@ -1304,6 +1304,70 @@ export const CUTTING_COSTS: MissionDefinition = {
   },
 };
 
+/**
+ * Each of Curly's two payments for his storage mount (#292): half when the
+ * player takes the job, half when they report it done. The two halves are the
+ * whole 300-Credit payment — there is no separate materials allowance.
+ */
+export const CURLY_MUST_STASH_PAYMENT_CREDITS = 150;
+
+/**
+ * Curly Must-Stash — an optional paid commission at HH B&B (#292).
+ *
+ * Curly already owns his storage container; what he needs is somewhere to put
+ * it, so the job is the mount and nothing else. It is the same Tier-1 build as
+ * The Jag's stash mount, done through the ordinary Mission-authorized repair
+ * target inside the B&B, and the work pays its own Welding XP — the Mission
+ * adds none. The finished mount holds Curly's box in Curly's room: it is a job
+ * finished for him, never storage the player owns or can open.
+ *
+ * He pays half on acceptance (the offer's acceptance effect) and half on the
+ * turn-in (the ordinary completion reward), each exactly once through the
+ * generic Mission commands. It names no continuation and nothing requires it,
+ * so ignoring it changes nothing anywhere else, including the player's own
+ * stash mounts.
+ */
+export const CURLY_MUST_STASH: MissionDefinition = {
+  id: MISSION_IDS.curlyMustStash,
+  title: "Curly Must-Stash",
+  summary: "Weld a mount for Curly's storage container in his room at HH B&B.",
+  prerequisiteMissionId: MISSION_IDS.keepTheChange,
+  prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 1 }],
+  offers: [
+    {
+      npcId: NPC_IDS.curly,
+      locationId: LOCATION_IDS.holoHollow,
+      dialogueId: DIALOGUE_IDS.curlyMustStashOffer,
+      actionLabel: "TAKE THE JOB",
+      acceptEffect: { kind: "credits", amount: CURLY_MUST_STASH_PAYMENT_CREDITS },
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.curlyMustStashAccepted },
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.curlyStashMount,
+      objective: "Build Curly's stash mount at HH B&B",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.curly,
+    locationId: LOCATION_IDS.holoHollow,
+    requiresStationary: true,
+    objective: "Collect the rest of your payment from Curly at HH B&B",
+    dialogueId: DIALOGUE_IDS.curlyMustStashTurnIn,
+    actionLabel: "COLLECT PAYMENT",
+  },
+  reward: { kind: "credits", amount: CURLY_MUST_STASH_PAYMENT_CREDITS },
+  dialogue: {
+    repairReminderDialogueId: DIALOGUE_IDS.curlyMustStashRepairReminder,
+    completionPresentationDialogueId: DIALOGUE_IDS.curlyMustStashCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.curly, dialogueId: DIALOGUE_IDS.curlyPostCurlyMustStash },
+  ],
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -1327,6 +1391,8 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Renn's optional purchase (#233): after Brace Yourself, at any Fabrication
   // level and whether or not A Cut Above was ever taken.
   CUTTING_COSTS,
+  // Curly's optional commission at HH B&B (#292), after Keep the Change.
+  CURLY_MUST_STASH,
 ];
 
 const missions = new Map<string, MissionDefinition>(

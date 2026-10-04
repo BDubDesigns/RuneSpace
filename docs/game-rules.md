@@ -30,7 +30,7 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers (the starter MYKEA and the fabricated Scrap Box and Freight Harness), two Mining tools (the Salvage Cutter and the Mining 5 Loadsteel Cutter), and Equipment, all resolved through one authored equipment-definition boundary (#233).
 - **Locations & presentation** — location scenes and the local world map.
 - **Holo Hollow, Local Places & Credits** — the first settlement, one-level Local Places inside it, character-scoped Credits, and Bix's authored merchant Trade (`docs/gameplay-foundations.md`, `docs/holo-hollow.md`).
-- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / A Cut Above, plus the optional Out of the Weather and Cutting Costs), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
+- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / A Cut Above, plus the optional Out of the Weather, Cutting Costs and Curly Must-Stash), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
 ## World & skills
 

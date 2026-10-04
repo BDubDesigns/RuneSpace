@@ -7,6 +7,43 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #292 — Curly and Curly Must-Stash.
+    slug: "curly-must-stash",
+    title: "Curly Must-Stash",
+    publishedAt: "2026-10-04T02:15:00-07:00",
+    summary:
+      "There's a new guest at the HH B&B. Curly, an offworld backpacker, has a storage container, a room full of luggage, and a paying job for anyone who can weld.",
+    hero: {
+      src: "/updates/curly-must-stash.webp",
+      alt: "A lamplit inn guest room with a MYKEA storage container mounted on a welded frame above the bed, the luggage around it a little tidier",
+      width: 1672,
+      height: 892,
+    },
+    body: [
+      [
+        "Once Keep the Change has opened the HH B&B to you, Mara isn't the only person inside any more. ",
+        { text: "Curly", articleSlug: "curly" },
+        " is a young backpacker from offworld, travelling to see how people live on other planets, and he has brought a great deal of luggage to do it with.",
+      ],
+      [
+        "He already owns a perfectly good storage container. What he needs is somewhere to mount it, and he's happy to pay for skilled local labour: 150 Credits when you take the job, and another 150 when it's done. Curly Must-Stash is optional and needs Welding 1. The mount is the same job as the stash mount at The Jag — 6 Refined Ferrite, 3 Slag and six ",
+        { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
+        " — built right there in the B&B, and the passes earn their own Welding XP.",
+      ],
+      "The container stays his, in his room. It isn't a stash for you, and building it doesn't change anything about the stashes you can build for yourself.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Curly, a second person to talk to at the HH B&B once Keep the Change is done, with his own topics.",
+          "Curly Must-Stash, an optional job at Welding 1: build a mount for Curly's container in his room. It pays 150 Credits up front and 150 on completion.",
+          "A Wiki page for Curly.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #284 — character-owned site stashes.
     slug: "a-stash-of-your-own",
     title: "A Stash of Your Own",

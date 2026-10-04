@@ -192,13 +192,13 @@ describe("issue #159 active Local Place interpretation", () => {
     expect(
       getResidentNpcs({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }),
     ).toEqual([]);
-    // Reading the raw request instead would have resolved Mara.
+    // Reading the raw request instead would have resolved Mara (and Curly).
     expect(
       getResidentNpcs({
         locationId: LOCATION_IDS.holoHollow,
         localPlaceId: requestedLocalPlaceId,
       }).map((npc) => npc.id),
-    ).toEqual([NPC_IDS.maraKells]);
+    ).toEqual([NPC_IDS.maraKells, NPC_IDS.curly]);
   });
 });
 
@@ -244,7 +244,8 @@ describe("issue #159 Local-Place-scoped residents", () => {
       locationId: LOCATION_IDS.holoHollow,
       localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     });
-    expect(residents.map((npc) => npc.id)).toEqual([NPC_IDS.maraKells]);
+    // Mara first, then her guest Curly (#292), in roster order.
+    expect(residents.map((npc) => npc.id)).toEqual([NPC_IDS.maraKells, NPC_IDS.curly]);
     const mara = residents[0];
     // Issue #170 supplies her approved set. The shared expression vocabulary is
     // mapped to her own art; `firm` is composed and matter-of-fact rather than
@@ -302,11 +303,12 @@ describe("issue #170 mission-derived Local Place access", () => {
       requestedLocalPlaceId: LOCAL_PLACE_IDS.hhBnb,
       completedMissionIds: completed,
     });
+    // Curly (#292) shares her place, and so her one gate.
     expect(
       getResidentNpcs({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }).map(
         (npc) => npc.id,
       ),
-    ).toEqual([NPC_IDS.maraKells]);
+    ).toEqual([NPC_IDS.maraKells, NPC_IDS.curly]);
     // Still nobody merely for standing in town, and still nobody while locked.
     expect(getResidentNpcs({ locationId: LOCATION_IDS.holoHollow })).toEqual([]);
     expect(
