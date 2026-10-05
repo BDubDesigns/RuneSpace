@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
@@ -261,7 +261,7 @@ export function InventoryPanel({
         tabIndex={-1}
       >
         {state.inventory.stacks.map((stack) => (
-          <InventoryStackVisual
+          <StackItemVisual
             interactive
             itemId={stack.itemId}
             key={stack.id}
@@ -331,7 +331,7 @@ export function InventoryPanel({
           </div>
           <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
             {resolvedSelection.kind === "stack" ? (
-              <InventoryStackVisual
+              <StackItemVisual
                 className="h-28 w-28 self-start"
                 itemId={resolvedSelection.entry.itemId}
                 name={resolvedSelection.entry.name}

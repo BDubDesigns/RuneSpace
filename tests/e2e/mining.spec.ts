@@ -1615,13 +1615,15 @@ test("a Secondary Find reads as a RARE FIND beside the ore, under one combined X
   // The ore, then the find, then the combined XP last.
   await expect(cards).toHaveCount(3);
   await expect(cards.nth(0)).toContainText("Ferrite Shale");
-  await expect(cards.nth(0).locator("[data-tile-tag]")).toHaveCount(0);
   await expect(cards.nth(1)).toContainText("Uncut Topaz");
-  await expect(cards.nth(1)).toHaveAccessibleName("Rare find: 1 Uncut Topaz found");
-  await expect(cards.nth(1).locator("[data-tile-tag]")).toHaveText("RARE FIND");
+  await expect(cards.nth(1)).toHaveAccessibleName("1 Uncut Topaz found");
   await expect(cards.nth(2)).toContainText("Mining");
   await expect(cards.nth(2)).toContainText("+35");
   await expect(cards.nth(2)).toHaveAccessibleName("35 Mining XP earned");
+  // No literal RARE FIND tag on a physical item tile: the item's own rare
+  // presentation carries it, and nothing competes with the quantity badge.
+  await expect(result).not.toContainText("RARE FIND");
+  await expect(result.locator("[data-tile-tag]")).toHaveCount(0);
   await expect(cards.nth(1).getByTestId("item-artwork")).toBeVisible();
   await expect
     .poll(() =>
@@ -1635,26 +1637,88 @@ test("a Secondary Find reads as a RARE FIND beside the ore, under one combined X
     )
     .toBe(true);
 
+  // A stackable reward is the shared stack visual, filled by the quantity this
+  // attempt awarded over the canonical stack limit: Shale 1 of 10, Topaz 1 of 2.
+  await expect(cards.nth(0).locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "10");
+  await expect(cards.nth(1).locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "50");
+  await expect(cards.nth(0)).not.toHaveAttribute("data-item-rarity", /.+/);
+  await expect(cards.nth(1)).toHaveAttribute("data-item-rarity", "rare");
+  // The XP reward is a reward tile, not an item stack: no stack indicator.
+  await expect(cards.nth(2).locator("[data-stack-track]")).toHaveCount(0);
+  await expect(cards.nth(2)).not.toHaveAttribute("data-item-rarity", /.+/);
+  // Rare reads the same on the border and the stack indicator; Shale keeps Mining yellow.
+  const colours = await cards.evaluateAll((elements) =>
+    elements.map((element) => ({
+      border: getComputedStyle(element).borderTopColor,
+      fill: element.querySelector("[data-stack-fill]")
+        ? getComputedStyle(element.querySelector("[data-stack-fill]")!).backgroundColor
+        : undefined,
+    })),
+  );
+  expect(colours[1]!.fill).toBe(colours[1]!.border);
+  expect(colours[0]!.fill).not.toBe(colours[1]!.fill);
+
   // The run summary stays item-keyed and honest, with one combined XP total.
   await expect(page.getByText("1 Ferrite Shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("1 Uncut Topaz found", { exact: true })).toBeVisible();
   await expect(page.getByText("35 Mining XP", { exact: true })).toBeVisible();
 
-  // Every card is the same normal width at every viewport, however they wrap.
-  async function boxes() {
-    return Promise.all([0, 1, 2].map(async (index) => (await cards.nth(index).boundingBox())!));
+  // The columns that fit share the row's width; a short last row keeps one
+  // column's width and stays left-aligned.
+  const grid = result.locator("[data-reward-grid]");
+  async function layout() {
+    const [gridBox, ...boxes] = await Promise.all([
+      grid.boundingBox(),
+      ...[0, 1, 2].map((index) => cards.nth(index).boundingBox()),
+    ]);
+    return { grid: gridBox!, cards: boxes.map((box) => box!) };
   }
   await page.setViewportSize({ width: 1_400, height: 900 });
-  const wide = await boxes();
-  expect(new Set(wide.map((box) => Math.round(box.width)))).toEqual(new Set([120]));
+  const wide = await layout();
+  expect(new Set(wide.cards.map((box) => Math.round(box.width))).size).toBe(1);
   // Room for all three: one row.
-  expect(new Set(wide.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(new Set(wide.cards.map((box) => Math.round(box.y))).size).toBe(1);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const narrow = await boxes();
-  expect(new Set(narrow.map((box) => Math.round(box.width)))).toEqual(new Set([120]));
-  // Two fit across; the third wraps beneath the first, left-aligned and unstretched.
-  expect(Math.round(narrow[1]!.y)).toBe(Math.round(narrow[0]!.y));
-  expect(narrow[2]!.y).toBeGreaterThan(narrow[0]!.y + narrow[0]!.height - 1);
-  expect(Math.round(narrow[2]!.x)).toBe(Math.round(narrow[0]!.x));
+  const narrow = await layout();
+  // Two fit across and split the row between them, edge to edge.
+  expect(Math.round(narrow.cards[1]!.y)).toBe(Math.round(narrow.cards[0]!.y));
+  expect(Math.abs(narrow.cards[0]!.width - narrow.cards[1]!.width)).toBeLessThan(1);
+  expect(
+    Math.abs(narrow.cards[1]!.x + narrow.cards[1]!.width - (narrow.grid.x + narrow.grid.width)),
+  ).toBeLessThan(1);
+  // The third wraps beneath the first at the SAME one-column width, not stretched.
+  expect(narrow.cards[2]!.y).toBeGreaterThan(narrow.cards[0]!.y + narrow.cards[0]!.height - 1);
+  expect(Math.round(narrow.cards[2]!.x)).toBe(Math.round(narrow.cards[0]!.x));
+  expect(Math.abs(narrow.cards[2]!.width - narrow.cards[0]!.width)).toBeLessThan(1);
+});
+
+test("rare gems keep their rare look in Inventory, beside ordinary items that do not", async ({
+  page,
+  testCharacter,
+}) => {
+  await db.insert(inventoryStacks).values([
+    { characterId: testCharacter.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 },
+    { characterId: testCharacter.id, itemId: ITEM_IDS.uncutTopaz, quantity: 1 },
+  ]);
+  await page.reload();
+  await page.getByRole("button", { name: "Inventory" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  const rare = inventory.locator('[data-item-rarity="rare"]');
+  await expect(rare).toHaveCount(1);
+  await expect(rare).toContainText("Uncut Topaz");
+  await expect(rare.locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "50");
+  // Ordinary Inventory items are unchanged: no rarity, Mining-yellow stack fill.
+  const [rareFill, rareBorder, shaleFill] = await Promise.all([
+    rare.locator("[data-stack-fill]").evaluate((el) => getComputedStyle(el).backgroundColor),
+    rare.evaluate((el) => getComputedStyle(el).borderTopColor),
+    inventory
+      .locator("article, button")
+      .filter({ hasText: "Ferrite Shale" })
+      .locator("[data-stack-fill]")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  expect(rareFill).toBe(rareBorder);
+  expect(shaleFill).not.toBe(rareFill);
 });

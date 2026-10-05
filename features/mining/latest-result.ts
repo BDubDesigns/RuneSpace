@@ -1,3 +1,4 @@
+import { getItemDefinition } from "@/game/config/balance";
 import type { MiningRunAttempt } from "@/server/mining";
 
 export function latestMiningAttempt(
@@ -8,7 +9,17 @@ export function latestMiningAttempt(
 
 /** One visible reward on a successful attempt's result (#308). */
 export type MiningRewardCard =
-  | { kind: "item"; key: string; itemId: string; quantity: number; rareFind: boolean }
+  | {
+      kind: "item";
+      key: string;
+      itemId: string;
+      /** What THIS attempt awarded — not any persisted stack's quantity. */
+      quantity: number;
+      /** True for a Secondary Find: the attempt "found" it rather than "earned" it. */
+      found: boolean;
+      /** The item's canonical stack limit when it stacks; the fill is quantity / this. */
+      stackLimit: number | undefined;
+    }
   | { kind: "xp"; key: string; amount: number };
 
 /**
@@ -32,7 +43,8 @@ export function miningRewardCards(
             key: `primary-${attempt.itemId}`,
             itemId: attempt.itemId,
             quantity: attempt.quantityAwarded,
-            rareFind: false,
+            found: false,
+            stackLimit: stackLimitOf(attempt.itemId),
           },
         ]
       : []),
@@ -41,12 +53,19 @@ export function miningRewardCards(
       key: `find-${index}-${find.itemId}`,
       itemId: find.itemId,
       quantity: find.quantity,
-      rareFind: true,
+      found: true,
+      stackLimit: stackLimitOf(find.itemId),
     })),
     ...(attempt.xpAwarded > 0
       ? [{ kind: "xp" as const, key: "xp", amount: attempt.xpAwarded }]
       : []),
   ];
+}
+
+/** The canonical stack limit of an item that stacks (the one home: its definition). */
+function stackLimitOf(itemId: string): number | undefined {
+  const definition = getItemDefinition(itemId);
+  return definition?.kind === "stack" ? definition.stackLimit : undefined;
 }
 
 export function resolvedAttemptCount(previousAttempts: number, currentAttempts: number): number {

@@ -9,6 +9,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { RewardGrid } from "@/components/ui/RewardGrid";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
@@ -92,7 +93,7 @@ function latestAttemptAnnouncement(
       ? " Power Cell depleted · Mining continues at normal speed."
       : "";
   return attempt.success
-    ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.secondaryFinds.map((find) => `Rare find: ${find.quantity} ${resolveItemPresentation(find.itemId, find.itemId).displayName} found. `).join("")}${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
+    ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.secondaryFinds.map((find) => `${find.quantity} ${resolveItemPresentation(find.itemId, find.itemId).displayName} found. `).join("")}${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
     : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}. ${charge}${depleted}`;
 }
 
@@ -151,21 +152,33 @@ function LatestAttemptResult({
               const rise = feedback
                 ? `rs-reward-feedback${index > 0 ? ` [animation-delay:${index * 90}ms]` : ""}`
                 : "";
-              return card.kind === "item" ? (
-                <ItemVisual
-                  accessibleLabel={
-                    card.rareFind
-                      ? `Rare find: ${card.quantity} ${itemDisplayName(card.itemId)} found`
-                      : `${card.quantity} ${itemDisplayName(card.itemId)} earned`
-                  }
-                  className={rise}
-                  itemId={card.itemId}
-                  key={card.key}
-                  name={itemDisplayName(card.itemId)}
-                  quantity={card.quantity}
-                  rareFind={card.rareFind}
-                />
-              ) : (
+              if (card.kind === "item") {
+                const accessibleLabel = `${card.quantity} ${itemDisplayName(card.itemId)} ${card.found ? "found" : "earned"}`;
+                // A stackable reward reads like the same item in Inventory: the
+                // one shared stack visual, filled by what this attempt awarded
+                // against the item's canonical stack limit.
+                return card.stackLimit !== undefined ? (
+                  <StackItemVisual
+                    accessibleLabel={accessibleLabel}
+                    className={rise}
+                    itemId={card.itemId}
+                    key={card.key}
+                    name={itemDisplayName(card.itemId)}
+                    quantity={card.quantity}
+                    stackLimit={card.stackLimit}
+                  />
+                ) : (
+                  <ItemVisual
+                    accessibleLabel={accessibleLabel}
+                    className={rise}
+                    itemId={card.itemId}
+                    key={card.key}
+                    name={itemDisplayName(card.itemId)}
+                    quantity={card.quantity}
+                  />
+                );
+              }
+              return (
                 // The combined XP for the whole attempt, never a bonus card.
                 <SkillXpTile
                   amount={card.amount}

@@ -8,6 +8,7 @@ import {
 import { ITEM_IDS, MERCHANT_IDS } from "@/game/config/foundations";
 import { getMerchant } from "@/game/content/merchants";
 import { getItemPresentation } from "@/game/content/item-presentation";
+import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
   miningAwardFacts,
   miningPreflightStopReason,
@@ -465,7 +466,7 @@ describe("the reward cards for an attempt", () => {
   it("lists the ore, then each find in resolved order, then the combined XP last", () => {
     expect(
       miningRewardCards({ ...base, secondaryFinds: [{ itemId: TOPAZ, quantity: 1 }] }).map(
-        (card) => (card.kind === "item" ? `${card.itemId}${card.rareFind ? "*" : ""}` : "xp"),
+        (card) => (card.kind === "item" ? `${card.itemId}${card.found ? "*" : ""}` : "xp"),
       ),
     ).toEqual([SHALE, `${TOPAZ}*`, "xp"]);
   });
@@ -492,5 +493,58 @@ describe("the reward cards for an attempt", () => {
         secondaryFinds: [],
       }),
     ).toEqual([]);
+  });
+});
+
+describe("rarity is the item's own presentation", () => {
+  it("authors the three uncut gems as rare, and nothing else", () => {
+    const rare = Object.values(ITEM_IDS).filter(
+      (itemId) => getItemPresentation(itemId)?.rarity === "rare",
+    );
+    expect(rare.sort()).toEqual([QUARTZ, SAPPHIRE, TOPAZ].sort());
+  });
+
+  it("does not depend on any source's table or on announcements", () => {
+    // Quartz is rare yet announced nowhere; the announcement flag is separate.
+    expect(getItemPresentation(QUARTZ)?.rarity).toBe("rare");
+    const quartzEntry = jag.secondaryFinds.find((entry) => entry.itemId === QUARTZ);
+    expect(quartzEntry?.announce).toBe(false);
+    expect(Object.keys(quartzEntry!).sort()).toEqual(["announce", "itemId", "oneIn"]);
+  });
+});
+
+describe("a stackable reward's stack fill", () => {
+  const stackFill = (card: ReturnType<typeof miningRewardCards>[number]) =>
+    card.kind === "item" && card.stackLimit !== undefined
+      ? inventoryStackFillFraction(card.quantity, card.stackLimit)
+      : undefined;
+
+  it("is the awarded quantity over the canonical stack limit", () => {
+    const cards = (itemId: string, quantity: number, find?: string) =>
+      miningRewardCards({
+        success: true,
+        itemId,
+        quantityAwarded: quantity,
+        xpAwarded: 35,
+        secondaryFinds: find ? [{ itemId: find, quantity: 1 }] : [],
+      });
+    // Ferrite Shale x2 with a limit of 10 is 20%; each gem x1 with a limit of 2 is 50%.
+    expect(stackFill(cards(SHALE, 2)[0]!)).toBe(0.2);
+    for (const gem of [QUARTZ, TOPAZ, SAPPHIRE]) {
+      expect(stackFill(cards(SHALE, 1, gem)[1]!)).toBe(0.5);
+    }
+  });
+
+  it("gives the combined XP card no stack at all", () => {
+    const xp = miningRewardCards({
+      success: true,
+      itemId: SHALE,
+      quantityAwarded: 1,
+      xpAwarded: 15,
+      secondaryFinds: [],
+    }).at(-1)!;
+    expect(xp.kind).toBe("xp");
+    expect(stackFill(xp)).toBeUndefined();
+    expect(xp).not.toHaveProperty("stackLimit");
   });
 });

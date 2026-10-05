@@ -159,7 +159,9 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
   "Chat" in `docs/design-system.md`.
 - **Presentation.** The result's rewards are the ore, each find in resolved
   order, then the combined XP last, in a wrapping equal-width reward grid
-  (`components/ui/RewardGrid.tsx`); a find carries the RARE FIND tag.
+  (`components/ui/RewardGrid.tsx`). The gems are authored as `rare` item
+  presentation (`docs/design-system.md`, "Item rarity"), so they read as rare
+  in Inventory too; the RARE FIND label belongs to the General System line only.
 
 ## Bounded runs (issue #229)
 

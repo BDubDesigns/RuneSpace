@@ -1,5 +1,7 @@
 import Image from "next/image";
 import { useId, type ReactNode } from "react";
+import type { ItemRarity } from "@/game/content/item-presentation";
+import { ITEM_RARITY_STYLE } from "./item-rarity";
 
 type VisualTileProps = {
   accessibleLabel: string;
@@ -13,10 +15,10 @@ type VisualTileProps = {
   /** Omit to render no corner plate (unique items carry no fake stack quantity). */
   badge?: string;
   /**
-   * A short label on the tile's top-left corner, for a reward that is itself a
-   * special event (the RARE FIND treatment, #308). Presentation only.
+   * The item's authored rarity (#308). A rare tile takes the rarity outline
+   * unless the caller names its own accent (skill XP does).
    */
-  tag?: string;
+  rarity?: ItemRarity;
   background?: ReactNode;
   className?: string;
   fallbackText: string;
@@ -46,7 +48,7 @@ export function VisualTile({
   accentColor,
   artworkSrc,
   badge,
-  tag,
+  rarity,
   background,
   className = "",
   fallbackText,
@@ -64,7 +66,12 @@ export function VisualTile({
     "aria-label": accessibleLabel,
     "data-mission-guidance": missionGuidance ? "active" : undefined,
     className: rootClassName,
-    style: accentColor ? { borderColor: accentColor } : undefined,
+    "data-item-rarity": rarity,
+    style: accentColor
+      ? { borderColor: accentColor }
+      : rarity
+        ? { borderColor: ITEM_RARITY_STYLE[rarity].accent }
+        : undefined,
   };
   const content = (
     <>
@@ -109,14 +116,6 @@ export function VisualTile({
       >
         <span className="line-clamp-2 break-words">{name}</span>
       </span>
-      {tag !== undefined ? (
-        <span
-          className="absolute left-2 top-2 z-20 border border-current bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[0.625rem] uppercase leading-none tracking-wide text-[color:var(--rs-rare-find-accent)]"
-          data-tile-tag=""
-        >
-          {tag}
-        </span>
-      ) : null}
       {badge !== undefined ? (
         <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
           {badge}

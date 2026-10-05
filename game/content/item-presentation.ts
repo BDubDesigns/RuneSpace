@@ -6,6 +6,13 @@ import { getItemDefinition } from "@/game/config/balance";
  * can use the returned artwork when it exists and their supplied name when it
  * does not.
  */
+/**
+ * An item's authored rarity, a presentation property of the ITEM (#308). A rare
+ * item reads as rare on every shared item visual; it is independent of how the
+ * item is obtained and of whether finding it is announced anywhere.
+ */
+export type ItemRarity = "rare";
+
 export type ItemPresentation = {
   displayName: string;
   accessibleDescription: string;
@@ -16,6 +23,8 @@ export type ItemPresentation = {
    * authored before descriptions existed present without one.
    */
   description?: string;
+  /** Omitted for an ordinary item. */
+  rarity?: ItemRarity;
 };
 
 const itemPresentations = {
@@ -123,6 +132,7 @@ const itemPresentations = {
       "Rough translucent smoky quartz crystals chipped free of a little dark host rock",
     textFallback: "UQ",
     artworkSrc: "/item-art/uncut-quartz.webp",
+    rarity: "rare",
     description:
       "A rough translucent crystal chipped free from the rock. Common enough to recognize, valuable enough to keep.",
   },
@@ -132,6 +142,7 @@ const itemPresentations = {
       "Rough warm amber topaz crystals pulled from the rock with a little host matrix still clinging",
     textFallback: "UT",
     artworkSrc: "/item-art/uncut-topaz.webp",
+    rarity: "rare",
     description:
       "A warm amber crystal pulled from the rock intact. Valuable even in its rough state.",
   },
@@ -141,6 +152,7 @@ const itemPresentations = {
       "Rough deep blue sapphire crystals with fractured faces rising from a little dark host rock",
     textFallback: "US",
     artworkSrc: "/item-art/uncut-sapphire.webp",
+    rarity: "rare",
     description:
       "A dense blue crystal with a rough, fractured surface. Rare, heavy-looking, and unmistakably valuable.",
   },
