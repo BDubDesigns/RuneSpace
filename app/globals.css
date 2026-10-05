@@ -916,14 +916,32 @@ body {
 }
 
 .rs-update-figure {
-  float: none;
+  float: right;
   clear: both;
-  width: min(100%, 14rem);
-  margin: 0 auto 1.5rem;
+  width: min(42%, 10rem);
+  margin: 0 0 1rem 1rem;
+}
+
+.rs-update-figure--left {
+  float: left;
+  margin: 0 1rem 1rem 0;
 }
 
 .rs-update-figure--npc {
-  width: min(100%, 12rem);
+  width: min(36%, 9rem);
+}
+
+@media (max-width: 340px) {
+  .rs-update-figure {
+    float: none;
+    clear: both;
+    width: min(100%, 12rem);
+    margin: 0 auto 1.5rem;
+  }
+
+  .rs-update-figure--npc {
+    width: min(100%, 12rem);
+  }
 }
 
 @media (min-width: 640px) {

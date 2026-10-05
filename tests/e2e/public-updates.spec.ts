@@ -103,7 +103,7 @@ test("Rare Finds renders canonical Topaz only in its article", async ({ page }) 
     .toBe(true);
 });
 
-for (const width of [1280, 390]) {
+for (const width of [1280, 390, 320]) {
   test(`ordered item/NPC figures wrap or stack and clear Patch Notes at ${width}px`, async ({
     page,
   }) => {
@@ -173,7 +173,10 @@ for (const width of [1280, 390]) {
           top: box.top,
           bottom: box.bottom,
           center: box.x + box.width / 2,
-          bodyCenter: body.getBoundingClientRect().x + body.getBoundingClientRect().width / 2,
+          bodyLeft: body.getBoundingClientRect().left,
+          bodyRight: body.getBoundingClientRect().right,
+          figureMarginLeft: parseFloat(getComputedStyle(figure).marginLeft),
+          figureMarginRight: parseFloat(getComputedStyle(figure).marginRight),
           lines: lines.map((line) => ({ x: line.x, right: line.right, top: line.top })),
         };
       });
@@ -181,17 +184,26 @@ for (const width of [1280, 390]) {
     for (const [index, figure] of layout.entries()) {
       expect(figure.x).toBeGreaterThanOrEqual(0);
       expect(figure.right).toBeLessThanOrEqual(width);
-      if (width === 390) {
+      if (width === 320) {
         expect(figure.float).toBe("none");
-        expect(Math.abs(figure.center - figure.bodyCenter)).toBeLessThan(1);
+        expect(Math.abs(figure.center - (figure.bodyLeft + figure.bodyRight) / 2)).toBeLessThan(1);
         expect(figure.lines[0]!.top).toBeGreaterThanOrEqual(figure.bottom);
       } else {
-        expect(figure.float).toBe(index === 0 ? "right" : "left");
+        const side = index === 0 ? "right" : "left";
+        expect(figure.float).toBe(side);
         const beside = figure.lines.filter((line) => line.top < figure.bottom);
         expect(beside.length).toBeGreaterThan(0);
         for (const line of beside) {
-          if (index === 0) expect(line.right).toBeLessThan(figure.x);
+          if (side === "right") expect(line.right).toBeLessThan(figure.x);
           else expect(line.x).toBeGreaterThan(figure.right);
+        }
+        if (width === 390) {
+          const availableBeside =
+            side === "right"
+              ? figure.x - figure.figureMarginLeft - figure.bodyLeft
+              : figure.bodyRight - figure.right - figure.figureMarginRight;
+          const bodyWidth = figure.bodyRight - figure.bodyLeft;
+          expect(availableBeside / bodyWidth).toBeGreaterThanOrEqual(0.45);
         }
         if (index === 0) expect(figure.lines.some((line) => line.top > figure.bottom)).toBe(true);
       }
