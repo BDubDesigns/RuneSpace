@@ -43,6 +43,7 @@ export function ItemVisual({
   const presentation = resolveItemPresentation(itemId, name);
   return (
     <VisualTile
+      rarity={presentation.rarity}
       accessibleDescription={
         additionalDescription
           ? `${presentation.accessibleDescription}. ${additionalDescription}`

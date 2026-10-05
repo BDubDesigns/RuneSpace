@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
@@ -73,7 +73,7 @@ export function LiveWorkpiecePanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="w-28 shrink-0">
           {recipe.outputStackLimit !== undefined ? (
-            <InventoryStackVisual
+            <StackItemVisual
               itemId={recipe.outputItemId}
               name={recipe.outputName}
               quantity={recipe.outputQuantity}

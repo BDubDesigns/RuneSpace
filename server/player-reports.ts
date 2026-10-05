@@ -7,6 +7,7 @@ import {
   playerReports,
   whisperParticipants,
   type Character,
+  asPlayerChatMessage,
   type ChatMessage,
 } from "@/db/rune-space";
 import { chatRetentionCutoff, type ChatChannel } from "@/game/domain/chat";
@@ -62,7 +63,8 @@ export type ReportOptions = { now?: Date };
 const MESSAGE_NOT_FOUND = "That message can't be reported.";
 const NOTE_TOO_LONG = `Notes can be up to ${REPORT_POLICY.noteMaxLength} characters.`;
 
-function snapshot(row: ChatMessage): ReportedMessageSnapshot {
+function snapshot(message: ChatMessage): ReportedMessageSnapshot {
+  const row = asPlayerChatMessage(message);
   return {
     id: row.id,
     seq: row.seq,
@@ -88,17 +90,19 @@ async function captureEvidence(row: ChatMessage, now: Date): Promise<MessageRepo
       ? eq(chatMessages.conversationId, row.conversationId!)
       : channelFeed(row.channel as ChatChannel);
   const retained = gte(chatMessages.createdAt, new Date(chatRetentionCutoff(now.getTime())));
+  // Context is what players said; an automatic System line (#308) is not evidence.
+  const playerMessage = eq(chatMessages.kind, "player");
   const [before, after] = await Promise.all([
     db
       .select()
       .from(chatMessages)
-      .where(and(feed, retained, lt(chatMessages.seq, row.seq)))
+      .where(and(feed, retained, playerMessage, lt(chatMessages.seq, row.seq)))
       .orderBy(desc(chatMessages.seq))
       .limit(REPORT_POLICY.contextBefore),
     db
       .select()
       .from(chatMessages)
-      .where(and(feed, retained, gt(chatMessages.seq, row.seq)))
+      .where(and(feed, retained, playerMessage, gt(chatMessages.seq, row.seq)))
       .orderBy(asc(chatMessages.seq))
       .limit(REPORT_POLICY.contextAfter),
   ]);
@@ -221,7 +225,8 @@ export async function reportMessage(
       ),
     )
     .limit(1);
-  if (!row) return { error: MESSAGE_NOT_FOUND };
+  // A System announcement (#308) belongs to no one, so there is nobody to report.
+  if (!row || row.kind !== "player") return { error: MESSAGE_NOT_FOUND };
   // A Whisper is reportable only by the other participant character.
   if (row.channel === "whisper") {
     const [participant] = await db
@@ -242,7 +247,7 @@ export async function reportMessage(
   const [reported] = await db
     .select()
     .from(characters)
-    .where(eq(characters.id, row.senderCharacterId))
+    .where(eq(characters.id, asPlayerChatMessage(row).senderCharacterId))
     .limit(1);
   if (!reported) return { error: MESSAGE_NOT_FOUND };
 

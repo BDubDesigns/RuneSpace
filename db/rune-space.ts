@@ -1333,13 +1333,21 @@ export const chatMessages = pgTable(
       .default(sql`gen_random_uuid()`),
     seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull().unique(),
     channel: text("channel").notNull(),
-    senderPlayerAccountId: text("sender_player_account_id")
-      .notNull()
-      .references(() => playerAccounts.id, { onDelete: "restrict" }),
-    senderCharacterId: text("sender_character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "restrict" }),
-    senderCharacterName: text("sender_character_name").notNull(),
+    /**
+     * What this row is (#308): `player` is a message a character sent, and
+     * `rare_find` is an automatic System announcement of a Mining find. A
+     * System row has NO sender: it is not a player, so it never borrows an
+     * account, a character, or a made-up identity — the three sender columns
+     * below are null exactly when the row is not a `player` message.
+     */
+    kind: text("kind").notNull().default("player"),
+    senderPlayerAccountId: text("sender_player_account_id").references(() => playerAccounts.id, {
+      onDelete: "restrict",
+    }),
+    senderCharacterId: text("sender_character_id").references(() => characters.id, {
+      onDelete: "restrict",
+    }),
+    senderCharacterName: text("sender_character_name"),
     body: text("body").notNull(),
     // Null for an ordinary message; the Credits paid for a promoted Trade ad.
     promotedPriceCredits: integer("promoted_price_credits"),
@@ -1351,6 +1359,12 @@ export const chatMessages = pgTable(
   },
   (table) => [
     check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade', 'whisper')`),
+    check("chat_messages_kind_check", sql`${table.kind} in ('player', 'rare_find')`),
+    check(
+      "chat_messages_sender_check",
+      sql`(${table.kind} = 'player') = (${table.senderPlayerAccountId} is not null and ${table.senderCharacterId} is not null and ${table.senderCharacterName} is not null)
+        and (${table.kind} = 'player' or (${table.senderPlayerAccountId} is null and ${table.senderCharacterId} is null and ${table.senderCharacterName} is null and ${table.channel} = 'general'))`,
+    ),
     check(
       "chat_messages_conversation_check",
       sql`(${table.channel} = 'whisper') = (${table.conversationId} is not null)`,
@@ -2235,6 +2249,29 @@ export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+/** A `chat_messages` row a character sent: its sender identity is present. */
+export type PlayerChatMessage = ChatMessage & {
+  senderPlayerAccountId: string;
+  senderCharacterId: string;
+  senderCharacterName: string;
+};
+
+/**
+ * Narrow a row to a player's message (#308). A System announcement has no
+ * sender, and every path that reads, reports, or whispers one by sender is
+ * about a player; reaching one with a System row is a bug, not a case.
+ */
+export function asPlayerChatMessage(row: ChatMessage): PlayerChatMessage {
+  if (
+    row.senderPlayerAccountId === null ||
+    row.senderCharacterId === null ||
+    row.senderCharacterName === null
+  ) {
+    throw new Error(`Chat message ${row.id} has no sender: it is not a player's message`);
+  }
+  return row as PlayerChatMessage;
+}
 export type ChatMessageMention = typeof chatMessageMentions.$inferSelect;
 export type RecipeUnlockNotice = typeof recipeUnlockNotices.$inferSelect;
 export type PlayerReport = typeof playerReports.$inferSelect;

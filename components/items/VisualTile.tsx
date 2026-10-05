@@ -1,5 +1,7 @@
 import Image from "next/image";
 import { useId, type ReactNode } from "react";
+import type { ItemRarity } from "@/game/content/item-presentation";
+import { ITEM_RARITY_STYLE } from "./item-rarity";
 
 type VisualTileProps = {
   accessibleLabel: string;
@@ -12,6 +14,11 @@ type VisualTileProps = {
   artworkSrc?: string;
   /** Omit to render no corner plate (unique items carry no fake stack quantity). */
   badge?: string;
+  /**
+   * The item's authored rarity (#308). A rare tile takes the rarity outline
+   * unless the caller names its own accent (skill XP does).
+   */
+  rarity?: ItemRarity;
   background?: ReactNode;
   className?: string;
   fallbackText: string;
@@ -41,6 +48,7 @@ export function VisualTile({
   accentColor,
   artworkSrc,
   badge,
+  rarity,
   background,
   className = "",
   fallbackText,
@@ -58,7 +66,12 @@ export function VisualTile({
     "aria-label": accessibleLabel,
     "data-mission-guidance": missionGuidance ? "active" : undefined,
     className: rootClassName,
-    style: accentColor ? { borderColor: accentColor } : undefined,
+    "data-item-rarity": rarity,
+    style: accentColor
+      ? { borderColor: accentColor }
+      : rarity
+        ? { borderColor: ITEM_RARITY_STYLE[rarity].accent }
+        : undefined,
   };
   const content = (
     <>

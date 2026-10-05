@@ -1,9 +1,71 @@
+import { getItemDefinition } from "@/game/config/balance";
 import type { MiningRunAttempt } from "@/server/mining";
 
 export function latestMiningAttempt(
   attempts: readonly MiningRunAttempt[],
 ): MiningRunAttempt | undefined {
   return attempts.at(-1);
+}
+
+/** One visible reward on a successful attempt's result (#308). */
+export type MiningRewardCard =
+  | {
+      kind: "item";
+      key: string;
+      itemId: string;
+      /** What THIS attempt awarded — not any persisted stack's quantity. */
+      quantity: number;
+      /** True for a Secondary Find: the attempt "found" it rather than "earned" it. */
+      found: boolean;
+      /** The item's canonical stack limit when it stacks; the fill is quantity / this. */
+      stackLimit: number | undefined;
+    }
+  | { kind: "xp"; key: string; amount: number };
+
+/**
+ * The reward cards a resolved attempt actually has, in their semantic order:
+ * the source's own ore, then each Secondary Find in resolved order, then the
+ * attempt's combined Mining XP last. It maps over whatever exists — nothing
+ * here knows how many finds today's content can award — and a failed attempt
+ * has none.
+ */
+export function miningRewardCards(
+  attempt: Pick<MiningRunAttempt, "success" | "itemId" | "quantityAwarded" | "secondaryFinds"> & {
+    xpAwarded: number;
+  },
+): readonly MiningRewardCard[] {
+  if (!attempt.success) return [];
+  return [
+    ...(attempt.quantityAwarded > 0
+      ? [
+          {
+            kind: "item" as const,
+            key: `primary-${attempt.itemId}`,
+            itemId: attempt.itemId,
+            quantity: attempt.quantityAwarded,
+            found: false,
+            stackLimit: stackLimitOf(attempt.itemId),
+          },
+        ]
+      : []),
+    ...attempt.secondaryFinds.map((find, index) => ({
+      kind: "item" as const,
+      key: `find-${index}-${find.itemId}`,
+      itemId: find.itemId,
+      quantity: find.quantity,
+      found: true,
+      stackLimit: stackLimitOf(find.itemId),
+    })),
+    ...(attempt.xpAwarded > 0
+      ? [{ kind: "xp" as const, key: "xp", amount: attempt.xpAwarded }]
+      : []),
+  ];
+}
+
+/** The canonical stack limit of an item that stacks (the one home: its definition). */
+function stackLimitOf(itemId: string): number | undefined {
+  const definition = getItemDefinition(itemId);
+  return definition?.kind === "stack" ? definition.stackLimit : undefined;
 }
 
 export function resolvedAttemptCount(previousAttempts: number, currentAttempts: number): number {

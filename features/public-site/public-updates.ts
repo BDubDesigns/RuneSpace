@@ -7,6 +7,46 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #308 — Mining Secondary Finds and uncut gemstones.
+    slug: "rare-finds",
+    title: "Rare finds",
+    publishedAt: "2026-10-04T15:30:00-07:00",
+    summary:
+      "Mining can now turn up more than ore. A successful attempt will occasionally pull a rough gemstone out of the rock — Uncut Quartz, Topaz or Sapphire — and the rarest ones get announced in General.",
+    body: [
+      [
+        "Every so often a successful Mining attempt will come away with something besides ore: a rough, uncut gemstone chipped out of the rock. It's a bonus on top of the ore you were already after, never a replacement for it, and it only happens on a success. The Jag can give Uncut Quartz or Uncut Topaz; Deep Jag can give Uncut Topaz or Uncut Sapphire. They are rare. You can mine for a good while and see nothing, which is what makes the ones you do see worth noticing. See ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " for the details.",
+      ],
+      "A find shows up on the attempt's result as a purple-framed tile beside your ore, and the gems keep that purple frame wherever you carry them, Inventory included. The Mining experience on that result is one number — the ore's usual amount plus a bonus for the gem: 10 for Quartz, 20 for Topaz and 30 for Sapphire, the same wherever you dig it up. A Loadsteel Cutter's extra ore is still only extra ore; it doesn't find you more gems.",
+      "Mining now wants room for your ore and a possible find before it starts, and keeps checking as you go, so a gem is never found and then lost for lack of space. If you're nearly full when one does turn up, the gem is kept and it's the ore that may come up short. Gems stack two to a tile, and Bix will buy them: 8 Credits for Quartz, 18 for Topaz and 35 for Sapphire.",
+      [
+        "Two of the finds are announced. When someone digs up Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a RARE FIND System line appears in General saying who found it and where. It's RuneSpace talking, not a player, so there's nobody to whisper, report or block, and it doesn't use up anyone's message allowance. See ",
+        { text: "Community Rules", articleSlug: COMMUNITY_RULES_SLUG },
+        " for how General is meant to be used.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Rare finds in Mining: Uncut Quartz and Uncut Topaz at The Jag, and Uncut Topaz and Uncut Sapphire at Deep Jag.",
+          "Rare gems are framed in purple on the attempt result and in your Inventory, with the Mining experience for the attempt shown as one combined total.",
+          "Bix buys Uncut Quartz for 8 Credits, Uncut Topaz for 18 and Uncut Sapphire for 35.",
+          "System announcements in General when Uncut Topaz is found at The Jag or Uncut Sapphire at Deep Jag.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Mining checks for room for your ore and one possible find before each attempt, so it can stop a little sooner when your Inventory is nearly full.",
+          "Mining rewards now share the row in as many equal-width cards as fit, instead of a fixed two or three, and a stackable reward shows how full a stack it would fill, just like Inventory.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #292 — Curly and Curly Must-Stash.
     slug: "curly-must-stash",
     title: "Curly Must-Stash",

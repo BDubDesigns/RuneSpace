@@ -34,7 +34,12 @@ import {
 import { PUBLIC_CHAT_DRAFT_KEY } from "./chat-drafts";
 import { ChatComposer } from "./ChatComposer";
 import { useChat } from "./ChatContext";
-import { ChatMessageRow, MessageActionButton, RedactedChatMessageRow } from "./ChatMessageRow";
+import {
+  ChatMessageRow,
+  MessageActionButton,
+  RedactedChatMessageRow,
+  SystemChatMessageRow,
+} from "./ChatMessageRow";
 import {
   atMentionLimit,
   mentionsShown,
@@ -337,7 +342,7 @@ export function PublicChat({
     const senders = [...feeds.general.messages, ...feeds.trade.messages]
       .filter(
         (message): message is VisibleChatMessageView =>
-          !message.redacted && message.senderCharacterId !== characterId,
+          !message.redacted && !message.system && message.senderCharacterId !== characterId,
       )
       .sort((a, b) => b.seq - a.seq)
       .map((message) => ({
@@ -533,6 +538,18 @@ export function PublicChat({
                   key={message.id}
                   senderName={message.senderName}
                   sentAt={message.sentAt}
+                />
+              );
+            }
+            // An automatic System line (#308) has no sender, so it has no actions.
+            if (message.system) {
+              return (
+                <SystemChatMessageRow
+                  body={message.body}
+                  id={message.id}
+                  key={message.id}
+                  sentAt={message.sentAt}
+                  treatment={message.treatment}
                 />
               );
             }

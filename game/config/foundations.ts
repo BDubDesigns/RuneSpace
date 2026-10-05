@@ -57,6 +57,11 @@ const itemIds = {
   galvanicWireSpool: asContentId("galvanic_wire_spool"),
   loadsteelCutter: asContentId("loadsteel_cutter"),
   freightHarness: asContentId("freight_harness"),
+  // Mining Secondary Finds (#308): rough gemstones a successful extraction can
+  // turn up alongside the source's ordinary ore.
+  uncutQuartz: asContentId("uncut_quartz"),
+  uncutTopaz: asContentId("uncut_topaz"),
+  uncutSapphire: asContentId("uncut_sapphire"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {

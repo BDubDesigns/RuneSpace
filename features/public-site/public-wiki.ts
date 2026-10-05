@@ -192,6 +192,16 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Rare finds",
+        paragraphs: [
+          "Now and then a successful attempt turns up something extra in the rock: a rough, uncut gemstone. It comes in addition to your ore, never instead of it, and a failed attempt never finds one. A find is rare — you can mine for a long while without seeing one — and an attempt turns up at most one.",
+          "The Jag can give Uncut Quartz or Uncut Topaz. Deep Jag can give Uncut Topaz or Uncut Sapphire. A find shows on the attempt's result as a purple-framed tile beside your ore — the gems keep that purple frame in your Inventory too — and the Mining experience on that result is one total: the ore's usual amount plus a bonus for the gem. Quartz adds 10, Topaz 20 and Sapphire 30, wherever you find them.",
+          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems.",
+          "Mining only starts, and keeps going, while you have room for your ore and for a find. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
+          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where. The other finds are yours alone to know about.",
+        ],
+      },
+      {
         heading: "Refining at the Abandoned Processing Yard",
         paragraphs: [
           "Refining is only available at the Abandoned Processing Yard. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
@@ -222,6 +232,7 @@ const authoredWikiArticles = [
           "Swapping Cutters stops a Mining run; start it again to mine with the one you just equipped.",
           "Refining needs its inputs on hand; stock up before heading to the Processing Yard.",
           "Galvanite is heavy — 400g a piece against shale's 100g — so a full trip out of Deep Jag is a much shorter one.",
+          "Leave a spare slot while you mine, so a rare find always has somewhere to go.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
         ],
       },
@@ -386,6 +397,9 @@ const authoredWikiArticles = [
           "Power Cell — 4 Credits each",
           "Galvanite — 4 Credits each",
           "Galvanic Stock — 18 Credits each",
+          "Uncut Quartz — 8 Credits each",
+          "Uncut Topaz — 18 Credits each",
+          "Uncut Sapphire — 35 Credits each",
         ],
       },
       {
@@ -1426,7 +1440,7 @@ const authoredWikiArticles = [
         heading: "Over the counter",
         paragraphs: [
           [
-            "Bix sells Power Cells, and buys Ferrite Shale, Refined Ferrite, Slag and any spare cells you are carrying — see ",
+            "Bix sells Power Cells, and buys Ferrite Shale, Refined Ferrite, Slag, any uncut gemstones you have mined, and any spare cells you are carrying — see ",
             { text: "Credits & Trading", articleSlug: "credits-and-trading" },
             " for what each is worth. Talking to him and trading with him are separate things, and you can do either without the other.",
           ],
@@ -1706,7 +1720,7 @@ const authoredWikiArticles = [
       {
         heading: "Public chat and promoted ads",
         paragraphs: [
-          "Every General and Trade message is saved with its text, the channel, when it was sent, the character that sent it, that character's name at the time, and the player account the character belongs to. A promoted Trade ad is saved the same way, plus the Credits it cost. Everyone playing can read public messages while they're kept.",
+          "Every General and Trade message is saved with its text, the channel, when it was sent, the character that sent it, that character's name at the time, and the player account the character belongs to. A promoted Trade ad is saved the same way, plus the Credits it cost. Automatic System lines in General, such as a rare-find announcement, are saved with their text and time but no player attached. Everyone playing can read public messages while they're kept.",
           "RuneSpace keeps these so chat history loads when you open it, so the shared send limit and the promoted-ad cooldown can be applied to your account across all your characters and tabs, and so reported messages can be checked.",
           "When a message @mentions someone, RuneSpace also saves which characters it mentions, their names at the time, and whether each of them has read it, so the mention lights up for that player and clears on every device once they've seen it. Mentions are part of the message: everyone who can read the message can see who it mentions, and they're deleted along with it.",
         ],

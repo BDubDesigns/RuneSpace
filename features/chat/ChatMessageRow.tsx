@@ -145,6 +145,51 @@ export function ChatMessageRow({
 }
 
 /**
+ * An automatic System line in General (#308), today a Mining RARE FIND. It is
+ * plainly RuneSpace's own output: named "System", carrying the restrained
+ * RARE FIND treatment, with no sender to open and so no Whisper, Report, or
+ * Block, and it can mention no one.
+ */
+export function SystemChatMessageRow({
+  id,
+  body,
+  sentAt,
+  treatment,
+}: {
+  id: string;
+  body: string;
+  sentAt: string;
+  treatment: "rare_find";
+}) {
+  return (
+    <li
+      className="border-l-4 border-l-[color:var(--rs-rare-find-accent)] bg-[color:var(--rs-rare-find-surface)] px-3 py-2"
+      data-chat-message={id}
+      data-chat-system={treatment}
+    >
+      <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-[color:var(--rs-text-muted)]">
+        <span
+          className="font-semibold text-[color:var(--rs-text-secondary)]"
+          data-chat-sender-system=""
+        >
+          System
+        </span>
+        <span
+          className="font-display uppercase tracking-[0.12em] text-[color:var(--rs-rare-find-accent)]"
+          data-rare-find-label=""
+        >
+          RARE FIND
+        </span>
+        <time dateTime={sentAt}>{formatTime(sentAt)}</time>
+      </p>
+      <p className="whitespace-pre-wrap break-words text-sm text-[color:var(--rs-text-primary)] [overflow-wrap:anywhere]">
+        {body}
+      </p>
+    </li>
+  );
+}
+
+/**
  * A public message from an account the viewer blocked (#261). The server sent
  * only its place, sender name at send, and time, so there is nothing to
  * reveal: no body, no actions, and no tap target. The hidden line is subdued,

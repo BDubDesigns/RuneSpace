@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getItemMaximumCharge } from "@/game/config/balance";
+import { getItemPresentation } from "@/game/content/item-presentation";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { discardInventoryStackAction } from "@/server/actions";
@@ -260,7 +261,7 @@ export function InventoryPanel({
         tabIndex={-1}
       >
         {state.inventory.stacks.map((stack) => (
-          <InventoryStackVisual
+          <StackItemVisual
             interactive
             itemId={stack.itemId}
             key={stack.id}
@@ -330,7 +331,7 @@ export function InventoryPanel({
           </div>
           <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
             {resolvedSelection.kind === "stack" ? (
-              <InventoryStackVisual
+              <StackItemVisual
                 className="h-28 w-28 self-start"
                 itemId={resolvedSelection.entry.itemId}
                 name={resolvedSelection.entry.name}
@@ -354,6 +355,14 @@ export function InventoryPanel({
               <InventoryDetailsStats selection={resolvedSelection} />
             </dl>
           </div>
+          {getItemPresentation(resolvedSelection.entry.itemId)?.description ? (
+            <p
+              className="mt-3 text-sm italic text-[color:var(--rs-text-secondary)]"
+              data-item-description
+            >
+              {getItemPresentation(resolvedSelection.entry.itemId)?.description}
+            </p>
+          ) : null}
           {selectedIsPowerCell ? (
             <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
               <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">

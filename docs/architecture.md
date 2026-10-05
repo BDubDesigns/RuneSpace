@@ -347,6 +347,40 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   Trade messages raise no attention or unread count; only an `@mention` does
   (below).
 
+### Public System messages (Issue #308)
+
+General also carries automatic **System** lines — today only a Mining RARE FIND
+announcement (`docs/gameplay-foundations.md`, "Secondary Finds"). They are a
+first-class kind of row in the one durable timeline, not a fake player.
+
+- **Persistence:** `chat_messages.kind` is `player` or `rare_find`. A System row
+  has *no* sender account, character, or name, and a check constraint makes that
+  a database fact (the three sender columns are null exactly when `kind` is not
+  `player`; System rows are `general` only). No System account or character is
+  ever created. `asPlayerChatMessage` (`db/rune-space.ts`) narrows a row to a
+  player's message where a sender is required, and throws if it is not one.
+- **Seam:** `server/public-system-messages.ts` is the one place that writes and
+  shapes them. `recordRareFindAnnouncement` runs inside the caller's
+  transaction — Mining's resolution persist — so the item, the XP, the run
+  history and the announcement commit or roll back together. Live delivery is
+  queued with `afterCharacterCommandCommits`, so nothing is published for a
+  rolled-back find and a missed delivery is recovered by the ordinary history
+  read.
+- **Contract:** `SystemChatMessageView` (`system: true`, `treatment`) is a third
+  member of `ChatMessageView`. It carries no sender id and no mentions. It is
+  never redacted (it belongs to no account a viewer could have blocked) and is
+  delivered to everyone.
+- **Not a send:** the rolling send budget and ad cooldown read only rows with a
+  sender account, so a System line spends nobody's budget. It creates no
+  `@mention`, shows no Whisper / Report / Block, and is not reportable
+  (`reportMessage` refuses it; report context and retained-chat views read
+  player messages only).
+- **Eligibility is authored,** per source and per find entry
+  (`MiningSecondaryFindBalance.announce`), never inferred from rarity. The line
+  reads "{character name} just found {item} at {location}!" with the character's
+  name, never the account's, and is created when the find commits, with the
+  time of that commit.
+
 ### Public `@mentions` (Issue #261)
 
 - **Identity:** a mention targets a stable character. The composer's `@`

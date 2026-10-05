@@ -124,6 +124,47 @@ slightly larger text on `--rs-chat-promoted-surface` with a
 `--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
 "Promoted ad" — brighter than ordinary chat, never an alert.
 
+A System line (#308) — today a Mining RARE FIND announcement — is RuneSpace's own
+output and reads that way: the sender is the word "System" (never a player
+name), with a "RARE FIND" label in `--rs-rare-find-accent` and a 4px
+`--rs-rare-find-accent` left rim on `--rs-rare-find-surface`. It has no name
+button, no "…" toggle, and no Whisper / Report / Block. The label belongs to the
+*event*; it is not printed on item tiles.
+
+**Item rarity (#308).** Rarity is a property of the *item's own presentation*
+(`rarity` on `ItemPresentation`, `game/content/item-presentation.ts`), not of
+where it was found: the three uncut gems are `rare`, and nothing else is. Every
+shared item visual reads it — `VisualTile` outlines a rare tile in
+`--rs-item-rare-accent` (and marks it `data-item-rarity`), and the shared stack
+visual draws a rare item's stack track and fill in `--rs-item-rare-accent` /
+`--rs-item-rare-stack-track` instead of Mining yellow (`components/items/item-rarity.ts`
+maps rarity to those tokens). So a gem looks the same in Inventory, storage,
+recipes and a Mining reward. It is restrained — no glow or animation — never
+borrows `--rs-accent-success`, and is independent of whether finding the item
+is announced anywhere. A future Secondary Find is not automatically rare; its
+own presentation decides.
+
+**Stack items and rewards (#308).** `StackItemVisual`
+(`components/items/StackItemVisual.tsx`, formerly `InventoryStackVisual`) is the
+one stackable-item tile: art, nameplate, quantity badge and the left-side
+stack-fill indicator (`inventoryStackFillFraction`). A stackable Mining reward
+uses it with the quantity *the attempt awarded* over the item's canonical stack
+limit (Ferrite Shale ×2 of 10 is 20%; a gem ×1 of 2 is 50%); that is not a claim
+about the player's persisted stack. The skill-XP reward tile is not an item and
+gets no stack indicator.
+
+**Reward cards (#308).** A result's rewards sit in `RewardGrid`
+(`components/ui/RewardGrid.tsx`): the columns that fit at the minimum card width
+(`--rs-reward-card-min-width`) share the row's width equally and the rest wrap
+left to right. The grid uses `auto-fit`, which collapses tracks no card lands
+in: two rewards on a wide row are halves, three are thirds, and when there are
+more rewards than columns every column is occupied, so a short last row stays one
+column wide and left-aligned rather than stretching. No decorative empty cells
+are drawn. On a phone a three-reward Mining result is
+2 + 1 and a plain two-reward result is two half-width cards. A Mining result
+lists the ore, then each Secondary Find in resolved order, then one skill-XP card
+with the *combined* amount last; the XP card is never promoted above the loot.
+
 Whispers (#247) are the third tab. Unread Whispers use the News unread
 language on both the launcher and the tab (count badge plus
 `--rs-glow-news-unread`, count in the accessible name). The tab opens with a

@@ -15,6 +15,7 @@ import {
 import { user } from "@/db/auth-schema";
 import {
   characters,
+  asPlayerChatMessage,
   chatMessages,
   moderationAppeals,
   moderationCaseNotes,
@@ -563,17 +564,20 @@ function retainedView(
     from: iso(window.from),
     to: iso(window.to),
     truncated,
-    messages: rows.slice(0, RETAINED_CHAT_MAX_MESSAGES).map((row) => ({
-      id: row.id,
-      channel: row.channel,
-      conversationId: row.conversationId,
-      senderPlayerAccountId: row.senderPlayerAccountId,
-      senderCharacterId: row.senderCharacterId,
-      senderCharacterName: row.senderCharacterName,
-      body: row.body,
-      promoted: row.promotedPriceCredits !== null,
-      sentAt: iso(row.createdAt),
-    })),
+    messages: rows
+      .slice(0, RETAINED_CHAT_MAX_MESSAGES)
+      .map(asPlayerChatMessage)
+      .map((row) => ({
+        id: row.id,
+        channel: row.channel,
+        conversationId: row.conversationId,
+        senderPlayerAccountId: row.senderPlayerAccountId,
+        senderCharacterId: row.senderCharacterId,
+        senderCharacterName: row.senderCharacterName,
+        body: row.body,
+        promoted: row.promotedPriceCredits !== null,
+        sentAt: iso(row.createdAt),
+      })),
   };
 }
 

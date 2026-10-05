@@ -4,7 +4,7 @@ import { Fragment, useRef, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemVisual } from "@/components/items/ItemVisual";
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { getItemMaximumCharge } from "@/game/config/balance";
 import { useSelectableDetails } from "@/features/shared/use-selectable-details";
 import {
@@ -212,7 +212,7 @@ function StorageRegionSection({
       key: `stack:${stack.id}`,
       selected: isSelected("stack", stack.id),
       node: (
-        <InventoryStackVisual
+        <StackItemVisual
           interactive
           itemId={stack.itemId}
           name={stack.name}

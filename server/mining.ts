@@ -25,18 +25,23 @@ import {
   resolveMining,
   type MiningRandom,
   type MiningResolution,
+  type MiningSecondaryFindAward,
   type MiningStopReason,
 } from "@/game/domain/mining";
 import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import { type ActionResolver, type DatabaseTransaction } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { getLocation } from "@/game/content/locations";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { recordRareFindAnnouncement } from "@/server/public-system-messages";
 import { loadPlaySnapshot } from "@/server/play-state";
 
 const systemRandom: MiningRandom = {
   nextBasisPoints: () => randomInt(10_000),
   nextUnit: () => randomInt(2) / 2,
+  nextInteger: (exclusiveMaximum) => randomInt(exclusiveMaximum),
 };
 
 /**
@@ -48,6 +53,9 @@ function e2eMiningRandom(): MiningRandom {
   return {
     nextBasisPoints: () => [0, 3_500][attemptIndex++ % 2]!,
     nextUnit: () => 0,
+    // The last outcome of any Secondary Find roll is outside every authored
+    // span, so the browser journey never finds a gem by accident (#308).
+    nextInteger: (exclusiveMaximum) => exclusiveMaximum - 1,
   };
 }
 
@@ -73,6 +81,9 @@ export type MiningRunAttempt = {
   thresholdBasisPoints: number;
   itemId: string;
   quantityAwarded: number;
+  /** Bonus items this success found beside the ore (#308); empty for a miss. */
+  secondaryFinds: readonly MiningSecondaryFindAward[];
+  /** The attempt's combined Mining XP, Secondary Finds included. */
   xpAwarded: number;
   boosted: boolean;
   durationTicks: number;
@@ -203,7 +214,7 @@ export function createMiningResolver(
           : { kind: "continue", consumedTicks: outcome.consumedTicks },
       };
     },
-    persist: async (transaction, outcome) => {
+    persist: async (transaction, outcome, context) => {
       if (
         outcome.cutterInstanceId &&
         outcome.remainingCutterCharge !== outcome.cutterChargeBefore
@@ -259,6 +270,11 @@ export function createMiningResolver(
             itemsGained[attempt.itemId] =
               (itemsGained[attempt.itemId] ?? 0) + attempt.quantityAwarded;
           }
+          // Secondary Finds are items the run produced too, keyed like any
+          // other, so the run summary stays honest per item (#308).
+          for (const find of attempt.secondaryFinds) {
+            itemsGained[find.itemId] = (itemsGained[find.itemId] ?? 0) + find.quantity;
+          }
         }
         await transaction
           .update(characterMiningState)
@@ -271,6 +287,30 @@ export function createMiningResolver(
             updatedAt: new Date(),
           })
           .where(eq(characterMiningState.characterId, outcome.characterId));
+      }
+      // A find the source authors as announceable posts a public System line,
+      // inside this same transaction: the item, the XP, the run history, and the
+      // announcement commit together or not at all (#308). Eligibility is the
+      // authored entry's, never "the rarest item here".
+      const announced = outcome.attempts.flatMap((attempt) =>
+        attempt.secondaryFinds.filter(
+          (find) =>
+            outcome.source.secondaryFinds.find((entry) => entry.itemId === find.itemId)?.announce,
+        ),
+      );
+      if (announced.length > 0) {
+        const character = context?.character;
+        const location = character ? getLocation(character.currentLocationId) : undefined;
+        if (!character || !location)
+          throw new Error("A Mining announcement needs the character and the location it found at");
+        for (const find of announced) {
+          await recordRareFindAnnouncement(transaction, {
+            characterName: character.displayName,
+            itemName: resolveItemPresentation(find.itemId, find.itemId).displayName,
+            locationName: location.displayName,
+            now: new Date(),
+          });
+        }
       }
       if (outcome.stopReason)
         await transaction

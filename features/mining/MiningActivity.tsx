@@ -9,7 +9,9 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
+import { RewardGrid } from "@/components/ui/RewardGrid";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/mining";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -20,6 +22,7 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import {
   latestMiningAttempt,
+  miningRewardCards,
   remainingChargeLabel,
   resolvedAttemptCount,
   runBelongsToSource,
@@ -40,7 +43,7 @@ function isMiningStop(stop: NonNullable<PlayGameplayState["stop"]>): boolean {
 }
 
 /** The awarded item's authoritative display name, by its stable ID. */
-function itemName(itemId: string): string {
+function itemDisplayName(itemId: string): string {
   return resolveItemPresentation(itemId, itemId).displayName;
 }
 
@@ -90,7 +93,7 @@ function latestAttemptAnnouncement(
       ? " Power Cell depleted · Mining continues at normal speed."
       : "";
   return attempt.success
-    ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
+    ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.secondaryFinds.map((find) => `${find.quantity} ${resolveItemPresentation(find.itemId, find.itemId).displayName} found. `).join("")}${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
     : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}. ${charge}${depleted}`;
 }
 
@@ -98,14 +101,11 @@ function LatestAttemptResult({
   attempt,
   attemptsResolved,
   feedback,
-  itemName,
   maximumCharge,
 }: {
   attempt: MiningRunAttempt;
   attemptsResolved: number;
   feedback: boolean;
-  /** The awarded item's authoritative display name — never assumed to be Shale. */
-  itemName: string;
   /** The equipped Mining tool's own maximum charge, when one is equipped (#233). */
   maximumCharge: number | undefined;
 }) {
@@ -146,21 +146,50 @@ function LatestAttemptResult({
           <p className="mt-3 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
             Rewards
           </p>
-          <div className="mt-2 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
-            <ItemVisual
-              accessibleLabel={`${attempt.quantityAwarded} ${itemName} earned`}
-              className={feedback ? "rs-reward-feedback" : ""}
-              itemId={attempt.itemId}
-              name={itemName}
-              quantity={attempt.quantityAwarded}
-            />
-            <SkillXpTile
-              amount={attempt.xpAwarded}
-              className={feedback ? "rs-reward-feedback [animation-delay:90ms]" : ""}
-              skillId={SKILL_IDS.mining}
-              skillName="Mining"
-            />
-          </div>
+          <RewardGrid className="mt-2">
+            {miningRewardCards(attempt).map((card, index) => {
+              // Each card rises a beat after the one before it.
+              const rise = feedback
+                ? `rs-reward-feedback${index > 0 ? ` [animation-delay:${index * 90}ms]` : ""}`
+                : "";
+              if (card.kind === "item") {
+                const accessibleLabel = `${card.quantity} ${itemDisplayName(card.itemId)} ${card.found ? "found" : "earned"}`;
+                // A stackable reward reads like the same item in Inventory: the
+                // one shared stack visual, filled by what this attempt awarded
+                // against the item's canonical stack limit.
+                return card.stackLimit !== undefined ? (
+                  <StackItemVisual
+                    accessibleLabel={accessibleLabel}
+                    className={rise}
+                    itemId={card.itemId}
+                    key={card.key}
+                    name={itemDisplayName(card.itemId)}
+                    quantity={card.quantity}
+                    stackLimit={card.stackLimit}
+                  />
+                ) : (
+                  <ItemVisual
+                    accessibleLabel={accessibleLabel}
+                    className={rise}
+                    itemId={card.itemId}
+                    key={card.key}
+                    name={itemDisplayName(card.itemId)}
+                    quantity={card.quantity}
+                  />
+                );
+              }
+              return (
+                // The combined XP for the whole attempt, never a bonus card.
+                <SkillXpTile
+                  amount={card.amount}
+                  className={rise}
+                  key={card.key}
+                  skillId={SKILL_IDS.mining}
+                  skillName="Mining"
+                />
+              );
+            })}
+          </RewardGrid>
         </>
       ) : (
         <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
@@ -429,7 +458,6 @@ export function MiningActivity({ characterName }: { characterName: string }) {
             feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
           }
           feedback={feedback?.sequence === latestAttempt.sequence}
-          itemName={itemName(latestAttempt.itemId)}
           maximumCharge={cutter?.maximumCharge}
         />
       ) : null}
@@ -439,7 +467,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
               latestAttempt,
               feedback.attempts,
               cutter?.maximumCharge,
-              itemName(latestAttempt.itemId),
+              itemDisplayName(latestAttempt.itemId),
             )
           : ""}
       </p>

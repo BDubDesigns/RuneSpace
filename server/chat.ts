@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  asPlayerChatMessage,
   characters,
   chatMessageMentions,
   chatMessages,
@@ -51,6 +52,7 @@ import type { CharacterTarget } from "@/game/schemas/whispers";
 import { containsSevereTerm } from "@/server/chat-guardrail";
 import { lockAccountChatSends } from "@/server/chat-send-lock";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
+import { toSystemView } from "@/server/public-system-messages";
 import { isSociallyRestricted, SOCIALLY_RESTRICTED_MESSAGE } from "@/server/moderation-sanctions";
 import {
   accountsBlocking,
@@ -112,7 +114,11 @@ export function channelFeed(channel: ChatChannel): SQL {
     : eq(chatMessages.channel, "trade");
 }
 
-function toView(row: ChatMessage, mentions: readonly ChatMentionView[]): VisibleChatMessageView {
+function toView(
+  message: ChatMessage,
+  mentions: readonly ChatMentionView[],
+): VisibleChatMessageView {
+  const row = asPlayerChatMessage(message);
   return {
     redacted: false,
     id: row.id,
@@ -321,11 +327,14 @@ export async function readChatHistory(
   ]);
   return {
     channel: request.channel,
-    messages: page
-      .reverse()
-      .map(({ message, redacted }) =>
-        redacted ? redact(toView(message, [])) : toView(message, mentions.get(message.id) ?? []),
-      ),
+    messages: page.reverse().map(({ message, redacted }) =>
+      // A System line (#308) has no sender account, so no Block can redact it.
+      message.kind !== "player"
+        ? toSystemView(message)
+        : redacted
+          ? redact(toView(message, []))
+          : toView(message, mentions.get(message.id) ?? []),
+    ),
     hasOlder: rows.length > CHAT_POLICY.pageSize,
     budget: budgetFrom(sends, now),
     promotedAd: adStatus(lastAd, now),

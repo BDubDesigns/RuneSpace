@@ -85,8 +85,30 @@ export const VisibleChatMessageViewSchema = z.object({
   promoted: z.boolean(),
   /** The characters it mentions; empty for an ordinary message. */
   mentions: z.array(ChatMentionViewSchema),
+  /** A player message is never a System announcement (see `SystemChatMessageView`). */
+  system: z.literal(false).optional(),
 });
 export type VisibleChatMessageView = z.infer<typeof VisibleChatMessageViewSchema>;
+
+/**
+ * An automatic System line in General (#308): today, a Mining RARE FIND. It
+ * keeps its place in the one durable timeline like any message, but it is not
+ * a player's: it has no sender id, no mentions, and nothing to Whisper, Report,
+ * or Block, and a viewer who blocked someone never has it redacted because it
+ * belongs to no one. `treatment` names the restrained visual it carries.
+ */
+export const SystemChatMessageViewSchema = z.object({
+  redacted: z.literal(false),
+  system: z.literal(true),
+  id: z.string().min(1),
+  seq: z.number().int().positive(),
+  channel: z.literal("general"),
+  promoted: z.literal(false),
+  treatment: z.literal("rare_find"),
+  body: z.string().min(1),
+  sentAt: z.string().datetime(),
+});
+export type SystemChatMessageView = z.infer<typeof SystemChatMessageViewSchema>;
 
 /**
  * A message from an account the viewer blocked (#261), redacted by the server
@@ -106,8 +128,9 @@ export const RedactedChatMessageViewSchema = z.object({
 });
 export type RedactedChatMessageView = z.infer<typeof RedactedChatMessageViewSchema>;
 
-export const ChatMessageViewSchema = z.discriminatedUnion("redacted", [
+export const ChatMessageViewSchema = z.union([
   VisibleChatMessageViewSchema,
+  SystemChatMessageViewSchema,
   RedactedChatMessageViewSchema,
 ]);
 export type ChatMessageView = z.infer<typeof ChatMessageViewSchema>;
@@ -180,7 +203,8 @@ declare module "@/game/schemas/realtime" {
   interface RealtimeEventMap {
     /**
      * A public General/Trade message committed; a promoted ad arrives once.
-     * The sender's blockers receive the redacted form instead (#261).
+     * The sender's blockers receive the redacted form instead (#261). A System
+     * announcement (#308) is delivered to everyone, unredacted.
      */
     "chat.message": ChatMessageView;
     /**

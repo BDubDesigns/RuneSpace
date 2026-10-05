@@ -47,8 +47,13 @@ export function MiningRunPanel({
   // no keys yet, so the current source stands in at zero rather than the row
   // disappearing.
   const gained = Object.entries(run.itemsGained);
+  // The source's own ore is "gained"; an item its authored Secondary Find table
+  // lists is "found" (#308) — read from the source, never inferred from "not the ore".
   const gainedRows = (gained.length > 0 ? gained : [[source.itemId, 0] as const]).map(
-    ([itemId, quantity]) => ({ label: `${itemName(itemId)} gained`, value: quantity }),
+    ([itemId, quantity]) => ({
+      label: `${itemName(itemId)} ${source.secondaryFindItemIds.includes(itemId) ? "found" : "gained"}`,
+      value: quantity,
+    }),
   );
   return (
     <RunSummary
@@ -112,8 +117,14 @@ function MiningAttemptRow({
       </p>
       {attempt.success ? (
         <p>
-          {attempt.quantityAwarded} {itemName(attempt.itemId)} |{" "}
-          <XpAmount amount={attempt.xpAwarded} skillId={SKILL_IDS.mining} skillName="Mining" />
+          {attempt.quantityAwarded} {itemName(attempt.itemId)}
+          {attempt.secondaryFinds.map((find) => (
+            <span data-rare-find-entry={find.itemId} key={find.itemId}>
+              {" "}
+              + {find.quantity} {itemName(find.itemId)} (rare find)
+            </span>
+          ))}{" "}
+          | <XpAmount amount={attempt.xpAwarded} skillId={SKILL_IDS.mining} skillName="Mining" />
         </p>
       ) : (
         <p>

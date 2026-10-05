@@ -1,12 +1,12 @@
 "use client";
 
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import { StackItemVisual } from "@/components/items/StackItemVisual";
 import type { ReactNode } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 
 /**
  * One authored recipe batch as a tile (#232): the canonical item visual —
- * `InventoryStackVisual` for a stackable output, with its per-batch quantity
+ * `StackItemVisual` for a stackable output, with its per-batch quantity
  * badge and stack fill, `ItemVisual` for a unique item — and the recipe and any
  * unmet requirement directly beneath it.
  *
@@ -49,7 +49,7 @@ export function RecipeTile({
   return (
     <div className="min-w-0 space-y-1.5" {...rest}>
       {stackLimit !== undefined ? (
-        <InventoryStackVisual
+        <StackItemVisual
           accessibleLabel={tileLabel}
           interactive={onSelect !== undefined}
           itemId={itemId}

@@ -8,6 +8,7 @@ import {
   whisperConversations,
   whisperParticipants,
   type Character,
+  asPlayerChatMessage,
   type ChatMessage,
 } from "@/db/rune-space";
 import { CHAT_POLICY, chatRetentionCutoff, whisperParticipantKey } from "@/game/domain/chat";
@@ -64,7 +65,8 @@ const SELF_REFUSAL = "You can't whisper your own characters.";
 const NO_SUCH_CHARACTER = "No character has that name.";
 const UNDELIVERABLE = "Your Whisper couldn't be delivered.";
 
-function toView(row: ChatMessage, recipientCharacterId: string): WhisperMessageView {
+function toView(message: ChatMessage, recipientCharacterId: string): WhisperMessageView {
+  const row = asPlayerChatMessage(message);
   return {
     id: row.id,
     seq: row.seq,

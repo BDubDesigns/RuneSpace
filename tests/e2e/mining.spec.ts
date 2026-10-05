@@ -1575,3 +1575,210 @@ test("selected details stay open through actions and dismiss deliberately", asyn
   expect(drawerOverflow).toBeLessThanOrEqual(1);
   await captureReviewScreenshot(page, "mining-mobile-inventory-dossier.png");
 });
+
+test("a Secondary Find reads as a RARE FIND beside the ore, under one combined XP total", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  const attempt = {
+    sequence: 1,
+    resolvedAt: new Date().toISOString(),
+    success: true,
+    rolledBasisPoints: 0,
+    thresholdBasisPoints: 3_500,
+    itemId: ITEM_IDS.ferriteShale,
+    quantityAwarded: 1,
+    secondaryFinds: [{ itemId: ITEM_IDS.uncutTopaz, quantity: 1 }],
+    // 15 Ferrite Shale XP + 20 Uncut Topaz XP, never two XP cards.
+    xpAwarded: 35,
+    boosted: false,
+    durationTicks: 10,
+    chargeConsumed: false,
+    remainingCharge: 0,
+  };
+  const run = {
+    runAttempts: 1,
+    runSuccesses: 1,
+    runItemsGained: { [ITEM_IDS.ferriteShale]: 1, [ITEM_IDS.uncutTopaz]: 1 },
+    runXpGained: 35,
+    recentAttempts: [attempt],
+  };
+  await db
+    .insert(characterMiningState)
+    .values({ characterId, ...run })
+    .onConflictDoUpdate({ target: characterMiningState.characterId, set: run });
+  await page.reload();
+
+  const result = page.getByRole("region", { name: "Latest mining attempt", exact: true });
+  const cards = result.locator("[data-reward-grid] > *");
+  // The ore, then the find, then the combined XP last.
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("Ferrite Shale");
+  await expect(cards.nth(1)).toContainText("Uncut Topaz");
+  await expect(cards.nth(1)).toHaveAccessibleName("1 Uncut Topaz found");
+  await expect(cards.nth(2)).toContainText("Mining");
+  await expect(cards.nth(2)).toContainText("+35");
+  await expect(cards.nth(2)).toHaveAccessibleName("35 Mining XP earned");
+  // No literal RARE FIND tag on a physical item tile: the item's own rare
+  // presentation carries it, and nothing competes with the quantity badge.
+  await expect(result).not.toContainText("RARE FIND");
+  await expect(result.locator("[data-tile-tag]")).toHaveCount(0);
+  await expect(cards.nth(1).getByTestId("item-artwork")).toBeVisible();
+  await expect
+    .poll(() =>
+      evaluateImage(
+        cards.nth(1).getByTestId("item-artwork"),
+        (image) =>
+          image.complete &&
+          image.naturalWidth > 0 &&
+          new URL(image.currentSrc).searchParams.get("url") === "/item-art/uncut-topaz.webp",
+      ),
+    )
+    .toBe(true);
+
+  // A stackable reward is the shared stack visual, filled by the quantity this
+  // attempt awarded over the canonical stack limit: Shale 1 of 10, Topaz 1 of 2.
+  await expect(cards.nth(0).locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "10");
+  await expect(cards.nth(1).locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "50");
+  await expect(cards.nth(0)).not.toHaveAttribute("data-item-rarity", /.+/);
+  await expect(cards.nth(1)).toHaveAttribute("data-item-rarity", "rare");
+  // The XP reward is a reward tile, not an item stack: no stack indicator.
+  await expect(cards.nth(2).locator("[data-stack-track]")).toHaveCount(0);
+  await expect(cards.nth(2)).not.toHaveAttribute("data-item-rarity", /.+/);
+  // Rare reads the same on the border and the stack indicator; Shale keeps Mining yellow.
+  const colours = await cards.evaluateAll((elements) =>
+    elements.map((element) => ({
+      border: getComputedStyle(element).borderTopColor,
+      fill: element.querySelector("[data-stack-fill]")
+        ? getComputedStyle(element.querySelector("[data-stack-fill]")!).backgroundColor
+        : undefined,
+    })),
+  );
+  expect(colours[1]!.fill).toBe(colours[1]!.border);
+  expect(colours[0]!.fill).not.toBe(colours[1]!.fill);
+
+  // The run summary stays item-keyed and honest, with one combined XP total.
+  await expect(page.getByText("1 Ferrite Shale gained", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 Uncut Topaz found", { exact: true })).toBeVisible();
+  await expect(page.getByText("35 Mining XP", { exact: true })).toBeVisible();
+
+  // The columns that fit share the row's width; a short last row keeps one
+  // column's width and stays left-aligned.
+  const grid = result.locator("[data-reward-grid]");
+  async function layout() {
+    const [gridBox, ...boxes] = await Promise.all([
+      grid.boundingBox(),
+      ...[0, 1, 2].map((index) => cards.nth(index).boundingBox()),
+    ]);
+    return { grid: gridBox!, cards: boxes.map((box) => box!) };
+  }
+  await page.setViewportSize({ width: 1_400, height: 900 });
+  const wide = await layout();
+  expect(new Set(wide.cards.map((box) => Math.round(box.width))).size).toBe(1);
+  // Room for all three: one row of three equal thirds consuming the whole row.
+  expect(new Set(wide.cards.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(Math.abs(wide.cards[0]!.x - wide.grid.x)).toBeLessThan(1);
+  expect(
+    Math.abs(wide.cards[2]!.x + wide.cards[2]!.width - (wide.grid.x + wide.grid.width)),
+  ).toBeLessThan(1);
+  expect(Math.abs(wide.cards[0]!.width * 3 - wide.grid.width)).toBeLessThan(20);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrow = await layout();
+  // Two fit across and split the row between them, edge to edge.
+  expect(Math.round(narrow.cards[1]!.y)).toBe(Math.round(narrow.cards[0]!.y));
+  expect(Math.abs(narrow.cards[0]!.width - narrow.cards[1]!.width)).toBeLessThan(1);
+  expect(
+    Math.abs(narrow.cards[1]!.x + narrow.cards[1]!.width - (narrow.grid.x + narrow.grid.width)),
+  ).toBeLessThan(1);
+  // The third wraps beneath the first at the SAME one-column width, not stretched.
+  expect(narrow.cards[2]!.y).toBeGreaterThan(narrow.cards[0]!.y + narrow.cards[0]!.height - 1);
+  expect(Math.round(narrow.cards[2]!.x)).toBe(Math.round(narrow.cards[0]!.x));
+  expect(Math.abs(narrow.cards[2]!.width - narrow.cards[0]!.width)).toBeLessThan(1);
+});
+
+test("an ordinary two-reward Mining result is two equal halves of the row", async ({
+  page,
+  testCharacter,
+}) => {
+  const run = {
+    runAttempts: 1,
+    runSuccesses: 1,
+    runItemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+    runXpGained: 15,
+    recentAttempts: [
+      {
+        sequence: 1,
+        resolvedAt: new Date().toISOString(),
+        success: true,
+        rolledBasisPoints: 0,
+        thresholdBasisPoints: 3_500,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
+        secondaryFinds: [],
+        xpAwarded: 15,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
+      },
+    ],
+  };
+  await db
+    .insert(characterMiningState)
+    .values({ characterId: testCharacter.id, ...run })
+    .onConflictDoUpdate({ target: characterMiningState.characterId, set: run });
+  await page.reload();
+  const grid = page
+    .getByRole("region", { name: "Latest mining attempt", exact: true })
+    .locator("[data-reward-grid]");
+  const cards = grid.locator(":scope > *");
+  await expect(cards).toHaveCount(2);
+  for (const viewport of [
+    { width: 1_400, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const [gridBox, first, second] = await Promise.all([
+      grid.boundingBox(),
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
+    // Two equal halves that consume the row, edge to edge.
+    expect(Math.round(first!.y)).toBe(Math.round(second!.y));
+    expect(Math.abs(first!.width - second!.width)).toBeLessThan(1);
+    expect(Math.abs(first!.x - gridBox!.x)).toBeLessThan(1);
+    expect(Math.abs(second!.x + second!.width - (gridBox!.x + gridBox!.width))).toBeLessThan(1);
+  }
+});
+
+test("rare gems keep their rare look in Inventory, beside ordinary items that do not", async ({
+  page,
+  testCharacter,
+}) => {
+  await db.insert(inventoryStacks).values([
+    { characterId: testCharacter.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 },
+    { characterId: testCharacter.id, itemId: ITEM_IDS.uncutTopaz, quantity: 1 },
+  ]);
+  await page.reload();
+  await page.getByRole("button", { name: "Inventory" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  const rare = inventory.locator('[data-item-rarity="rare"]');
+  await expect(rare).toHaveCount(1);
+  await expect(rare).toContainText("Uncut Topaz");
+  await expect(rare.locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "50");
+  // Ordinary Inventory items are unchanged: no rarity, Mining-yellow stack fill.
+  const [rareFill, rareBorder, shaleFill] = await Promise.all([
+    rare.locator("[data-stack-fill]").evaluate((el) => getComputedStyle(el).backgroundColor),
+    rare.evaluate((el) => getComputedStyle(el).borderTopColor),
+    inventory
+      .locator("article, button")
+      .filter({ hasText: "Ferrite Shale" })
+      .locator("[data-stack-fill]")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  expect(rareFill).toBe(rareBorder);
+  expect(shaleFill).not.toBe(rareFill);
+});

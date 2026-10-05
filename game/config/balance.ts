@@ -45,6 +45,18 @@ const balanceSchema = z.object({
         successXp: z.literal(15),
         yieldMinimum: z.literal(1),
         yieldMaximum: z.literal(2),
+        secondaryFinds: z.tuple([
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutQuartz),
+            oneIn: z.literal(40),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutTopaz),
+            oneIn: z.literal(60),
+            announce: z.literal(true),
+          }),
+        ]),
       }),
       /**
        * Deep Jag's Galvanite (#209). Harder ore: a longer attempt, a curve
@@ -63,6 +75,18 @@ const balanceSchema = z.object({
         successXp: z.literal(25),
         yieldMinimum: z.literal(1),
         yieldMaximum: z.literal(2),
+        secondaryFinds: z.tuple([
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutTopaz),
+            oneIn: z.literal(35),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutSapphire),
+            oneIn: z.literal(55),
+            announce: z.literal(true),
+          }),
+        ]),
       }),
     }),
   }),
@@ -759,6 +783,30 @@ const balanceSchema = z.object({
       massGrams: z.literal(9_000),
       equipment: z.object({ kind: z.literal("container"), slotCapacity: z.literal(6) }),
     }),
+    /**
+     * Mining Secondary Finds (#308): rough gemstones. Each owns the one bonus
+     * Mining XP it is worth wherever a source's table awards it, so the same
+     * Topaz is worth the same at The Jag and at Deep Jag and no source restates
+     * it. Two to a stack keeps a few specimens a real carrying decision.
+     */
+    uncutQuartz: z.object({
+      itemId: z.literal(ITEM_IDS.uncutQuartz),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+      secondaryFindMiningXp: z.literal(10),
+    }),
+    uncutTopaz: z.object({
+      itemId: z.literal(ITEM_IDS.uncutTopaz),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+      secondaryFindMiningXp: z.literal(20),
+    }),
+    uncutSapphire: z.object({
+      itemId: z.literal(ITEM_IDS.uncutSapphire),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+      secondaryFindMiningXp: z.literal(30),
+    }),
   }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
@@ -815,6 +863,10 @@ const defaults = balanceSchema.parse({
         successXp: 15,
         yieldMinimum: 1,
         yieldMaximum: 2,
+        secondaryFinds: [
+          { itemId: ITEM_IDS.uncutQuartz, oneIn: 40, announce: false },
+          { itemId: ITEM_IDS.uncutTopaz, oneIn: 60, announce: true },
+        ],
       },
       galvanite: {
         actionId: ACTION_IDS.galvaniteMining,
@@ -826,6 +878,10 @@ const defaults = balanceSchema.parse({
         successXp: 25,
         yieldMinimum: 1,
         yieldMaximum: 2,
+        secondaryFinds: [
+          { itemId: ITEM_IDS.uncutTopaz, oneIn: 35, announce: false },
+          { itemId: ITEM_IDS.uncutSapphire, oneIn: 55, announce: true },
+        ],
       },
     },
   },
@@ -1216,6 +1272,24 @@ const defaults = balanceSchema.parse({
       massGrams: 9_000,
       equipment: { kind: "container", slotCapacity: 6 },
     },
+    uncutQuartz: {
+      itemId: ITEM_IDS.uncutQuartz,
+      massGrams: 100,
+      stackLimit: 2,
+      secondaryFindMiningXp: 10,
+    },
+    uncutTopaz: {
+      itemId: ITEM_IDS.uncutTopaz,
+      massGrams: 100,
+      stackLimit: 2,
+      secondaryFindMiningXp: 20,
+    },
+    uncutSapphire: {
+      itemId: ITEM_IDS.uncutSapphire,
+      massGrams: 100,
+      stackLimit: 2,
+      secondaryFindMiningXp: 30,
+    },
   },
   carrying: {
     startingCapacityGrams: 50_000,
@@ -1237,9 +1311,32 @@ export type RepairTargetBalance =
 /** One authored material requirement on a repair recipe (#209). */
 export type RepairMaterialRequirement = RepairTargetBalance["materials"][number];
 
-/** One authored Mining source (#209). */
-export type MiningSourceBalance =
-  EffectiveGameBalance["mining"]["sources"][keyof EffectiveGameBalance["mining"]["sources"]];
+/**
+ * One authored Mining source (#209). Its Secondary Find table (#308) is typed
+ * as the general list it is, not as today's two-entry literals: a source may
+ * author any number of finds, including none, and resolution treats them alike.
+ */
+export type MiningSourceBalance = {
+  [Key in keyof EffectiveGameBalance["mining"]["sources"]]: Omit<
+    EffectiveGameBalance["mining"]["sources"][Key],
+    "secondaryFinds"
+  > & { secondaryFinds: readonly MiningSecondaryFindBalance[] };
+}[keyof EffectiveGameBalance["mining"]["sources"]];
+
+/**
+ * One authored Secondary Find on a Mining source (#308): a bonus item a
+ * successful extraction can turn up beside the source's ordinary ore.
+ *
+ * `oneIn` is the entry's ABSOLUTE chance per successful extraction (1 / oneIn).
+ * A source's entries are one mutually exclusive table — one roll, at most one
+ * find — so they never combine into a pair. `announce` is authored per entry:
+ * whether finding it posts a public System line to General.
+ */
+export type MiningSecondaryFindBalance = {
+  readonly itemId: string;
+  readonly oneIn: number;
+  readonly announce: boolean;
+};
 
 /** One authored Refining recipe (#209). */
 export type RefiningRecipeBalance =
