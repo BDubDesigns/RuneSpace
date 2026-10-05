@@ -20,6 +20,7 @@ function makeTravel(overrides: Partial<TravelState> = {}): TravelState {
     destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
     startedAt: startedAt.toISOString(),
     arrivesAt: new Date(startedAt.getTime() + 30_000).toISOString(),
+    scavengeSuppressed: false,
     scavenge: {
       opportunityStartTick: 3,
       opensAt: new Date(startedAt.getTime() + 1_800).toISOString(),

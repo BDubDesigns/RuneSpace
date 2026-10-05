@@ -90,6 +90,7 @@ import {
 import { claimCleanPass, type CleanPassClaimResult } from "@/server/clean-pass";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
+import { turnBackTravel } from "@/server/travel-commands";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import { markChatMentionsRead, postPromotedTradeAd, sendChatMessage } from "@/server/chat";
@@ -163,6 +164,7 @@ import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
+  TurnBackTravelRequestSchema,
   ScavengeClaimRequestSchema,
   ScavengeRevealAcknowledgmentRequestSchema,
   ClaimPowerCellsRequestSchema,
@@ -972,6 +974,13 @@ export async function beginTransportTravelAction(input: unknown): Promise<PlayAc
     if (error instanceof TravelRuleError) return { error: error.message };
     throw error;
   }
+}
+
+/** Turn Back from the active Journey. Arrival wins any race; see `turnBackTravel`. */
+export async function turnBackTravelAction(input: unknown): Promise<PlayActionResult> {
+  const request = TurnBackTravelRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Turn Back command." };
+  return runPlayAction(request.data.characterId, turnBackTravel);
 }
 
 export type ScavengeClaimActionResult =

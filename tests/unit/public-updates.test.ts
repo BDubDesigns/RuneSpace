@@ -117,10 +117,32 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the rare finds Update as the newest", () => {
+  it("publishes the Turn Back Update as the newest, linking Travel & Scavenging", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("rare-finds");
+    expect(latest.slug).toBe("turn-back");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("rare-finds")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    // Player-facing: the button, the fare consequence and the Scavenge rule.
+    const text = JSON.stringify(latest);
+    for (const label of ["Turn Back", "isn't refunded", "Scavenge", "complete a walk"]) {
+      expect(text).toContain(label);
+    }
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({
+      text: "Travel & Scavenging",
+      articleSlug: "travel-and-scavenging",
+    });
+  });
+
+  it("publishes the rare finds Update", () => {
+    // A newer Update has shipped since (#312), so it is found by slug.
+    const latest = getPublicUpdate("rare-finds")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("curly-must-stash")!.publishedAt),
     );

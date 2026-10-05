@@ -3,7 +3,6 @@ import {
   activeActions,
   characterMiningState,
   characterRefiningState,
-  characterTravelState,
   type ActiveAction,
   type Character,
 } from "@/db/rune-space";
@@ -18,6 +17,7 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
 import { interruptPracticeWelding } from "@/server/practice-welding";
 import { clearFabricationWorkpiece, isFabricationAction } from "@/server/fabrication";
 import { interruptTinkering, isTinkeringAction } from "@/server/tinkering";
+import { clearActiveJourney } from "@/server/travel";
 import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
 
@@ -136,11 +136,10 @@ export async function forceIdleResolvedAction(
   }
 
   if (actionId === ACTION_IDS.travel) {
-    await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
-    await transaction
-      .delete(characterTravelState)
-      .where(eq(characterTravelState.characterId, character.id));
-    // Committed character_scavenge_reveals is intentionally preserved.
+    // Committed character_scavenge_reveals is intentionally preserved, and an
+    // operator force-idle never sets Scavenge suppression (that is the player's
+    // own Turn Back rule, #312).
+    await clearActiveJourney(transaction, character.id);
     return { interrupted: true, interruptedActionId: actionId };
   }
 

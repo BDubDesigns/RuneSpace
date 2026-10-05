@@ -1403,7 +1403,8 @@ that mode owns the two things that differ:
 - **Scavenge eligibility** — only a walk has a Scavenge window. A ride has none
   at all: the travel row stores `NULL`, the projection exposes nothing, and
   `claimScavenge` refuses. A database CHECK ties the two together so the
-  invariant cannot be violated by any command.
+  invariant cannot be violated by any command. A walk may also carry `NULL`,
+  but only while Scavenge is suppressed after a Turn Back (below).
 
 A paid route is **not map adjacency**. Holo Hollow and The Jag remain
 non-adjacent: walking between them is unchanged, the map draws no new walkable
@@ -1450,9 +1451,9 @@ or pathfinding, and nothing computes "the best way to get somewhere".
 ### Optional walking Scavenge window (issue #88)
 
 - Each ordinary 40-tick walking leg receives one server-chosen Scavenge start
-  tick in the inclusive range **3–30**. The opportunity is open for **5 ticks
-  = 3 seconds**, then is permanently missed; arrival, replacement, or any
-  future cancellation ends the leg and its opportunity. The server accepts a
+  tick in the inclusive range **3–30** (none while suppressed, below). The
+  opportunity is open for **5 ticks = 3 seconds**, then is permanently missed;
+  arrival, replacement, or Turn Back ends the leg and its opportunity. The server accepts a
   claim for one additional second after the client-visible expiry to absorb
   network delay; this grace does not extend the visible or clickable window.
 - Claiming is a server-authoritative transaction. Capacity is preflighted for
@@ -1478,6 +1479,33 @@ or pathfinding, and nothing computes "the best way to get somewhere".
   never alter the committed outcome or disable the optional Scavenge control.
   DONE only acknowledges the presentation; it cannot award, reroll, or change
   Travel and is idempotent.
+
+### Turn Back and Scavenge suppression (issue #312)
+
+- **Turn Back** is a player command on an active Journey, walk or ride. The owned
+  character is locked and Travel reconciled first, so **arrival wins**: a Journey
+  already due commits its arrival and Turn Back finds nothing to cancel; there is
+  no "too late" window and the client countdown is never authoritative. A Journey
+  that remains has its Travel action and `character_travel_state` cleared
+  together. `current_location_id` is the origin for the whole Journey and is not
+  touched, so the character is idle at the origin: no halfway place, no return
+  trip, elapsed progress discarded. A retry, or a forged request while not
+  traveling, is a no-op that returns authoritative state.
+- Committed Scavenge rewards and reveals are never rolled back; an unclaimed
+  opportunity lives on the travel row and disappears with it. An operator
+  force-idle shares the same clearing helper but never sets suppression.
+- Cancelling a **walk** sets `characters.scavenge_suppressed` — even before that
+  Journey's opportunity appeared, so cancelling cannot reroll the random window.
+  While set, a new walk stores no Scavenge window (NULL), spends no random roll,
+  and `claimScavenge` refuses with `scavenge_suppressed`. Starting or cancelling
+  further walks, reloading, logging out and in, and any Crew Hauler ride neither
+  clear it nor are affected by it. It clears only when a **walking** Journey
+  arrives.
+- Cancelling a **ride** is immediate and not refunded (the fare was debited at
+  boarding), and neither sets nor clears suppression.
+- The flag is projected as `PlayGameplayState.scavengeSuppressed` and, per
+  Journey, `travelState.scavengeSuppressed`, so the UI states it rather than
+  holding a client-only latch.
 
 ### Location population (issue #62)
 
@@ -1764,6 +1792,6 @@ the Salvage Cutter — takes the 2× below. A charged Loadsteel Cutter keeps its
   fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
 a large hex grid or full planet map, world coordinates, terrain simulation,
 pathfinding, multi-hop routing, route queues, random encounters, fast travel,
-teleportation, recalls, Travel cancellation, background workers, WebSockets,
+teleportation, recalls, Travel cancellation (shipped later in #312), background workers, WebSockets,
 client-authoritative timers, Phaser/canvas/WebGL map rendering, and Inventory/
 Equipment overlay polish from issue #41 are all explicitly out of scope here.

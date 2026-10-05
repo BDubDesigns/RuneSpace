@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #312 — Turn Back from an active Journey.
+    slug: "turn-back",
+    title: "Turn back",
+    publishedAt: "2026-10-05T09:10:00-07:00",
+    summary:
+      "You can now Turn Back from a Journey. It ends the trip and leaves you where you set out — but turning back from a walk switches Scavenge off until you complete one.",
+    body: [
+      [
+        "Start walking somewhere, change your mind, and you used to be stuck until you arrived. The Journey now has a Turn Back button. One click, no confirmation, and you're idle at the place you left — not halfway along the route, and with no trip home to wait out. If you arrive before the button gets there, you've arrived and you stay put. See ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        " for the details.",
+      ],
+      "Turning back from a walk isn't a way to reroll Scavenge. After you turn back from a walk, walks stop offering Scavenge until you complete a walk by arriving — starting and cancelling more walks won't change that, and neither will reloading or logging out and in. The Journey says so while it applies, and a find you'd already claimed stays yours.",
+      "You can also turn back from the Crew Hauler. The fare was spent when you boarded and isn't refunded, and the button says so before you press it. Turning back from a ride doesn't touch Scavenge.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Turn Back on the Journey, for walks and Crew Hauler rides alike.",
+          "A notice that Scavenge is unavailable until you complete a walk, shown after turning back from a walk and on any walk it affects.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Turning back from a walk switches off Scavenge on walks until you complete one by arriving.",
+          "A Crew Hauler ride that you turn back from is not refunded.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #308 — Mining Secondary Finds and uncut gemstones.
     slug: "rare-finds",
     title: "Rare finds",

@@ -803,7 +803,9 @@ export type ScavengeClaimStatus =
         | "not_open"
         | "missed"
         | "already_claimed"
-        | "capacity_blocked";
+        | "capacity_blocked"
+        /** A walk begun while Scavenge is suppressed after a Turn Back (#312). */
+        | "scavenge_suppressed";
       message: string;
     };
 
@@ -982,7 +984,13 @@ export type PlayGameplayState = {
     mode: TravelMode;
     startedAt: string;
     arrivesAt: string;
-    /** Present only for an ordinary walk. A paid ride offers nothing to scavenge. */
+    /**
+     * True for a walk begun while Scavenge is suppressed after a Turn Back
+     * (#312): the Journey has no window at all, and says so. Always false for
+     * a ride, which never had one to suppress.
+     */
+    scavengeSuppressed: boolean;
+    /** Present only for an ordinary, unsuppressed walk. A paid ride offers nothing to scavenge. */
     scavenge?: {
       opportunityStartTick: number;
       opensAt: string;
@@ -990,6 +998,12 @@ export type PlayGameplayState = {
       outcome?: ScavengeResolvedOutcome;
     };
   };
+  /**
+   * True while a Turn Back from a walk is still suppressing walking Scavenge
+   * (#312). Durable and server-owned: it survives reload and only a completed
+   * walking Journey clears it.
+   */
+  scavengeSuppressed: boolean;
   /** Committed Scavenge outcomes awaiting presentation acknowledgment. */
   scavengeReveals: readonly ScavengeReveal[];
   /** Current Pacific-day claim state, only when the character is at the Annex. */
@@ -1899,7 +1913,7 @@ export async function stateFromTransaction(
   miningStopReason?: MiningStopReason,
   commandError?: PlayGameplayState["commandError"],
   travelError?: PlayGameplayState["travelError"],
-  characterRow?: { currentLocationId: string; credits: number },
+  characterRow?: { currentLocationId: string; credits: number; scavengeSuppressed: boolean },
   now = new Date(),
   refiningRecentResult: PlayGameplayState["refiningRecentResult"] = {
     successes: 0,
@@ -2167,8 +2181,11 @@ export async function stateFromTransaction(
           arrivesAt: new Date(
             action.startedAt.getTime() + ticksToMilliseconds(travelDurationTicks(travelMode)),
           ).toISOString(),
+          scavengeSuppressed:
+            travelOffersScavenge(travelMode) && travel.scavengeOpportunityStartTick === null,
           // A paid ride offers no Scavenge opportunity at all, so the Journey
-          // exposes none rather than a window nobody may claim.
+          // exposes none rather than a window nobody may claim. A suppressed
+          // walk (#312) has none either, by the same representation.
           scavenge:
             travelOffersScavenge(travelMode) && travel.scavengeOpportunityStartTick !== null
               ? (() => {
@@ -2295,6 +2312,7 @@ export async function stateFromTransaction(
     missions,
     location: { currentLocationId },
     credits,
+    scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
     scavengeReveals,
     travelState,
     powerAnnex:
@@ -2807,7 +2825,12 @@ export async function beginTravel(
         originLocationId: currentLocationId,
         destinationLocationId,
         mode: "walk",
-        scavengeOpportunityStartTick: scavengeOpportunityStartTick(random.nextBasisPoints()),
+        // While Scavenge is suppressed after a Turn Back (#312) the walk gets no
+        // window at all, and no random roll is spent deciding where one would
+        // have been. Only a completed walk lifts the suppression.
+        scavengeOpportunityStartTick: reloaded?.scavengeSuppressed
+          ? null
+          : scavengeOpportunityStartTick(random.nextBasisPoints()),
       });
 
       return stateFromTransaction(
@@ -3012,14 +3035,20 @@ export async function claimScavenge(
       // Riding offers nothing to scavenge. This is the authoritative refusal:
       // a forged claim during a paid ride is rejected here regardless of what
       // the client believes it can see.
-      if (
-        !travelOffersScavenge(travel.mode as TravelMode) ||
-        travel.scavengeOpportunityStartTick === null
-      ) {
+      if (!travelOffersScavenge(travel.mode as TravelMode)) {
         return stateFor({
           status: "refused",
           reason: "no_scavenge_on_this_journey",
           message: "There is nothing to scavenge from the back of a hauler.",
+        });
+      }
+      // A walk with no window is a suppressed one (#312): the same authoritative
+      // refusal, whatever the client believes it can see.
+      if (travel.scavengeOpportunityStartTick === null) {
+        return stateFor({
+          status: "refused",
+          reason: "scavenge_suppressed",
+          message: "Scavenge is unavailable until you complete a walk.",
         });
       }
       const opportunityStartTick = travel.scavengeOpportunityStartTick;

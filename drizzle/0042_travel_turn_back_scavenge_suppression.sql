@@ -1,0 +1,3 @@
+ALTER TABLE "character_travel_state" DROP CONSTRAINT "character_travel_state_scavenge_window_matches_mode";--> statement-breakpoint
+ALTER TABLE "characters" ADD COLUMN "scavenge_suppressed" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "character_travel_state" ADD CONSTRAINT "character_travel_state_scavenge_window_matches_mode" CHECK (("character_travel_state"."mode" = 'walk' AND ("character_travel_state"."scavenge_opportunity_start_tick" IS NULL OR ("character_travel_state"."scavenge_opportunity_start_tick" >= 3 AND "character_travel_state"."scavenge_opportunity_start_tick" <= 30))) OR ("character_travel_state"."mode" <> 'walk' AND "character_travel_state"."scavenge_opportunity_start_tick" IS NULL));

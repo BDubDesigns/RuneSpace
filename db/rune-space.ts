@@ -163,6 +163,12 @@ export const characters = pgTable(
     // one activity's state. Default Off; read when an activity resolves, so a
     // change applies to work that resolves after it.
     autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
+    // Walking Scavenge suppression (issue #312). Set when the player turns back
+    // from a walking Journey, so cancelling cannot be used to reroll the random
+    // Scavenge window; cleared only when a walking Journey arrives. A Crew Hauler
+    // ride neither sets nor clears it. It lives with the character, not the
+    // travel row, because it must outlive the Journey that set it.
+    scavengeSuppressed: boolean("scavenge_suppressed").notNull().default(false),
   },
   (table) => [
     check(
@@ -356,7 +362,9 @@ export const characterTravelState = pgTable(
     mode: text("mode").notNull().default("walk"),
     // One stable optional Scavenge window belongs to an ordinary walking leg.
     // A paid ride has no Scavenge opportunity at all, so the column is NULL
-    // there rather than carrying an unused window nobody may claim.
+    // there rather than carrying an unused window nobody may claim. A walk begun
+    // while `characters.scavenge_suppressed` is set (#312) also has no window:
+    // NULL on a walk means "Scavenge suppressed for this Journey".
     // The outcome fields stay null until an authoritative claim commits.
     scavengeOpportunityStartTick: integer("scavenge_opportunity_start_tick"),
     scavengeOutcomeId: text("scavenge_outcome_id"),
@@ -368,11 +376,12 @@ export const characterTravelState = pgTable(
       sql`${table.originLocationId} <> ${table.destinationLocationId}`,
     ),
     check("character_travel_state_mode", sql`${table.mode} IN ('walk', 'crew_hauler')`),
-    // The structural invariant behind "riding offers nothing to scavenge":
-    // a walk always has an authored window, and no other mode ever does.
+    // The structural invariant behind "riding offers nothing to scavenge": a
+    // walk has either an authored window or none (suppressed, #312), and no
+    // other mode ever has one.
     check(
       "character_travel_state_scavenge_window_matches_mode",
-      sql`(${table.mode} = 'walk' AND ${table.scavengeOpportunityStartTick} IS NOT NULL AND ${table.scavengeOpportunityStartTick} >= 3 AND ${table.scavengeOpportunityStartTick} <= 30) OR (${table.mode} <> 'walk' AND ${table.scavengeOpportunityStartTick} IS NULL)`,
+      sql`(${table.mode} = 'walk' AND (${table.scavengeOpportunityStartTick} IS NULL OR (${table.scavengeOpportunityStartTick} >= 3 AND ${table.scavengeOpportunityStartTick} <= 30))) OR (${table.mode} <> 'walk' AND ${table.scavengeOpportunityStartTick} IS NULL)`,
     ),
     // Only a walk can ever have claimed a Scavenge outcome.
     check(

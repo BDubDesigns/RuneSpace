@@ -99,7 +99,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 79 production player actions", () => {
+  it("enumerates exactly the 80 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -110,13 +110,14 @@ describe("player server actions (server/actions.ts)", () => {
     // Ready, Change Offer, and Confirm. #274 adds the System conversation read.
     // #261 adds the public mention read and Whisper conversation hide. #284
     // adds seven site stash commands: stack and item deposit and withdrawal,
-    // and container install, swap, and remove.
-    expect(bodies.size).toBe(79);
+    // and container install, swap, and remove. #312 adds Turn Back from a
+    // Journey.
+    expect(bodies.size).toBe(80);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(75);
+    expect(gameplay).toHaveLength(76);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
