@@ -501,13 +501,15 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     const dialog = await openChat(page, player.character.id);
     const general = log(dialog, "General");
     const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
-    await expect(
-      general.getByText(`after ${tag} #${CHAT_POLICY.pageSize}`, { exact: true }),
-    ).toBeVisible();
+    // The first page has loaded once older history is on offer, and the row
+    // is a full page of newer messages deep, so it is not rendered yet. No
+    // particular seeded message is assumed to be on this page: concurrent
+    // journeys may push those off it too.
+    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
+    await expect(olderButton).toBeVisible();
     await expect(line).toHaveCount(0);
     // Each click fetches the next older page by cursor; only a page boundary
     // can end the walk, so it needs no wait other than the response itself.
-    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
     while ((await line.count()) === 0) {
       await expect(olderButton).toBeVisible();
       const loaded = page.waitForResponse(
