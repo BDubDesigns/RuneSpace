@@ -1676,8 +1676,13 @@ test("a Secondary Find reads as a RARE FIND beside the ore, under one combined X
   await page.setViewportSize({ width: 1_400, height: 900 });
   const wide = await layout();
   expect(new Set(wide.cards.map((box) => Math.round(box.width))).size).toBe(1);
-  // Room for all three: one row.
+  // Room for all three: one row of three equal thirds consuming the whole row.
   expect(new Set(wide.cards.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(Math.abs(wide.cards[0]!.x - wide.grid.x)).toBeLessThan(1);
+  expect(
+    Math.abs(wide.cards[2]!.x + wide.cards[2]!.width - (wide.grid.x + wide.grid.width)),
+  ).toBeLessThan(1);
+  expect(Math.abs(wide.cards[0]!.width * 3 - wide.grid.width)).toBeLessThan(20);
 
   await page.setViewportSize({ width: 390, height: 844 });
   const narrow = await layout();
@@ -1691,6 +1696,61 @@ test("a Secondary Find reads as a RARE FIND beside the ore, under one combined X
   expect(narrow.cards[2]!.y).toBeGreaterThan(narrow.cards[0]!.y + narrow.cards[0]!.height - 1);
   expect(Math.round(narrow.cards[2]!.x)).toBe(Math.round(narrow.cards[0]!.x));
   expect(Math.abs(narrow.cards[2]!.width - narrow.cards[0]!.width)).toBeLessThan(1);
+});
+
+test("an ordinary two-reward Mining result is two equal halves of the row", async ({
+  page,
+  testCharacter,
+}) => {
+  const run = {
+    runAttempts: 1,
+    runSuccesses: 1,
+    runItemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+    runXpGained: 15,
+    recentAttempts: [
+      {
+        sequence: 1,
+        resolvedAt: new Date().toISOString(),
+        success: true,
+        rolledBasisPoints: 0,
+        thresholdBasisPoints: 3_500,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
+        secondaryFinds: [],
+        xpAwarded: 15,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
+      },
+    ],
+  };
+  await db
+    .insert(characterMiningState)
+    .values({ characterId: testCharacter.id, ...run })
+    .onConflictDoUpdate({ target: characterMiningState.characterId, set: run });
+  await page.reload();
+  const grid = page
+    .getByRole("region", { name: "Latest mining attempt", exact: true })
+    .locator("[data-reward-grid]");
+  const cards = grid.locator(":scope > *");
+  await expect(cards).toHaveCount(2);
+  for (const viewport of [
+    { width: 1_400, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const [gridBox, first, second] = await Promise.all([
+      grid.boundingBox(),
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
+    // Two equal halves that consume the row, edge to edge.
+    expect(Math.round(first!.y)).toBe(Math.round(second!.y));
+    expect(Math.abs(first!.width - second!.width)).toBeLessThan(1);
+    expect(Math.abs(first!.x - gridBox!.x)).toBeLessThan(1);
+    expect(Math.abs(second!.x + second!.width - (gridBox!.x + gridBox!.width))).toBeLessThan(1);
+  }
 });
 
 test("rare gems keep their rare look in Inventory, beside ordinary items that do not", async ({

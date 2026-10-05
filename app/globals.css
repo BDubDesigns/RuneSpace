@@ -809,13 +809,15 @@ body {
   animation: rs-result-danger 3.6s ease-out;
 }
 
-/* Reward cards (#308): as many columns as fit at the minimum card width, sharing
-   the row's width equally, wrapping left to right. `auto-fill` (not `auto-fit`)
-   keeps the empty tracks, so a short last row stays at ONE column's width and
-   left-aligned instead of stretching across the row. */
+/* Reward cards (#308): the columns that are actually occupied share the row's
+   width equally, up to as many as fit at the minimum card width, wrapping left
+   to right. `auto-fit` collapses tracks no card ever lands in, so two rewards on
+   a wide row are two halves and three are thirds; when more rewards than columns
+   fit, every column is occupied in the first row, so a short last row stays at
+   ONE column's width and left-aligned instead of stretching. */
 .rs-reward-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--rs-reward-card-min-width), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--rs-reward-card-min-width), 1fr));
   gap: 0.5rem;
 }
 

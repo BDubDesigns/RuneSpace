@@ -156,9 +156,11 @@ gets no stack indicator.
 **Reward cards (#308).** A result's rewards sit in `RewardGrid`
 (`components/ui/RewardGrid.tsx`): the columns that fit at the minimum card width
 (`--rs-reward-card-min-width`) share the row's width equally and the rest wrap
-left to right. The grid uses `auto-fill` so empty tracks are kept: a short last
-row stays one column wide and left-aligned rather than stretching, and no
-decorative empty cells are drawn. On a phone a three-reward Mining result is
+left to right. The grid uses `auto-fit`, which collapses tracks no card lands
+in: two rewards on a wide row are halves, three are thirds, and when there are
+more rewards than columns every column is occupied, so a short last row stays one
+column wide and left-aligned rather than stretching. No decorative empty cells
+are drawn. On a phone a three-reward Mining result is
 2 + 1 and a plain two-reward result is two half-width cards. A Mining result
 lists the ore, then each Secondary Find in resolved order, then one skill-XP card
 with the *combined* amount last; the XP card is never promoted above the loot.
