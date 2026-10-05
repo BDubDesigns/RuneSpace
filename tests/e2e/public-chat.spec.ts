@@ -5,6 +5,7 @@ import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
+import { CHAT_POLICY } from "@/game/domain/chat";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
@@ -487,11 +488,36 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     body,
     createdAt: new Date(Date.now() - 5_000),
   });
+  // The General feed is game-wide and history pages by `seq`, so concurrent
+  // journeys' messages can push this row off the latest page at any time.
+  // Make that the setup rather than a race: a full page of newer messages
+  // always displaces it, and it is found through the ordinary history flow.
+  await seedHistory(
+    player,
+    "general",
+    Array.from({ length: CHAT_POLICY.pageSize }, (_, index) => `after ${tag} #${index + 1}`),
+  );
   try {
     const dialog = await openChat(page, player.character.id);
-    const line = log(dialog, "General").locator('[data-chat-system="rare_find"]', {
-      hasText: tag,
-    });
+    const general = log(dialog, "General");
+    const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
+    await expect(
+      general.getByText(`after ${tag} #${CHAT_POLICY.pageSize}`, { exact: true }),
+    ).toBeVisible();
+    await expect(line).toHaveCount(0);
+    // Each click fetches the next older page by cursor; only a page boundary
+    // can end the walk, so it needs no wait other than the response itself.
+    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
+    while ((await line.count()) === 0) {
+      await expect(olderButton).toBeVisible();
+      const loaded = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/chat" &&
+          new URL(response.url()).searchParams.has("before"),
+      );
+      await olderButton.click();
+      await loaded;
+    }
     await expect(line).toBeVisible();
     await expect(line).toContainText("System");
     await expect(line).toContainText("RARE FIND");
