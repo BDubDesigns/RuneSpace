@@ -491,7 +491,9 @@ regardless of Mission state.
   border and a connector under the selected column tie it to its tile. The
   preview is artwork beside the full item name and its quantity or charge — never
   a `VisualTile` squeezed into a thumbnail — so a long name wraps instead of
-  clipping. Selecting the same tile or Close dismisses it; the shared
+  clipping. The placement, measured column count and connector are the shared
+  `features/shared/RowDetailsGrid.tsx`, which Inventory also uses (#311) for its
+  own richer details at its own two-column phone / four-column grid. Selecting the same tile or Close dismisses it; the shared
   selectable-details reveal, reduced-motion handling and focus restoration are
   unchanged. Cargo Hold and every site stash share this surface.
 

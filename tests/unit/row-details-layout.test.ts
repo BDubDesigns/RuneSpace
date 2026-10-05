@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { detailsInsertionIndex, tileColumn } from "@/features/storage/storage-grid-layout";
+import { detailsInsertionIndex, tileColumn } from "@/features/shared/row-details-layout";
 
-describe("storage grid row placement (#291)", () => {
+describe("row-details placement (#291)", () => {
   it("inserts details after the last tile of the selected tile's row at three columns", () => {
     // Nine tiles on a phone: rows are 0-2, 3-5, 6-8.
     expect(detailsInsertionIndex(0, 3, 9)).toBe(2);

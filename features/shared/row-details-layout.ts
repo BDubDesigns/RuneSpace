@@ -1,5 +1,6 @@
 /**
- * Pure row arithmetic for the storage tile grids (Issue #291). The selected
+ * Pure row arithmetic for tile grids with row-anchored details — Cargo Hold /
+ * Site Stash (Issue #291) and Inventory (#311). The selected
  * item's details are inserted into the grid's own child order, right after the
  * last tile of the selected tile's row, so the DOM reading and tab order match
  * what is drawn. The column count is whatever the grid currently renders —

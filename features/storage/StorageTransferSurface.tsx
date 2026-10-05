@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, type ReactNode, type RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemVisual } from "@/components/items/ItemVisual";
@@ -11,8 +11,7 @@ import {
   StorageSelectionDetails,
   type StorageDetailsPlacement,
 } from "@/features/storage/StorageSelectionDetails";
-import { detailsInsertionIndex, tileColumn } from "@/features/storage/storage-grid-layout";
-import { useGridColumnCount } from "@/features/storage/use-grid-column-count";
+import { RowDetailsGrid } from "@/features/shared/RowDetailsGrid";
 import {
   resolveStorageSelection,
   sameStorageSelection,
@@ -136,12 +135,8 @@ function chargeBadge(item: StorageUniqueEntry): string | undefined {
 type StorageTile = { key: string; selected: boolean; node: ReactNode };
 
 /**
- * One region's tile grid, with the selected item's details inserted into the
- * grid's own child order right after the selected tile's row (#291). It owns
- * the measured column count because the row boundary is whatever the grid is
- * laying out now (three columns on a phone, four from `sm`), so the details
- * follow the right row at any width and stay in DOM and tab order. The gap is
- * one custom property so the details' connector can span exactly one gap.
+ * One region's tile grid; the row-anchored details placement (#291) is the
+ * shared `RowDetailsGrid`, here with Cargo Hold's three-column phone grid.
  */
 function StorageTileGrid({
   ariaLabel,
@@ -153,28 +148,15 @@ function StorageTileGrid({
   renderDetails: ((placement: StorageDetailsPlacement) => ReactNode) | undefined;
   tiles: readonly StorageTile[];
 }) {
-  const gridRef = useRef<HTMLDivElement>(null);
-  const columns = useGridColumnCount(gridRef);
-  const selectedIndex = renderDetails ? tiles.findIndex((tile) => tile.selected) : -1;
-  const insertAfter =
-    selectedIndex < 0 ? -1 : detailsInsertionIndex(selectedIndex, columns, tiles.length);
   return (
-    <div
-      aria-label={ariaLabel}
-      className="mt-3 grid grid-cols-3 gap-[var(--storage-grid-gap)] [--storage-grid-gap:0.5rem] sm:grid-cols-4"
-      ref={gridRef}
-    >
-      {tiles.flatMap((tile, index) => {
-        const node = <Fragment key={tile.key}>{tile.node}</Fragment>;
-        if (index !== insertAfter) return [node];
-        return [
-          node,
-          <Fragment key="selection-details">
-            {renderDetails?.({ column: tileColumn(selectedIndex, columns), columns })}
-          </Fragment>,
-        ];
-      })}
-    </div>
+    <RowDetailsGrid
+      ariaLabel={ariaLabel}
+      className="mt-3"
+      columnsClassName="grid-cols-3 sm:grid-cols-4"
+      renderDetails={(placement) => renderDetails?.(placement)}
+      selectedIndex={renderDetails ? tiles.findIndex((tile) => tile.selected) : -1}
+      tiles={tiles}
+    />
   );
 }
 
