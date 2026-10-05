@@ -482,8 +482,8 @@ Must-Stash). His character canon lives on his Notion Canon page.
 
 The foundation asset pass delivered:
 
-- the Holo Hollow town scene, its World Location map identifier, and a copy of
-  the town scene as the public Update hero;
+- the Holo Hollow town scene and its World Location map identifier; the public
+  Update hero references the same canonical town scene directly;
 - exterior Local Place scenes for Bix's shop, the Community Assistance Center,
   and HH B&B;
 - dedicated conversation interiors for Bix's shop and the Community Assistance

@@ -904,3 +904,44 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Public Update figures wrap prose around their rectangular frame. A new
+   figure clears the previous one so authored groups remain in body order. */
+.rs-update-body > p {
+  margin-bottom: 1.5rem;
+}
+
+.rs-update-body > p:last-child {
+  margin-bottom: 0;
+}
+
+.rs-update-figure {
+  float: none;
+  clear: both;
+  width: min(100%, 14rem);
+  margin: 0 auto 1.5rem;
+}
+
+.rs-update-figure--npc {
+  width: min(100%, 12rem);
+}
+
+@media (min-width: 640px) {
+  .rs-update-figure {
+    width: min(35%, 14rem);
+  }
+
+  .rs-update-figure--npc {
+    width: min(30%, 12rem);
+  }
+
+  .rs-update-figure--left {
+    float: left;
+    margin: 0 1.5rem 1rem 0;
+  }
+
+  .rs-update-figure--right {
+    float: right;
+    margin: 0 0 1rem 1.5rem;
+  }
+}

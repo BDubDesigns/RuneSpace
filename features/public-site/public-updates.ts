@@ -1,3 +1,5 @@
+import { ITEM_IDS } from "@/game/config/foundations";
+import { resolveArticleArt } from "@/game/content/article-art";
 import { PublicUpdateSchema } from "@/game/schemas/public-updates";
 import { COMMUNITY_RULES_SLUG, SAFETY_PRIVACY_SLUG } from "./policy-links";
 import { getWikiArticle } from "./public-wiki";
@@ -14,6 +16,7 @@ const authoredUpdates = [
     summary:
       "Mining can now turn up more than ore. A successful attempt will occasionally pull a rough gemstone out of the rock — Uncut Quartz, Topaz or Sapphire — and the rarest ones get announced in General.",
     body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.uncutTopaz }, side: "right" },
       [
         "Every so often a successful Mining attempt will come away with something besides ore: a rough, uncut gemstone chipped out of the rock. It's a bonus on top of the ore you were already after, never a replacement for it, and it only happens on a success. The Jag can give Uncut Quartz or Uncut Topaz; Deep Jag can give Uncut Topaz or Uncut Sapphire. They are rare. You can mine for a good while and see nothing, which is what makes the ones you do see worth noticing. See ",
         { text: "Mining & Refining", articleSlug: "mining-and-refining" },
@@ -54,7 +57,7 @@ const authoredUpdates = [
     summary:
       "There's a new guest at the HH B&B. Curly, an offworld backpacker, has a storage container, a room full of luggage, and a paying job for anyone who can weld.",
     hero: {
-      src: "/updates/curly-must-stash.webp",
+      src: "/location-scenes/curly-room-after.webp",
       alt: "A lamplit inn guest room with a MYKEA storage container mounted on a welded frame above the bed, the luggage around it a little tidier",
       width: 1672,
       height: 892,
@@ -375,7 +378,7 @@ const authoredUpdates = [
     summary:
       "Fabrication 5 and 8: make your own Power Cells, Galvanic Wire Spools and a second Mining tool, the Loadsteel Cutter, then a Freight Harness for six more Inventory slots. Tansy and Renn both have a job about that Cutter.",
     hero: {
-      src: "/updates/deep-jag-opened.webp",
+      src: "/location-scenes/deep-jag-opened.webp",
       alt: "Cleared mine passage held open by a welded header beam on two yellow hydraulic braces, rubble pushed to the sides, tunnel running away into the dark",
       width: 1536,
       height: 384,
@@ -417,7 +420,7 @@ const authoredUpdates = [
     summary:
       "Tansy comes out to Rusk Recovery to teach Fabrication: brackets, a Scrap Box and a Salvage Cutter of your own at the new Fabrication Station, Manual Override if you want to push your luck, and Tinkering to take finished pieces apart again.",
     hero: {
-      src: "/updates/rusk-recovery-yard.webp",
+      src: "/location-scenes/rusk-recovery.webp",
       alt: "Wade Rusk's recovery yard, with the Workbench and a terminal reading WORK ORDERS beneath the yard's sign, racked salvage under an overcast sky",
       width: 1536,
       height: 384,
@@ -582,7 +585,7 @@ const authoredUpdates = [
     summary:
       "There is a passage under The Jag that has been shut since before you got here. Tansy has the brace. You have the torch. Below it is harder ore than anything you have cut so far.",
     hero: {
-      src: "/updates/deep-jag-opened.webp",
+      src: "/location-scenes/deep-jag-opened.webp",
       alt: "Cleared mine passage held open by a welded header beam on two yellow hydraulic braces, rubble pushed to the sides, tunnel running away into the dark",
       width: 1536,
       height: 384,
@@ -628,7 +631,7 @@ const authoredUpdates = [
     summary:
       "Wade's terminal stops being empty. Reach Welding level 5, take 10,001 Hours, and the Work Orders board is yours to keep — paying jobs, real Credits, and a Workbench that now has to mind its manners about sharing.",
     hero: {
-      src: "/updates/rusk-recovery-yard.webp",
+      src: "/location-scenes/rusk-recovery.webp",
       alt: "Wade Rusk's recovery yard, with the Workbench and a terminal reading WORK ORDERS beneath the yard's sign, racked salvage under an overcast sky",
       width: 1536,
       height: 384,
@@ -710,7 +713,7 @@ const authoredUpdates = [
     summary:
       "Wade Rusk has a yard, a workbench, and six pieces of scrap with your name on them. Welding stops being something two jobs needed and starts being something you can just go and get better at.",
     hero: {
-      src: "/updates/rusk-recovery-yard.webp",
+      src: "/location-scenes/rusk-recovery.webp",
       alt: "Working recovery yard with racked salvage, stripped components, damaged work vehicles, and a welding bench under an overcast sky",
       width: 1536,
       height: 384,
@@ -752,7 +755,7 @@ const authoredUpdates = [
     summary:
       "Renn Calder has an optional job nobody else wanted: fix the Crew Stop on the haul road. Do it, and the mining crews start letting you ride along.",
     hero: {
-      src: "/updates/crew-stop-repaired.webp",
+      src: "/location-scenes/holo-hollow-crew-stop-repaired.webp",
       alt: "Roadside crew shelter at dusk, its canopy whole and squared on welded bracing with the bench remounted along the back wall, mine workings lit beyond",
       width: 1536,
       height: 384,
@@ -825,7 +828,7 @@ const authoredUpdates = [
     summary:
       "Wade makes you his apprentice, hands you 24 Credits for a three-cell job, and sends you to meet the man who keeps the useful things on a shelf.",
     hero: {
-      src: "/updates/hh-bnb-opens.webp",
+      src: "/location-scenes/hh-bnb-exterior.webp",
       alt: "Converted family bed-and-breakfast serving as a working inn, with a hand-lettered HH B&B sign",
       width: 1536,
       height: 384,
@@ -864,7 +867,7 @@ const authoredUpdates = [
     summary:
       "The town you have been hearing about is finally on the map. Walk into Holo Hollow, meet Bix and Renn, and spend your first Credits.",
     hero: {
-      src: "/updates/holo-hollow-town.webp",
+      src: "/location-scenes/holo-hollow.webp",
       alt: "Weathered main street of Holo Hollow, faded holo-tourism signage above working shopfronts under an overcast sky",
       width: 1536,
       height: 384,
@@ -1061,6 +1064,10 @@ export function validatePublicUpdates(input: readonly unknown[]): readonly Publi
 
     for (const paragraph of update.body) {
       if (typeof paragraph === "string") continue;
+      if (!Array.isArray(paragraph)) {
+        resolveArticleArt(paragraph.art);
+        continue;
+      }
       for (const segment of paragraph) {
         if (typeof segment !== "string" && !getWikiArticle(segment.articleSlug)) {
           throw new Error(
