@@ -85,7 +85,7 @@ describe("public Updates content boundary", () => {
 
   it("ships the Holo Hollow town art as that release's hero", () => {
     expect(getPublicUpdate("holo-hollow-opens-for-business")?.hero).toMatchObject({
-      src: "/updates/holo-hollow-town.webp",
+      src: "/location-scenes/holo-hollow.webp",
       width: 1536,
       height: 384,
     });
@@ -98,7 +98,7 @@ describe("public Updates content boundary", () => {
       Date.parse(getPublicUpdate("open-channels")!.publishedAt),
     );
     const links = trading.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Player Trading", articleSlug: "player-trading" });
     expect(getWikiArticle("player-trading")?.category).toBe("gear-and-credits");
@@ -108,7 +108,7 @@ describe("public Updates content boundary", () => {
     // Newer Updates have shipped since (#261), so it is found by slug.
     const unlocks = getPublicUpdate("something-new-to-make")!;
     const links = unlocks.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Mining & Refining", articleSlug: "mining-and-refining" });
     expect(links).toContainEqual({
@@ -144,7 +144,7 @@ describe("public Updates content boundary", () => {
     expect(text).not.toMatch(/secondary find/i);
     expect(text).not.toMatch(/\bquests?\b/i);
     const links = latest.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Mining & Refining", articleSlug: "mining-and-refining" });
   });
@@ -166,10 +166,10 @@ describe("public Updates content boundary", () => {
     expect(text).toContain("isn't a stash for you");
     expect(text).not.toMatch(/\bquests?\b/i);
     const links = latest.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Curly", articleSlug: "curly" });
-    expect(latest.hero?.src).toBe("/updates/curly-must-stash.webp");
+    expect(latest.hero?.src).toBe("/location-scenes/curly-room-after.webp");
   });
 
   it("publishes the site stash Update", () => {
@@ -187,7 +187,7 @@ describe("public Updates content boundary", () => {
     }
     expect(text).not.toMatch(/\bquests?\b/i);
     const links = latest.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "the Wiki", articleSlug: "cargo-hold-and-welding" });
   });
@@ -213,7 +213,7 @@ describe("public Updates content boundary", () => {
       Date.parse(getPublicUpdate("something-new-to-make")!.publishedAt),
     );
     const links = latest.body
-      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Safety & Privacy", articleSlug: "safety-and-privacy" });
   });

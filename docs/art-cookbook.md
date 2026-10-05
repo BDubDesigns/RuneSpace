@@ -459,8 +459,13 @@ If no appropriate existing asset exists, publish without a hero. Do not block a
 worthwhile Update and do not generate meaningless filler solely so an article
 has a picture.
 
-Update-specific copies belong under `public/updates/` according to the publishing
-contract.
+Reference existing art at its canonical runtime home; do not create Update-specific
+copies. Location/conversation scenes stay in `public/location-scenes/`, NPC
+expressions in `public/npc-art/`, items in `public/item-art/`, and landing art
+in `public/landing/`. Only genuinely Update-owned art belongs in `public/updates/`.
+Inline item/NPC figures use canonical content identities and preserve the full
+artwork with prose wrapping around a rectangular frame on wide screens and
+stacking on phones; see `docs/public-updates.md`.
 
 ## Masters and game-ready derivatives
 
@@ -480,7 +485,7 @@ include:
 - keyed, cleaned, grayscale, trimmed map WebP;
 - resized/compressed environment WebP;
 - transparent NPC expression PNG;
-- an Update-specific copy of approved location art.
+- runtime scene art also referenced directly by a public Update.
 
 Never destroy or overwrite a useful master merely because a derivative shipped.
 Runtime repository paths are the production contract. Source-master storage is a
@@ -521,7 +526,7 @@ Current production conventions:
   the neutral master scaled down to match, never up) and
   `public/location-scenes/curly-room-{before,after}.webp` (a 15:8 centre crop)
 - map identifiers -> `public/map-icons/`
-- Update-specific heroes -> `public/updates/`
+- genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 
 Canonical content registries should reference these assets rather than UI
 components inventing paths ad hoc.

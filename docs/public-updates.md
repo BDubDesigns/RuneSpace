@@ -27,26 +27,53 @@ Every object requires:
   boundary (issue #156) identifies "the newest published Update" by this same
   instant and cannot distinguish two Updates that share one.
 - `summary`: the short excerpt shown on the index and homepage.
-- `body`: an ordered array of prose paragraphs. A paragraph may instead be an
-  array of text and Wiki link segments (`{ text, articleSlug }`, the same
+- `body`: an ordered array of prose paragraphs and optional figure blocks. A
+  paragraph may instead be an array of text and Wiki link segments (`{ text, articleSlug }`, the same
   shape and rules as the Wiki's, see `docs/public-wiki.md`) when an Update
   should link a phrase to a Wiki article such as the Community Rules; every
   `articleSlug` must be a real authored Wiki article.
 - `patchNotes`: an ordered array of sections, each with a `heading` such as
   `Added`, `Changed`, or `Fixed`, and one or more player-facing `items`.
 
-An optional `hero` may reference a committed image under `public/landing/` or
-`public/updates/`. Store new Update-specific images in `public/updates/` and
-reference them with the public path, for example
-`/updates/repair-complete.webp`, plus its real `alt`, `width`, and `height`.
-Reference only committed, repository-local, approved image files. RuneSpace
-intentionally uses AI-generated artwork, and approved generated art is welcome
-once it is committed; the boundary is stability, not provenance. Do not
-reference source-only or master assets, remote or external URLs, or images
-produced at build or request time. When the
-art already ships elsewhere in the repository (for example a location scene),
-commit a copy of that same approved file under `public/updates/` rather than
-widening the allowed paths.
+An optional `hero` may reference a committed image under `public/landing/`,
+`public/location-scenes/`, or `public/updates/`. Reference the artwork's real
+runtime home: existing game scenery stays in `public/location-scenes/` and
+landing-owned art stays in `public/landing/`. `public/updates/` is only for art
+whose canonical purpose is the Update itself. Never copy existing game art
+there just to publish it. Supply the public path, descriptive `alt`, and real
+intrinsic `width` and `height`. Reference only approved runtime files, never
+source masters, remote URLs, or images produced at build/request time.
+
+### Inline item and NPC figures
+
+Place each figure immediately before the prose it accompanies; multiple figures
+are allowed in body order. Existing plain and linked paragraphs remain valid.
+
+```ts
+body: [
+  { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.uncutTopaz }, side: "right" },
+  "The prose that belongs beside the gem...",
+  { kind: "figure", art: { kind: "npc", npcId: NPC_IDS.curly }, side: "left" },
+  "The prose that belongs beside the portrait...",
+]
+```
+
+An NPC reference may include `expressionId`; omission selects the canonical
+neutral expression. `caption` is optional on the figure and defaults to the
+canonical display name. Do not supply `src` or alt text: `resolveArticleArt` in
+`game/content/article-art.ts` resolves item artwork/name/accessibility from
+`item-presentation.ts` and NPC identity/role/expression from `npcs.ts`.
+Unknown references, missing item artwork, and missing NPC expression artwork
+fail collection validation during import/build. Arbitrary image paths and
+other art kinds are not supported.
+
+Figures retain the full artwork with its intrinsic shape. At 640px and wider,
+prose wraps around the rectangular frame on the authored side; each new figure
+clears the preceding one. On phones figures stack centered before their prose,
+capped at 14rem for items and 12rem for NPCs. The article body contains its
+floats, so Patch Notes always start below them. Figures appear only in articles;
+index cards, homepage Latest Update and account News stay summary-only. The
+Wiki schema and renderer do not support figures in this slice.
 
 ### Hero image policy
 
@@ -62,9 +89,8 @@ widening the allowed paths.
 - Prefer repo-local committed assets and public paths, and keep the schema's
   requirements: accurate, descriptive `alt` text and the image's real intrinsic
   `width` and `height`.
-- The article model supports one hero only. Secondary inline article images are
-  not part of this contract; do not add them without an approved change to the
-  schema and renderer.
+- The article model supports one wide hero plus ordered inline item/NPC
+  figures. Item and portrait art belongs in a figure rather than a wide banner.
 
 `docs/art-cookbook.md` owns the visual-production rule for choosing, generating,
 and reviewing hero art. This document owns the publishing contract and

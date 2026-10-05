@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { WikiLinkSegmentSchema } from "@/game/schemas/public-wiki";
+import { ArticleArtSchema } from "@/game/schemas/article-art";
 
 const updateSlug = z
   .string()
@@ -17,8 +18,8 @@ export const PublicUpdateHeroSchema = z
     src: z
       .string()
       .regex(
-        /^\/(?:landing|updates)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/,
-        "Update images must be committed under public/landing or public/updates",
+        /^\/(?:landing|updates|location-scenes)\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/,
+        "Update heroes must be committed under public/landing, public/updates or public/location-scenes",
       ),
     alt: updateText,
     width: z.number().int().positive(),
@@ -47,6 +48,20 @@ export const PublicUpdateParagraphSchema = z.union([
   z.array(z.union([z.string().min(1), WikiLinkSegmentSchema])).min(1),
 ]);
 
+export const PublicUpdateFigureSchema = z
+  .object({
+    kind: z.literal("figure"),
+    art: ArticleArtSchema,
+    side: z.enum(["left", "right"]),
+    caption: updateText.optional(),
+  })
+  .strict();
+
+export const PublicUpdateBodyBlockSchema = z.union([
+  PublicUpdateParagraphSchema,
+  PublicUpdateFigureSchema,
+]);
+
 /** The complete repository-authored Update contract. */
 export const PublicUpdateSchema = z
   .object({
@@ -54,7 +69,7 @@ export const PublicUpdateSchema = z
     title: updateText,
     publishedAt: z.string().datetime({ offset: true }),
     summary: updateText,
-    body: z.array(PublicUpdateParagraphSchema).min(1),
+    body: z.array(PublicUpdateBodyBlockSchema).min(1),
     patchNotes: z.array(PublicUpdatePatchSectionSchema).min(1),
     hero: PublicUpdateHeroSchema.optional(),
   })
@@ -62,3 +77,4 @@ export const PublicUpdateSchema = z
 
 export type PublicUpdate = z.infer<typeof PublicUpdateSchema>;
 export type PublicUpdateParagraph = z.infer<typeof PublicUpdateParagraphSchema>;
+export type PublicUpdateFigure = z.infer<typeof PublicUpdateFigureSchema>;

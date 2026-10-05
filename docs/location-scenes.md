@@ -187,8 +187,9 @@ user relies on.
 Both were downsampled with Lanczos and encoded at libwebp quality 80 — the same
 derivation as the issue #78 set above — and flattened, since environment art is
 opaque. 1536×384 matches the Holo Hollow Local Place set rather than upscaling
-to the older 1920×480 convention. The repaired scene is also committed under
-`public/updates/` as the Update hero, per `docs/public-updates.md`.
+to the older 1920×480 convention. The Update hero references this same canonical
+scene directly under
+`public/location-scenes/`, per `docs/public-updates.md`.
 
 | Rusk Recovery (#190) | Delivered | Dimensions | Bytes |
 |---|---|---|---|
@@ -206,8 +207,9 @@ surfaces can appear later without the picture changing. The Fabrication Station
 picture, so Fabricate and Tinker are activity UI under the shared scene, with no
 station scene of its own. The yard also ships its
 own conversation background rather than reusing the 4:1 scene, the same choice
-the Holo Hollow interiors made. Its scene is committed a second time under
-`public/updates/` as that release's Update hero, per `docs/public-updates.md`.
+the Holo Hollow interiors made. That release's Update hero references the same
+canonical scene under
+`public/location-scenes/`, per `docs/public-updates.md`.
 
 **Known art follow-up (non-blocking).** The three Holo Hollow Local Place
 exteriors (`holo-hollow-souvenirs-exterior.webp`,

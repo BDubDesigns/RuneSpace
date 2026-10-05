@@ -11,7 +11,7 @@ import {
   type PublicUpdate,
 } from "./public-updates";
 import { publicSiteFooterLinks, publicSiteNavigation } from "./public-site-content";
-import { WikiLinkedText } from "./WikiLinkedText";
+import { PublicUpdateBody } from "./PublicUpdateBody";
 
 function PublicationDate({ publishedAt }: { publishedAt: string }) {
   return (
@@ -108,13 +108,7 @@ export function PublicUpdateArticlePage({ update }: { update: PublicUpdate }) {
           </figure>
         ) : null}
 
-        <div className="mt-10 max-w-3xl space-y-6 text-base leading-8 text-[color:var(--rs-text-secondary)]">
-          {update.body.map((paragraph, index) => (
-            <p key={index}>
-              <WikiLinkedText paragraph={paragraph} />
-            </p>
-          ))}
-        </div>
+        <PublicUpdateBody body={update.body} />
 
         <section aria-labelledby="patch-notes-heading" className="mt-12 max-w-3xl">
           <h2
