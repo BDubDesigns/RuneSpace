@@ -25,6 +25,11 @@ import {
   type ResolvedInventorySelection,
 } from "./inventory-selection";
 import { useSelectableDetails } from "@/features/shared/use-selectable-details";
+import {
+  RowDetailsGrid,
+  RowDetailsPanel,
+  type RowDetailsTile,
+} from "@/features/shared/RowDetailsGrid";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
@@ -236,6 +241,72 @@ export function InventoryPanel({
     enqueueForeground(execute);
   }
 
+  // One ordered tile list — stacks, unique items, then empty slots — so the
+  // shared row-details grid treats every slot as a grid cell when it decides
+  // which row the selected tile belongs to.
+  const tiles: (RowDetailsTile & { selected: boolean })[] = [
+    ...state.inventory.stacks.map((stack) => ({
+      key: stack.id,
+      selected:
+        resolvedSelection !== undefined && selected?.kind === "stack" && selected.id === stack.id,
+      node: (
+        <StackItemVisual
+          interactive
+          itemId={stack.itemId}
+          name={stack.name}
+          onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
+          quantity={stack.quantity}
+          selected={selected?.kind === "stack" && selected.id === stack.id}
+          stackLimit={stack.stackLimit}
+        />
+      ),
+    })),
+    ...state.inventory.uniqueItems.map((item) => ({
+      key: item.id,
+      selected:
+        resolvedSelection !== undefined && selected?.kind === "unique" && selected.id === item.id,
+      node: (
+        <ItemVisual
+          accessibleLabel={item.name}
+          additionalDescription={
+            item.currentCharge !== undefined
+              ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
+              : undefined
+          }
+          badge={
+            item.currentCharge !== undefined
+              ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
+              : undefined
+          }
+          className={
+            missionGuidanceTargets.equipmentItemIds.has(item.itemId)
+              ? "rs-mission-guidance"
+              : undefined
+          }
+          interactive
+          itemId={item.itemId}
+          name={item.name}
+          onSelect={() => toggleSelect({ kind: "unique", id: item.id })}
+          missionGuidance={missionGuidanceTargets.equipmentItemIds.has(item.itemId)}
+          selected={selected?.kind === "unique" && selected.id === item.id}
+        />
+      ),
+    })),
+    ...Array.from({ length: Math.max(0, totalSlots - state.inventory.slotsUsed) }, (_, index) => ({
+      key: `empty-${state.inventory.slotsUsed + index}`,
+      selected: false,
+      node: (
+        <div
+          aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
+          className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
+          onClick={clearSelection}
+        >
+          Empty slot
+        </div>
+      ),
+    })),
+  ];
+
   const content = (
     <div className="pb-2" data-inventory-surface onClick={onSurfaceClick}>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -254,232 +325,188 @@ export function InventoryPanel({
           <Feedback tone={message.tone}>{message.message}</Feedback>
         </div>
       ) : null}
-      <div
-        ref={gridRef}
-        className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-        aria-label={`${totalSlots} inventory slots`}
-        tabIndex={-1}
-      >
-        {state.inventory.stacks.map((stack) => (
-          <StackItemVisual
-            interactive
-            itemId={stack.itemId}
-            key={stack.id}
-            name={stack.name}
-            onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
-            quantity={stack.quantity}
-            selected={selected?.kind === "stack" && selected.id === stack.id}
-            stackLimit={stack.stackLimit}
-          />
-        ))}
-        {state.inventory.uniqueItems.map((item) => (
-          <ItemVisual
-            accessibleLabel={item.name}
-            additionalDescription={
-              item.currentCharge !== undefined
-                ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
-                : undefined
-            }
-            badge={
-              item.currentCharge !== undefined
-                ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
-                : undefined
-            }
-            className={
-              missionGuidanceTargets.equipmentItemIds.has(item.itemId)
-                ? "rs-mission-guidance"
-                : undefined
-            }
-            interactive
-            itemId={item.itemId}
-            key={item.id}
-            name={item.name}
-            onSelect={() => toggleSelect({ kind: "unique", id: item.id })}
-            missionGuidance={missionGuidanceTargets.equipmentItemIds.has(item.itemId)}
-            selected={selected?.kind === "unique" && selected.id === item.id}
-          />
-        ))}
-        {Array.from({ length: Math.max(0, totalSlots - state.inventory.slotsUsed) }, (_, index) => (
-          <div
-            aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
-            className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
-            key={`empty-${state.inventory.slotsUsed + index}`}
-            onClick={clearSelection}
-          >
-            Empty slot
-          </div>
-        ))}
-      </div>
-      {resolvedSelection ? (
-        <section
-          aria-label={`${resolvedSelection.entry.name} details`}
-          className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-          data-details-panel
-          ref={detailsRef}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <h3
-              className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
-              ref={detailsHeadingRef}
-              tabIndex={-1}
+      <RowDetailsGrid
+        ariaLabel={`${totalSlots} inventory slots`}
+        className="mt-4"
+        columnsClassName="grid-cols-2 sm:grid-cols-4"
+        gridRef={gridRef}
+        renderDetails={(placement) =>
+          resolvedSelection ? (
+            <RowDetailsPanel
+              // Inventory's drawer ends above the footer and scrolls itself.
+              clearBottomNav={false}
+              aria-label={`${resolvedSelection.entry.name} details`}
+              data-details-panel
+              panelRef={detailsRef}
+              placement={placement}
             >
-              Item details
-            </h3>
-            <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
-              Close details
-            </ActionButton>
-          </div>
-          <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
-            {resolvedSelection.kind === "stack" ? (
-              <StackItemVisual
-                className="h-28 w-28 self-start"
-                itemId={resolvedSelection.entry.itemId}
-                name={resolvedSelection.entry.name}
-                quantity={resolvedSelection.entry.quantity}
-                stackLimit={resolvedSelection.entry.stackLimit}
-              />
-            ) : (
-              <ItemVisual
-                accessibleLabel={resolvedSelection.entry.name}
-                badge={
-                  resolvedSelection.entry.currentCharge !== undefined
-                    ? `${resolvedSelection.entry.currentCharge}/${getItemMaximumCharge(resolvedSelection.entry.itemId)}`
-                    : undefined
-                }
-                className="h-28 w-28 self-start"
-                itemId={resolvedSelection.entry.itemId}
-                name={resolvedSelection.entry.name}
-              />
-            )}
-            <dl className="min-w-0 text-sm text-[color:var(--rs-text-secondary)]">
-              <InventoryDetailsStats selection={resolvedSelection} />
-            </dl>
-          </div>
-          {getItemPresentation(resolvedSelection.entry.itemId)?.description ? (
-            <p
-              className="mt-3 text-sm italic text-[color:var(--rs-text-secondary)]"
-              data-item-description
-            >
-              {getItemPresentation(resolvedSelection.entry.itemId)?.description}
-            </p>
-          ) : null}
-          {selectedIsPowerCell ? (
-            <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
-              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-                Load effect
-              </p>
-              <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
-                {!loadTool ? (
-                  <li>Loads into an equipped Mining Cutter</li>
-                ) : loadTool.chargedEffect.kind === "extra_yield" ? (
-                  // What loading does is the equipped tool's own definition (#233).
-                  <>
-                    <li>{loadTool.maximumCharge} charged attempts</li>
-                    <li>+{loadTool.chargedEffect.units} ore per successful attempt</li>
-                    <li>Attempt timing, success chance, and XP remain unchanged</li>
-                  </>
-                ) : (
-                  <>
-                    <li>{loadTool.maximumCharge} boosted attempts</li>
-                    <li>Speeds attempt timing only</li>
-                    <li>Success chance, yield, and XP remain unchanged</li>
-                  </>
-                )}
-              </ul>
-            </div>
-          ) : null}
-          {resolvedSelection.kind === "unique" ? (
-            <>
-              {resolvedSelection.entry.currentCharge !== undefined ? (
-                <div className="mt-3">
-                  <StatusMeter
-                    detail={`${resolvedSelection.entry.currentCharge} of ${getItemMaximumCharge(resolvedSelection.entry.itemId)} charges remaining`}
-                    label="Cutter charge"
-                    value={
-                      (resolvedSelection.entry.currentCharge /
-                        (getItemMaximumCharge(resolvedSelection.entry.itemId) ?? 1)) *
-                      100
-                    }
+              <div className="flex items-center justify-between gap-2">
+                <h3
+                  className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
+                  ref={detailsHeadingRef}
+                  tabIndex={-1}
+                >
+                  Item details
+                </h3>
+                <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
+                  Close details
+                </ActionButton>
+              </div>
+              <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                {resolvedSelection.kind === "stack" ? (
+                  <StackItemVisual
+                    className="h-28 w-28 self-start"
+                    itemId={resolvedSelection.entry.itemId}
+                    name={resolvedSelection.entry.name}
+                    quantity={resolvedSelection.entry.quantity}
+                    stackLimit={resolvedSelection.entry.stackLimit}
                   />
+                ) : (
+                  <ItemVisual
+                    accessibleLabel={resolvedSelection.entry.name}
+                    badge={
+                      resolvedSelection.entry.currentCharge !== undefined
+                        ? `${resolvedSelection.entry.currentCharge}/${getItemMaximumCharge(resolvedSelection.entry.itemId)}`
+                        : undefined
+                    }
+                    className="h-28 w-28 self-start"
+                    itemId={resolvedSelection.entry.itemId}
+                    name={resolvedSelection.entry.name}
+                  />
+                )}
+                <dl className="min-w-0 text-sm text-[color:var(--rs-text-secondary)]">
+                  <InventoryDetailsStats selection={resolvedSelection} />
+                </dl>
+              </div>
+              {getItemPresentation(resolvedSelection.entry.itemId)?.description ? (
+                <p
+                  className="mt-3 text-sm italic text-[color:var(--rs-text-secondary)]"
+                  data-item-description
+                >
+                  {getItemPresentation(resolvedSelection.entry.itemId)?.description}
+                </p>
+              ) : null}
+              {selectedIsPowerCell ? (
+                <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
+                  <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+                    Load effect
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
+                    {!loadTool ? (
+                      <li>Loads into an equipped Mining Cutter</li>
+                    ) : loadTool.chargedEffect.kind === "extra_yield" ? (
+                      // What loading does is the equipped tool's own definition (#233).
+                      <>
+                        <li>{loadTool.maximumCharge} charged attempts</li>
+                        <li>+{loadTool.chargedEffect.units} ore per successful attempt</li>
+                        <li>Attempt timing, success chance, and XP remain unchanged</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>{loadTool.maximumCharge} boosted attempts</li>
+                        <li>Speeds attempt timing only</li>
+                        <li>Success chance, yield, and XP remain unchanged</li>
+                      </>
+                    )}
+                  </ul>
                 </div>
               ) : null}
-              <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                Unique item — cannot be dropped.
-              </p>
-              {equipAvailability ? (
+              {resolvedSelection.kind === "unique" ? (
+                <>
+                  {resolvedSelection.entry.currentCharge !== undefined ? (
+                    <div className="mt-3">
+                      <StatusMeter
+                        detail={`${resolvedSelection.entry.currentCharge} of ${getItemMaximumCharge(resolvedSelection.entry.itemId)} charges remaining`}
+                        label="Cutter charge"
+                        value={
+                          (resolvedSelection.entry.currentCharge /
+                            (getItemMaximumCharge(resolvedSelection.entry.itemId) ?? 1)) *
+                          100
+                        }
+                      />
+                    </div>
+                  ) : null}
+                  <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                    Unique item — cannot be dropped.
+                  </p>
+                  {equipAvailability ? (
+                    <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+                      <ActionButton
+                        disabled={!equipAvailability.enabled}
+                        intent="mining"
+                        loading={foregroundBusy}
+                        onClick={runEquip}
+                      >
+                        {equipAvailability.enabled
+                          ? `Equip in ${equipAvailability.slotLabel}`
+                          : "Equip Cutter"}
+                      </ActionButton>
+                      {!equipAvailability.enabled ? (
+                        equipAvailability.reason === "mining_level" ? (
+                          <Feedback>
+                            Requires Mining {equipAvailability.requiredMiningLevel} to equip.
+                          </Feedback>
+                        ) : (
+                          <Feedback>Another command is in progress.</Feedback>
+                        )
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+              {selectedIsPowerCell ? (
                 <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
                   <ActionButton
-                    disabled={!equipAvailability.enabled}
+                    disabled={!loadAvailability?.enabled}
                     intent="mining"
-                    loading={foregroundBusy}
-                    onClick={runEquip}
+                    loading={loadBusy}
+                    onClick={loadPowerCell}
                   >
-                    {equipAvailability.enabled
-                      ? `Equip in ${equipAvailability.slotLabel}`
-                      : "Equip Cutter"}
+                    Load into {loadTool?.name ?? "Mining Cutter"}
                   </ActionButton>
-                  {!equipAvailability.enabled ? (
-                    equipAvailability.reason === "mining_level" ? (
+                  {loadAvailability && !loadAvailability.enabled ? (
+                    loadAvailability.reason === "charged" ? (
                       <Feedback>
-                        Requires Mining {equipAvailability.requiredMiningLevel} to equip.
+                        Power Cell already loaded — {loadAvailability.remainingCharge} boosted
+                        attempts remain. Deplete the Cutter before loading another.
                       </Feedback>
+                    ) : loadAvailability.reason === "no_cutter" ? (
+                      <Feedback>Equip a Mining Cutter before loading a Power Cell.</Feedback>
+                    ) : loadAvailability.reason === "no_cells" ? (
+                      <Feedback>No loose Power Cells are carried.</Feedback>
                     ) : (
                       <Feedback>Another command is in progress.</Feedback>
                     )
                   ) : null}
                 </div>
               ) : null}
-            </>
-          ) : null}
-          {selectedIsPowerCell ? (
-            <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
-              <ActionButton
-                disabled={!loadAvailability?.enabled}
-                intent="mining"
-                loading={loadBusy}
-                onClick={loadPowerCell}
-              >
-                Load into {loadTool?.name ?? "Mining Cutter"}
-              </ActionButton>
-              {loadAvailability && !loadAvailability.enabled ? (
-                loadAvailability.reason === "charged" ? (
-                  <Feedback>
-                    Power Cell already loaded — {loadAvailability.remainingCharge} boosted attempts
-                    remain. Deplete the Cutter before loading another.
-                  </Feedback>
-                ) : loadAvailability.reason === "no_cutter" ? (
-                  <Feedback>Equip a Mining Cutter before loading a Power Cell.</Feedback>
-                ) : loadAvailability.reason === "no_cells" ? (
-                  <Feedback>No loose Power Cells are carried.</Feedback>
-                ) : (
-                  <Feedback>Another command is in progress.</Feedback>
-                )
+              {resolvedSelection.kind === "stack" ? (
+                <div className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3">
+                  <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
+                    Drop
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
+                      <ActionButton
+                        disabled={foregroundBusy}
+                        intent="danger"
+                        key={action.mode}
+                        onClick={(event) =>
+                          openConfirmation(action, resolvedSelection.entry, event.currentTarget)
+                        }
+                      >
+                        {action.label}
+                      </ActionButton>
+                    ))}
+                  </div>
+                </div>
               ) : null}
-            </div>
-          ) : null}
-          {resolvedSelection.kind === "stack" ? (
-            <div className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3">
-              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
-                Drop
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
-                  <ActionButton
-                    disabled={foregroundBusy}
-                    intent="danger"
-                    key={action.mode}
-                    onClick={(event) =>
-                      openConfirmation(action, resolvedSelection.entry, event.currentTarget)
-                    }
-                  >
-                    {action.label}
-                  </ActionButton>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+            </RowDetailsPanel>
+          ) : null
+        }
+        selectedIndex={tiles.findIndex((tile) => tile.selected)}
+        tiles={tiles}
+      />
       {confirming ? (
         <div
           role="alert"
