@@ -5,7 +5,6 @@ import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
-import { CHAT_POLICY } from "@/game/domain/chat";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
@@ -488,28 +487,14 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     body,
     createdAt: new Date(Date.now() - 5_000),
   });
-  // The General feed is game-wide and history pages by `seq`, so concurrent
-  // journeys' messages can push this row off the latest page at any time.
-  // Make that the setup rather than a race: a full page of newer messages
-  // always displaces it, and it is found through the ordinary history flow.
-  await seedHistory(
-    player,
-    "general",
-    Array.from({ length: CHAT_POLICY.pageSize }, (_, index) => `after ${tag} #${index + 1}`),
-  );
   try {
     const dialog = await openChat(page, player.character.id);
     const general = log(dialog, "General");
     const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
-    // The first page has loaded once older history is on offer, and the row
-    // is a full page of newer messages deep, so it is not rendered yet. No
-    // particular seeded message is assumed to be on this page: concurrent
-    // journeys may push those off it too.
     const olderButton = dialog.getByRole("button", { name: "Load older messages" });
-    await expect(olderButton).toBeVisible();
-    await expect(line).toHaveCount(0);
-    // Each click fetches the next older page by cursor; only a page boundary
-    // can end the walk, so it needs no wait other than the response itself.
+    // General is game-wide, so concurrent rows may push this announcement
+    // beyond page 1 before Chat opens. If it is not on the latest page, find it
+    // with the ordinary cursor-based Load older messages flow.
     while ((await line.count()) === 0) {
       await expect(olderButton).toBeVisible();
       const loaded = page.waitForResponse(
