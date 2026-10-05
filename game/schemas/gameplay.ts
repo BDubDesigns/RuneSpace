@@ -52,6 +52,11 @@ export const BeginTravelRequestSchema = z.object({
   destinationLocationId: LocationIdSchema,
 });
 
+/** Turn Back supplies only the owned character identity; the Journey and its outcome are server-owned. */
+export const TurnBackTravelRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** Scavenge supplies only the owned character identity; timing and reward are server-owned. */
 export const ScavengeClaimRequestSchema = z.object({
   characterId: z.string().uuid(),

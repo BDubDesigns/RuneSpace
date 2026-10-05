@@ -1635,3 +1635,138 @@ test("the Journey feed leads with the newest event and its live Scavenge action 
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "travel-mobile-journey-newest-first.png");
 });
+
+// ---------------------------------------------------------------------------
+// Issue #312: Turn Back from an active Journey.
+// ---------------------------------------------------------------------------
+
+async function characterRow(characterId: string) {
+  const [row] = await db.select().from(characters).where(eq(characters.id, characterId));
+  return row!;
+}
+
+async function journeyRowCount(characterId: string) {
+  const [actions, travel] = await Promise.all([
+    db.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
+    db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
+  ]);
+  return { actions: actions.length, travel: travel.length };
+}
+
+test("Turn Back ends a walk at the origin, suppresses Scavenge until a walk is completed (#312)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  // A walk offers no suppression notice while Scavenge is still on the table.
+  await expect(page.locator("[data-journey-scavenge-suppressed]")).toHaveCount(0);
+  await expect(page.locator("[data-turn-back]")).not.toContainText("refunded");
+
+  // Reachable from the Journey itself, with no confirmation step.
+  await page.getByRole("button", { name: "Turn Back" }).click();
+  await expect(page.getByText("Journey progress")).toHaveCount(0);
+  await expect(page.locator("[data-scavenge-suppressed-notice]")).toContainText(
+    "Scavenge is unavailable until you complete a walk",
+  );
+  expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.crashSite,
+    scavengeSuppressed: true,
+  });
+
+  // Durable: the explanation is rebuilt from the server after a reload.
+  await page.reload();
+  await expect(page.locator("[data-scavenge-suppressed-notice]")).toBeVisible();
+
+  // A suppressed walk says so, and never offers an opportunity — even at a
+  // point where an unsuppressed walk's earliest window would be open.
+  await openMapSurface(page);
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await expect(page.locator("[data-journey-scavenge-suppressed]")).toContainText(
+    "Scavenge is unavailable on this Journey",
+  );
+  const midWalk = new Date(Date.now() - 8_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: midWalk, resolvedThroughAt: midWalk })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.locator("[data-journey-scavenge-suppressed]")).toBeVisible();
+  await expect(page.locator('[data-journey-event="scavenge"]')).toHaveCount(0);
+
+  // Completing the walk is what lifts the suppression.
+  const arrivedPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: arrivedPast, resolvedThroughAt: arrivedPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByText("Journey progress")).toHaveCount(0);
+  await expect(page.locator("[data-scavenge-suppressed-notice]")).toHaveCount(0);
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.abandonedProcessingYard,
+    scavengeSuppressed: false,
+  });
+
+  // The next walk offers Scavenge again.
+  await openMapSurface(page);
+  await page.getByRole("button", { name: /Crash Site/ }).click();
+  await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await expect(page.locator("[data-journey-scavenge-suppressed]")).toHaveCount(0);
+  const [travel] = await db
+    .select()
+    .from(characterTravelState)
+    .where(eq(characterTravelState.characterId, characterId));
+  expect(travel?.scavengeOpportunityStartTick).not.toBeNull();
+});
+
+test("Turn Back from the Crew Hauler warns about the fare first and does not refund it (#312)", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const startedAt = new Date(Date.now() - 6_000);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.travel,
+    startedAt,
+    resolvedThroughAt: startedAt,
+  });
+  await db.insert(characterTravelState).values({
+    characterId,
+    originLocationId: LOCATION_IDS.holoHollow,
+    destinationLocationId: LOCATION_IDS.theJag,
+    mode: "crew_hauler",
+    scavengeOpportunityStartTick: null,
+  });
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.holoHollow, credits: 5 })
+    .where(eq(characters.id, characterId));
+
+  await page.goto(`/play/${characterId}`);
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  // The consequence is stated before the click, beside the control itself.
+  await expect(page.locator("[data-turn-back]")).toContainText("Fare won't be refunded.");
+  await page.getByRole("button", { name: "Turn Back" }).click();
+
+  await expect(page.getByText("Journey progress")).toHaveCount(0);
+  expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.holoHollow,
+    credits: 5,
+    scavengeSuppressed: false,
+  });
+  // Cancelling a ride is not a walk's Scavenge reroll, so there is nothing to explain.
+  await expect(page.locator("[data-scavenge-suppressed-notice]")).toHaveCount(0);
+});

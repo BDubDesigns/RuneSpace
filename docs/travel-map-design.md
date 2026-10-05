@@ -106,6 +106,26 @@ than duplicating it in map tiles.
   stride, and footing, so a ride would misdescribe what the player is doing; the Journey summary also
   says "Riding the Crew Hauler" rather than "Walking", from the authoritative travel mode.
 
+## Turn Back (issue #312)
+- `JourneyPanel` carries one **Turn Back** control (`TurnBackControl`) for walks and rides alike, with no
+  confirmation. A ride shows "Fare won't be refunded." beside it before the click; the fare was spent at boarding.
+- `turnBackTravel` (`server/travel-commands.ts`) reconciles Travel under the owned-character lock first, so
+  **arrival wins**: if arrival was already due it commits and the command finds nothing to cancel. Otherwise it
+  clears the Travel action and `characterTravelState` through `clearActiveJourney` (`server/travel.ts`, shared
+  with the operator force-idle). `characters.current_location_id` is the origin for the whole Journey and is
+  never touched, so there is no halfway place and no return trip. A retried or forged command while not
+  traveling is a no-op returning authoritative state.
+- Committed `characterScavengeReveals` stay; an unclaimed opportunity lives on the travel row and goes with it.
+- **Scavenge suppression** is `characters.scavenge_suppressed`, set by cancelling a *walk* (even before its
+  opportunity appeared, so cancelling cannot reroll the random window) and cleared only when a *walking*
+  Journey arrives (`createTravelResolver`). A ride neither sets nor clears it. While set, `beginTravel` stores a
+  walk with `scavenge_opportunity_start_tick` NULL and spends no random roll; NULL on a walk therefore means
+  "suppressed", the check constraint allows it, `travelState.scavengeSuppressed` projects it, and
+  `claimScavenge` refuses a forged claim with `scavenge_suppressed`.
+- The explanation never rests on the click: `ScavengeSuppressedNotice` renders from the authoritative
+  `PlayGameplayState.scavengeSuppressed` whenever the player is not in transit, and `JourneyPanel` states it for
+  a suppressed walk, so reloading or logging out and in changes nothing.
+
 ## Authored transport routes are not map adjacency (issue #172)
 - The Crew Hauler runs Holo Hollow → The Jag, which are **two walking legs apart** through The
   Long Scramble. Adding it changed no adjacency: walking between them still refuses (`not_adjacent`),

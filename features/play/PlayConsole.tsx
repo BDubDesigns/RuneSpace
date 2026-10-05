@@ -7,6 +7,7 @@ import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
+import { ScavengeSuppressedNotice } from "@/features/travel/ScavengeSuppressedNotice";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { refreshPlayAction } from "@/server/actions";
 import { usePlay } from "./PlayContext";
@@ -95,6 +96,7 @@ export function PlayConsole({
           state={state}
         />
       ) : null}
+      <ScavengeSuppressedNotice />
       {surface === "map" ? (
         // The return control is the desktop main-column header's while docked
         // (#286), so the panel does not carry a second one beside it.

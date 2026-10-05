@@ -6,7 +6,9 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getLocation } from "@/game/content/locations";
 import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
+import { Feedback } from "@/components/ui/Feedback";
 import { ScavengeControl } from "./ScavengeControl";
+import { TurnBackControl } from "./TurnBackControl";
 import { deriveJourneyFeed, newestJourneyEventsFirst } from "./journey-feed";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -72,6 +74,19 @@ export function JourneyPanel() {
           ? "Nothing to do but sit with the crew. No new activity can begin until you arrive."
           : "The active work stopped before departure. No new activity can begin until you arrive."}
       </p>
+
+      {/* Suppression is stated, never merely implied by a missing find (#312). */}
+      {travel.scavengeSuppressed ? (
+        <div data-journey-scavenge-suppressed>
+          <Feedback>
+            Scavenge is unavailable on this Journey. Complete a walk to find things along the road
+            again.
+          </Feedback>
+        </div>
+      ) : null}
+
+      {/* Reachable here, with the Journey itself, rather than through the Map. */}
+      <TurnBackControl rideFare={Boolean(rideName)} />
 
       {/* Newest first (#240): the latest beat leads, so a live Scavenge control
           is reachable without scrolling past older history, which stays below

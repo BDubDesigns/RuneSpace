@@ -97,7 +97,7 @@ actions and their seams:
 | Cargo Hold | `depositCargoStackAction`, `withdrawCargoStackAction`, `depositCargoUniqueItemAction`, `withdrawCargoUniqueItemAction` | lock + reconcile |
 | Site stashes | `depositSiteStashStackAction`, `withdrawSiteStashStackAction`, `depositSiteStashUniqueItemAction`, `withdrawSiteStashUniqueItemAction`, `installSiteStashContainerAction`, `swapSiteStashContainerAction`, `removeSiteStashContainerAction` | lock + reconcile |
 | Inventory / Equipment | `discardInventoryStackAction`, `equipEquipmentAction`, `unequipEquipmentAction` | lock + reconcile |
-| Travel / Scavenge | `beginTravelAction`, `beginTransportTravelAction`, `claimScavengeAction` | lock + reconcile |
+| Travel / Scavenge | `beginTravelAction`, `beginTransportTravelAction`, `turnBackTravelAction`, `claimScavengeAction` | lock + reconcile |
 | Instant interactions | `acknowledgeScavengeRevealAction`, `claimPowerCellsAction`, `tradeWithMerchantAction` | lock only (deliberately no reconcile) |
 
 The remaining actions are account/character management and stay

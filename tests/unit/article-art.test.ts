@@ -127,7 +127,7 @@ describe("canonical article art", () => {
       }),
     );
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Rare finds");
+      expect(markup).toContain("Turn back");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("uncut-topaz.webp");
     }

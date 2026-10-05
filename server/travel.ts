@@ -1,5 +1,10 @@
 import { eq } from "drizzle-orm";
-import { characters, characterTravelState, type CharacterTravelState } from "@/db/rune-space";
+import {
+  activeActions,
+  characters,
+  characterTravelState,
+  type CharacterTravelState,
+} from "@/db/rune-space";
 import { ACTION_IDS, type TravelMode } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import {
@@ -9,7 +14,7 @@ import {
   type TravelState,
 } from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
-import type { ActionResolver } from "@/server/action-resolution";
+import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { loadLocationStateFacts } from "@/server/location-state";
 import type { LocationStateFacts } from "@/game/domain/location-state";
 
@@ -43,6 +48,28 @@ export type TravelSnapshot = {
 export type TravelResolution = {
   arrived: boolean;
 };
+
+/**
+ * End the active Journey without arriving: delete the Travel action and its
+ * `characterTravelState` row, nothing more. The one shared seam for an operator
+ * force-idle and the player's own Turn Back (#312), so the two can never drift.
+ *
+ * `characters.current_location_id` is the authoritative origin for the whole
+ * Journey and is never touched here, so the character stays where they left.
+ * Committed `characterScavengeReveals` are preserved; an unclaimed Scavenge
+ * opportunity lives on the travel row and disappears with it. Callers decide
+ * what else the cancellation means (Scavenge suppression is the player
+ * command's rule, not an operator's).
+ */
+export async function clearActiveJourney(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<void> {
+  await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
+  await transaction
+    .delete(characterTravelState)
+    .where(eq(characterTravelState.characterId, characterId));
+}
 
 /**
  * The Travel resolver is a blocking one-active-action resolver. It owns no
@@ -188,9 +215,15 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         );
       }
 
+      // Completing a walking Journey is the only thing that lifts Scavenge
+      // suppression (#312); a ride arriving leaves it exactly as it was.
       await transaction
         .update(characters)
-        .set({ currentLocationId: storedDestination })
+        .set(
+          storedMode === "walk"
+            ? { currentLocationId: storedDestination, scavengeSuppressed: false }
+            : { currentLocationId: storedDestination },
+        )
         .where(eq(characters.id, context.character.id));
       await transaction
         .delete(characterTravelState)

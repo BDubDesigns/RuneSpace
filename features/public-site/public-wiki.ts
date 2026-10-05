@@ -134,13 +134,21 @@ const authoredWikiArticles = [
       {
         heading: "Scavenging while you walk",
         paragraphs: [
-          "Every ordinary walk gives you one chance to scavenge along the way. The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg. Riding the Crew Hauler gives you none at all.",
+          "Every ordinary walk gives you one chance to scavenge along the way — unless you recently turned back from one (see Turning back, below). The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg. Riding the Crew Hauler gives you none at all.",
           "The Journey lists the newest thing that happened first, marked Latest, with the rest of the walk below it — so when something catches your eye, the Scavenge button is at the top rather than under the rest of the trip.",
           [
             "Claiming it can turn up a little Ferrite Shale, a ",
             { text: "Power Cell", articleSlug: "power-cells" },
             " or two, some Refined Ferrite, or nothing at all. It never costs you anything to try, and it never slows down or speeds up your arrival.",
           ],
+        ],
+      },
+      {
+        heading: "Turning back",
+        paragraphs: [
+          "Changed your mind? Turn Back on the Journey ends the trip on the spot and leaves you idle where you set out. You don't end up partway along the route, and there's no trip home to wait for. If you arrive first, you've arrived: you stay at the destination.",
+          "Turning back from a walk isn't a free reroll of Scavenge. After you turn back from a walk, walks stop offering Scavenge — through reloading, reconnecting and logging out and in — until you complete a walk by arriving. Another Turn Back doesn't clear it, and neither does a Crew Hauler ride. The Journey tells you when Scavenge is unavailable. Anything you had already scavenged stays yours, and an opportunity you hadn't claimed is gone with the trip.",
+          "You can turn back from the Crew Hauler too, and it never gets you the 5 Credits back. Turning back from a ride doesn't affect Scavenge either way.",
         ],
       },
     ],
