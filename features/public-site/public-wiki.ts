@@ -550,7 +550,7 @@ const authoredWikiArticles = [
           [
             "The repair needs exactly 15 ",
             { text: "Refined Ferrite and 6 Slag", articleSlug: "mining-and-refining" },
-            ". You can contribute materials across more than one visit, but the game asks you to confirm the exact amount each time — once installed, materials can't be taken back out.",
+            ". You can contribute materials across more than one visit, and the install button names the exact amount it will take — once installed, materials can't be taken back out.",
           ],
         ],
       },
@@ -583,7 +583,7 @@ const authoredWikiArticles = [
           [
             "Back at the Crash Site, the ship has a second repair after the Cargo Hold: the Landing Gear. It is part of ",
             { text: "Wheel Be Right Back", articleSlug: "missions" },
-            ', and its controls appear beside the Cargo Hold only once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored. Propulsion offline." The ship looks just as wrecked as before, and nothing about it lets you fly.',
+            ', and it sits beside the Cargo Hold from the start as a damaged system. Its repair opens up once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored. Propulsion offline." The ship looks just as wrecked as before, and nothing about it lets you fly.',
           ],
           [
             "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",

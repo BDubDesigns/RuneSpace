@@ -10,6 +10,7 @@ import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPane
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
+import { ShipSystemPanel } from "@/features/ship/ShipSystemPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import type { RepairProjection } from "@/server/play";
@@ -112,18 +113,16 @@ function primaryActivity(
     case LOCATION_IDS.abandonedProcessingYard:
       return <RefiningConsole />;
     case LOCATION_IDS.crashSite:
-      // The Cargo Hold is the Crash Site's standing activity; the Landing Gear
-      // (#322) is a second repair that exists only once Wade's Mission has been
-      // accepted, and stays on show afterwards because its finished status is
-      // how the wreck tells the player what it can and cannot do yet.
+      // The crashed ship's systems (#322): every one is visible from the start as
+      // a damaged system, and a Mission only decides whether it can be repaired.
+      // They share one presentation (`ShipSystemPanel`); a future Propulsion
+      // system is one more entry here.
       return (
         <>
           <CargoHoldPanel />
-          <RepairWorkPanel
-            eyebrow="Ship"
+          <ShipSystemPanel
             materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
             targetId={REPAIR_TARGET_IDS.landingGear}
-            title="Landing Gear"
             weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
           />
         </>

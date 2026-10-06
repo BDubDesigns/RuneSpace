@@ -34,6 +34,9 @@ import { expect, openNpcConversation, openTestCharacter, test } from "./fixtures
 
 const balance = getEffectiveGameBalance();
 const gear = balance.repairTargets.landingGear;
+// The Landing Gear is one of the ship's systems (#322): the shell is always there,
+// and its repair interior exists only while the job is authorized and unfinished.
+const GEAR_SYSTEM = `[data-ship-system="${REPAIR_TARGET_IDS.landingGear}"]`;
 const GEAR_PANEL = `[data-repair-work-panel="${REPAIR_TARGET_IDS.landingGear}"]`;
 const STATUS = "Landing gear restored. Propulsion offline.";
 
@@ -119,9 +122,28 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
         MISSION_IDS.braceYourself,
       ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
     );
-  await standAt(characterId, LOCATION_IDS.ruskRecovery);
+  // The wreck shows its Landing Gear from the start, damaged, before Wade has
+  // said a word: visible, compact, and with no recipe and nothing to press.
+  await standAt(characterId, LOCATION_IDS.crashSite);
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
+  const system = page.locator(GEAR_SYSTEM);
+  await expect(system).toBeVisible();
+  await expect(system).toHaveAttribute("data-ship-system-state", "offline");
+  await expect(system.getByRole("heading")).toContainText("Ship");
+  await expect(system.getByRole("heading")).toContainText("Landing Gear");
+  await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
+    "The landing gear is damaged and cannot be repaired yet.",
+  );
+  await expect(system.getByRole("button")).toHaveCount(0);
+  await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
+  await expect(system).not.toContainText("Wheel Assembl");
+  await expect(system).not.toContainText("Welding");
+  // Beside it, the Cargo Hold is the same kind of panel.
+  await expect(page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`)).toBeVisible();
+
+  await standAt(characterId, LOCATION_IDS.ruskRecovery);
+  await page.reload();
 
   // Offered, not auto-accepted: Wade has a job to give, and nothing is on the
   // strip until it is taken.
@@ -193,9 +215,12 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
 
   // One Landing Gear panel beside the Cargo Hold: three authored material rows
   // and the twelve welds.
+  // Accepting the job expanded the same panel; no second flag was set.
+  await expect(system).toHaveAttribute("data-ship-system-state", "repair");
+  await expect(system.locator("[data-ship-system-status]")).toHaveCount(0);
   const panel = page.locator(GEAR_PANEL);
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText("Landing Gear");
+  await expect(system).toContainText("Landing Gear");
   await expect(panel).toHaveAttribute("data-repair-complete", "false");
   await expect(panel.getByText(/Wheel Assembly —/)).toBeVisible();
   await expect(panel.getByText(/Mounting Bracket —/)).toBeVisible();
@@ -203,7 +228,6 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await expect(panel.getByText("0 / 2").first()).toBeVisible();
   await expect(panel.getByText("0 / 12 welds")).toBeVisible();
   await expect(panel.locator("[data-repair-start-welding]")).toHaveCount(0);
-  await expect(page.locator("[data-repair-completed-status]")).toHaveCount(0);
 
   await panel.locator("[data-repair-contribute]").click();
   await expect(panel.locator("[data-repair-start-welding]")).toBeVisible();
@@ -224,16 +248,15 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await page.reload();
 
   // Finished: the ship's own status, on the same panel, in the same wreck.
-  const finished = page.locator(GEAR_PANEL);
-  await expect(finished).toHaveAttribute("data-repair-complete", "true");
-  await expect(finished.locator("[data-repair-completed-status]")).toHaveText(STATUS);
+  await expect(system).toHaveAttribute("data-ship-system-state", "complete");
+  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
+  await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
+  await expect(system.getByRole("button")).toHaveCount(0);
   expect(await weldingXp(characterId)).toBe(gear.repairIncrements * balance.welding.xpPerIncrement);
 
   // Durable across another reload, in the generic repair row.
   await page.reload();
-  await expect(page.locator(GEAR_PANEL).locator("[data-repair-completed-status]")).toHaveText(
-    STATUS,
-  );
+  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
   const [row] = await db
     .select({ completedAt: characterRepairTargets.completedAt })
     .from(characterRepairTargets)
@@ -282,7 +305,5 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   // The ship keeps its one wreck presentation and its status at the Crash Site.
   await standAt(characterId, LOCATION_IDS.crashSite);
   await page.reload();
-  await expect(page.locator(GEAR_PANEL).locator("[data-repair-completed-status]")).toHaveText(
-    STATUS,
-  );
+  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
 });

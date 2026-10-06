@@ -58,13 +58,18 @@ export type RepairTargetDefinition = {
    */
   materialNotes?: Readonly<Record<string, string>>;
   /**
-   * The status a finished repair reads as on its own surface (#322), in place of
-   * the generic "done and holding" line. Authored here beside the target it
-   * describes, so the words that tell a player what the repair did and what it
-   * did not do have exactly one home, and read from the repair's own completion
-   * rather than from a second flag.
+   * The status a finished ship system reads as on its own surface (#322).
+   * Authored here beside the target it describes, so the words that tell a
+   * player what the repair did and what it did not do have exactly one home, and
+   * read from the repair's own completion rather than from a second flag.
    */
   completedStatus?: string;
+  /**
+   * What a ship system reads as while it is damaged and no job has authorized
+   * its repair (#322). Used by the shared ship-system panel, so a system is
+   * visible from the start without the recipe or any progression hint.
+   */
+  offlineStatus?: string;
 };
 
 export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
@@ -73,6 +78,8 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     displayName: "Cargo Hold",
     locationId: LOCATION_IDS.crashSite,
     authorization: { kind: "mission", missionId: MISSION_IDS.holdItTogether },
+    offlineStatus: "The Cargo Hold is buckled from the crash and still inaccessible.",
+    completedStatus: "Cargo Hold operational.",
     materialNotes: {
       [ITEM_IDS.refinedFerrite]: "replacement plating and braces",
       [ITEM_IDS.slag]: "thermal packing for bulkhead voids",
@@ -110,6 +117,7 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
       [ITEM_IDS.mountingBracket]: "ship-side mounting hardware",
       [ITEM_IDS.galvanicWireSpool]: "actuation and sensor wiring",
     },
+    offlineStatus: "The landing gear is damaged and cannot be repaired yet.",
     completedStatus: "Landing gear restored. Propulsion offline.",
   },
   // Site stash mounts (#284): permanent, per-character, one per authored site.

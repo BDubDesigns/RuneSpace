@@ -435,9 +435,39 @@ fabricated, bought and traded parts are identical and the installing character
 needs no Fabrication or Refining level — only the Welding the work itself
 trains. It uses the global Welding cadence, the global 50 XP per section and
 the ordinary Clean Pass. Its authored `completedStatus` — "Landing gear
-restored. Propulsion offline." — is what the shared repair panel reads when the
-repair is complete; completion unlocks no flight, route or fuel behaviour and
+restored. Propulsion offline." — is what the ship-system panel (below) reads
+when the repair is complete; completion unlocks no flight, route or fuel behaviour and
 adds no ship art or location-state variant.
+
+### Ship systems: one presentation at the Crash Site (issue #322)
+
+The Cargo Hold, the Landing Gear and whatever the ship's engine becomes are
+**visible physical systems of the crashed ship**, and they share one
+presentation and state model, `features/ship/ShipSystemPanel.tsx`: *visible
+damaged system → Mission authorizes the repair → the standard repair
+presentation → completed system*. Progression changes whether a system is
+actionable, never whether the player can see that the ship has it.
+
+- **Offline** (no authorization, not complete): a compact, noninteractive panel
+  — the small `SHIP` eyebrow, the system's name and its authored
+  `offlineStatus` (`game/content/repair-targets`). It shows no recipe, no
+  material and no progression hint.
+- **Repair** (authorized, unfinished): the same panel expands into the standard
+  `RepairWorkPanel` (embedded), so every system's materials, Welding meter,
+  Clean Pass, skill row and carried-material context look and behave alike.
+- **Complete**: the same panel stays, showing the target's authored
+  `completedStatus`, plus any system-specific content passed in as children —
+  the Cargo Hold's storage, unchanged.
+
+The state is read from the repair target's own projection (`repairAvailable`,
+`complete`) through `deriveShipSystemState`; there is no second flag and the
+shell names no Mission and no target. Only the ship's systems use it: the Deep
+Jag brace, the Crew Stop and the stash mounts are not parts of the player's ship
+and keep the plain repair panel. Moving the Cargo Hold onto the standard repair
+presentation retired its bespoke material, Welding and Reward cards and its
+separate commit-confirmation step; the install control now names the exact
+amounts it takes, as every other repair does. A future Propulsion system is one
+more registry entry and one more panel at the Crash Site.
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and

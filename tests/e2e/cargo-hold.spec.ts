@@ -99,17 +99,23 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
 
   const cargoPanel = page.locator("[data-cargo-hold]");
   const selection = cargoPanel.locator("[data-storage-selection]");
-  const lockedStatus = cargoPanel.locator('[data-cargo-hold-status="locked"]');
+  // The Cargo Hold is one of the ship's systems (#322): the same shell as the
+  // Landing Gear, damaged and noninteractive until its job is taken.
+  const lockedStatus = cargoPanel.locator('[data-ship-system-status="offline"]');
+  const repairPanel = cargoPanel.locator(
+    `[data-repair-work-panel="${REPAIR_TARGET_IDS.cargoHold}"]`,
+  );
   const restoredStatus = cargoPanel.locator('[data-cargo-hold-status="restored"]');
   const operationalStatus = cargoPanel.locator('[data-cargo-hold-status="operational"]');
-  const completionAnnouncement = cargoPanel.locator("[data-cargo-hold-announcement]");
+  const completionAnnouncement = cargoPanel.locator("[data-ship-system-announcement]");
   const expectSteadyState = async (occupancy = "0 / 32") => {
     await expect(restoredStatus).toHaveCount(0);
     await expect(operationalStatus).toBeVisible();
-    await expect(cargoPanel.getByRole("heading", { name: "CARGO HOLD", exact: true })).toHaveCount(
-      1,
+    await expect(cargoPanel.getByRole("heading")).toHaveCount(1);
+    await expect(cargoPanel.getByRole("heading")).toContainText("Cargo Hold");
+    await expect(cargoPanel.locator('[data-ship-system-status="complete"]')).toHaveText(
+      "Cargo Hold operational.",
     );
-    await expect(cargoPanel.getByText("OPERATIONAL", { exact: true })).toHaveCount(1);
     await expect(operationalStatus).toContainText(`${occupancy} SLOTS OCCUPIED`);
     await expect(operationalStatus.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
     await expect(completionAnnouncement).toHaveText("");
@@ -122,18 +128,19 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
     }),
   ).toBeVisible();
   await expect(lockedStatus).toBeVisible();
-  await expect(
-    cargoPanel.getByRole("heading", { name: "Damaged Cargo Hold", exact: true }),
-  ).toBeVisible();
+  await expect(cargoPanel.getByRole("heading")).toContainText("Ship");
+  await expect(cargoPanel.getByRole("heading")).toContainText("Cargo Hold");
+  await expect(cargoPanel).toHaveAttribute("data-ship-system-state", "offline");
   await expect(cargoPanel).toContainText(
     "The Cargo Hold is buckled from the crash and still inaccessible.",
   );
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toHaveCount(0);
+  await expect(repairPanel).toHaveCount(0);
+  await expect(cargoPanel.getByRole("button")).toHaveCount(0);
   await expect(cargoPanel).not.toContainText("Refined Ferrite");
   await expect(cargoPanel).not.toContainText("Slag");
   await expect(cargoPanel).not.toContainText("Welding");
-  await expect(cargoPanel).not.toContainText("CONTRIBUTE MATERIALS");
-  await expect(cargoPanel).not.toContainText("START WELDING");
+  await expect(cargoPanel).not.toContainText("Install");
+  await expect(cargoPanel).not.toContainText("Start Welding");
   await captureReviewScreenshot(page, "cargo-mobile-locked.png");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
@@ -151,8 +158,11 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   ]);
   await page.reload();
   await expect(lockedStatus).toHaveCount(0);
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
+  // Accepting the job expands the same panel into the standard repair
+  // presentation; no second flag is involved.
+  await expect(cargoPanel).toHaveAttribute("data-ship-system-state", "repair");
+  await expect(repairPanel).toContainText("0 / 15");
+  await expect(repairPanel).toContainText("0 / 6");
 
   // The Mission Log reports the two materials as two requirements (#172): the
   // Cargo Hold gets the same staged repair objective as any other repair job,
@@ -177,35 +187,25 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   ).toContainText("Carrying: 6");
   await page.keyboard.press("Escape");
   // Mission guidance: Hold It Together is active with materials still needed,
-  // so CONTRIBUTE MATERIALS carries the generic green treatment and its
-  // exterior halo.
-  await expectExteriorMissionHalo(
-    cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }),
-    "active",
-  );
-  await cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }).click();
-  const confirmation = page.locator("[data-cargo-confirmation]");
-  await expect(confirmation).toContainText("Refined Ferrite ×15");
-  await expect(confirmation).toContainText("Slag ×6");
-  await confirmation.getByRole("button", { name: "COMMIT MATERIALS" }).click();
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("15 / 15");
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("6 / 6");
-  // Materials complete and Welding idle: START WELDING is now the guided affordance.
-  await expectExteriorMissionHalo(
-    cargoPanel.getByRole("button", { name: "START WELDING" }),
-    "active",
-  );
-  await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toBeVisible();
-  await cargoPanel.getByRole("button", { name: "START WELDING" }).click();
-  await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).toBeVisible();
-  // Active Welding never advances the mission: STOP WELDING carries no green guidance.
-  await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).not.toHaveAttribute(
-    "data-mission-guidance",
-  );
+  // so the install control carries the generic green treatment and its
+  // exterior halo. The install names the exact amounts it will take.
+  const install = repairPanel.locator("[data-repair-contribute]");
+  await expect(install).toContainText("Install 15 Refined Ferrite and 6 Slag");
+  await expectExteriorMissionHalo(install, "active");
+  await install.click();
+  await expect(repairPanel).toContainText("15 / 15");
+  await expect(repairPanel).toContainText("6 / 6");
+  // Materials complete and Welding idle: Start Welding is now the guided affordance.
+  const startWelding = repairPanel.locator("[data-repair-start-welding]");
+  await expectExteriorMissionHalo(startWelding, "active");
+  await expect(startWelding).toBeVisible();
+  await startWelding.click();
+  const stopWelding = repairPanel.locator("[data-repair-stop-welding]");
+  await expect(stopWelding).toBeVisible();
+  // Active Welding never advances the mission: Stop Welding carries no green guidance.
+  await expect(stopWelding).not.toHaveAttribute("data-mission-guidance");
   // An ordinary unguided ActionButton gets no halo wrapper at all.
-  await expect(
-    cargoPanel.getByRole("button", { name: "STOP WELDING" }).locator("xpath=.."),
-  ).not.toHaveClass(/\brs-control-halo\b/);
+  await expect(stopWelding.locator("xpath=..")).not.toHaveClass(/\brs-control-halo\b/);
 
   const completedAgo = new Date(
     Date.now() -
@@ -297,7 +297,7 @@ test("keeps a previously repaired Cargo Hold usable without mission state", asyn
   await page.reload();
 
   const cargoPanel = page.locator("[data-cargo-hold]");
-  await expect(cargoPanel.locator('[data-cargo-hold-status="locked"]')).toHaveCount(0);
+  await expect(cargoPanel.locator('[data-ship-system-status="offline"]')).toHaveCount(0);
   await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toBeVisible();
   await expect(cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
 });
