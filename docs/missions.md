@@ -613,9 +613,10 @@ the strips, and the compact Current Missions strips carry no source detail.
 
 Because a Mission never picks a production route, neither do the sources: all
 discoverable methods are listed. The resolver and its rules are owned by
-`docs/architecture.md` ("Item sources"). A repair with a single material states
-that material on its objective line and has no row to attach a control to, so
-it gets no Sources control today.
+`docs/architecture.md` ("Item sources"). A repair with several materials names each on its own row; one with a single
+material projects that material's `itemId` on the requirement while it is still
+being installed, and both get the same control. Once the material is installed
+the projection stops naming it, so the control disappears with it.
 
 ## 11. Explorer-first behavior
 
