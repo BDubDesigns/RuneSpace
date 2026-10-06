@@ -162,7 +162,7 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
 
   // Taken: it is on the strip, and the Landing Gear still belongs to the Crash Site.
   const strip = page.locator(`[data-mission-strip="${MISSION_IDS.wheelBeRightBack}"]`);
-  await expect(strip).toHaveAttribute("data-mission-phase", "active");
+  await expect(strip).toHaveAttribute("data-mission-phase", "work");
   await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
 
   // Returning to Wade with nothing done gets the locked reminder, and no report.
