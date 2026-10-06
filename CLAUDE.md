@@ -29,7 +29,7 @@ every push (in-progress, then ready) and each post wakes the session.
 ## CI: every PR push runs everything
 
 Each push to a PR, Draft or not, starts fast checks, PostgreSQL integration, and
-three canonical E2E shards together, and `Merge gate` requires all of them. A red
+five canonical E2E shards together, and `Merge gate` requires all of them. A red
 `Merge gate` is a real failure to read and fix, never an expected draft state.
 Do not add labels to force CI; `e2e-screenshots` is Brandon's call.
 

@@ -108,8 +108,12 @@ describe("CI workflow contract", () => {
     );
   });
 
-  it("keeps all three canonical E2E shards", () => {
-    expect(jobs.get("canonical-e2e")).toMatch(/^ {8}shard: \[1, 2, 3\]$/m);
+  it("runs five canonical E2E shards that agree on the shard total", () => {
+    const e2e = jobs.get("canonical-e2e")!;
+    expect(e2e).toMatch(/^ {8}shard: \[1, 2, 3, 4, 5\]$/m);
+    expect(e2e).toContain("name: Canonical E2E shard ${{ matrix.shard }}/5");
+    expect(e2e).toMatch(/^ {6}RUNESPACE_E2E_SHARD_TOTAL: 5$/m);
+    expect(e2e).toMatch(/^ {6}RUNESPACE_E2E_WORKERS: 2$/m);
   });
 
   it("makes the merge gate depend on every lane and report failed or skipped ones", () => {

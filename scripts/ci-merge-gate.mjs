@@ -7,7 +7,7 @@
 
 import { fileURLToPath } from "node:url";
 
-// Job ids from .github/workflows/ci.yml. canonical-e2e is the three-shard
+// Job ids from .github/workflows/ci.yml. canonical-e2e is the five-shard
 // matrix; GitHub reports one aggregate result that succeeds only if all do.
 export const REQUIRED_JOBS = ["fast-checks", "integration", "canonical-e2e"];
 

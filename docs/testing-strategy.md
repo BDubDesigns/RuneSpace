@@ -105,9 +105,9 @@ small number of critical mobile player journeys.
     `trace: "retain-on-failure"` write per-test screenshots and traces into
     `test-results/`; CI uploads those as a bounded failure-diagnostics artifact
     regardless of screenshot review
-  - runs as three independent GitHub Actions shards, each with its own
+  - runs as five independent GitHub Actions shards, each with its own
     PostgreSQL service, disposable database, migrations, production server, and
-    shard-named diagnostics/timing artifacts; all three are required by
+    shard-named diagnostics/timing artifacts; all five are required by
     `Merge gate`
   - captures the curated review manifest only in a separate deterministic,
     unsharded one-worker job when `RUNESPACE_E2E_SCREENSHOTS=true` is explicitly
@@ -576,7 +576,7 @@ Before removing or weakening a test, record where the behavior remains protected
 The `CI` workflow runs the same full validation for every PR revision, Draft or
 not, and every push to `main`. The fast job (frozen install, typecheck of the app
 and every test including `tests/e2e`, lint, format check, unit tests, and one
-production build), PostgreSQL integration, and the three canonical E2E shards all
+production build), PostgreSQL integration, and the five canonical E2E shards all
 start together; none waits for or consumes another's output. This optimizes
 elapsed review time: an early fast-job failure no longer saves browser minutes,
 but it still fails `Merge gate`.
@@ -590,7 +590,7 @@ but it still fails `Merge gate`.
 
 `Merge gate` (`scripts/ci-merge-gate.mjs`, covered by
 `tests/unit/ci-gate-policy.test.ts`) needs every lane and passes only when the
-fast job, integration, and all three shards succeeded; a failed, skipped,
+fast job, integration, and all five shards succeeded; a failed, skipped,
 canceled, or missing required lane fails it. The screenshot lane counts only
 when requested, and then it must succeed. Any label event reruns the full
 validation rather than skipping it, because GitHub reports a skipped job as
@@ -599,7 +599,7 @@ PR runs use a per-PR concurrency group so obsolete work is canceled only for tha
 PR; main and manual runs use unique groups. Branch protection state is recorded
 in `docs/development-workflow.md` (§CI and the merge gate).
 
-CI retains a separate PostgreSQL integration job, a three-shard canonical E2E
+CI retains a separate PostgreSQL integration job, a five-shard canonical E2E
 matrix, and an opt-in unsharded screenshot lane. The canonical runner is the
 single source of truth for E2E behavioral verification in both local development
 and GitHub Actions; curated screenshots are produced and uploaded only in the

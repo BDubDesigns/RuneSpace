@@ -130,12 +130,12 @@ jobs:
         run: pnpm test:integration:issue-126
 
   canonical-e2e:
-    name: Canonical E2E shard ${{ matrix.shard }}/3
+    name: Canonical E2E shard ${{ matrix.shard }}/5
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
     services:
       postgres:
         image: postgres:16-alpine
@@ -150,7 +150,7 @@ jobs:
     env:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
       RUNESPACE_E2E_SHARD_INDEX: ${{ matrix.shard }}
-      RUNESPACE_E2E_SHARD_TOTAL: 3
+      RUNESPACE_E2E_SHARD_TOTAL: 5
       RUNESPACE_E2E_WORKERS: 2
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:

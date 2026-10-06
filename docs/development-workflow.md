@@ -398,7 +398,8 @@ build, and hold it until their own teardown finishes.
 
 A serialized canonical run on the otherwise idle Hermes host measured 11 min 45 s
 on 2026-09-28 (2 min 17 s build, 9 min 24 s of Playwright), against about three
-minutes across GitHub's three shards. So on Hermes:
+minutes across GitHub's three shards (the topology at that time; CI now
+uses five). So on Hermes:
 
 - During implementation, run unit, integration, and focused E2E proportional to
   the touched boundary.
@@ -527,14 +528,14 @@ changes the global public-gameplay row; sign-out, portraits, registration, and
 character creation retain independent sessions.
 
 The canonical runner invokes that selection once with zero retries and
-retain-on-failure traces. GitHub runs three `--shard` jobs concurrently, each
+retain-on-failure traces. GitHub runs five `--shard` jobs concurrently, each
 with its own PostgreSQL service, disposable database, and production server.
 The initial local/CI benchmark uses two Playwright workers; keep timing summaries
 from `.playwright/canonical-timing-*.json` and choose a later worker count from
 GitHub wall-clock and stability evidence rather than treating two as a permanent
 target. Curated review screenshots are opt-in only: the `e2e-screenshots` label
 runs a separate deterministic one-worker, unsharded lane using the same
-selection and fixtures. The normal three behavioral shards do not generate that
+selection and fixtures. The normal five behavioral shards do not generate that
 manifest. For the Issue #139 stress evidence, run inventory-equip at least ten
 times with at least two workers and zero retries, plus a repeated state-heavy
 gameplay spec in parallel with zero retries; report failures, retries, and wall
@@ -558,7 +559,7 @@ Run affected focused checks when their required environment is available. For
 example, integration tests require PostgreSQL and browser tests require the
 Playwright browser dependencies and their database setup.
 
-Canonical CI also runs PostgreSQL integration tests and three concurrent shards
+Canonical CI also runs PostgreSQL integration tests and five concurrent shards
 of the explicit canonical E2E behavioral selection. A separate one-worker
 screenshot lane runs only when the `e2e-screenshots` label is requested. A local
 skip or unavailable environment is not a pass: report it as unexecuted and wait
@@ -673,7 +674,7 @@ PostgreSQL service; none waits for or consumes another:
   and every test including `tests/e2e`, lint, format check, unit tests, and one
   production build);
 - `PostgreSQL integration tests`;
-- `Canonical E2E shard 1/3`, `2/3`, and `3/3`.
+- `Canonical E2E shard 1/5` through `5/5`.
 
 `Merge gate` depends on every lane, runs even when one failed, was skipped, or
 was canceled, and passes only when each required lane succeeded (`scripts/ci-merge-gate.mjs`).
