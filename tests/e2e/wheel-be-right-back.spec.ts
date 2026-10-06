@@ -122,28 +122,9 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
         MISSION_IDS.braceYourself,
       ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
     );
-  // The wreck shows its Landing Gear from the start, damaged, before Wade has
-  // said a word: visible, compact, and with no recipe and nothing to press.
-  await standAt(characterId, LOCATION_IDS.crashSite);
+  await standAt(characterId, LOCATION_IDS.ruskRecovery);
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const system = page.locator(GEAR_SYSTEM);
-  await expect(system).toBeVisible();
-  await expect(system).toHaveAttribute("data-ship-system-state", "offline");
-  await expect(system.getByRole("heading")).toContainText("Ship");
-  await expect(system.getByRole("heading")).toContainText("Landing Gear");
-  await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
-    "The landing gear is damaged and cannot be repaired yet.",
-  );
-  await expect(system.getByRole("button")).toHaveCount(0);
-  await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
-  await expect(system).not.toContainText("Wheel Assembl");
-  await expect(system).not.toContainText("Welding");
-  // Beside it, the Cargo Hold is the same kind of panel.
-  await expect(page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`)).toBeVisible();
-
-  await standAt(characterId, LOCATION_IDS.ruskRecovery);
-  await page.reload();
 
   // Offered, not auto-accepted: Wade has a job to give, and nothing is on the
   // strip until it is taken.
@@ -179,6 +160,32 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
     conversation.getByRole("img", { name: "Wade Rusk, scowl expression" }),
   ).toBeVisible();
   await expect(conversation.getByRole("button", { name: /decline/i })).toHaveCount(0);
+  // The wreck shows its Landing Gear from the start, damaged, before the job is
+  // taken: visible, compact, and with no recipe and nothing to press. Checked
+  // part-way through rather than at the very start, so this journey is not at the
+  // Crash Site while other specs measure it.
+  await page.keyboard.press("Escape");
+  await standAt(characterId, LOCATION_IDS.crashSite);
+  await page.reload();
+  const system = page.locator(GEAR_SYSTEM);
+  await expect(system).toBeVisible();
+  await expect(system).toHaveAttribute("data-ship-system-state", "offline");
+  await expect(system.getByRole("heading")).toContainText("Ship");
+  await expect(system.getByRole("heading")).toContainText("Landing Gear");
+  await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
+    "The landing gear is damaged and cannot be repaired yet.",
+  );
+  await expect(system.getByRole("button")).toHaveCount(0);
+  await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
+  await expect(system).not.toContainText("Wheel Assembl");
+  await expect(system).not.toContainText("Welding");
+  // Beside it, the Cargo Hold is the same kind of panel.
+  await expect(page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`)).toBeVisible();
+  // Back to Wade, who still has the job to give.
+  await standAt(characterId, LOCATION_IDS.ruskRecovery);
+  await page.reload();
+  conversation = await openNpcConversation(page, "Wade Rusk");
+  await conversation.getByRole("button", { name: /Wheel Be Right Back/ }).click();
   await (await playToAction(conversation, "TAKE THE JOB")).click();
   await page.keyboard.press("Escape");
 
