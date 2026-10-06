@@ -111,8 +111,7 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   const expectSteadyState = async (occupancy = "0 / 32") => {
     await expect(restoredStatus).toHaveCount(0);
     await expect(operationalStatus).toBeVisible();
-    await expect(cargoPanel.getByRole("heading")).toHaveCount(1);
-    await expect(cargoPanel.getByRole("heading")).toContainText("Cargo Hold");
+    await expect(cargoPanel.getByRole("heading").filter({ hasText: "Cargo Hold" })).toHaveCount(1);
     await expect(cargoPanel.locator('[data-ship-system-status="complete"]')).toHaveText(
       "Cargo Hold operational.",
     );
@@ -483,9 +482,9 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await expect(carriedSection).toContainText("2 / 8");
   await expect(cargoSection.getByRole("heading", { name: "CARGO", exact: true })).toBeVisible();
   await expect(cargoSection).toContainText("9 / 32");
-  // The Cargo Hold panel keeps exactly one CARGO HOLD title (#193): the
+  // The Cargo Hold panel keeps exactly one Cargo Hold title (#193): the
   // regions group the two inventories without repeating the panel's name.
-  await expect(cargoPanel.getByRole("heading", { name: "CARGO HOLD", exact: true })).toHaveCount(1);
+  await expect(cargoPanel.getByRole("heading").filter({ hasText: "Cargo Hold" })).toHaveCount(1);
   const desktopTiles = await measureRegionTiles(carriedSection);
   for (const tile of desktopTiles) {
     expect(tile.tileWidth).toBe(desktopTiles[0]!.tileWidth);

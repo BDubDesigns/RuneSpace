@@ -158,7 +158,7 @@ function CargoHoldStorage({ justCompleted }: { justCompleted: boolean }) {
             labels={CARGO_HOLD_STORAGE_LABELS}
             mode={storageMode}
             onModeChange={setStorageMode}
-            onSelectItem={() => undefined}
+            onSelectItem={() => setTransferFeedback(undefined)}
             pending={pending}
             projection={projectCargoHoldStorage(state)}
             transfers={cargoTransfers}
