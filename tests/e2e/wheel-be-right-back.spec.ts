@@ -164,6 +164,11 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   const strip = page.locator(`[data-mission-strip="${MISSION_IDS.wheelBeRightBack}"]`);
   await expect(strip).toHaveAttribute("data-mission-phase", "work");
   await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
+  // Nothing installed or carried: the compact strip lists the whole shopping list.
+  const stillNeeded = strip.locator("[data-mission-strip-needed]");
+  await expect(stillNeeded).toHaveText(
+    "Still needed: 2 Wheel Assemblies · 2 Mounting Brackets · 1 Galvanic Wire Spool",
+  );
 
   // Returning to Wade with nothing done gets the locked reminder, and no report.
   conversation = await openNpcConversation(page, "Wade Rusk");
@@ -182,6 +187,9 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   ]);
   await standAt(characterId, LOCATION_IDS.crashSite);
   await page.reload();
+  // Everything is now carried, so there is nothing left to obtain.
+  await expect(strip).toHaveAttribute("data-mission-phase", "work");
+  await expect(stillNeeded).toHaveCount(0);
 
   // One Landing Gear panel beside the Cargo Hold: three authored material rows
   // and the twelve welds.

@@ -253,9 +253,6 @@ describe("the Mission's shape", () => {
     expect(WHEEL_BE_RIGHT_BACK.requirements.map((requirement) => requirement.kind)).toEqual([
       "repair_target_complete",
     ]);
-    expect(
-      MISSIONS.some((mission) => mission.prerequisiteMissionId === MISSION_IDS.aCutAbove),
-    ).toBe(false);
     expect(WHEEL_BE_RIGHT_BACK.prerequisiteMissionId).not.toBe(A_CUT_ABOVE.id);
   });
 

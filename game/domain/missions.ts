@@ -991,6 +991,34 @@ export function missionGuidancePhase(
   return projection.stage?.requirementsSatisfied ? "turn_in" : "work";
 }
 
+/** One repair material the player still has to obtain. */
+export type StillNeededMaterial = { itemId: string; label: string; remaining: number };
+
+/**
+ * What a multi-material repair Mission still needs the player to GET (#322), for
+ * the compact Mission strip's acquisition line.
+ *
+ * It answers "what do I still need to obtain?", so a carried unit covers a unit
+ * of need: `remaining = required - installed - carried`, clamped at zero, and
+ * only materials with something remaining are listed. That is a reading of the
+ * projection, not a change to it — carried material is still never installed
+ * material, and the Mission Log keeps showing every authoritative row.
+ *
+ * Only the first unmet requirement is read, and only while it is a repair in
+ * its materials phase (the only time the projection carries material rows), so
+ * it is empty during Welding, once every material is covered, and for every
+ * other kind of objective. Nothing here names a Mission or a repair target.
+ */
+export function stillNeededMaterials(
+  projection: Pick<MissionProjection, "requirements">,
+): readonly StillNeededMaterial[] {
+  const first = projection.requirements?.find((requirement) => !requirement.satisfied);
+  return (first?.materials ?? []).flatMap((material) => {
+    const remaining = Math.max(0, material.target - material.current - (material.carried ?? 0));
+    return remaining > 0 ? [{ itemId: material.itemId, label: material.label, remaining }] : [];
+  });
+}
+
 /**
  * The meaning an NPC's controls present when several Missions target them.
  * Deterministic precedence: active green (work remains) over turn-in blue over

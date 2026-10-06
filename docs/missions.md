@@ -577,6 +577,22 @@ It is ordinary document flow (never sticky or fixed) and scrolls away normally.
   any other still-unmet requirement with numeric progress (so simultaneous
   requirements such as Mining attempts and a Ferrite Shale stack stay visible).
   It is not the Mission Log, which keeps the full checklist.
+- **Still needed (#322).** While the first unmet requirement is a multi-material
+  `repair_target_complete` in its materials phase, the strip adds one subordinate
+  line, `Still needed: 2 Wheel Assemblies · 2 Mounting Brackets · 1 Galvanic Wire
+  Spool` (`data-mission-strip-needed`). It is `stillNeededMaterials(projection)`
+  (`game/domain/missions.ts`): `required - installed - carried` per projected
+  material row, clamped at zero, listing only what remains, and read from the
+  existing projection with no Mission or repair-target branch. It answers "what
+  do I still need to obtain?" — carried material is never treated as installed,
+  and the objective, the durable progress and the Mission Log are unchanged (the
+  Log keeps every authoritative row, covered or not). The line is absent once
+  installed plus carried covers everything, and during Welding. Counts use the
+  item's authored `pluralName` (`itemQuantityLabel`, `game/content/item-presentation.ts`).
+  It is deliberately separate from map guidance: `repairTargetGuidance` still
+  points toward a repair only while the player carries something that advances
+  it, because where to *get* the material (mine, refine, fabricate, buy, trade)
+  is the player's choice and is never invented.
 - A strip is a status row, not an interaction target: it exposes
   `data-mission-phase="work" | "turn_in"` and never `data-mission-guidance`,
   which stays reserved for the controls and places a player acts on.
