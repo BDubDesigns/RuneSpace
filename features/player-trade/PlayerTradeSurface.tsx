@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { usePlay } from "@/features/play/PlayContext";
+import { isItemTransferable } from "@/game/domain/player-trade";
 import type { TradeExchangeLines, TradeSessionView } from "@/game/schemas/player-trade";
 import {
   usePlayerTrade,
@@ -217,7 +218,9 @@ function YourOffer({
     (stack) => stack.carried > stack.offered,
   );
   const offeredItemIds = new Set(offered.items.map((item) => item.itemInstanceId));
-  const uniques = state.inventory.uniqueItems.filter((item) => !offeredItemIds.has(item.id));
+  const uniques = state.inventory.uniqueItems.filter(
+    (item) => !offeredItemIds.has(item.id) && isItemTransferable(item.itemId),
+  );
 
   return (
     <OfferPanel

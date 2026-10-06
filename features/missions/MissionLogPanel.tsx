@@ -9,6 +9,7 @@ import {
 import { XpAmount } from "@/components/ui/XpAmount";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
+import { ItemSourcesButton } from "@/features/item-sources/ItemSourcesButton";
 import type { MissionProjection } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
 
@@ -29,10 +30,12 @@ function MissionEntry({
   mission,
   expanded,
   onToggle,
+  state,
 }: {
   mission: MissionProjection;
   expanded: boolean;
   onToggle: () => void;
+  state: PlayGameplayState;
 }) {
   const ready = mission.state === "ready_for_completion";
   const completed = mission.state === "completed";
@@ -92,6 +95,12 @@ function MissionEntry({
                   </span>
                   <span className="text-[color:var(--rs-text-secondary)]">
                     {requirement.objective}
+                    {/* A Mission only says what it needs. How to get an unmet item
+                        is the item's own reference, derived from the content
+                        that owns each way of getting it (#326). */}
+                    {requirement.itemId && !requirement.satisfied ? (
+                      <ItemSourcesButton itemId={requirement.itemId} state={state} />
+                    ) : null}
                     {/* Secondary context (what is carried, for instance) is its
                         own subordinate line so it can never read as progress. */}
                     {requirement.detail ? (
@@ -112,6 +121,9 @@ function MissionEntry({
                         key={material.itemId}
                       >
                         {`${material.label} — ${material.current} / ${material.target}`}
+                        {material.current < material.target ? (
+                          <ItemSourcesButton itemId={material.itemId} state={state} />
+                        ) : null}
                         {material.carried !== undefined ? (
                           <span
                             className="pl-2 text-[color:var(--rs-text-muted)]"
@@ -233,6 +245,7 @@ export function MissionLogPanel({
                 <MissionEntry
                   expanded={expandedId === mission.missionId}
                   key={mission.missionId}
+                  state={state}
                   mission={mission}
                   onToggle={() => toggle(mission.missionId)}
                 />
@@ -266,6 +279,7 @@ export function MissionLogPanel({
                   <MissionEntry
                     expanded={expandedId === mission.missionId}
                     key={mission.missionId}
+                    state={state}
                     mission={mission}
                     onToggle={() => toggle(mission.missionId)}
                   />

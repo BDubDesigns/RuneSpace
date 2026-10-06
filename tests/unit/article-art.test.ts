@@ -126,12 +126,14 @@ describe("canonical article art", () => {
         },
       }),
     );
+    // The index lists every Update; the homepage shows only the newest (#326).
+    expect(index).toContain("Wheel Be Right Back");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Wheel Be Right Back");
+      expect(markup).toContain("How to get it");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("uncut-topaz.webp");
-      // The newest Update opens with an item figure of its own (#322); like any
-      // other, it is an article-only feature.
+      // Newer Updates open with an item figure of their own (#322, #326); like
+      // any other, it is an article-only feature.
       expect(markup).not.toContain("wheel-assembly.webp");
     }
   });

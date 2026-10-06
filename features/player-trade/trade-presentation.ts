@@ -1,5 +1,6 @@
 import { getItemMaximumCharge } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { isItemTransferable } from "@/game/domain/player-trade";
 import type {
   TradeExchangeLines,
   TradeRequestChange,
@@ -76,6 +77,7 @@ export function offerableStacks(
     totals.set(stack.itemId, (totals.get(stack.itemId) ?? 0) + stack.quantity);
   }
   return [...totals]
+    .filter(([itemId]) => isItemTransferable(itemId))
     .map(([itemId, quantity]) => ({
       itemId,
       name: itemDisplayName(itemId),

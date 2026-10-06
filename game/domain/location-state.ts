@@ -1,4 +1,4 @@
-import { getLocation } from "@/game/content/locations";
+import { getLocation, LOCATIONS } from "@/game/content/locations";
 import type { LocationDefinition, LocationStateVariant } from "@/game/schemas/locations";
 
 /**
@@ -136,4 +136,25 @@ export function validateLocationStateVariants(
       }
     }
   }
+}
+
+/**
+ * The World Locations that currently host an authoritative action, in authored
+ * location order, given each location's already-resolved state (#326).
+ *
+ * The one place an action's host is derived from the location registry plus a
+ * character's resolved variants, so a source that exists only in a state
+ * variant (Deep Jag's Galvanite mine) is found exactly when the character's
+ * state makes it real, and is otherwise absent. It reads the resolved
+ * projection rather than re-deriving variants, so the browser and the server
+ * ask the same question of the same facts.
+ */
+export function locationsOfferingAction(
+  actionId: string,
+  states: Readonly<Record<string, { readonly availableActionIds: readonly string[] }>>,
+  locations: readonly LocationDefinition[] = LOCATIONS,
+): readonly string[] {
+  return locations
+    .filter((location) => states[location.id]?.availableActionIds.includes(actionId) ?? false)
+    .map((location) => location.id);
 }

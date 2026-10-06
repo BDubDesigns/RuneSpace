@@ -118,9 +118,30 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Wheel Be Right Back Update as the newest, linking its Wiki pages", () => {
+  it("publishes the item-sources Update as the newest, without hinting at undiscovered content", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("how-to-get-it");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("wheel-be-right-back")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    for (const label of ["Sources", "Mission Log", "locked", "Back button"]) {
+      expect(text.toLowerCase()).toContain(label.toLowerCase());
+    }
+    // A reference to what is already shown, never a pointer at unseen Missions or odds.
+    expect(text).not.toMatch(/\bquests?\b|Return the Favor|10,000 Hours|1 in \d|\d+%/i);
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Missions", articleSlug: "missions" });
+  });
+
+  it("publishes the Wheel Be Right Back Update, linking its Wiki pages", () => {
+    // Newer Updates have shipped since (#326), so it is found by slug.
+    const latest = getPublicUpdate("wheel-be-right-back")!;
     expect(latest.slug).toBe("wheel-be-right-back");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("turn-back")!.publishedAt),

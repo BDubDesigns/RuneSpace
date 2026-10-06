@@ -347,3 +347,45 @@ describe("repair-target map guidance is unchanged by the strip line", () => {
     expect([...deriveMissionGuidanceTargets([surplus]).repairTargetIds]).toEqual([]);
   });
 });
+
+describe("the Mission Log offers item sources without touching the Mission (#326)", () => {
+  const log = (projection: MissionProjection) =>
+    renderToStaticMarkup(
+      React.createElement(MissionLogPanel, {
+        state: stateOf(projection),
+        onClose: () => undefined,
+        presentation: "docked",
+        triggerRef: { current: null },
+      }),
+    );
+  const triggers = (markup: string) =>
+    [...markup.matchAll(/data-item-sources-trigger="([^"]+)"/g)].map((match) => match[1]);
+
+  it("puts a named Sources control on every unmet material row", () => {
+    const markup = log(wheelMission());
+    expect(triggers(markup).sort()).toEqual(
+      [ITEM_IDS.wheelAssembly, ITEM_IDS.mountingBracket, ITEM_IDS.galvanicWireSpool].sort(),
+    );
+    expect(markup).toContain('aria-label="How to get Wheel Assembly"');
+    expect(markup).toContain('aria-label="How to get Galvanic Wire Spool"');
+  });
+
+  it("offers none for a material that is fully installed", () => {
+    const markup = log(wheelMission({ installed: { [ITEM_IDS.mountingBracket]: 2 } }));
+    expect(triggers(markup)).not.toContain(ITEM_IDS.mountingBracket);
+    expect(triggers(markup)).toContain(ITEM_IDS.wheelAssembly);
+  });
+
+  it("keeps the compact Current Missions strip free of source detail", () => {
+    expect(strip(wheelMission())).not.toContain("data-item-sources");
+  });
+
+  it("leaves the projection and its guidance exactly as authored", () => {
+    const projection = wheelMission({ carried: { [ITEM_IDS.wheelAssembly]: 1 } });
+    const before = structuredClone(projection);
+    const guidanceBefore = [...deriveMissionGuidanceTargets([projection]).repairTargetIds];
+    log(projection);
+    expect(projection).toEqual(before);
+    expect([...deriveMissionGuidanceTargets([projection]).repairTargetIds]).toEqual(guidanceBefore);
+  });
+});
