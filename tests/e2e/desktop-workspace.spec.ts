@@ -612,8 +612,13 @@ async function pageGeometry(page: Page) {
         overflowY: getComputedStyle(el).overflowY,
       };
     };
+    // The place's "Only you here" line becomes a taller "N other characters
+    // here" control once its client read returns, and who else is standing at the
+    // Crash Site depends on what else is running. That says nothing about the
+    // feed or the rail, so the page's length is measured without that section.
+    const population = document.querySelector<HTMLElement>("[data-location-population]");
     return {
-      documentScroll: document.documentElement.scrollHeight,
+      documentScroll: document.documentElement.scrollHeight - (population?.offsetHeight ?? 0),
       viewport: document.documentElement.clientHeight,
       main: box("main"),
       rail: box("[data-play-rail]"),
@@ -647,35 +652,14 @@ test("a long docked General feed scrolls inside the rail and never lengthens the
   page,
   testCharacter,
 }) => {
-  // The place's "Only you here" line becomes a taller "N other characters here"
-  // control once its client read returns, and which other characters are standing
-  // at the Crash Site depends on what else is running. That is not what this test
-  // is about, so each measurement waits for the read to settle first.
-  const populationRead = () =>
-    page.waitForResponse((response) => response.url().includes("/api/location-population"));
-  // The response resolves before React commits its result, so give it two frames.
-  const frames = () =>
-    page.evaluate(
-      () =>
-        new Promise<void>((done) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => done())),
-        ),
-    );
-  const firstRead = populationRead();
   await openAt(page, testCharacter.id, DESKTOP);
   await waitForDock(page);
   await expect(page.locator("[data-chat-log]")).toBeVisible();
-  await firstRead;
-  await frames();
-  await expect(page.locator("[data-location-population]")).toBeVisible();
   const empty = await pageGeometry(page);
 
   await seedFeed(testCharacter.id, "general", 60);
   await seedFeed(testCharacter.id, "trade", 60);
-  const secondRead = populationRead();
   await page.reload();
-  await secondRead;
-  await frames();
   await waitForDock(page);
   await expect(page.locator("[data-chat-message]").last()).toBeVisible();
   const populated = await pageGeometry(page);
