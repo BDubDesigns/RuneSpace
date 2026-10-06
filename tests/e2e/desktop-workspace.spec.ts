@@ -612,8 +612,13 @@ async function pageGeometry(page: Page) {
         overflowY: getComputedStyle(el).overflowY,
       };
     };
+    // The place's "Only you here" line becomes a taller "N other characters
+    // here" control once its client read returns, and who else is standing at the
+    // Crash Site depends on what else is running. That says nothing about the
+    // feed or the rail, so the page's length is measured without that section.
+    const population = document.querySelector<HTMLElement>("[data-location-population]");
     return {
-      documentScroll: document.documentElement.scrollHeight,
+      documentScroll: document.documentElement.scrollHeight - (population?.offsetHeight ?? 0),
       viewport: document.documentElement.clientHeight,
       main: box("main"),
       rail: box("[data-play-rail]"),

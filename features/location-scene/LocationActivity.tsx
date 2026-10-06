@@ -10,6 +10,7 @@ import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPane
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
+import { ShipSystemPanel } from "@/features/ship/ShipSystemPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import type { RepairProjection } from "@/server/play";
@@ -112,7 +113,20 @@ function primaryActivity(
     case LOCATION_IDS.abandonedProcessingYard:
       return <RefiningConsole />;
     case LOCATION_IDS.crashSite:
-      return <CargoHoldPanel />;
+      // The crashed ship's systems (#322): every one is visible from the start as
+      // a damaged system, and a Mission only decides whether it can be repaired.
+      // They share one presentation (`ShipSystemPanel`); a future Propulsion
+      // system is one more entry here.
+      return (
+        <>
+          <CargoHoldPanel />
+          <ShipSystemPanel
+            materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
+            targetId={REPAIR_TARGET_IDS.landingGear}
+            weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
+          />
+        </>
+      );
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
     case LOCATION_IDS.ruskRecovery:

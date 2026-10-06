@@ -9,6 +9,42 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #322 — Wheel Be Right Back and the Wheel Assembly.
+    slug: "wheel-be-right-back",
+    title: "Wheel Be Right Back",
+    publishedAt: "2026-10-05T19:15:00-07:00",
+    summary:
+      "Wade has a new ship job for anyone who has finished Brace Yourself: get the landing gear back under the wreck. It brings a new Fabrication 5 part, a second repair at the Crash Site, and an engine that is still dead.",
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.wheelAssembly }, side: "right" },
+      [
+        "Once you have finished Brace Yourself, go and see Wade at Rusk Recovery. He wants the ship's wheels rebuilt and its mounts back under it — it won't make her fly, but there's no point fixing an engine on something that can't land. Nobody hands you the job; you take it from him yourself, whenever you like. See ",
+        { text: "Missions", articleSlug: "missions" },
+        " for the details.",
+      ],
+      [
+        "The job needs 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, installed at the Crash Site and welded in twelve passes. The Wheel Assembly is new: a Fabrication 5 recipe at the ",
+        { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+        " that takes 3 Refined Ferrite, 1 Galvanic Stock and a Mounting Bracket, and, like any other part, can be taken apart again by Tinkering. You never need Fabrication or Refining levels of your own to do the job — buy the parts, trade for them or be given them — but the welding is always yours. Finishing it pays Wade's 250 Welding XP on top of the passes themselves.",
+      ],
+      [
+        'When the last pass lands, the Landing Gear panel at the Crash Site reads "Landing gear restored. Propulsion offline." The wreck looks just as it did, and the ship still can\'t fly. See ',
+        { text: "Cargo Hold & Welding", articleSlug: "cargo-hold-and-welding" },
+        " for the recipe.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Wheel Be Right Back, a job Wade offers at Rusk Recovery once Brace Yourself is finished: repair the ship's landing gear at the Crash Site, then report to him for 250 Welding XP.",
+          "The Landing Gear repair at the Crash Site: 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve welding passes.",
+          "The Wheel Assembly, a Fabrication 5 recipe (3 Refined Ferrite, 1 Galvanic Stock and 1 Mounting Bracket, 21.6 seconds, 100 Fabrication XP) that stacks two to a slot and can be traded or Tinkered.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #312 — Turn Back from an active Journey.
     slug: "turn-back",
     title: "Turn back",

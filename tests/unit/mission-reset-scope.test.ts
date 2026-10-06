@@ -57,6 +57,8 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      // Wheel Be Right Back hangs off Brace Yourself too (#322).
+      "wheel_be_right_back",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -81,6 +83,8 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      // Wheel Be Right Back hangs off Brace Yourself too (#322).
+      "wheel_be_right_back",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -97,6 +101,7 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      "wheel_be_right_back",
       "a_cut_above",
       "cutting_costs",
       "curly_must_stash",

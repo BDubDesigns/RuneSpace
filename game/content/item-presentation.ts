@@ -15,6 +15,13 @@ export type ItemRarity = "rare";
 
 export type ItemPresentation = {
   displayName: string;
+  /**
+   * The name when the item is counted and the count is not one ("2 Wheel
+   * Assemblies"). Authored only where adding an "s" would be wrong or the item
+   * is a countable thing; omitted names (Refined Ferrite, Slag) read the same at
+   * any quantity.
+   */
+  pluralName?: string;
   accessibleDescription: string;
   textFallback: string;
   artworkSrc?: string;
@@ -48,6 +55,7 @@ const itemPresentations = {
   },
   [ITEM_IDS.powerCell]: {
     displayName: "Power Cell",
+    pluralName: "Power Cells",
     accessibleDescription: "Salvaged DeWhat? power cell with QC FAILED marking and visible repairs",
     textFallback: "PC",
     artworkSrc: "/item-art/power-cell.webp",
@@ -93,6 +101,7 @@ const itemPresentations = {
   // Tier-1 Fabrication outputs (#232).
   [ITEM_IDS.mountingBracket]: {
     displayName: "Mounting Bracket",
+    pluralName: "Mounting Brackets",
     accessibleDescription: "Fabricated mounting bracket for permanent installations",
     textFallback: "MB",
     artworkSrc: "/item-art/mounting-bracket.webp",
@@ -106,6 +115,7 @@ const itemPresentations = {
   // Fabrication 5 and 8 outputs (#233).
   [ITEM_IDS.galvanicWireSpool]: {
     displayName: "Galvanic Wire Spool",
+    pluralName: "Galvanic Wire Spools",
     accessibleDescription:
       "Spool of dark conductive Galvanic wire wound between bolted yellow-and-steel flanges, with a crimped lug on the free end",
     textFallback: "GW",
@@ -124,6 +134,15 @@ const itemPresentations = {
       "Strapped freight harness frame with shoulder straps and hip belt carrying a rugged rear cargo box",
     textFallback: "FH",
     artworkSrc: "/item-art/freight-harness.webp",
+  },
+  // The Landing Gear's wheel (#322).
+  [ITEM_IDS.wheelAssembly]: {
+    displayName: "Wheel Assembly",
+    pluralName: "Wheel Assemblies",
+    accessibleDescription:
+      "Rebuilt heavy-duty wheel with a deep-treaded rubber tire, riveted steel hub plates and a pinned swivel mounting plate, rust-streaked and work-worn",
+    textFallback: "WA",
+    artworkSrc: "/item-art/wheel-assembly.webp",
   },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {
@@ -213,4 +232,18 @@ export function resolveItemPresentation(itemId: string, fallbackName: string): I
       textFallback: fallbackName,
     }
   );
+}
+
+/**
+ * "1 Wheel Assembly" / "2 Wheel Assemblies" / "5 Refined Ferrite": a counted
+ * item name in its authored singular or plural, falling back to the supplied
+ * name for an item with no presentation.
+ */
+export function itemQuantityLabel(itemId: string, quantity: number, fallbackName: string): string {
+  const presentation = resolveItemPresentation(itemId, fallbackName);
+  const name =
+    quantity === 1
+      ? presentation.displayName
+      : (presentation.pluralName ?? presentation.displayName);
+  return `${quantity} ${name}`;
 }

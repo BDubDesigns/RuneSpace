@@ -364,6 +364,22 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(6),
     }),
+    /**
+     * The ship's Landing Gear at the Crash Site (#322): the Galvanic-tier step
+     * between the Ferrite-tier Cargo Hold and the future Propulsion work. It
+     * consumes finished components rather than raw stock, so the same recipe
+     * serves a character who fabricated them and one who traded for them.
+     */
+    landingGear: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.landingGear),
+      actionId: z.literal(ACTION_IDS.landingGearWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.wheelAssembly), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+      ]),
+      repairIncrements: z.literal(12),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -507,6 +523,24 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(1) }),
         ]),
       }),
+      /**
+       * The Landing Gear's wheel (#322): mostly structural Refined Ferrite with
+       * one Galvanic Stock and a Mounting Bracket. Its 1,550 g is exactly the
+       * three 150 g Ferrite, the 800 g Stock and the 300 g Bracket it is made of.
+       */
+      wheelAssembly: z.object({
+        actionId: z.literal(ACTION_IDS.wheelAssemblyFabrication),
+        outputItemId: z.literal(ITEM_IDS.wheelAssembly),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(36),
+        baseXp: z.literal(100),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(3) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+          z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(1) }),
+        ]),
+      }),
       /** The Fabrication 8 capstone (#233): an advanced +6-slot container attachment. */
       freightHarness: z.object({
         actionId: z.literal(ACTION_IDS.freightHarnessFabrication),
@@ -580,6 +614,11 @@ const balanceSchema = z.object({
       loadsteelCutter: z.object({
         actionId: z.literal(ACTION_IDS.loadsteelCutterTinkering),
         recipeActionId: z.literal(ACTION_IDS.loadsteelCutterFabrication),
+      }),
+      // Ordinary derived Tinkering (#322); the Wheel Assembly has no exception.
+      wheelAssembly: z.object({
+        actionId: z.literal(ACTION_IDS.wheelAssemblyTinkering),
+        recipeActionId: z.literal(ACTION_IDS.wheelAssemblyFabrication),
       }),
       freightHarness: z.object({
         actionId: z.literal(ACTION_IDS.freightHarnessTinkering),
@@ -777,6 +816,16 @@ const balanceSchema = z.object({
       itemId: z.literal(ITEM_IDS.galvanicWireSpool),
       massGrams: z.literal(1_000),
       stackLimit: z.literal(3),
+    }),
+    /**
+     * The Wheel Assembly (#322): 1,550 g, conserved through its authored inputs,
+     * and two to a stack so the Landing Gear's whole wheel requirement is one
+     * carried stack with no Mission-specific inventory behaviour.
+     */
+    wheelAssembly: z.object({
+      itemId: z.literal(ITEM_IDS.wheelAssembly),
+      massGrams: z.literal(1_550),
+      stackLimit: z.literal(2),
     }),
     freightHarness: z.object({
       itemId: z.literal(ITEM_IDS.freightHarness),
@@ -1047,6 +1096,16 @@ const defaults = balanceSchema.parse({
       ],
       repairIncrements: 6,
     },
+    landingGear: {
+      targetId: REPAIR_TARGET_IDS.landingGear,
+      actionId: ACTION_IDS.landingGearWelding,
+      materials: [
+        { itemId: ITEM_IDS.wheelAssembly, quantity: 2 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+        { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+      ],
+      repairIncrements: 12,
+    },
   },
   cargoHold: {
     capacitySlots: 32,
@@ -1137,6 +1196,19 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.powerCell, quantity: 1 },
         ],
       },
+      wheelAssembly: {
+        actionId: ACTION_IDS.wheelAssemblyFabrication,
+        outputItemId: ITEM_IDS.wheelAssembly,
+        outputQuantity: 1,
+        minimumLevel: 5,
+        durationTicks: 36,
+        baseXp: 100,
+        inputs: [
+          { itemId: ITEM_IDS.refinedFerrite, quantity: 3 },
+          { itemId: ITEM_IDS.galvanicStock, quantity: 1 },
+          { itemId: ITEM_IDS.mountingBracket, quantity: 1 },
+        ],
+      },
       freightHarness: {
         actionId: ACTION_IDS.freightHarnessFabrication,
         outputItemId: ITEM_IDS.freightHarness,
@@ -1190,6 +1262,10 @@ const defaults = balanceSchema.parse({
       loadsteelCutter: {
         actionId: ACTION_IDS.loadsteelCutterTinkering,
         recipeActionId: ACTION_IDS.loadsteelCutterFabrication,
+      },
+      wheelAssembly: {
+        actionId: ACTION_IDS.wheelAssemblyTinkering,
+        recipeActionId: ACTION_IDS.wheelAssemblyFabrication,
       },
       freightHarness: {
         actionId: ACTION_IDS.freightHarnessTinkering,
@@ -1267,6 +1343,7 @@ const defaults = balanceSchema.parse({
       equipment: { kind: "container", slotCapacity: 3 },
     },
     galvanicWireSpool: { itemId: ITEM_IDS.galvanicWireSpool, massGrams: 1_000, stackLimit: 3 },
+    wheelAssembly: { itemId: ITEM_IDS.wheelAssembly, massGrams: 1_550, stackLimit: 2 },
     freightHarness: {
       itemId: ITEM_IDS.freightHarness,
       massGrams: 9_000,

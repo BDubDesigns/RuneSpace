@@ -307,6 +307,11 @@ function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
 }
 
+/** Wade's reward tile at his own yard (#322), against the place he is standing in. */
+function wadeAtYardSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
+  return { kind: "skill_xp", skillId, amount, backgroundId: ruskYard, text: "" };
+}
+
 /**
  * One item beat per distinct item in a reward, showing the true awarded
  * total regardless of how many carried stacks Inventory's own stack limit
@@ -1886,6 +1891,78 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.neutral, "Brace is holding. I check it."),
       tansyLocal(EXPRESSION_IDS.smile, "Go mine your rock."),
     ],
+  },
+  // Wheel Be Right Back (#322). Wade at his own yard, because Keep the Change
+  // moved him there long before Brace Yourself. His register is the Canon's:
+  // short declaratives, no exclamation marks, approval arriving as a shorter
+  // sentence rather than a warmer one. He has only three portraits, so the
+  // expression carries the one thing the words do not: neutral is the flat
+  // working default, scowl is the gruff deflection he reaches for the moment
+  // something sounds like a kindness or an order he'd rather not repeat, and
+  // concerned is kept for when the job is the ship itself.
+  [DIALOGUE_IDS.wadeWheelBeRightBackOffer]: {
+    id: DIALOGUE_IDS.wadeWheelBeRightBackOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Heard the Deep Jag brace is still holding. Good work."),
+      wadeAtYard(
+        EXPRESSION_IDS.concerned,
+        "Your ship's still sitting on her belly. Get the wheels rebuilt and the mounts back under her. Won't make her fly, but there's no point fixing the engine before she can land.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.scowl,
+        "How you get the parts is your business. Two Wheel Assemblies, two Mounting Brackets, one Galvanic Wire Spool.",
+      ),
+    ],
+  },
+  // Said whenever the player comes back with the Landing Gear unfinished,
+  // whether they have installed nothing, half the parts, or are mid-weld. It
+  // names the shopping list and the place, and nothing that assumes how far
+  // along they are.
+  [DIALOGUE_IDS.wadeWheelBeRightBackRepairReminder]: {
+    id: DIALOGUE_IDS.wadeWheelBeRightBackRepairReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Two Wheel Assemblies, two Mounting Brackets, one Galvanic Wire Spool. Get them under the ship at the Crash Site.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWheelBeRightBackBusy]: {
+    id: DIALOGUE_IDS.wadeWheelBeRightBackBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You're in the middle of something. Finish it, then tell me about the gear.",
+      ),
+    ],
+  },
+  // REPORT REPAIR has already been chosen and the player has no response beat
+  // here, so Wade states rather than asks.
+  [DIALOGUE_IDS.wadeWheelBeRightBackTurnIn]: {
+    id: DIALOGUE_IDS.wadeWheelBeRightBackTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Wheels on. Mounts welded. Good.")],
+  },
+  [DIALOGUE_IDS.wadeWheelBeRightBackCompletion]: {
+    id: DIALOGUE_IDS.wadeWheelBeRightBackCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "That'll hold. She's got her feet back under her."),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Engine's still dead. That's another job."),
+      wadeAtYardSkillXpBeat(SKILL_IDS.welding, 250),
+    ],
+  },
+  // His ordinary follow-up wherever he stands, which may be the moment after the
+  // report. It states the whole of the ship's state and assumes no time has
+  // passed, no trip to the wreck, and no promise about the engine.
+  [DIALOGUE_IDS.wadePostWheelBeRightBack]: {
+    id: DIALOGUE_IDS.wadePostWheelBeRightBack,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Landing gear's done. Engine isn't.")],
   },
   // Return the Favor (#232) — the locked offer scene from the Fabrication
   // design. Tansy teaches the station; Wade supplies the shop's shorthand.

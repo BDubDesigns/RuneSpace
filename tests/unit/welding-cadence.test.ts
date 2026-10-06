@@ -147,6 +147,7 @@ describe("weldingActionIds keeps its narrower repair-target contract (#172, #207
         ACTION_IDS.siteStashProcessingYardWelding,
         ACTION_IDS.siteStashDeepJagWelding,
         ACTION_IDS.curlyStashMountWelding,
+        ACTION_IDS.landingGearWelding,
       ]),
     );
   });

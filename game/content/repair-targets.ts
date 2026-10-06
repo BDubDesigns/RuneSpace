@@ -57,6 +57,19 @@ export type RepairTargetDefinition = {
    * the Cargo Hold is the thing it is rendering.
    */
   materialNotes?: Readonly<Record<string, string>>;
+  /**
+   * The status a finished ship system reads as on its own surface (#322).
+   * Authored here beside the target it describes, so the words that tell a
+   * player what the repair did and what it did not do have exactly one home, and
+   * read from the repair's own completion rather than from a second flag.
+   */
+  completedStatus?: string;
+  /**
+   * What a ship system reads as while it is damaged and no job has authorized
+   * its repair (#322). Used by the shared ship-system panel, so a system is
+   * visible from the start without the recipe or any progression hint.
+   */
+  offlineStatus?: string;
 };
 
 export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
@@ -65,6 +78,8 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     displayName: "Cargo Hold",
     locationId: LOCATION_IDS.crashSite,
     authorization: { kind: "mission", missionId: MISSION_IDS.holdItTogether },
+    offlineStatus: "The Cargo Hold is buckled from the crash and still inaccessible.",
+    completedStatus: "Cargo Hold operational.",
     materialNotes: {
       [ITEM_IDS.refinedFerrite]: "replacement plating and braces",
       [ITEM_IDS.slag]: "thermal packing for bulkhead voids",
@@ -88,6 +103,22 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
       [ITEM_IDS.refinedFerrite]: "the brace legs and the crown plate",
       [ITEM_IDS.powerCell]: "charge for Tansy's jack, spent setting the brace",
     },
+  },
+  {
+    // The ship's landing gear (#322). A Wade Mission reveals it, but nothing
+    // here is Wade-specific: the ship status below is read from the repair's own
+    // completion, and finishing it opens no flight, route or Propulsion work.
+    id: REPAIR_TARGET_IDS.landingGear,
+    displayName: "Landing Gear",
+    locationId: LOCATION_IDS.crashSite,
+    authorization: { kind: "mission", missionId: MISSION_IDS.wheelBeRightBack },
+    materialNotes: {
+      [ITEM_IDS.wheelAssembly]: "the rebuilt wheels the ship stands on",
+      [ITEM_IDS.mountingBracket]: "ship-side mounting hardware",
+      [ITEM_IDS.galvanicWireSpool]: "actuation and sensor wiring",
+    },
+    offlineStatus: "The landing gear is damaged and cannot be repaired yet.",
+    completedStatus: "Landing gear restored. Propulsion offline.",
   },
   // Site stash mounts (#284): permanent, per-character, one per authored site.
   // Same tier, same Welding gate, same recipe wherever it is built.

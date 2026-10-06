@@ -11,6 +11,13 @@ clients.
   resampling the full master on every request. The committed derivative is a
   640 px long-edge lossless WebP of the same render; nothing was regenerated,
   recomposed or recoloured.
+- `wheel-assembly.png` is the approved 1254×1254 transparent render of the
+  Wheel Assembly (#322). The committed derivative
+  `public/item-art/wheel-assembly.webp` follows the Fabrication-art convention
+  of the Galvanic Wire Spool, Loadsteel Cutter and Freight Harness: alpha noise
+  below 4 cleared, trimmed to its content, scaled to a 576 px long edge, centred
+  on a 640×640 transparent canvas and saved as lossless WebP. Nothing was
+  regenerated, recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

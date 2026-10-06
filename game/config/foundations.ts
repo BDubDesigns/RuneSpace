@@ -57,6 +57,9 @@ const itemIds = {
   galvanicWireSpool: asContentId("galvanic_wire_spool"),
   loadsteelCutter: asContentId("loadsteel_cutter"),
   freightHarness: asContentId("freight_harness"),
+  // Wheel Be Right Back (#322). A Fabrication 5 stackable ship component: tradable
+  // like any other stack, so a character who never fabricates can still install it.
+  wheelAssembly: asContentId("wheel_assembly"),
   // Mining Secondary Finds (#308): rough gemstones a successful extraction can
   // turn up alongside the source's ordinary ore.
   uncutQuartz: asContentId("uncut_quartz"),
@@ -105,6 +108,9 @@ const missionIds = {
   // Curly's optional paid commission at HH B&B (#292): weld a mount for the
   // storage container he already owns. The mount is his, never the player's.
   curlyMustStash: asContentId("curly_must_stash"),
+  // Wade's landing-gear job (#322): the midpoint ship repair between the Cargo
+  // Hold and the future Propulsion work. Offered manually after Brace Yourself.
+  wheelBeRightBack: asContentId("wheel_be_right_back"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -251,6 +257,15 @@ const dialogueIds = {
   curlyMustStashTurnIn: asContentId("curly_curly_must_stash_turn_in"),
   curlyMustStashCompletion: asContentId("curly_curly_must_stash_completion"),
   curlyPostCurlyMustStash: asContentId("curly_post_curly_must_stash"),
+  // Wheel Be Right Back (#322): Wade's offer, the reminder while the Landing Gear
+  // is unfinished, the "finish what you're doing" beat, the turn-in once it is
+  // installed, the paid completion, and his follow-up afterwards.
+  wadeWheelBeRightBackOffer: asContentId("wade_rusk_wheel_be_right_back_offer"),
+  wadeWheelBeRightBackRepairReminder: asContentId("wade_rusk_wheel_be_right_back_repair_reminder"),
+  wadeWheelBeRightBackBusy: asContentId("wade_rusk_wheel_be_right_back_busy"),
+  wadeWheelBeRightBackTurnIn: asContentId("wade_rusk_wheel_be_right_back_turn_in"),
+  wadeWheelBeRightBackCompletion: asContentId("wade_rusk_wheel_be_right_back_completion"),
+  wadePostWheelBeRightBack: asContentId("wade_rusk_post_wheel_be_right_back"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -375,6 +390,8 @@ export const ACTION_IDS = {
   siteStashDeepJagWelding: asContentId("site_stash_deep_jag_welding"),
   // Welding Curly's storage mount at HH B&B (#292).
   curlyStashMountWelding: asContentId("curly_stash_mount_welding"),
+  // Welding the ship's Landing Gear at the Crash Site (#322).
+  landingGearWelding: asContentId("landing_gear_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -395,10 +412,13 @@ export const ACTION_IDS = {
   powerCellFabrication: asContentId("power_cell_fabrication"),
   loadsteelCutterFabrication: asContentId("loadsteel_cutter_fabrication"),
   freightHarnessFabrication: asContentId("freight_harness_fabrication"),
+  // The Fabrication 5 Wheel Assembly and its ordinary Tinkering target (#322).
+  wheelAssemblyFabrication: asContentId("wheel_assembly_fabrication"),
   galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
   powerCellTinkering: asContentId("power_cell_tinkering"),
   loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),
   freightHarnessTinkering: asContentId("freight_harness_tinkering"),
+  wheelAssemblyTinkering: asContentId("wheel_assembly_tinkering"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -463,6 +483,10 @@ export const REPAIR_TARGET_IDS = {
   // Curly's storage mount in his room at HH B&B (#292). NPC-owned: completing
   // it is a commission finished for him, never a stash the player owns.
   curlyStashMount: asContentId("curly_stash_mount"),
+  // The ship's landing gear at the Crash Site (#322): the second Crash Site repair
+  // after the Cargo Hold. Its completion is the authoritative fact the Crash Site
+  // status reads; there is no second `landing_gear_restored` flag anywhere.
+  landingGear: asContentId("landing_gear"),
 } as const satisfies Record<string, ContentId>;
 
 /**

@@ -1,7 +1,8 @@
 "use client";
 
 import type { MissionProjection } from "@/game/domain/missions";
-import { missionGuidancePhase } from "@/game/domain/missions";
+import { itemQuantityLabel } from "@/game/content/item-presentation";
+import { missionGuidancePhase, stillNeededMaterials } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -50,6 +51,9 @@ export function MissionGuidanceStrips({
           // The first unmet requirement owns the current objective; others that
           // track progress at the same time stay visible, compactly.
           const alsoInProgress = unmet.slice(1).filter((requirement) => requirement.progress);
+          // A repair needing several materials also says what is still to be
+          // obtained, net of what is carried (#322); empty when nothing is.
+          const stillNeeded = stillNeededMaterials(mission);
           return (
             // A status row, not an interaction target: it carries the phase, never
             // `data-mission-guidance`, which marks what a player acts on.
@@ -74,6 +78,18 @@ export function MissionGuidanceStrips({
                 >
                   {mission.currentObjective}
                 </p>
+                {stillNeeded.length > 0 ? (
+                  <p
+                    className="mt-0.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]"
+                    data-mission-strip-needed
+                  >
+                    {`Still needed: ${stillNeeded
+                      .map((material) =>
+                        itemQuantityLabel(material.itemId, material.remaining, material.label),
+                      )
+                      .join(" · ")}`}
+                  </p>
+                ) : null}
                 {alsoInProgress.length > 0 ? (
                   <p
                     className="mt-0.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]"

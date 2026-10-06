@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { ITEM_IDS } from "@/game/config/foundations";
 import {
   formatPublicUpdateDate,
   getLatestPublishedUpdate,
@@ -117,9 +118,47 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Turn Back Update as the newest, linking Travel & Scavenging", () => {
+  it("publishes the Wheel Be Right Back Update as the newest, linking its Wiki pages", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("wheel-be-right-back");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("turn-back")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    // Player-facing: the job, the parts, the reward and the honest status.
+    const text = JSON.stringify(latest);
+    for (const label of [
+      "Wheel Be Right Back",
+      "Wade",
+      "Wheel Assembly",
+      "Fabrication 5",
+      "250 Welding XP",
+      "Landing gear restored. Propulsion offline.",
+    ]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toMatch(/\bquests?\b/i);
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Missions", articleSlug: "missions" });
+    expect(links).toContainEqual({
+      text: "Fabrication Station",
+      articleSlug: "fabrication-and-tinkering",
+    });
+    // The item figure resolves from the canonical item registry, not a path.
+    expect(latest.body[0]).toEqual({
+      kind: "figure",
+      art: { kind: "item", itemId: ITEM_IDS.wheelAssembly },
+      side: "right",
+    });
+  });
+
+  it("publishes the Turn Back Update, linking Travel & Scavenging", () => {
+    // A newer Update has shipped since (#322), so it is found by slug.
+    const latest = getPublicUpdate("turn-back")!;
     expect(latest.slug).toBe("turn-back");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("rare-finds")!.publishedAt),
