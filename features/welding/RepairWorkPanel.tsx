@@ -9,6 +9,7 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { getRepairTarget } from "@/game/content/repair-targets";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
@@ -174,8 +175,10 @@ export function RepairWorkPanel({
         {completionAnnouncement}
       </p>
       {repair.complete ? (
-        <p className="text-sm text-[color:var(--rs-text-secondary)]">
-          The work is done and it is holding.
+        <p className="text-sm text-[color:var(--rs-text-secondary)]" data-repair-completed-status>
+          {/* A target may author what its finished state says (#322); the rest
+              keep the generic line. */}
+          {getRepairTarget(targetId)?.completedStatus ?? "The work is done and it is holding."}
         </p>
       ) : !repair.materialComplete ? (
         <>

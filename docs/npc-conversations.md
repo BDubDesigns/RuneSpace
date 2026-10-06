@@ -187,7 +187,7 @@ Consequences that must stay true:
   stationary state, and every requirement inside the character transaction.
 
 Current authored labels include `Claim Cutter` (Walk It Off), `SHOW SHALE` (Cut
-Your Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together),
+Your Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together, Wheel Be Right Back),
 `HAND OVER THE CUTTER` (Return the Favor, Cutting Costs), `SHOW HER THE CUTTER`
 (A Cut Above), `TELL TANSY` (Break It Down, Brace Yourself), and `COLLECT PAYMENT`
 (Curly Must-Stash).

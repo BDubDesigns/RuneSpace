@@ -127,9 +127,12 @@ describe("canonical article art", () => {
       }),
     );
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Turn back");
+      expect(markup).toContain("Wheel Be Right Back");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("uncut-topaz.webp");
+      // The newest Update opens with an item figure of its own (#322); like any
+      // other, it is an article-only feature.
+      expect(markup).not.toContain("wheel-assembly.webp");
     }
   });
 

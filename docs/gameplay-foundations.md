@@ -417,6 +417,7 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Stash Mount: Abandoned Processing Yard (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
 | Stash Mount: Deep Jag (#284) | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 750 |
 | Curly's Stash Mount: HH B&B (#292) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
+| Landing Gear (Crash Site, #322) | 2 Wheel Assemblies + 2 Mounting Brackets + 1 Galvanic Wire Spool | 12 | 600 |
 
 Curly's mount is The Jag's Tier-1 job, authored as its own entry, done for an
 NPC: it is authorized by accepting **Curly Must-Stash**, lives inside HH B&B,
@@ -424,6 +425,19 @@ and its completion is a job finished for Curly. It is not a site stash
 (`game/content/site-stashes` never names it), holds no player storage, and the
 B&B shows its **Build Stash Mount** activity only while the work is authorized
 and unfinished — nothing remains once the last section lands.
+
+The Landing Gear (#322) is the Crash Site's second repair, authorized by
+accepting **Wheel Be Right Back**. It is the Galvanic-tier step of the ship
+ladder — Cargo Hold is Ferrite tier, Landing Gear Galvanic tier, and
+Propulsion is reserved for Galvaferrite, which this recipe never uses. Its
+materials are finished components, taken by item ID with no provenance, so
+fabricated, bought and traded parts are identical and the installing character
+needs no Fabrication or Refining level — only the Welding the work itself
+trains. It uses the global Welding cadence, the global 50 XP per section and
+the ordinary Clean Pass. Its authored `completedStatus` — "Landing gear
+restored. Propulsion offline." — is what the shared repair panel reads when the
+repair is complete; completion unlocks no flight, route or fuel behaviour and
+adds no ship art or location-state variant.
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
@@ -907,6 +921,7 @@ recipe and not a Tinkering target.
 | Galvanic Wire Spool | 5 | 1 Galvanic Stock → 1 Galvanic Wire Spool (1,000 g, stack 3) | 24 ticks / 14.4 s | 45 |
 | Power Cells | 5 | 1 Galvanic Stock → 2 Power Cells | 30 ticks / 18 s | 75 |
 | Loadsteel Cutter | 5 | 2 Galvaferrite + 1 Galvanic Wire Spool + 1 Power Cell → 1 Loadsteel Cutter (8,000 g, unique) | 45 ticks / 27 s | 180 |
+| Wheel Assembly | 5 | 3 Refined Ferrite + 1 Galvanic Stock + 1 Mounting Bracket → 1 Wheel Assembly (1,550 g, stack 2) | 36 ticks / 21.6 s | 100 |
 | Freight Harness | 8 | 4 Galvaferrite + 2 Mounting Brackets → 1 Freight Harness (9,000 g, unique) | 60 ticks / 36 s | 270 |
 
 Reaching the level is the whole gate: no Mission, NPC permission or personal
@@ -926,6 +941,11 @@ none of those is an inventory item.
   transformation of the Salvage Cutter. A new one comes off the machine at 0/10:
   its Power Cell commissions the tool and is not stored charge. See the Mining
   slice for its behaviour.
+- **The Wheel Assembly** (#322) is an ordinary tradable stack: its 1,550 g is
+  exactly its inputs (3 x 150 g Refined Ferrite + 800 g Galvanic Stock + 300 g
+  Mounting Bracket), and a stack of two is the Landing Gear's whole wheel
+  requirement. It is open at Fabrication 5 by level alone — accepting Wheel Be
+  Right Back unlocks nothing — and it is a normal Tinkering target.
 - **The Freight Harness** is an advanced container attachment: +6 Inventory
   slots in either of the two existing container slots, carried at its full
   9 kg — not a carry-capacity upgrade.
@@ -1021,8 +1041,9 @@ The Fabrication 5 and 8 targets (#233) follow from the same rules with no item
 exception: Galvanic Wire Spool 45 XP / 28.8 s / 1 Scrap and Power Cells 75 XP /
 36 s / 1 Scrap (a complete batch of **two** Cells — one Cell alone is never
 Tinkered) and Loadsteel Cutter 180 XP / 54 s / 2 Scrap, all at Fabrication 5;
-Freight Harness 270 XP / 72 s / 3 Scrap at Fabrication 8. Neither Direct Scrap
-recipe is a target.
+Wheel Assembly (#322) 100 XP / 43.2 s / 3 Scrap at Fabrication 5 (five input
+units, rounded up) and Freight Harness 270 XP / 72 s / 3 Scrap at Fabrication 8.
+Neither Direct Scrap recipe is a target.
 
 It follows Practice Welding's cycle model: a cycle commits — destroys — its batch
 the instant it begins, so a refresh can neither duplicate nor dodge the

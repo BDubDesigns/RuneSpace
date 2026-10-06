@@ -125,6 +125,14 @@ const itemPresentations = {
     textFallback: "FH",
     artworkSrc: "/item-art/freight-harness.webp",
   },
+  // The Landing Gear's wheel (#322).
+  [ITEM_IDS.wheelAssembly]: {
+    displayName: "Wheel Assembly",
+    accessibleDescription:
+      "Rebuilt heavy-duty wheel with a deep-treaded rubber tire, riveted steel hub plates and a pinned swivel mounting plate, rust-streaked and work-worn",
+    textFallback: "WA",
+    artworkSrc: "/item-art/wheel-assembly.webp",
+  },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {
     displayName: "Uncut Quartz",

@@ -66,7 +66,8 @@ function snapshot(overrides: Partial<TinkeringSnapshot> = {}): TinkeringSnapshot
 
 describe("the Tier-1 Tinkering set and its exact values", () => {
   it("authors exactly the eligible targets — never either Direct Scrap recipe", () => {
-    // The three Tier-1 targets (#232), then Fabrication 5 and 8's (#233).
+    // The three Tier-1 targets (#232), then Fabrication 5 and 8's (#233), with the
+    // Wheel Assembly (#322) among the Fabrication 5 ones.
     expect(tinkeringActionIds(balance)).toEqual([
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
@@ -74,6 +75,7 @@ describe("the Tier-1 Tinkering set and its exact values", () => {
       ACTION_IDS.galvanicWireSpoolTinkering,
       ACTION_IDS.powerCellTinkering,
       ACTION_IDS.loadsteelCutterTinkering,
+      ACTION_IDS.wheelAssemblyTinkering,
       ACTION_IDS.freightHarnessTinkering,
     ]);
     const dismantled = tinkeringActionIds(balance).map((id) => target(id).recipe.actionId);

@@ -19,7 +19,7 @@ import {
  * registry.
  *
  * - Crash Site: wreck / start location (Cargo Hold Welding after issue #89;
- *   no mining after issue #83).
+ *   no mining after issue #83; Landing Gear Welding after issue #322).
  * - Abandoned Processing Yard: Ferrite Refining (issue #81).
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  * - The Long Scramble (#83): intentionally barren traversal tile.
@@ -46,7 +46,10 @@ const locationDefinitions = [
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.holoHollow,
     ],
-    availableActionIds: [ACTION_IDS.cargoHoldWelding],
+    // Both Crash Site repairs: the Cargo Hold, and the Landing Gear (#322). Listing
+    // the Landing Gear is what lets Mission guidance walk a player elsewhere back
+    // to the one place it can be welded.
+    availableActionIds: [ACTION_IDS.cargoHoldWelding, ACTION_IDS.landingGearWelding],
     dormantActivities: [],
     presentation: {
       mapIconKey: "crash_site_deposit" as const,
@@ -221,6 +224,7 @@ const locationDefinitions = [
       ACTION_IDS.galvanicWireSpoolFabrication,
       ACTION_IDS.powerCellFabrication,
       ACTION_IDS.loadsteelCutterFabrication,
+      ACTION_IDS.wheelAssemblyFabrication,
       ACTION_IDS.freightHarnessFabrication,
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
@@ -228,6 +232,7 @@ const locationDefinitions = [
       ACTION_IDS.galvanicWireSpoolTinkering,
       ACTION_IDS.powerCellTinkering,
       ACTION_IDS.loadsteelCutterTinkering,
+      ACTION_IDS.wheelAssemblyTinkering,
       ACTION_IDS.freightHarnessTinkering,
     ],
     merchantId: MERCHANT_IDS.wadeRusk,

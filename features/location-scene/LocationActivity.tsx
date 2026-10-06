@@ -112,7 +112,22 @@ function primaryActivity(
     case LOCATION_IDS.abandonedProcessingYard:
       return <RefiningConsole />;
     case LOCATION_IDS.crashSite:
-      return <CargoHoldPanel />;
+      // The Cargo Hold is the Crash Site's standing activity; the Landing Gear
+      // (#322) is a second repair that exists only once Wade's Mission has been
+      // accepted, and stays on show afterwards because its finished status is
+      // how the wreck tells the player what it can and cannot do yet.
+      return (
+        <>
+          <CargoHoldPanel />
+          <RepairWorkPanel
+            eyebrow="Ship"
+            materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
+            targetId={REPAIR_TARGET_IDS.landingGear}
+            title="Landing Gear"
+            weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
+          />
+        </>
+      );
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
     case LOCATION_IDS.ruskRecovery:

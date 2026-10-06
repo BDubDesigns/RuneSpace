@@ -272,7 +272,8 @@ test("Fabrication 5 and 8: recipes by level, the x2 Cell batch, and advanced Tin
   );
   await station.locator('[data-station-mode-select="recipes"]').click();
   const catalog = station.locator("[data-fabrication-recipes-catalog]");
-  await expect(catalog.locator("[data-recipes-catalog-entry]")).toHaveCount(8);
+  // Eight Fabrication 1-5 recipes known before the Wheel Assembly (#322) made nine.
+  await expect(catalog.locator("[data-recipes-catalog-entry]")).toHaveCount(9);
   await expect(
     catalog.locator(`[data-recipes-catalog-entry="${ACTION_IDS.freightHarnessFabrication}"]`),
   ).toHaveCount(0);
@@ -349,7 +350,7 @@ test("Fabrication 5 and 8: recipes by level, the x2 Cell batch, and advanced Tin
   await station.locator('[data-station-mode-select="recipes"]').click();
   await expect(
     station.locator("[data-fabrication-recipes-catalog]").locator("[data-recipes-catalog-entry]"),
-  ).toHaveCount(9);
+  ).toHaveCount(10);
   // The Recipes view is what is on screen now.
   await expectArtwork(
     station

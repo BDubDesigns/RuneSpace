@@ -1201,6 +1201,68 @@ export const BRACE_YOURSELF: MissionDefinition = {
 };
 
 /**
+ * Wheel Be Right Back — Wade's landing-gear job (#322).
+ *
+ * The midpoint of the ship's restoration, between the Cargo Hold and the
+ * Propulsion work that has not been authored: the Cargo Hold is the Ferrite
+ * tier, the Landing Gear the Galvanic tier. Wade offers it by hand at Rusk
+ * Recovery once Brace Yourself is complete — it is never Brace Yourself's
+ * continuation — and its prerequisite is that Mission alone. Brace Yourself's
+ * own ancestry already proves the Cargo Hold chapter, so nothing here restates
+ * it. There is deliberately no skill prerequisite: the player must do the
+ * welding themselves, but the Wheel Assemblies, Brackets and Wire Spool may be
+ * fabricated, bought or traded for, so no personal Fabrication or Refining
+ * level gates acceptance or the repair, and A Cut Above is not required.
+ *
+ * The requirement observes the Landing Gear repair target and nothing else.
+ * The target's authorization is this Mission's acceptance, and a finished
+ * repair stays finished, so the ship status it reads is the repair's own
+ * completion. Finishing it unlocks no flight, travel route or Propulsion Mission;
+ * the 250 Welding XP is Wade's recognition on top of the 600 the twelve
+ * genuine sections already paid.
+ */
+export const WHEEL_BE_RIGHT_BACK: MissionDefinition = {
+  id: MISSION_IDS.wheelBeRightBack,
+  title: "Wheel Be Right Back",
+  summary: "Rebuild the ship's landing gear at the Crash Site, then report to Wade Rusk.",
+  prerequisiteMissionId: MISSION_IDS.braceYourself,
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.wadeWheelBeRightBackOffer,
+      actionLabel: "TAKE THE JOB",
+      // No acceptance effect and no continuation: the parts are the player's to
+      // find, and the offer already ends on the shopping list.
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.landingGear,
+      objective: "Repair the Landing Gear at the Crash Site",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Report the repaired Landing Gear to Wade Rusk at Rusk Recovery",
+    dialogueId: DIALOGUE_IDS.wadeWheelBeRightBackTurnIn,
+    actionLabel: "REPORT REPAIR",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 250 },
+  dialogue: {
+    repairReminderDialogueId: DIALOGUE_IDS.wadeWheelBeRightBackRepairReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeWheelBeRightBackBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeWheelBeRightBackCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostWheelBeRightBack },
+  ],
+};
+
+/**
  * A Cut Above — Tansy's Fabrication 5 lesson at The Jag (#233).
  *
  * What it teaches is a rule, not a recipe: new recipes unlock as Fabrication
@@ -1383,6 +1445,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Deep Jag's branch is 10,001 Hours' sibling, not its successor: neither
   // needs the other (#209). Its story gate is Break It Down (#232).
   BRACE_YOURSELF,
+  // Wade's landing-gear job (#322): after Brace Yourself, offered by hand, with
+  // no skill gate and no dependence on A Cut Above.
+  WHEEL_BE_RIGHT_BACK,
   // Tansy's Fabrication 5 lesson (#233): after Brace Yourself, at Fabrication 5.
   A_CUT_ABOVE,
   // The optional branch sits after the main chain: it is never a prerequisite

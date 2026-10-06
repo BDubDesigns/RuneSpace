@@ -38,6 +38,7 @@ describe("recipesUnlockedBetween", () => {
       ACTION_IDS.galvanicWireSpoolFabrication,
       ACTION_IDS.powerCellFabrication,
       ACTION_IDS.loadsteelCutterFabrication,
+      ACTION_IDS.wheelAssemblyFabrication,
     ]);
   });
 
@@ -54,6 +55,7 @@ describe("recipesUnlockedBetween", () => {
       ACTION_IDS.galvanicWireSpoolFabrication,
       ACTION_IDS.powerCellFabrication,
       ACTION_IDS.loadsteelCutterFabrication,
+      ACTION_IDS.wheelAssemblyFabrication,
       ACTION_IDS.freightHarnessFabrication,
     ]);
   });

@@ -527,7 +527,7 @@ const authoredWikiArticles = [
     title: "Cargo Hold & Welding",
     category: "work",
     summary:
-      "Repairing the ship's Cargo Hold, what it gives you once it's welded shut, what else you can weld, and the stashes you can build at your work sites.",
+      "Repairing the ship's Cargo Hold and Landing Gear, what the Cargo Hold gives you once it's welded shut, what else you can weld, and the stashes you can build at your work sites.",
     sections: [
       {
         paragraphs: [
@@ -579,6 +579,11 @@ const authoredWikiArticles = [
             "The biggest job so far is the collapsed passage at Deep Jag: 25 Refined Ferrite and 5 ",
             { text: "Power Cells", articleSlug: "power-cells" },
             " to build Tansy's brace out of, then fifteen passes to weld it together. The Cells go into the jack that lifts the roof and are spent doing it — like every other installed material, they don't come back.",
+          ],
+          [
+            "Back at the Crash Site, the ship has a second repair after the Cargo Hold: the Landing Gear. It is part of ",
+            { text: "Wheel Be Right Back", articleSlug: "missions" },
+            ', and its controls appear beside the Cargo Hold only once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored. Propulsion offline." The ship looks just as wrecked as before, and nothing about it lets you fly.',
           ],
           [
             "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",
@@ -870,6 +875,11 @@ const authoredWikiArticles = [
             " that needs Mining 5 to use. The Power Cell goes into building it, so it comes off the machine with no charge.",
           ],
           [
+            "Wheel Assembly (Fabrication 5) — 3 Refined Ferrite, 1 Galvanic Stock and 1 Mounting Bracket. 21.6 seconds, 100 Fabrication XP. A rebuilt wheel for the ship's ",
+            { text: "Landing Gear", articleSlug: "cargo-hold-and-welding" },
+            "; it weighs 1.55 kg and stacks only two to a slot. You can sell, trade or hand one to somebody who never touched the station, and it works the same for them.",
+          ],
+          [
             "Freight Harness (Fabrication 8) — 4 Galvaferrite and 2 Mounting Brackets. 36 seconds, 270 Fabrication XP. An advanced container that adds six ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
             " slots in either container attachment, at a hefty 9 kg.",
@@ -911,6 +921,7 @@ const authoredWikiArticles = [
           "Galvanic Wire Spool (Fabrication 5) — 45 Fabrication XP, 28.8 seconds, 1 Scrap Metal.",
           "Power Cells (Fabrication 5) — a pair at a time, never one alone: 75 Fabrication XP, 36 seconds, 1 Scrap Metal.",
           "Loadsteel Cutter (Fabrication 5) — 180 Fabrication XP, 54 seconds, 2 Scrap Metal.",
+          "Wheel Assembly (Fabrication 5) — 100 Fabrication XP, 43.2 seconds, 3 Scrap Metal.",
           "Freight Harness (Fabrication 8) — 270 Fabrication XP, 72 seconds, 3 Scrap Metal.",
         ],
       },
@@ -990,6 +1001,11 @@ const authoredWikiArticles = [
             { text: "Loadsteel Cutter", articleSlug: "fabrication-and-tinkering" },
             ". The recipe is already open at Fabrication 5 — taking the job doesn't unlock it, and you don't need any Refining. Show her a Loadsteel Cutter you're carrying or have equipped, however you came by it. She lets you keep it. Worth 500 Fabrication XP.",
           ],
+          [
+            "Wheel Be Right Back — once you have finished Brace Yourself, Wade offers to put the ship's landing gear back under it at Rusk Recovery. Bring 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool to the Crash Site, ",
+            { text: "weld the Landing Gear", articleSlug: "cargo-hold-and-welding" },
+            " in twelve passes, then report to Wade. Worth 250 Welding XP on top of the passes.",
+          ],
         ],
       },
       {
@@ -1035,6 +1051,18 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Wheel Be Right Back in detail",
+        paragraphs: [
+          "Wade won't come find you for this one, and finishing Brace Yourself doesn't start it: walk out to Rusk Recovery and take it from him when you want it. It asks for nothing else first — no Welding level beyond what Brace Yourself already took, no Fabrication or Refining, and you don't need A Cut Above.",
+          [
+            "Where the parts come from is up to you. You can make Wheel Assemblies at Fabrication 5 at the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            ", buy them, trade for them or be given them, and the same goes for the Mounting Brackets and the Galvanic Wire Spool. You always do the welding yourself.",
+          ],
+          "You can install the parts across as many visits as you like, and what goes in stays in. When the twelfth pass lands the Landing Gear is done for good, and Wade has 250 Welding XP for you on top of the 600 the passes earned. It doesn't make the ship fly: the engine is still dead, and the Crash Site says so.",
+        ],
+      },
+      {
         heading: "Out of the Weather in detail",
         paragraphs: [
           "This one costs you rather than paying you up front: the materials and the time are yours. Renn won't chase you about it, and the Crew Stop stays where it is however long you take — you can put in some of the Refined Ferrite, go and get more, and come back.",
@@ -1048,7 +1076,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, and Renn offers Cutting Costs in town. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, Renn offers Cutting Costs in town, and Wade offers Wheel Be Right Back at Rusk Recovery. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {
@@ -1263,7 +1291,7 @@ const authoredWikiArticles = [
         list: [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
-          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, repairing the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
+          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
           [
             "Fabrication — each finished piece at the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
@@ -1345,6 +1373,11 @@ const authoredWikiArticles = [
             "He is the one who teaches you ",
             { text: "Welding", articleSlug: "cargo-hold-and-welding" },
             ", and he is deliberate about what he will let you put a torch to. People bring him things they cannot afford to lose twice, so you spend a long time on his own scrap before you go anywhere near anybody else's property.",
+          ],
+          [
+            "Once you have finished Brace Yourself, he has a ship job for you too: ",
+            { text: "Wheel Be Right Back", articleSlug: "missions" },
+            ", rebuilding the landing gear at the Crash Site. He will not tell you where to get the parts, only what you need.",
           ],
           [
             "Get good enough and that changes. Once you can weld at a real level, Wade puts you on his ",
