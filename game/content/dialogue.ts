@@ -1907,7 +1907,7 @@ const dialogue = {
       wadeAtYard(EXPRESSION_IDS.neutral, "Heard the Deep Jag brace is still holding. Good work."),
       wadeAtYard(
         EXPRESSION_IDS.concerned,
-        "Get the wheels rebuilt and the mounts back under her. Won't make her fly, but there's no point fixing the engine before she can land.",
+        "Your ship's still sitting on her belly. Get the wheels rebuilt and the mounts back under her. Won't make her fly, but there's no point fixing the engine before she can land.",
       ),
       wadeAtYard(
         EXPRESSION_IDS.scowl,
@@ -1939,37 +1939,30 @@ const dialogue = {
       ),
     ],
   },
-  // The Landing Gear is a Crash Site repair and Wade is at the yard, so he asks
-  // rather than looks. He has nothing to see from here; what he is checking is
-  // that the player is reporting a finished weld and not a good intention.
+  // REPORT REPAIR has already been chosen and the player has no response beat
+  // here, so Wade states rather than asks.
   [DIALOGUE_IDS.wadeWheelBeRightBackTurnIn]: {
     id: DIALOGUE_IDS.wadeWheelBeRightBackTurnIn,
     npcId: NPC_IDS.wadeRusk,
-    beats: [
-      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. Wheels on? Mounts welded?"),
-      wadeAtYard(EXPRESSION_IDS.neutral, "Go on. Straight, no decoration."),
-    ],
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Wheels on. Mounts welded. Good.")],
   },
   [DIALOGUE_IDS.wadeWheelBeRightBackCompletion]: {
     id: DIALOGUE_IDS.wadeWheelBeRightBackCompletion,
     npcId: NPC_IDS.wadeRusk,
     beats: [
-      wadeAtYardSkillXpBeat(SKILL_IDS.welding, 250),
       wadeAtYard(EXPRESSION_IDS.neutral, "That'll hold. She's got her feet back under her."),
       wadeAtYard(EXPRESSION_IDS.scowl, "Engine's still dead. That's another job."),
+      wadeAtYardSkillXpBeat(SKILL_IDS.welding, 250),
     ],
   },
-  // His ordinary follow-up wherever he stands. It says the gear is holding and
-  // the engine is not, because that is the whole of the ship's state; it makes
-  // no promise about when, or whether, the engine is the next thing he asks for.
+  // His ordinary follow-up wherever he stands, which may be the moment after the
+  // report. It states the whole of the ship's state and assumes no time has
+  // passed, no trip to the wreck, and no promise about the engine.
   [DIALOGUE_IDS.wadePostWheelBeRightBack]: {
     id: DIALOGUE_IDS.wadePostWheelBeRightBack,
     npcId: NPC_IDS.wadeRusk,
     presentsAtCurrentVenue: true,
-    beats: [
-      wadeAtYard(EXPRESSION_IDS.neutral, "Gear's holding. I went and leaned on it."),
-      wadeAtYard(EXPRESSION_IDS.scowl, "Engine's still dead. I'm not pretending otherwise."),
-    ],
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Landing gear's done. Engine isn't.")],
   },
   // Return the Favor (#232) — the locked offer scene from the Fabrication
   // design. Tansy teaches the station; Wade supplies the shop's shorthand.

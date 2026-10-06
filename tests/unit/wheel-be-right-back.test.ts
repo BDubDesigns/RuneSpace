@@ -315,7 +315,7 @@ describe("Wade's locked dialogue", () => {
   it("makes the locked offer, in order and word for word", () => {
     expect(texts(DIALOGUE_IDS.wadeWheelBeRightBackOffer)).toEqual([
       "Heard the Deep Jag brace is still holding. Good work.",
-      "Get the wheels rebuilt and the mounts back under her. Won't make her fly, but there's no point fixing the engine before she can land.",
+      "Your ship's still sitting on her belly. Get the wheels rebuilt and the mounts back under her. Won't make her fly, but there's no point fixing the engine before she can land.",
       "How you get the parts is your business. Two Wheel Assemblies, two Mounting Brackets, one Galvanic Wire Spool.",
     ]);
   });
@@ -326,8 +326,22 @@ describe("Wade's locked dialogue", () => {
     ]);
   });
 
-  it("completes with the 250 Welding XP tile and the locked lines, word for word", () => {
+  it("opens the turn-in with one statement, since the player has no response beat", () => {
+    expect(texts(DIALOGUE_IDS.wadeWheelBeRightBackTurnIn)).toEqual([
+      "Wheels on. Mounts welded. Good.",
+    ]);
+  });
+
+  it("follows up with one line that assumes no time has passed", () => {
+    expect(texts(DIALOGUE_IDS.wadePostWheelBeRightBack)).toEqual([
+      "Landing gear's done. Engine isn't.",
+    ]);
+  });
+
+  it("completes with the locked lines word for word, then the 250 Welding XP tile", () => {
     const beats = getDialogue(DIALOGUE_IDS.wadeWheelBeRightBackCompletion)!.beats;
+    // The reward presentation comes last, after both of Wade's lines.
+    expect(beats.map((beat) => beat.kind)).toEqual(["npc", "npc", "skill_xp"]);
     expect(beats.filter((beat) => beat.kind === "skill_xp")).toEqual([
       expect.objectContaining({ skillId: SKILL_IDS.welding, amount: 250 }),
     ]);

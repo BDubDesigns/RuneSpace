@@ -145,7 +145,7 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await expect(
     conversation.getByRole("img", { name: "Wade Rusk, neutral expression" }),
   ).toBeVisible();
-  await playToText(conversation, /Won't make her fly, but there's no point fixing the engine/);
+  await playToText(conversation, /Your ship's still sitting on her belly\. Get the wheels rebuilt/);
   await expect(
     conversation.getByRole("img", { name: "Wade Rusk, concerned expression" }),
   ).toBeVisible();
@@ -238,19 +238,23 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   expect(row?.completedAt).not.toBeNull();
   await expect(strip).toHaveAttribute("data-mission-phase", "turn_in");
 
-  // Back to Wade: the report, the 250 Welding XP tile, and his two locked lines.
+  // Back to Wade: the report, his two locked lines, then the 250 Welding XP tile.
   await standAt(characterId, LOCATION_IDS.ruskRecovery);
   await page.reload();
   const report = await openNpcConversation(page, "Wade Rusk");
   await report.getByRole("button", { name: /Wheel Be Right Back/ }).click();
   await (await playToAction(report, "REPORT REPAIR")).click();
+  await playToText(report, /That'll hold\. She's got her feet back under her\./);
+  await playToText(report, /Engine's still dead\. That's another job\./);
+  await expect(report.getByRole("img", { name: "Wade Rusk, scowl expression" })).toBeVisible();
+  // The reward tile follows the last line, not the other way round.
+  await expect(report.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
+  await report.locator("[data-dialogue-text]").click();
+  await report.getByRole("button", { name: "Next", exact: true }).click();
   const xpTile = report.locator("[data-dialogue-skill-xp-tile]");
   await expect(xpTile).toBeVisible();
   await expect(xpTile.locator("[data-nameplate]")).toHaveText("Welding");
   await expect(xpTile).toContainText("+250");
-  await playToText(report, /That'll hold\. She's got her feet back under her\./);
-  await playToText(report, /Engine's still dead\. That's another job\./);
-  await expect(report.getByRole("img", { name: "Wade Rusk, scowl expression" })).toBeVisible();
   await page.keyboard.press("Escape");
   expect(await weldingXp(characterId)).toBe(850);
 
@@ -258,7 +262,9 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await page.reload();
   const after = await openNpcConversation(page, "Wade Rusk");
   await after.getByRole("button", { name: /Wheel Be Right Back/ }).click();
-  await expect(after.locator("[data-dialogue-text]")).toContainText("Gear's holding.");
+  await expect(after.locator("[data-dialogue-text]")).toContainText(
+    "Landing gear's done. Engine isn't.",
+  );
   await expect(after.getByRole("button", { name: "REPORT REPAIR" })).toHaveCount(0);
   await expect(after.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
   await page.keyboard.press("Escape");
