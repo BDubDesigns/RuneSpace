@@ -202,10 +202,23 @@ describe("which materials are still needed", () => {
         label: "Wheel Assembly",
         current: 0,
         target: 2,
+        satisfied: false,
         carried: 2,
       },
-      { itemId: ITEM_IDS.mountingBracket, label: "Mounting Bracket", current: 0, target: 2 },
-      { itemId: ITEM_IDS.galvanicWireSpool, label: "Galvanic Wire Spool", current: 0, target: 1 },
+      {
+        itemId: ITEM_IDS.mountingBracket,
+        label: "Mounting Bracket",
+        current: 0,
+        target: 2,
+        satisfied: false,
+      },
+      {
+        itemId: ITEM_IDS.galvanicWireSpool,
+        label: "Galvanic Wire Spool",
+        current: 0,
+        target: 1,
+        satisfied: false,
+      },
     ]);
     expect(carrying.currentObjective).toBe("Install repair materials at the Landing Gear");
   });

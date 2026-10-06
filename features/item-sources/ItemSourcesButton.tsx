@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { getItemPresentation } from "@/game/content/item-presentation";
 import { itemSourceFactsFromState } from "./item-source-facts";
+import { itemName } from "./item-source-presentation";
 import { ItemSourcesDrawer } from "./ItemSourcesDrawer";
 
 /**
@@ -20,7 +20,7 @@ export function ItemSourcesButton({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const name = getItemPresentation(itemId)?.displayName ?? itemId;
+  const name = itemName(itemId);
   return (
     <>
       <button

@@ -121,7 +121,7 @@ function MissionEntry({
                         key={material.itemId}
                       >
                         {`${material.label} — ${material.current} / ${material.target}`}
-                        {material.current < material.target ? (
+                        {!material.satisfied ? (
                           <ItemSourcesButton itemId={material.itemId} state={state} />
                         ) : null}
                         {material.carried !== undefined ? (

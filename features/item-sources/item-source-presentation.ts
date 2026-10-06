@@ -1,9 +1,14 @@
-import { getItemPresentation, itemQuantityLabel } from "@/game/content/item-presentation";
+import { itemQuantityLabel, resolveItemPresentation } from "@/game/content/item-presentation";
 import { getLocalPlace } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
-import type { ItemSource, ItemSourceFacts, ItemSourceKind } from "@/game/domain/item-sources";
+import {
+  itemSourceSkillLevel,
+  type ItemSource,
+  type ItemSourceFacts,
+  type ItemSourceKind,
+} from "@/game/domain/item-sources";
 
 /**
  * Player-facing wording for an item source (#326). The projection
@@ -42,8 +47,9 @@ export type ItemSourceDescription = {
   yields?: string;
 };
 
-function itemName(itemId: string): string {
-  return getItemPresentation(itemId)?.displayName ?? itemId;
+/** An item's player-facing name, from its authored presentation. */
+export function itemName(itemId: string): string {
+  return resolveItemPresentation(itemId, itemId).displayName;
 }
 
 function locationNames(locationIds: readonly string[]): string {
@@ -58,7 +64,7 @@ function lockedReason(source: ItemSource, facts: ItemSourceFacts): string | unde
   if (source.access.state !== "locked") return undefined;
   return source.access.gates
     .map((gate) => {
-      const have = facts.skillLevels[gate.skillId] ?? 1;
+      const have = itemSourceSkillLevel(facts, gate.skillId);
       return `Requires ${skillRequirement(gate.skillId, gate.level)} — you are ${have}`;
     })
     .join("; ");

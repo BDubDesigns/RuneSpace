@@ -29,6 +29,8 @@ const balance = getEffectiveGameBalance();
 const facts: ItemSourceFacts = {
   skillLevels: {},
   acceptedMissionIds: new Set(),
+  completedMissionIds: new Set(),
+  fabricationStationUnlocked: false,
   locationStates: {},
 };
 

@@ -247,6 +247,8 @@ export type MissionRequirementStatus = {
     label: string;
     current: number;
     target: number;
+    /** Installed material already covers the requirement (the repair's own rule). */
+    satisfied: boolean;
     carried?: number;
   }[];
 };
@@ -874,6 +876,7 @@ function projectRequirement(
               label: nameOf(material.itemId),
               current: material.contributed,
               target: material.required,
+              satisfied: material.contributed >= material.required,
               ...(carriedOf(material.itemId) > 0 && material.contributed < material.required
                 ? { carried: carriedOf(material.itemId) }
                 : {}),

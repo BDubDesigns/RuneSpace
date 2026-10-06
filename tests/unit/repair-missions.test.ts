@@ -152,6 +152,7 @@ describe.each(repairMissions)(
             label: itemName(material.itemId),
             current: partial[material.itemId] ?? 0,
             target: material.quantity,
+            satisfied: (partial[material.itemId] ?? 0) >= material.quantity,
             carried: 40,
           })),
         );

@@ -9,12 +9,15 @@ import {
 import { ACTION_IDS } from "@/game/config/foundations";
 import { LOCAL_PLACES } from "@/game/content/local-places";
 import { LOCATIONS } from "@/game/content/locations";
-import { MERCHANTS } from "@/game/content/merchants";
-import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
+import { isMerchantOpen, MERCHANTS } from "@/game/content/merchants";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
+import { STARTING_LEVEL } from "@/game/domain/character-progression";
+import { fabricationRecipeUnlocked } from "@/game/domain/fabrication";
+import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import { locationsOfferingAction } from "@/game/domain/location-state";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
+import { refiningRecipeUnlocked } from "@/game/domain/refining";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
@@ -136,10 +139,18 @@ export type FixedClaimSource = {
  * persisted for this feature.
  */
 export type ItemSourceFacts = {
-  /** Current level by stable skill ID; an absent skill is level 1. */
+  /** Current level by stable skill ID; an absent skill is at `STARTING_LEVEL`. */
   skillLevels: Readonly<Record<string, number>>;
   /** Missions the character has accepted, including finished ones. */
   acceptedMissionIds: ReadonlySet<string>;
+  /** Missions the character has completed (what a Local Place's access reads). */
+  completedMissionIds: ReadonlySet<string>;
+  /**
+   * Whether the Fabrication Station is the character's to use, exactly as the
+   * server projects it (`PlayGameplayState.fabricationStation.unlocked`). The
+   * rule belongs to the station, so it is carried in, never re-derived here.
+   */
+  fabricationStationUnlocked: boolean;
   /**
    * Each World Location's actions as THIS character's state resolves them
    * (`PlayGameplayState.locationStates`), so a source that exists only in an
@@ -156,8 +167,6 @@ export type ItemSourceRegistries = {
   merchants: readonly MerchantDefinition[];
   scavengeOutcomes: readonly ScavengeOutcome[];
   fixedClaims: readonly FixedClaimSource[];
-  /** The Mission whose acceptance opens the Fabrication Station. */
-  fabricationAuthorizingMissionId: string;
 };
 
 export function defaultItemSourceRegistries(): ItemSourceRegistries {
@@ -168,19 +177,19 @@ export function defaultItemSourceRegistries(): ItemSourceRegistries {
     merchants: MERCHANTS,
     scavengeOutcomes: SCAVENGE_OUTCOMES,
     fixedClaims: [POWER_ANNEX_CLAIM],
-    fabricationAuthorizingMissionId: RUSK_RECOVERY_CONTENT.fabricationAuthorizingMissionId,
   };
 }
 
-function skillLevel(facts: ItemSourceFacts, skillId: string): number {
-  return facts.skillLevels[skillId] ?? 1;
+/** A character's level in a skill; a skill they have no progress in is at the starting level. */
+export function itemSourceSkillLevel(facts: ItemSourceFacts, skillId: string): number {
+  return facts.skillLevels[skillId] ?? STARTING_LEVEL;
 }
 
-/** A recipe is capability-gated by its minimum level; below it, it is locked, not hidden. */
-function levelAccess(facts: ItemSourceFacts, skillId: string, level: number): ItemSourceAccess {
-  return skillLevel(facts, skillId) >= level
+/** A recipe gated by `unlocked` is capability-gated: below the level it is locked, not hidden. */
+function recipeAccess(unlocked: boolean, skillId: string, minimumLevel: number): ItemSourceAccess {
+  return unlocked
     ? { state: "available" }
-    : { state: "locked", gates: [{ kind: "skill_level", skillId, level }] };
+    : { state: "locked", gates: [{ kind: "skill_level", skillId, level: minimumLevel }] };
 }
 
 /**
@@ -213,7 +222,7 @@ export function resolveItemSources(
   // Fabrication: the station is Tansy's to open, so the whole kind is hidden
   // until its Mission is accepted — a character who has not been shown the
   // station is not told it exists.
-  if (facts.acceptedMissionIds.has(registries.fabricationAuthorizingMissionId)) {
+  if (facts.fabricationStationUnlocked) {
     for (const recipe of fabricationRecipes(balance)) {
       if (recipe.outputItemId !== itemId) continue;
       const locationIds = locationsOfferingAction(
@@ -233,7 +242,14 @@ export function resolveItemSources(
           quantity,
         })),
         outputQuantity: recipe.outputQuantity,
-        access: levelAccess(facts, balance.fabrication.skillId, recipe.minimumLevel),
+        access: recipeAccess(
+          fabricationRecipeUnlocked(
+            itemSourceSkillLevel(facts, balance.fabrication.skillId),
+            recipe,
+          ),
+          balance.fabrication.skillId,
+          recipe.minimumLevel,
+        ),
       });
     }
   }
@@ -260,7 +276,11 @@ export function resolveItemSources(
         })),
         outputQuantity: recipe.outputQuantity,
         deterministic: refiningRecipeIsDeterministic(recipe),
-        access: levelAccess(facts, balance.refining.skillId, recipe.minimumLevel),
+        access: recipeAccess(
+          refiningRecipeUnlocked(itemSourceSkillLevel(facts, balance.refining.skillId), recipe),
+          balance.refining.skillId,
+          recipe.minimumLevel,
+        ),
       });
     }
   }
@@ -293,22 +313,17 @@ export function resolveItemSources(
   }
 
   // Merchants: only what a merchant SELLS to the player is a source. Buying an
-  // item from the player is not. A merchant whose Mission has not been
-  // accepted, or whose shop is not open, has not been revealed.
+  // item from the player is not. A merchant who is not open to the
+  // character, or whose shop is not, has not been revealed.
   for (const merchant of registries.merchants) {
     const line = merchant.prices.find((price) => price.itemId === itemId);
     if (line?.sellPrice === undefined) continue;
-    if (
-      merchant.authorizingMissionId !== undefined &&
-      !facts.acceptedMissionIds.has(merchant.authorizingMissionId)
-    ) {
-      continue;
-    }
+    if (!isMerchantOpen(merchant, facts.acceptedMissionIds)) continue;
     const place = registries.localPlaces.find((candidate) => candidate.merchantId === merchant.id);
     const location = registries.locations.find((candidate) => candidate.merchantId === merchant.id);
     const locationId = place?.parentLocationId ?? location?.id;
     if (locationId === undefined) continue;
-    if (place && place.access.kind !== "open") continue;
+    if (place && !deriveLocalPlaceAccess(place, facts.completedMissionIds).available) continue;
     sources.push({
       kind: "merchant",
       merchantId: merchant.id,

@@ -6,17 +6,16 @@ import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemVisual } from "@/components/items/ItemVisual";
-import { getItemPresentation } from "@/game/content/item-presentation";
 import {
   extendItemSourcePath,
   resolveItemSources,
   type ItemSourceFacts,
 } from "@/game/domain/item-sources";
-import { describeItemSources, type ItemSourceDescription } from "./item-source-presentation";
-
-function nameOf(itemId: string): string {
-  return getItemPresentation(itemId)?.displayName ?? itemId;
-}
+import {
+  describeItemSources,
+  itemName,
+  type ItemSourceDescription,
+} from "./item-source-presentation";
 
 function SourceEntry({
   description,
@@ -84,7 +83,7 @@ function SourceEntry({
                 <span className="text-[color:var(--rs-text-secondary)]">{input.label}</span>
                 {inspectable(input.itemId) ? (
                   <button
-                    aria-label={`How to get ${nameOf(input.itemId)}`}
+                    aria-label={`How to get ${itemName(input.itemId)}`}
                     className="rs-focus min-h-[var(--rs-touch-target)] px-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--rs-accent-primary)] underline-offset-2 hover:underline"
                     data-item-source-inspect={input.itemId}
                     onClick={() => onInspect(input.itemId)}
@@ -131,17 +130,17 @@ export function ItemSourcesDetails({
   return (
     <div data-item-sources={currentId}>
       <div className="flex items-start gap-3">
-        <ItemVisual className="w-28 shrink-0" itemId={currentId} name={nameOf(currentId)} />
+        <ItemVisual className="w-28 shrink-0" itemId={currentId} name={itemName(currentId)} />
         {previousId ? (
           <ActionButton data-item-sources-back intent="secondary" onClick={onBack} type="button">
-            Back to {nameOf(previousId)}
+            Back to {itemName(previousId)}
           </ActionButton>
         ) : null}
       </div>
       {descriptions.length === 0 ? (
         <Feedback tone="muted">No known way to get this yet.</Feedback>
       ) : (
-        <ul aria-label={`Ways to get ${nameOf(currentId)}`} className="mt-3 space-y-2">
+        <ul aria-label={`Ways to get ${itemName(currentId)}`} className="mt-3 space-y-2">
           {descriptions.map((description) => (
             <SourceEntry
               description={description}
@@ -177,9 +176,9 @@ export function ItemSourcesDrawer({
   return (
     <Drawer
       eyebrow="How to get"
-      label={`How to get ${nameOf(currentId)}`}
+      label={`How to get ${itemName(currentId)}`}
       onClose={onClose}
-      title={nameOf(currentId)}
+      title={itemName(currentId)}
       triggerRef={triggerRef}
     >
       <ItemSourcesDetails

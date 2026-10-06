@@ -41,6 +41,8 @@ function facts(
   overrides: {
     levels?: Record<string, number>;
     accepted?: readonly string[];
+    completed?: readonly string[];
+    fabricationUnlocked?: boolean;
     deepJagOpen?: boolean;
   } = {},
 ): ItemSourceFacts {
@@ -52,6 +54,8 @@ function facts(
     acceptedMissionIds: new Set(
       overrides.accepted ?? [MISSION_IDS.returnTheFavor, MISSION_IDS.tenThousandHours],
     ),
+    completedMissionIds: new Set(overrides.completed ?? []),
+    fabricationStationUnlocked: overrides.fabricationUnlocked ?? true,
     locationStates: Object.fromEntries(
       LOCATIONS.map((location) => [
         location.id,
@@ -260,7 +264,10 @@ describe("item sources — discovery versus capability gates", () => {
   });
 
   it("hides the Fabrication Station entirely until its Mission is accepted", () => {
-    const sources = resolveItemSources(ITEM_IDS.wheelAssembly, facts({ accepted: [] }));
+    const sources = resolveItemSources(
+      ITEM_IDS.wheelAssembly,
+      facts({ accepted: [], fabricationUnlocked: false }),
+    );
     expect(sources.map((source) => source.kind)).toEqual(["player_trade"]);
     expect(JSON.stringify(sources)).not.toContain(MISSION_IDS.returnTheFavor);
   });
@@ -273,6 +280,44 @@ describe("item sources — discovery versus capability gates", () => {
       facts({ accepted: [MISSION_IDS.tenThousandHours] }),
     );
     expect(of(opened, "merchant")).toHaveLength(1);
+  });
+
+  it("derives a Local Place merchant's access from the place's own rule", () => {
+    const base = defaultItemSourceRegistries();
+    const gatedBy = MISSION_IDS.keepTheChange;
+    const reason = "Closed for the day.";
+    const registries = {
+      ...base,
+      localPlaces: base.localPlaces.map((place) =>
+        place.merchantId
+          ? {
+              ...place,
+              access: {
+                kind: "locked_until_mission_completed" as const,
+                missionId: gatedBy,
+                reason,
+              },
+            }
+          : place,
+      ),
+    };
+    const merchants = (completed: readonly string[]) =>
+      of(resolveItemSources(ITEM_IDS.powerCell, facts({ completed }), registries), "merchant");
+    expect(merchants([])).toEqual([]);
+    expect(merchants([gatedBy])).toHaveLength(1);
+  });
+
+  it("takes the Fabrication Station's unlock from the projected flag, not a Mission it names", () => {
+    const sources = (unlocked: boolean) =>
+      of(
+        resolveItemSources(
+          ITEM_IDS.wheelAssembly,
+          facts({ accepted: [], fabricationUnlocked: unlocked }),
+        ),
+        "fabricate",
+      );
+    expect(sources(false)).toEqual([]);
+    expect(sources(true)).toHaveLength(1);
   });
 
   it("finds Deep Jag's mine only once its opened state resolves", () => {

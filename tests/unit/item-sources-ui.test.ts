@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, skillLevelThresholds } from "@/game/config/balance";
 import { ITEM_IDS, MISSION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { LOCATIONS } from "@/game/content/locations";
 import { merchantRetailPrice, MERCHANTS } from "@/game/content/merchants";
@@ -26,6 +26,8 @@ function facts(fabricationLevel = 5): ItemSourceFacts {
   return {
     skillLevels: { [SKILL_IDS.fabrication]: fabricationLevel, [SKILL_IDS.refining]: 5 },
     acceptedMissionIds: new Set([MISSION_IDS.returnTheFavor, MISSION_IDS.tenThousandHours]),
+    completedMissionIds: new Set(),
+    fabricationStationUnlocked: true,
     locationStates: Object.fromEntries(
       LOCATIONS.map((location) => [
         location.id,
@@ -140,12 +142,16 @@ describe("item source details", () => {
 });
 
 describe("facts from the Play projection", () => {
-  it("reads levels, accepted Missions and resolved location actions as the server projected them", () => {
+  const xpFor = (skillId: string, level: number) =>
+    skillLevelThresholds(skillId)!.find((threshold) => threshold.level === level)!.totalXp;
+
+  it("reads levels through each skill's own curve and the shared Mission and unlock projections", () => {
     const state = {
-      mining: { level: 3 },
-      refining: { level: 4 },
-      welding: { level: 2 },
-      fabrication: { level: 6 },
+      skillTotalXp: {
+        [SKILL_IDS.mining]: xpFor(SKILL_IDS.mining, 3),
+        [SKILL_IDS.fabrication]: xpFor(SKILL_IDS.fabrication, 6),
+      },
+      fabricationStation: { unlocked: true },
       missions: [
         { missionId: "a", state: "active" },
         { missionId: "b", state: "completed" },
@@ -154,13 +160,25 @@ describe("facts from the Play projection", () => {
       locationStates: { the_jag: { availableActionIds: ["x"] } },
     } as unknown as PlayGameplayState;
     const built = itemSourceFactsFromState(state);
-    expect(built.skillLevels).toEqual({
-      [SKILL_IDS.mining]: 3,
-      [SKILL_IDS.refining]: 4,
-      [SKILL_IDS.welding]: 2,
-      [SKILL_IDS.fabrication]: 6,
-    });
+    expect(built.skillLevels[SKILL_IDS.mining]).toBe(3);
+    expect(built.skillLevels[SKILL_IDS.fabrication]).toBe(6);
+    // A skill with no XP row is authoritative zero: the starting level, never absent.
+    expect(built.skillLevels[SKILL_IDS.refining]).toBe(1);
     expect([...built.acceptedMissionIds].sort()).toEqual(["a", "b"]);
+    expect([...built.completedMissionIds]).toEqual(["b"]);
+    expect(built.fabricationStationUnlocked).toBe(true);
     expect(built.locationStates).toBe(state.locationStates);
+  });
+
+  it("covers every skill that has an approved level curve", () => {
+    const built = itemSourceFactsFromState({
+      skillTotalXp: {},
+      fabricationStation: { unlocked: false },
+      missions: [],
+      locationStates: {},
+    } as unknown as PlayGameplayState);
+    for (const skillId of Object.values(SKILL_IDS)) {
+      expect(skillId in built.skillLevels).toBe(skillLevelThresholds(skillId) !== undefined);
+    }
   });
 });
