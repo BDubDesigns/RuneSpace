@@ -489,9 +489,22 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
   });
   try {
     const dialog = await openChat(page, player.character.id);
-    const line = log(dialog, "General").locator('[data-chat-system="rare_find"]', {
-      hasText: tag,
-    });
+    const general = log(dialog, "General");
+    const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
+    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
+    // General is game-wide, so concurrent rows may push this announcement
+    // beyond page 1 before Chat opens. If it is not on the latest page, find it
+    // with the ordinary cursor-based Load older messages flow.
+    while ((await line.count()) === 0) {
+      await expect(olderButton).toBeVisible();
+      const loaded = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/chat" &&
+          new URL(response.url()).searchParams.has("before"),
+      );
+      await olderButton.click();
+      await loaded;
+    }
     await expect(line).toBeVisible();
     await expect(line).toContainText("System");
     await expect(line).toContainText("RARE FIND");
