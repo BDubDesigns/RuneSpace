@@ -396,47 +396,6 @@ Capacity and completion beats are presentation only — the authoritative
 completion stamp, consumption, and reward already committed when they become
 visible.
 
-#### 9.4 Lifecycle coverage is deliberate (#324)
-
-A Mission that validates technically can still play nonsensically: a reminder
-slot left empty used to present the turn-in opening, so a player who had not
-finished the work heard dialogue written for handing it in. The framework now
-makes every turn-in-NPC moment a deliberate choice.
-
-- **Reachable moments derive from content** (`missionLifecycleMoments` in
-  `game/domain/missions.ts`): one reminder per requirement kind the Mission
-  authors (`equipped_item` → equipment, `carried_stack` / `carried_unique_item` →
-  carried, `tracked_activity` → tracked activity, `repair_target_complete` →
-  repair, `npc_conversation` → conversation), plus `busy` and
-  `completion_presentation`, which every Mission reaches. `at_location` has no
-  reminder, so validation requires it to name the turn-in location.
-- **Each reachable moment authors its sequence or is declared omitted.**
-  `MissionDialogue.omitted` lists `{ moment, reason }` entries; the reason is
-  reviewer-facing content metadata, never shown to players. An omitted reminder
-  or `busy` presents the turn-in opening (with its completion command, which the
-  server refuses until the turn-in really is available); an omitted
-  `completion_presentation` returns to the hub after success.
-- **Not applicable is not the same as forgotten.** A slot or declaration for a
-  moment no requirement can reach is dead content and fails validation, as do a
-  declaration beside an authored sequence, a duplicate, and an empty reason.
-- **The resolver agrees.** `resolveNpcConversationWith` falls back to the
-  turn-in only for a declared moment; an undeclared gap yields no Mission entry
-  at all rather than the wrong scene. Validation makes that unreachable for
-  production content.
-- **Objective checks only.** Turn-in-NPC sequences must belong to the turn-in
-  NPC; a completion presentation must contain a beat for every reward grant (a
-  `skill_xp` beat of the same skill and amount, an `item` beat per granted item
-  and quantity; Credits come from the runtime receipt tile, §9.2); and a Mission
-  whose reward or acceptance effect can be refused for capacity authors both
-  capacity sequences, while one that cannot authors neither. Prose is never
-  inspected — pronouns, knowledge, timing and order are the narrative pass in
-  §13.
-
-Shipped omissions are both `busy`: Walk It Off (nothing can keep a character
-busy at The Jag before they hold the Cutter it grants) and Curly Must-Stash
-(its approved design authors no busy beat). `tests/unit/mission-lifecycle-coverage.test.ts`
-pins that list, so a new omission is visible in review.
-
 #### 9.2 A mandatory conversation is a one-time story event
 
 An `npc_conversation` requirement is **not** idle dialogue and **not** a
@@ -494,6 +453,45 @@ anyone but the turn-in NPC.
 Return the Favor is the first use: `override-bust` and `override-success`, with
 the bust-aware opening outranking the approving one, and the bust-aware reminder
 while the Cutter is still to be made.
+
+#### 9.4 Lifecycle coverage is deliberate (#324)
+
+A Mission that validates technically can still play nonsensically: a reminder
+slot left empty used to present the turn-in opening, so a player who had not
+finished the work heard dialogue written for handing it in. The framework now
+makes every turn-in-NPC moment a deliberate choice.
+
+- **Reachable moments derive from content** (`missionLifecycleMoments` in
+  `game/domain/missions.ts`): one reminder per requirement kind the Mission
+  authors (`equipped_item` → equipment, `carried_stack` / `carried_unique_item` →
+  carried, `tracked_activity` → tracked activity, `repair_target_complete` →
+  repair, `npc_conversation` → conversation), plus `busy` and
+  `completion_presentation`, which every Mission reaches. `at_location` has no
+  reminder, so validation requires it to name the turn-in location.
+- **Each reachable moment authors its sequence or is declared omitted.**
+  `MissionDialogue.omitted` lists `{ moment, reason }` entries; the reason is
+  reviewer-facing content metadata, never shown to players. An omitted reminder
+  or `busy` presents the turn-in opening (with its completion command, which the
+  server refuses until the turn-in really is available); an omitted
+  `completion_presentation` returns to the hub after success.
+- **Not applicable is not the same as forgotten.** A slot or declaration for a
+  moment no requirement can reach is dead content and fails validation, as do a
+  declaration beside an authored sequence, a duplicate, and an empty reason.
+- **The resolver agrees.** `resolveNpcConversationWith` falls back to the
+  turn-in only for a declared moment; an undeclared gap yields no Mission entry
+  at all rather than the wrong scene. Validation makes that unreachable for
+  production content.
+- **Objective checks only.** Turn-in-NPC sequences must belong to the turn-in
+  NPC; a completion presentation must contain a beat for every reward grant (a
+  `skill_xp` beat of the same skill and amount, an `item` beat per granted item
+  and quantity; Credits come from the runtime receipt tile, §9.2). Prose is never
+  inspected — pronouns, knowledge, timing and order are the narrative pass in
+  §13.
+
+Shipped omissions are both `busy`: Walk It Off (nothing can keep a character
+busy at The Jag before they hold the Cutter it grants) and Curly Must-Stash
+(its approved design authors no busy beat). `tests/unit/mission-lifecycle-coverage.test.ts`
+pins that list, so a new omission is visible in review.
 
 ## 9.1 Completion presentation is one-shot, not persistent idle
 

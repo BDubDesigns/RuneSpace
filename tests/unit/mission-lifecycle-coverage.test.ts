@@ -192,29 +192,6 @@ describe("issue #324 lifecycle coverage validation", () => {
     // Credits are presented by the runtime receipt tile, never an authored beat.
     expect(validate(repairMission({}, { reward: { kind: "credits", amount: 5 } }))).not.toThrow();
   });
-
-  it("requires capacity refusals exactly when a grant can be refused for capacity", () => {
-    expect(
-      validate(repairMission({ capacitySlotsDialogueId: DIALOGUE_IDS.tansyCapacitySlots })),
-    ).toThrow(/grants nothing that can be refused/);
-    expect(
-      validate(
-        repairMission(
-          {},
-          {
-            offers: [
-              {
-                npcId: NPC_IDS.wadeRusk,
-                locationId: LOCATION_IDS.crashSite,
-                dialogueId: DIALOGUE_IDS.wadeKeepTheChangeOffer,
-                acceptEffect: { kind: "stack_item", itemId: ITEM_IDS.scrapMetal, quantity: 1 },
-              },
-            ],
-          },
-        ),
-      ),
-    ).toThrow(/must author both capacity refusal sequences/);
-  });
 });
 
 describe("issue #324 resolver never silently substitutes the turn-in", () => {

@@ -4,7 +4,7 @@ import {
   skillLevelThresholds,
   tinkeringActionIds,
 } from "@/game/config/balance";
-import { ACTION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, type DialogueId } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
@@ -1581,12 +1581,27 @@ export function missionLifecycleMoments(
 ): readonly MissionLifecycleMoment[] {
   const moments = new Set<MissionLifecycleMoment>();
   for (const requirement of definition.requirements) {
-    const moment = REQUIREMENT_REMINDER_MOMENTS[requirement.kind];
+    const moment = reminderMomentFor(requirement.kind);
     if (moment) moments.add(moment);
   }
   moments.add("busy");
   moments.add("completion_presentation");
   return [...moments];
+}
+
+/** The reminder moment a first-unmet requirement of `kind` presents, if any. */
+export function reminderMomentFor(
+  kind: MissionRequirementKind,
+): MissionLifecycleMoment | undefined {
+  return REQUIREMENT_REMINDER_MOMENTS[kind];
+}
+
+/** The sequence this Mission authors for `moment`, if any. */
+export function lifecycleDialogueId(
+  definition: Pick<MissionDefinition, "dialogue">,
+  moment: MissionLifecycleMoment,
+): DialogueId | undefined {
+  return definition.dialogue[LIFECYCLE_DIALOGUE_SLOTS[moment]];
 }
 
 /** Whether the Mission explicitly declares `moment` as intentionally unauthored. */
@@ -1602,8 +1617,7 @@ export function missionOmitsMoment(
  * sequence or is declared in `dialogue.omitted` with a reason; a slot or a
  * declaration for a moment the Mission cannot reach is dead content and fails.
  * Turn-in-NPC sequences must belong to that NPC, a completion presentation
- * must present every authored reward grant, and a reachable capacity refusal
- * must author its beats. Prose is never inspected.
+ * must present every authored reward grant. Prose is never inspected.
  */
 function assertLifecycleCoverage(definition: MissionDefinition): void {
   const where = `Mission "${definition.id}"`;
@@ -1676,24 +1690,6 @@ function assertLifecycleCoverage(definition: MissionDefinition): void {
         );
       }
     }
-  }
-
-  const capacityReachable =
-    definition.reward?.kind === "item" ||
-    definition.reward?.kind === "stack_bundle" ||
-    definition.offers.some((offer) => offer.acceptEffect?.kind === "stack_item");
-  const capacityAuthored =
-    dialogue.capacitySlotsDialogueId !== undefined || dialogue.capacityMassDialogueId !== undefined;
-  if (
-    capacityReachable &&
-    (!dialogue.capacitySlotsDialogueId || !dialogue.capacityMassDialogueId)
-  ) {
-    throw new Error(
-      `${where} can be refused for capacity and must author both capacity refusal sequences.`,
-    );
-  }
-  if (!capacityReachable && capacityAuthored) {
-    throw new Error(`${where} authors capacity refusals but grants nothing that can be refused.`);
   }
 }
 

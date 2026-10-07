@@ -13,7 +13,12 @@ import {
   type MissionRequirementKind,
 } from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
-import { missionOmitsMoment, type MissionState } from "@/game/domain/missions";
+import {
+  lifecycleDialogueId,
+  missionOmitsMoment,
+  reminderMomentFor,
+  type MissionState,
+} from "@/game/domain/missions";
 
 /**
  * ONE canonical NPC conversation model.
@@ -444,33 +449,20 @@ function turnInStageDialogueId(
   const turnIn = reactiveVariant(definition, "turn_in", facts) ?? definition.turnIn.dialogueId;
   if (!stage) return turnIn;
   if (stage.turnInAvailable) return turnIn;
-  const dialogue = definition.dialogue;
   const momentOr = (moment: MissionLifecycleMoment, dialogueId: DialogueId | undefined) => {
     if (dialogueId && getDialogue(dialogueId)) return dialogueId;
     return missionOmitsMoment(definition, moment) ? turnIn : undefined;
   };
-  if (stage.requirementsSatisfied) return momentOr("busy", dialogue.busyDialogueId);
-  switch (stage.nextObjectiveKind) {
-    case "equipped_item":
-      return momentOr("equipment_reminder", dialogue.equipmentReminderDialogueId);
-    case "carried_stack":
-    case "carried_unique_item":
-      return momentOr("carried_reminder", dialogue.carriedReminderDialogueId);
-    case "tracked_activity":
-      return momentOr(
-        "tracked_activity_reminder",
-        reactiveVariant(definition, "tracked_activity_reminder", facts) ??
-          dialogue.trackedActivityReminderDialogueId,
-      );
-    case "repair_target_complete":
-      return momentOr("repair_reminder", dialogue.repairReminderDialogueId);
-    case "npc_conversation":
-      return momentOr("conversation_reminder", dialogue.conversationReminderDialogueId);
-    default:
-      // `at_location` is validated to name the turn-in location, so the turn-in
-      // NPC is not reached while it is unmet.
-      return turnIn;
-  }
+  if (stage.requirementsSatisfied) return momentOr("busy", lifecycleDialogueId(definition, "busy"));
+  const moment = stage.nextObjectiveKind && reminderMomentFor(stage.nextObjectiveKind);
+  // A kind with no reminder moment (`at_location`) is validated to name the
+  // turn-in location, so the turn-in NPC is not reached while it is unmet.
+  if (!moment) return turnIn;
+  const reactive =
+    moment === "tracked_activity_reminder"
+      ? reactiveVariant(definition, "tracked_activity_reminder", facts)
+      : undefined;
+  return momentOr(moment, reactive ?? lifecycleDialogueId(definition, moment));
 }
 
 /** Authored item-reward capacity refusal dialogue, if any. */

@@ -178,8 +178,14 @@ describe.each(repairMissions)(
       const empty = project(entry, observe(entry.targetId, { materials: partial }));
       expect(empty.guidance).toBeUndefined();
       // The repair site is the eventual destination, not the next actionable
-      // target (#324); the objective alone still names what is needed.
-      expect(empty.currentObjective).toBeTruthy();
+      // target (#324); the requirement still names every material needed.
+      const status = repairRequirement(empty, entry.targetId);
+      const named = multiMaterial
+        ? (status?.materials ?? []).map((row) => row.label)
+        : [status?.objective];
+      for (const material of entry.recipe.materials) {
+        expect(named.some((text) => text?.includes(itemName(material.itemId)))).toBe(true);
+      }
       expect(deriveMissionGuidanceTargets([empty]).repairTargetIds.has(entry.targetId)).toBe(false);
 
       // Nor from anywhere else: there is no location to send the player to.
