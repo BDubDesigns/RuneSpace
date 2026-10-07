@@ -8,11 +8,17 @@ import {
   MISSIONS,
   getMission,
   type MissionDefinition,
+  type MissionLifecycleMoment,
   type MissionRequirement,
   type MissionRequirementKind,
 } from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
-import type { MissionState } from "@/game/domain/missions";
+import {
+  lifecycleDialogueId,
+  missionOmitsMoment,
+  reminderMomentFor,
+  type MissionState,
+} from "@/game/domain/missions";
 
 /**
  * ONE canonical NPC conversation model.
@@ -427,7 +433,14 @@ function reactiveVariant(
   )?.dialogueId;
 }
 
-/** Selects the turn-in NPC's authored sequence from semantic stage data. */
+/**
+ * Selects the turn-in NPC's authored sequence from semantic stage data. A
+ * reminder or busy moment presents its own sequence; it falls back to the
+ * turn-in opening only when the Mission declares that moment in
+ * `dialogue.omitted` (#324). An undeclared gap resolves to no entry rather than
+ * presenting dialogue written for a different moment — registry validation
+ * makes that unreachable for production content.
+ */
 function turnInStageDialogueId(
   definition: MissionDefinition,
   stage: NpcConversationProjection["stage"],
@@ -436,35 +449,20 @@ function turnInStageDialogueId(
   const turnIn = reactiveVariant(definition, "turn_in", facts) ?? definition.turnIn.dialogueId;
   if (!stage) return turnIn;
   if (stage.turnInAvailable) return turnIn;
-  if (stage.requirementsSatisfied) return dialogueOr(definition.dialogue.busyDialogueId, turnIn);
-  if (stage.nextObjectiveKind === "equipped_item") {
-    return dialogueOr(definition.dialogue.equipmentReminderDialogueId, turnIn);
-  }
-  if (
-    stage.nextObjectiveKind === "carried_stack" ||
-    stage.nextObjectiveKind === "carried_unique_item"
-  ) {
-    return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "tracked_activity") {
-    return dialogueOr(
-      reactiveVariant(definition, "tracked_activity_reminder", facts) ??
-        definition.dialogue.trackedActivityReminderDialogueId,
-      turnIn,
-    );
-  }
-  if (stage.nextObjectiveKind === "repair_target_complete") {
-    return dialogueOr(definition.dialogue.repairReminderDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "npc_conversation") {
-    return dialogueOr(definition.dialogue.conversationReminderDialogueId, turnIn);
-  }
-  return turnIn;
-}
-
-function dialogueOr(dialogueId: DialogueId | undefined, fallback: DialogueId): DialogueId {
-  if (dialogueId && getDialogue(dialogueId)) return dialogueId;
-  return fallback;
+  const momentOr = (moment: MissionLifecycleMoment, dialogueId: DialogueId | undefined) => {
+    if (dialogueId && getDialogue(dialogueId)) return dialogueId;
+    return missionOmitsMoment(definition, moment) ? turnIn : undefined;
+  };
+  if (stage.requirementsSatisfied) return momentOr("busy", lifecycleDialogueId(definition, "busy"));
+  const moment = stage.nextObjectiveKind && reminderMomentFor(stage.nextObjectiveKind);
+  // A kind with no reminder moment (`at_location`) is validated to name the
+  // turn-in location, so the turn-in NPC is not reached while it is unmet.
+  if (!moment) return turnIn;
+  const reactive =
+    moment === "tracked_activity_reminder"
+      ? reactiveVariant(definition, "tracked_activity_reminder", facts)
+      : undefined;
+  return momentOr(moment, reactive ?? lifecycleDialogueId(definition, moment));
 }
 
 /** Authored item-reward capacity refusal dialogue, if any. */

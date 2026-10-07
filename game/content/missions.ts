@@ -376,9 +376,39 @@ export type MissionTurnIn = {
 };
 
 /**
+ * A turn-in-NPC lifecycle moment that has its own authored sequence slot
+ * (#324). Which moments a Mission can reach follows from its requirement kinds
+ * (`missionLifecycleMoments` in `game/domain/missions.ts`); `busy` and
+ * `completion_presentation` are reachable for every Mission.
+ */
+export type MissionLifecycleMoment =
+  | "equipment_reminder"
+  | "carried_reminder"
+  | "tracked_activity_reminder"
+  | "repair_reminder"
+  | "conversation_reminder"
+  | "busy"
+  | "completion_presentation";
+
+/**
+ * A reachable lifecycle moment this Mission deliberately leaves unauthored
+ * (#324), so omission is a reviewable choice rather than an accident. Its
+ * documented fallback then applies: an omitted reminder or `busy` presents the
+ * turn-in opening, and an omitted `completion_presentation` returns to the hub.
+ * Without a declaration, a reachable moment must author its sequence.
+ */
+export type MissionDialogueOmission = {
+  moment: MissionLifecycleMoment;
+  /** Reviewer-facing reason the fallback is right here. Never shown to players. */
+  reason: string;
+};
+
+/**
  * Authored semantic dialogue mappings. Stable semantic mission state selects
  * the sequence; no boolean-expression language and no prose in server logic.
- * All fields optional — a mission authors only the branches it needs.
+ * Every lifecycle moment the Mission can reach is either authored here or
+ * listed in `omitted`; registry validation enforces that and rejects slots for
+ * moments the Mission cannot reach.
  */
 export type MissionDialogue = {
   /** First unmet requirement is an equipped_item. */
@@ -411,6 +441,8 @@ export type MissionDialogue = {
    * reminder (#232), in priority order. See `MissionReactiveDialogue`.
    */
   reactive?: readonly MissionReactiveDialogue[];
+  /** Reachable lifecycle moments deliberately left to their fallback (#324). */
+  omitted?: readonly MissionDialogueOmission[];
 };
 
 /** One authored minimum skill level a mission requires before it is offered. */
@@ -528,6 +560,13 @@ export const WALK_IT_OFF: MissionDefinition = {
     completionPresentationDialogueId: DIALOGUE_IDS.tansyAfterClaim,
     capacitySlotsDialogueId: DIALOGUE_IDS.tansyCapacitySlots,
     capacityMassDialogueId: DIALOGUE_IDS.tansyCapacityMass,
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "Nothing can keep a character busy at The Jag before they hold the Cutter this Mission grants: Ferrite Shale Mining is its only action and needs the Cutter equipped.",
+      },
+    ],
   },
   completedNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeFollowUp }],
 };
@@ -1424,6 +1463,13 @@ export const CURLY_MUST_STASH: MissionDefinition = {
   dialogue: {
     repairReminderDialogueId: DIALOGUE_IDS.curlyMustStashRepairReminder,
     completionPresentationDialogueId: DIALOGUE_IDS.curlyMustStashCompletion,
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "The approved design authors no busy beat (#292): a busy character hears Curly's turn-in, whose payment the server refuses until they stop.",
+      },
+    ],
   },
   completedNpcDialogue: [
     { npcId: NPC_IDS.curly, dialogueId: DIALOGUE_IDS.curlyPostCurlyMustStash },

@@ -134,6 +134,10 @@ describe("issue #124 mission registry validation", () => {
               recommendedActionId: ACTION_IDS.ferriteShaleMining,
             },
           ],
+          dialogue: {
+            ...WALK_IT_OFF.dialogue,
+            carriedReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
+          },
         }),
       ]),
     ).not.toThrow();
