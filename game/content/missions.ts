@@ -1307,9 +1307,9 @@ export const WHEEL_BE_RIGHT_BACK: MissionDefinition = {
  * The final physical repair of the player's ship: Wheel Be Right Back's
  * landing gear was the midpoint. Wade offers it by hand at Rusk Recovery once
  * Wheel Be Right Back is complete and the player has personal Welding 8, and it
- * is never that Mission's continuation. Welding 8 is both an offer gate here and
- * the repair target's own `minimumWeldingLevel`, so the work cannot be forged
- * past it. Nothing else is required: no Refining or Fabrication level, no
+ * is never that Mission's continuation. Welding 8 is authored once, as this
+ * offer gate; the repair target reads that same level
+ * (`requiresMissionWeldingLevel`), so the work cannot be forged past it. Nothing else is required: no Refining or Fabrication level, no
  * Cargo Hold prerequisite repeated, and no component provenance, because
  * Wheel Be Right Back's own ancestry already proves the earlier chapter and the
  * Drive Mounts may be fabricated, bought or traded for.

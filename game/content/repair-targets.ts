@@ -14,9 +14,10 @@ import {
  * What reveals a repair target's controls (#284 generalized this from the
  * original Mission-only rule).
  *
- * - `mission`: the named Mission has been ACCEPTED and, when authored, the
- *   character's personal Welding level has reached `minimumWeldingLevel`. A
- *   finished repair stays usable regardless of Mission state or level.
+ * - `mission`: the named Mission has been ACCEPTED and, when
+ *   `requiresMissionWeldingLevel` is set, the character's personal Welding level
+ *   has reached the Welding level that Mission itself requires. A finished repair
+ *   stays usable regardless of Mission state or level.
  * - `welding_level`: the character's personal Welding level has reached
  *   `level` and, when authored, `requiresCompletedTargetId` is itself
  *   complete (Deep Jag's stash mount needs the passage open first). No other
@@ -28,13 +29,14 @@ export type RepairAuthorization =
       kind: "mission";
       missionId: MissionId;
       /**
-       * A personal Welding level the permanent work also needs (#330), on top of
-       * the Mission's acceptance. Enforced by the one repair-access predicate, so
-       * the controls and the commands agree and no command holds a level of its
-       * own. Absent for a Mission-authorized repair that asks no skill of the
-       * hands doing it.
+       * The permanent work also needs the personal Welding level the authorizing
+       * Mission already requires of its offer (#330), read from that Mission's
+       * `prerequisiteSkillLevels`, so the level has exactly one home. Enforced
+       * by the one repair-access predicate, so the controls and the commands
+       * agree and no command holds a level of its own. Absent for a repair that
+       * asks no skill of the hands doing it.
        */
-      minimumWeldingLevel?: number;
+      requiresMissionWeldingLevel?: true;
     }
   | { kind: "welding_level"; level: number; requiresCompletedTargetId?: RepairTargetId };
 
@@ -151,10 +153,11 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     id: REPAIR_TARGET_IDS.propulsionSystem,
     displayName: "Propulsion System",
     locationId: LOCATION_IDS.crashSite,
+    // Welding 8 is Thrust Issues' own offer gate; the repair reads it from there.
     authorization: {
       kind: "mission",
       missionId: MISSION_IDS.thrustIssues,
-      minimumWeldingLevel: 8,
+      requiresMissionWeldingLevel: true,
     },
     materialNotes: {
       [ITEM_IDS.driveMount]: "the powered interface between the drive and the hull",

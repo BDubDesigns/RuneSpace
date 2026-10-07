@@ -5,6 +5,7 @@ import { usePlay } from "@/features/play/PlayContext";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { getRepairTarget } from "@/game/content/repair-targets";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { completedRepairStatus } from "@/game/domain/repair-targets";
 
 /**
@@ -123,7 +124,7 @@ export function ShipSystemPanel({
             className="text-sm font-semibold text-[color:var(--rs-text-secondary)]"
             data-ship-system-status="complete"
           >
-            {completedRepairStatus(definition, state.missions)}
+            {completedRepairStatus(definition, deriveCompletedMissionIds(state.missions))}
           </p>
           {children?.({ justCompleted })}
         </>

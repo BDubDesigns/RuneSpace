@@ -2,7 +2,9 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { characterMissions, characterRepairTargets } from "@/db/rune-space";
 import { skillLevelThresholds } from "@/game/config/balance";
 import { SKILL_IDS, type RepairTargetId } from "@/game/config/foundations";
+import { getMission } from "@/game/content/missions";
 import { getRepairTarget } from "@/game/content/repair-targets";
+import { missionSkillPrerequisiteLevel } from "@/game/domain/missions";
 import { repairComplete, type RepairTargetState } from "@/game/domain/welding-repair";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { characterSkillLevel } from "@/server/skill-levels";
@@ -28,6 +30,13 @@ export function deriveRepairAccess(
 ): RepairAccess {
   const complete = repairComplete(repair);
   return { complete, repairAvailable: complete || authorizingMissionAccepted };
+}
+
+function missionWeldingRequirement(missionId: string): number {
+  const mission = getMission(missionId);
+  const level = mission && missionSkillPrerequisiteLevel(mission, SKILL_IDS.welding);
+  if (level === undefined) throw new Error(`Mission "${missionId}" requires no Welding level.`);
+  return level;
 }
 
 async function weldingLevel(transaction: DatabaseTransaction, characterId: string) {
@@ -67,12 +76,13 @@ export async function loadRepairAccess(
       )
       .for("update");
     let authorized = rows[0]?.acceptedAt != null;
-    // A Mission-authorized repair may also ask for personal Welding (#330). It is
-    // read here, beside the acceptance, so the controls and every command ask
-    // the same question and no command holds a level of its own.
-    if (authorized && authorization.minimumWeldingLevel !== undefined) {
-      authorized =
-        (await weldingLevel(transaction, characterId)) >= authorization.minimumWeldingLevel;
+    // A Mission-authorized repair may also ask for the personal Welding its
+    // Mission requires (#330). The level is read from that Mission's own
+    // prerequisites, beside the acceptance, so the controls and every command ask
+    // the same question and no level is restated or held by a command.
+    if (authorized && authorization.requiresMissionWeldingLevel) {
+      const required = missionWeldingRequirement(authorization.missionId);
+      authorized = (await weldingLevel(transaction, characterId)) >= required;
     }
     return deriveRepairAccess(repair, authorized);
   }

@@ -34,6 +34,13 @@ import {
  *   first location whose player-facing state changes durably — see its
  *   `stateVariants` and `game/domain/location-state`.
  */
+/**
+ * The Crash Site state variant that shows the repaired ship (#330). Named once so
+ * the Crash Site's conversation backdrop reads the same variant rather than
+ * restating what it requires.
+ */
+export const CRASH_SITE_SHIP_RESTORED_VARIANT_ID = "crash_site_ship_restored";
+
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
@@ -62,7 +69,7 @@ const locationDefinitions = [
     // restoration change no scene: the ship is one wreck until its drive is fixed.
     stateVariants: [
       {
-        id: "crash_site_ship_restored",
+        id: CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
         requires: { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
         description:
           "Your ship stands repaired on its landing gear in the mud and scrap, its propulsion restored.",

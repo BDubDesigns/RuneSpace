@@ -129,7 +129,9 @@ describe("a ship system's state is only its repair target's projection", () => {
 
   it("is driven by authorization and completion alone: no Mission is named in the shell", () => {
     const source = readFileSync("features/ship/ShipSystemPanel.tsx", "utf8");
-    expect(source).not.toMatch(/MISSION_IDS|missionId|wheel_be|holdItTogether/i);
+    // No particular Mission: the generic completed-Missions helper (#330) is the
+    // only Mission-shaped thing the shell may use, and it names none.
+    expect(source).not.toMatch(/MISSION_IDS|missionId\b|wheel_be|holdItTogether|thrust/i);
     expect(source).not.toMatch(/REPAIR_TARGET_IDS/);
   });
 });

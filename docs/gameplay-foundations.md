@@ -456,13 +456,15 @@ per section (16 sections, 800 base Welding XP) and the ordinary Clean Pass, with
 **no** Mission completion XP, Credits or item: the repair is its own reward.
 
 It is the first Mission-authorized repair that also needs a skill of the hands
-doing it. `authorization: { kind: "mission", missionId, minimumWeldingLevel }`
-adds a personal Welding level to the Mission's acceptance, read by the one
-`loadRepairAccess` predicate — so the controls, contribution and Welding
-commands all agree, and there is no Propulsion-specific check in a command. The
-Mission's own `prerequisiteSkillLevels` (Welding 8) gates the offer, and a unit
-test pins the two to the same level so a Mission cannot be accepted and then
-never worked. A finished repair stays usable whatever the level or Mission state.
+doing it. `authorization: { kind: "mission", missionId, requiresMissionWeldingLevel: true }`
+adds the personal Welding level the Mission itself requires to the Mission's
+acceptance, read by the one `loadRepairAccess` predicate — so the controls,
+contribution and Welding commands all agree, and there is no Propulsion-specific
+check in a command. The level has exactly one home: the Mission's own
+`prerequisiteSkillLevels` (Welding 8) gates the offer, and the repair reads that
+same entry rather than restating it, so a Mission can never be accepted and then
+never worked. Startup validation rejects the flag on a Mission that requires no
+Welding level. A finished repair stays usable whatever the level or Mission state.
 
 The repair's completion is **the** physical fact that the ship is restored.
 Nothing duplicates it: there is no persisted `flight_ready` boolean to drift.

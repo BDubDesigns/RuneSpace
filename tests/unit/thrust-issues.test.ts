@@ -39,7 +39,9 @@ import { resolveNpcConversation } from "@/game/domain/conversation";
 import { fabricationRecipeUnlocked } from "@/game/domain/fabrication";
 import { resolveLocationState } from "@/game/domain/location-state";
 import {
+  deriveCompletedMissionIds,
   deriveMissionGuidanceTargets,
+  missionSkillPrerequisiteLevel,
   missionSkillPrerequisiteSatisfied,
   projectMission,
   validateMissionDefinitions,
@@ -195,23 +197,19 @@ describe("the Propulsion System repair target", () => {
       authorization: {
         kind: "mission",
         missionId: MISSION_IDS.thrustIssues,
-        minimumWeldingLevel: 8,
+        requiresMissionWeldingLevel: true,
       },
     });
     expect(getRepairTarget(REPAIR_TARGET_IDS.propulsionSystem)?.localPlaceId).toBeUndefined();
   });
 
-  it("asks the repair for the same Welding level the Mission asks of the offer", () => {
-    // One literal in two places would be able to drift into a Mission a player
-    // can accept and then never work; this is the guard against that.
+  it("holds the Welding level in one place: the Mission's own offer gate", () => {
+    // The repair authors no level of its own; it reads this one, so the two can
+    // never drift into a Mission a player can accept and then never work.
     const authorization = getRepairTarget(REPAIR_TARGET_IDS.propulsionSystem)!.authorization;
-    expect(authorization.kind).toBe("mission");
-    expect(THRUST_ISSUES.prerequisiteSkillLevels).toEqual([
-      {
-        skillId: SKILL_IDS.welding,
-        level: authorization.kind === "mission" ? authorization.minimumWeldingLevel : -1,
-      },
-    ]);
+    expect(JSON.stringify(authorization)).not.toMatch(/\b8\b/);
+    expect(missionSkillPrerequisiteLevel(THRUST_ISSUES, SKILL_IDS.welding)).toBe(8);
+    expect(missionSkillPrerequisiteLevel(THRUST_ISSUES, SKILL_IDS.fabrication)).toBeUndefined();
   });
 
   it("consumes exactly 2 Drive Mounts + 1 Galvaferrite + 2 Mounting Brackets + 1 Wire Spool", () => {
@@ -268,27 +266,24 @@ describe("the Propulsion System repair target", () => {
     ).toBe(false);
   });
 
-  it("passes startup validation and rejects a nonsensical Welding level", () => {
+  it("passes startup validation, and rejects reading a Welding level its Mission lacks", () => {
     const missionIds = new Set(MISSIONS.map((mission) => mission.id));
     const target = getRepairTarget(REPAIR_TARGET_IDS.propulsionSystem)!;
-    expect(() => validateRepairTargets([target], missionIds)).not.toThrow();
-    for (const minimumWeldingLevel of [0, -1, 2.5]) {
-      expect(() =>
-        validateRepairTargets(
-          [
-            {
-              ...target,
-              authorization: {
-                kind: "mission",
-                missionId: MISSION_IDS.thrustIssues,
-                minimumWeldingLevel,
-              },
-            },
-          ],
-          missionIds,
-        ),
-      ).toThrow(/invalid Welding level gate/);
-    }
+    const levelOf = (missionId: string) => {
+      const mission = MISSIONS.find((candidate) => candidate.id === missionId);
+      return mission && missionSkillPrerequisiteLevel(mission, SKILL_IDS.welding);
+    };
+    expect(() => validateRepairTargets([target], missionIds, levelOf)).not.toThrow();
+    // The same flag against a Mission with no Welding prerequisite gates on nothing.
+    const wrong = {
+      ...target,
+      authorization: {
+        kind: "mission",
+        missionId: MISSION_IDS.wheelBeRightBack,
+        requiresMissionWeldingLevel: true,
+      },
+    } as const;
+    expect(() => validateRepairTargets([wrong], missionIds, levelOf)).toThrow(/requires none/);
   });
 
   it("annotates exactly the materials its recipe requires", () => {
@@ -311,27 +306,26 @@ describe("the ship's status words come from the repairs and the Mission, nothing
   it("states the locked statuses before turn-in and after it", () => {
     expect(propulsionTarget.completedStatus).toBe("Propulsion restored. Report to Wade.");
     expect(propulsionTarget.reportedStatus).toBe("Propulsion restored. Ship flight-ready.");
-    expect(completedRepairStatus(propulsionTarget, [])).toBe(
+    expect(completedRepairStatus(propulsionTarget, new Set())).toBe(
       "Propulsion restored. Report to Wade.",
     );
-    for (const state of ["not_accepted", "active", "ready_for_completion"]) {
+    for (const state of ["not_accepted", "active", "ready_for_completion"] as const) {
       expect(
-        completedRepairStatus(propulsionTarget, [{ missionId: MISSION_IDS.thrustIssues, state }]),
+        completedRepairStatus(
+          propulsionTarget,
+          deriveCompletedMissionIds([{ missionId: MISSION_IDS.thrustIssues, state }]),
+        ),
       ).toBe("Propulsion restored. Report to Wade.");
     }
-    expect(
-      completedRepairStatus(propulsionTarget, [
-        { missionId: MISSION_IDS.thrustIssues, state: "completed" },
-      ]),
-    ).toBe("Propulsion restored. Ship flight-ready.");
+    expect(completedRepairStatus(propulsionTarget, new Set([MISSION_IDS.thrustIssues]))).toBe(
+      "Propulsion restored. Ship flight-ready.",
+    );
   });
 
   it("does not take another Mission's completion for the turn-in", () => {
-    expect(
-      completedRepairStatus(propulsionTarget, [
-        { missionId: MISSION_IDS.wheelBeRightBack, state: "completed" },
-      ]),
-    ).toBe("Propulsion restored. Report to Wade.");
+    expect(completedRepairStatus(propulsionTarget, new Set([MISSION_IDS.wheelBeRightBack]))).toBe(
+      "Propulsion restored. Report to Wade.",
+    );
   });
 
   it("no longer claims Propulsion offline anywhere on the Landing Gear", () => {
@@ -339,11 +333,9 @@ describe("the ship's status words come from the repairs and the Mission, nothing
     expect(gearTarget.completedStatus).not.toMatch(/propulsion/i);
     expect(gearTarget.reportedStatus).toBeUndefined();
     // Landing Gear restoration changes with no Mission and no Propulsion fact.
-    expect(
-      completedRepairStatus(gearTarget, [
-        { missionId: MISSION_IDS.wheelBeRightBack, state: "completed" },
-      ]),
-    ).toBe("Landing gear restored.");
+    expect(completedRepairStatus(gearTarget, new Set([MISSION_IDS.wheelBeRightBack]))).toBe(
+      "Landing gear restored.",
+    );
   });
 
   it("shows a compact offline status with no recipe or progression hint", () => {
