@@ -105,8 +105,13 @@ test("pins from either surface on a phone, keeps the Mission active, and survive
   await expect(pinHold).toHaveAttribute("aria-pressed", "false");
   await expect(pinChange).toHaveAttribute("aria-pressed", "true");
 
-  // Keep the Change is expanded (it is ready to turn in): its Current
+  // Open Keep the Change, whose every requirement is met: its Current
   // Objective leads, ahead of the Progress list, with no reward preview.
+  await changeEntry.locator("button[aria-expanded]").click();
+  await expect(changeEntry.locator("button[aria-expanded]")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   const current = changeEntry.locator("[data-mission-log-current]");
   await expect(current).toContainText("Current objective");
   await expect(changeEntry.locator("[data-mission-log-next]")).toHaveText(
@@ -143,12 +148,9 @@ test("pins from either surface on a phone, keeps the Mission active, and survive
     [MISSION_IDS.holdItTogether, MISSION_IDS.keepTheChange].sort(),
   );
 
-  // The preference is durable, and presentation only: the unpinned Keep the
-  // Change still counts as ready to turn in, from the Mission projection.
+  // The preference is durable.
   await page.reload();
-  await expect(page.getByRole("button", { name: /^Missions/ })).toHaveAccessibleName(
-    "Missions, 1 ready to turn in",
-  );
+  await expect(page.getByRole("button", { name: /^Missions/ })).toBeVisible();
   await expect(page.locator("[data-mission-strip]")).toHaveCount(0);
 
   // Re-pin from the Log, by keyboard: the strip returns with its live objective.
@@ -156,6 +158,11 @@ test("pins from either surface on a phone, keeps the Mission active, and survive
   const reopened = page.getByRole("dialog", { name: "Mission Log" });
   const repin = reopened.getByRole("button", { name: "Pin Hold It Together", exact: true });
   await expect(repin).toHaveAttribute("aria-pressed", "false");
+  // Presentation only: the unpinned Keep the Change is still in its blue
+  // hand-in phase, straight from the Mission projection.
+  await expect(
+    reopened.locator(`[data-mission-log-entry="${MISSION_IDS.keepTheChange}"]`),
+  ).toHaveAttribute("data-mission-phase", "turn_in");
   await repin.focus();
   await page.keyboard.press("Space");
   await expect(repin).toHaveAttribute("aria-pressed", "true");
@@ -213,8 +220,8 @@ test("the wide desktop objectives region and the docked Log agree immediately", 
   await expect(
     docked.getByRole("button", { name: "Pin Keep the Change", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
-  // The Mission itself is untouched: still listed as active, ready to turn in.
-  await expect(
-    docked.locator(`[data-mission-log-entry="${MISSION_IDS.keepTheChange}"]`),
-  ).toHaveAttribute("data-mission-log-state", "ready_for_completion");
+  // The Mission itself is untouched: still active, still in its hand-in phase.
+  const changeEntry = docked.locator(`[data-mission-log-entry="${MISSION_IDS.keepTheChange}"]`);
+  await expect(changeEntry).toHaveAttribute("data-mission-log-state", "active");
+  await expect(changeEntry).toHaveAttribute("data-mission-phase", "turn_in");
 });
