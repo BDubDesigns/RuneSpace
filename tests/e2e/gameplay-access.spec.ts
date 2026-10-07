@@ -311,7 +311,9 @@ test.describe("gameplay access gate and launch controls", () => {
     await admin.getByLabel("Character name").fill(playerACharacterName);
     await admin.getByRole("button", { name: "Search" }).click();
     await admin.getByText(playerACharacterName, { exact: true }).first().click();
-    await expect(admin.getByRole("heading", { name: "State snapshot" })).toBeVisible();
+    await expect(admin.getByRole("heading", { name: "Character inspector" })).toBeVisible();
+    // Account access lives on the inspector's Account tab (#333).
+    await admin.getByRole("tab", { name: "Account" }).click();
 
     const panel = admin.getByRole("region", { name: "Account access" });
     await expect(panel.getByText("Not granted", { exact: true })).toBeVisible();

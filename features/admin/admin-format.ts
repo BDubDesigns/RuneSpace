@@ -1,5 +1,5 @@
 import { getLocation, LOCATIONS } from "@/game/content/locations";
-import { skillLevelThresholds } from "@/game/config/balance";
+import { inventoryItemDefinitions, skillLevelThresholds } from "@/game/config/balance";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { presentedSkills } from "@/game/domain/character-progression";
 import { getItemPresentation } from "@/game/content/item-presentation";
@@ -259,23 +259,40 @@ export function xpSettableSkills(): readonly { skillId: string; displayName: str
   });
 }
 
-/**
- * Canonical items the ADD ITEM control offers, with human labels for the
- * operator. Stackables and uniques are both offered; ADD ITEM validates against
- * the authoritative item definition at the command boundary. `kind` drives
- * operator UX: uniques are added exactly one-per-command (no quantity input),
- * stackables take a positive whole quantity.
- */
-export const ADMIN_OFFERED_ITEMS = [
-  { itemId: "ferrite_shale", label: "Ferrite Shale", kind: "stack" },
-  { itemId: "refined_ferrite", label: "Refined Ferrite", kind: "stack" },
-  { itemId: "slag", label: "Slag", kind: "stack" },
-  { itemId: "power_cell", label: "Power Cell", kind: "stack" },
-  { itemId: "salvage_cutter", label: "Salvage Cutter", kind: "unique" },
-  { itemId: "mykea_schleppraum_8", label: "Mykea Schleppraum 8", kind: "unique" },
-] as const;
+/** One item the ADD ITEM control can grant. */
+export type AdminGrantableItem = {
+  itemId: string;
+  label: string;
+  /** Drives operator UX: uniques are added one-per-command (no quantity input). */
+  kind: "stack" | "unique";
+};
 
-export type AdminOfferedItem = (typeof ADMIN_OFFERED_ITEMS)[number];
+/**
+ * Every canonical inventory item the ADD ITEM control offers, derived from the
+ * authoritative item definitions (`inventoryItemDefinitions`) and item
+ * presentation — never a hand-maintained admin list — so a newly authored item
+ * appears with no admin edit. Ordered by display name. ADD ITEM re-validates
+ * the item, quantity and capacity at the command boundary regardless.
+ */
+export function adminGrantableItems(): readonly AdminGrantableItem[] {
+  return inventoryItemDefinitions()
+    .map((definition) => ({
+      itemId: definition.itemId,
+      label: itemLabel(definition.itemId),
+      kind: definition.kind,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "en") || a.itemId.localeCompare(b.itemId));
+}
+
+/** The catalog narrowed by a case-insensitive name filter (blank keeps all). */
+export function filterAdminGrantableItems(
+  items: readonly AdminGrantableItem[],
+  query: string,
+): readonly AdminGrantableItem[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return items;
+  return items.filter((item) => item.label.toLowerCase().includes(needle));
+}
 
 /**
  * The canonical locations offered as teleport destinations. Derived directly

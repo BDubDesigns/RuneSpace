@@ -82,7 +82,7 @@ export default async function AdminCharacterInspectorPage({
         />
       }
     >
-      <AdminInspector initial={inspector} />
+      <AdminInspector key={inspector.characterId} initial={inspector} />
     </GameShell>
   );
 }
