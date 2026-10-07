@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { flushSync } from "react-dom";
 import { setMissionPinnedAction } from "@/server/actions";
 import { usePlay } from "@/features/play/PlayContext";
@@ -15,56 +15,71 @@ import { usePlay } from "@/features/play/PlayContext";
  * `message` for the caller to show.
  *
  * Controls are never disabled while a change is in flight, because a focused
- * button that becomes disabled loses keyboard focus. Presses made meanwhile
- * join a per-Mission queue (the latest press for a Mission wins) that the
- * running pass drains, so quickly unpinning several strips drops none of them
- * even though the shared command gate keeps only one queued intent. The
- * command is idempotent, so a repeat asks for the state already requested.
+ * button that becomes disabled loses keyboard focus. Presses made meanwhile,
+ * from the strips or the Log alike, join one per-Mission queue (the latest
+ * press for a Mission wins) that the running pass drains, so no press is lost
+ * even though the shared command gate keeps only one queued intent. Each press
+ * reports back to the surface that made it. The command is idempotent, so a
+ * repeat asks for the state already requested.
  */
-type PinIntent = { pinned: boolean; afterChange?: () => void };
+type PinIntent = {
+  characterId: string;
+  pinned: boolean;
+  afterChange?: () => void;
+  setPending: (missionId: string | undefined) => void;
+  report: (message: string) => void;
+};
+
+/** Shared by every mounted surface, so their presses never compete for the gate. */
+const queued = new Map<string, PinIntent>();
 
 export function useMissionPin() {
   const { acceptState, enqueueForeground, releaseCommand, requestAutoRefresh, state } = usePlay();
   const [, startTransition] = useTransition();
   const [pendingMissionId, setPendingMissionId] = useState<string>();
   const [message, setMessage] = useState<string>();
-  const queued = useRef(new Map<string, PinIntent>());
 
   /** Runs holding the command gate; settles every queued press, in order. */
   function drain() {
     startTransition(async () => {
+      let current: PinIntent | undefined;
       try {
-        for (let next = first(queued.current); next; next = first(queued.current)) {
-          const [missionId, { pinned, afterChange }] = next;
-          queued.current.delete(missionId);
-          setPendingMissionId(missionId);
+        for (let next = first(queued); next; next = first(queued)) {
+          const [missionId, intent] = next;
+          queued.delete(missionId);
+          current = intent;
+          intent.setPending(missionId);
           const result = await setMissionPinnedAction({
-            characterId: state.characterId,
+            characterId: intent.characterId,
             missionId,
-            pinned,
+            pinned: intent.pinned,
           });
+          intent.setPending(undefined);
           if ("error" in result) {
-            setMessage(result.error);
+            intent.report(result.error);
             continue;
           }
           if (result.pin.status === "refused") {
             acceptState(result.state);
-            setMessage(result.pin.message);
+            intent.report(result.pin.message);
             continue;
           }
-          if (afterChange) {
+          if (intent.afterChange) {
             flushSync(() => acceptState(result.state));
-            afterChange();
+            intent.afterChange();
           } else {
             acceptState(result.state);
           }
         }
       } catch {
-        queued.current.clear();
-        setMessage("Comms interruption. The Mission Log could not confirm that change.");
+        current?.setPending(undefined);
+        const failed = [current, ...queued.values()];
+        queued.clear();
+        for (const intent of new Set(failed)) {
+          intent?.report("Comms interruption. The Mission Log could not confirm that change.");
+        }
         requestAutoRefresh();
       } finally {
-        setPendingMissionId(undefined);
         releaseCommand();
       }
     });
@@ -76,7 +91,13 @@ export function useMissionPin() {
    */
   function setPinned(missionId: string, pinned: boolean, afterChange?: () => void) {
     setMessage(undefined);
-    queued.current.set(missionId, { pinned, afterChange });
+    queued.set(missionId, {
+      characterId: state.characterId,
+      pinned,
+      afterChange,
+      setPending: setPendingMissionId,
+      report: setMessage,
+    });
     // A pass already holding the gate picks this up; otherwise this starts one.
     // A pass that finds the queue already drained simply releases the gate.
     enqueueForeground(drain);
