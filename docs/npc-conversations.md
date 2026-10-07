@@ -204,7 +204,10 @@ hard-coded mission-ID chains — and returns an ordered entry list:
    the stage branch is selected exactly as before (turn-in / busy / equipment /
    carried / tracked-activity / cargo-repair / conversation reminder), with a
    reactive variant replacing the turn-in opening or the tracked-activity
-   reminder when a Mission-local fact holds (#232, `docs/missions.md` §9.3); for other
+   reminder when a Mission-local fact holds (#232, `docs/missions.md` §9.3). A
+   reminder or busy moment the Mission leaves unauthored presents the turn-in
+   opening only when the Mission declares it in `dialogue.omitted`; otherwise
+   there is no entry (`docs/missions.md` §9.4). For other
    NPCs an **unsatisfied mandatory conversation** (§4.1) wins first, then the
    authored `activeNpcDialogue`, then that NPC's offer `activeDialogueId`.
 2. **Available offers**, newest first: a `not_accepted` Mission whose projected

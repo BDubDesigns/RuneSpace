@@ -265,6 +265,9 @@ describe("Keep the Change: World Location -> Local Place -> NPC handoff, and no 
     });
   });
 
+  // Guidance points at the next unambiguous actionable target, never merely the
+  // eventual destination (#324): several legitimate Power Cell sources means no
+  // waypoint, while the objective copy still says what to acquire.
   it("invents no acquisition guidance once Bix is met but Power Cells are still short", () => {
     const bixMetShortOnCells = keepTheChangeObservation({
       trackedProgress: new Map([["bix-introduction", 1]]),
@@ -279,6 +282,7 @@ describe("Keep the Change: World Location -> Local Place -> NPC handoff, and no 
       bixMetShortOnCells,
     );
     expect(inHoloHollow.guidance).toBeUndefined();
+    expect(inHoloHollow.currentObjective).toMatch(/Power Cell/);
 
     const atCrashSite = projectMission(
       KEEP_THE_CHANGE,

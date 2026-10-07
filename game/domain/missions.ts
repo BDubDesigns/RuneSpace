@@ -15,6 +15,8 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import type {
   MissionDefinition,
+  MissionDialogue,
+  MissionLifecycleMoment,
   MissionRequirement,
   MissionRequirementKind,
   MissionSkillPrerequisite,
@@ -1533,8 +1535,190 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
       }
     }
+    assertLifecycleCoverage(definition);
   }
   assertContinuationGraph(definitions);
+}
+
+/** The `MissionDialogue` slot that authors each turn-in-NPC lifecycle moment. */
+const LIFECYCLE_DIALOGUE_SLOTS = {
+  equipment_reminder: "equipmentReminderDialogueId",
+  carried_reminder: "carriedReminderDialogueId",
+  tracked_activity_reminder: "trackedActivityReminderDialogueId",
+  repair_reminder: "repairReminderDialogueId",
+  conversation_reminder: "conversationReminderDialogueId",
+  busy: "busyDialogueId",
+  completion_presentation: "completionPresentationDialogueId",
+} as const satisfies Record<MissionLifecycleMoment, keyof MissionDialogue>;
+
+/**
+ * The reminder each requirement kind needs at the turn-in NPC while it is the
+ * first unmet requirement. `at_location` has none: validation requires it to
+ * name the turn-in location, so the turn-in NPC is never reached while it is
+ * unmet (#324).
+ */
+const REQUIREMENT_REMINDER_MOMENTS: Record<
+  MissionRequirementKind,
+  MissionLifecycleMoment | undefined
+> = {
+  at_location: undefined,
+  equipped_item: "equipment_reminder",
+  carried_stack: "carried_reminder",
+  carried_unique_item: "carried_reminder",
+  tracked_activity: "tracked_activity_reminder",
+  repair_target_complete: "repair_reminder",
+  npc_conversation: "conversation_reminder",
+};
+
+/**
+ * Every turn-in-NPC lifecycle moment this Mission can reach (#324): one
+ * reminder per requirement kind it authors, plus `busy` and the one-shot
+ * completion presentation, which every Mission reaches. Derived from authored
+ * requirement kinds only — never from a Mission ID or prose.
+ */
+export function missionLifecycleMoments(
+  definition: Pick<MissionDefinition, "requirements">,
+): readonly MissionLifecycleMoment[] {
+  const moments = new Set<MissionLifecycleMoment>();
+  for (const requirement of definition.requirements) {
+    const moment = REQUIREMENT_REMINDER_MOMENTS[requirement.kind];
+    if (moment) moments.add(moment);
+  }
+  moments.add("busy");
+  moments.add("completion_presentation");
+  return [...moments];
+}
+
+/** Whether the Mission explicitly declares `moment` as intentionally unauthored. */
+export function missionOmitsMoment(
+  definition: Pick<MissionDefinition, "dialogue">,
+  moment: MissionLifecycleMoment,
+): boolean {
+  return (definition.dialogue.omitted ?? []).some((omission) => omission.moment === moment);
+}
+
+/**
+ * The lifecycle-coverage contract (#324). Every reachable moment authors its
+ * sequence or is declared in `dialogue.omitted` with a reason; a slot or a
+ * declaration for a moment the Mission cannot reach is dead content and fails.
+ * Turn-in-NPC sequences must belong to that NPC, a completion presentation
+ * must present every authored reward grant, and a reachable capacity refusal
+ * must author its beats. Prose is never inspected.
+ */
+function assertLifecycleCoverage(definition: MissionDefinition): void {
+  const where = `Mission "${definition.id}"`;
+  const dialogue = definition.dialogue;
+  const turnInNpcId = definition.turnIn.npcId;
+  for (const requirement of definition.requirements) {
+    if (
+      requirement.kind === "at_location" &&
+      requirement.locationId !== definition.turnIn.locationId
+    ) {
+      throw new Error(
+        `${where} at_location requirement "${requirement.locationId}" differs from its turn-in location; no location reminder exists, so the turn-in NPC would present the turn-in instead.`,
+      );
+    }
+  }
+  assertDialogueNpc(definition.id, definition.turnIn.dialogueId, turnInNpcId, "turn-in");
+
+  const reachable = new Set(missionLifecycleMoments(definition));
+  const declared = new Set<MissionLifecycleMoment>();
+  for (const omission of dialogue.omitted ?? []) {
+    if (declared.has(omission.moment)) {
+      throw new Error(`${where} declares the omitted moment "${omission.moment}" twice.`);
+    }
+    declared.add(omission.moment);
+    if (omission.reason.trim().length === 0) {
+      throw new Error(`${where} must give a reason for omitting "${omission.moment}".`);
+    }
+  }
+  for (const [moment, slot] of Object.entries(LIFECYCLE_DIALOGUE_SLOTS) as [
+    MissionLifecycleMoment,
+    (typeof LIFECYCLE_DIALOGUE_SLOTS)[MissionLifecycleMoment],
+  ][]) {
+    const dialogueId = dialogue[slot];
+    if (!reachable.has(moment)) {
+      if (dialogueId || declared.has(moment)) {
+        throw new Error(
+          `${where} authors the "${moment}" moment, which none of its requirements can reach.`,
+        );
+      }
+      continue;
+    }
+    if (dialogueId && declared.has(moment)) {
+      throw new Error(`${where} both authors and omits the "${moment}" moment.`);
+    }
+    if (!dialogueId && !declared.has(moment)) {
+      throw new Error(
+        `${where} can reach the "${moment}" moment but neither authors "${slot}" nor declares it in dialogue.omitted.`,
+      );
+    }
+    if (dialogueId) assertDialogueNpc(definition.id, dialogueId, turnInNpcId, moment);
+  }
+
+  const presentation = dialogue.completionPresentationDialogueId
+    ? getDialogue(dialogue.completionPresentationDialogueId)
+    : undefined;
+  if (presentation) {
+    for (const grant of rewardPresentationGrants(definition)) {
+      const presented = presentation.beats.some((beat) =>
+        grant.kind === "skill_xp"
+          ? beat.kind === "skill_xp" &&
+            beat.skillId === grant.skillId &&
+            beat.amount === grant.amount
+          : beat.kind === "item" &&
+            beat.itemId === grant.itemId &&
+            beat.quantity === grant.quantity,
+      );
+      if (!presented) {
+        throw new Error(
+          `${where} completion presentation does not present its ${grant.kind === "skill_xp" ? `${grant.amount} ${grant.skillId} XP` : `${grant.quantity} × ${grant.itemId}`} reward.`,
+        );
+      }
+    }
+  }
+
+  const capacityReachable =
+    definition.reward?.kind === "item" ||
+    definition.reward?.kind === "stack_bundle" ||
+    definition.offers.some((offer) => offer.acceptEffect?.kind === "stack_item");
+  const capacityAuthored =
+    dialogue.capacitySlotsDialogueId !== undefined || dialogue.capacityMassDialogueId !== undefined;
+  if (
+    capacityReachable &&
+    (!dialogue.capacitySlotsDialogueId || !dialogue.capacityMassDialogueId)
+  ) {
+    throw new Error(
+      `${where} can be refused for capacity and must author both capacity refusal sequences.`,
+    );
+  }
+  if (!capacityReachable && capacityAuthored) {
+    throw new Error(`${where} authors capacity refusals but grants nothing that can be refused.`);
+  }
+}
+
+/**
+ * The beats an authored completion presentation must contain for the reward:
+ * a skill-XP beat for skill XP, an item beat per granted item. Credits are
+ * presented by the runtime receipt tile, never an authored beat (#290).
+ */
+function rewardPresentationGrants(
+  definition: MissionDefinition,
+): readonly (
+  | { kind: "skill_xp"; skillId: string; amount: number }
+  | { kind: "item"; itemId: string; quantity: number }
+)[] {
+  const reward = definition.reward;
+  if (!reward || reward.kind === "credits") return [];
+  if (reward.kind === "skill_xp") {
+    return [{ kind: "skill_xp", skillId: reward.skillId, amount: reward.amount }];
+  }
+  if (reward.kind === "item") return [{ kind: "item", itemId: reward.itemId, quantity: 1 }];
+  return reward.items.map((entry) => ({
+    kind: "item" as const,
+    itemId: entry.itemId,
+    quantity: entry.quantity,
+  }));
 }
 
 /**

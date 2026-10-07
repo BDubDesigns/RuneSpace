@@ -60,9 +60,9 @@ type MissionDefinition = {
 - **`requirements[]`** — ordered requirements (§5) evaluated against live authoritative state on every projection.
 - **`turnIn`** — `npcId` + `locationId` + `requiresStationary: true` + objective copy + `dialogueId` (§7). Mission location semantics are authored here and **never** derived from an NPC's `homeLocationId`.
 - **`reward`** — at most one narrow reward, and optional: a mission whose real outcome is world/social state authors none (§8).
-- **`dialogue`** — optional semantic mappings (§9).
+- **`dialogue`** — semantic mappings (§9). Every lifecycle moment the Mission can reach is either authored or declared in `dialogue.omitted` (§9.4).
 
-Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, skill-prerequisite shape, continuation shape/cycles, stackable checks, stack limits, reward skill curve, and `recommendedActionId` capability). An authoring mistake never reaches a player as a silent runtime refusal.
+Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, skill-prerequisite shape, continuation shape/cycles, stackable checks, stack limits, reward skill curve, `recommendedActionId` capability, and lifecycle dialogue coverage, §9.4). An authoring mistake never reaches a player as a silent runtime refusal.
 
 ### 3.1 Authored mission continuation
 
@@ -376,7 +376,7 @@ persistent idle dialogue — it is immediate one-shot presentation after success
 | --- | --- | --- | --- |
 | Offer | **Offer** | `MissionOffer.dialogueId` | `not_accepted` + prerequisite satisfied + this NPC authors an offer |
 | Offer | **Authored acceptance continuation** | `MissionOffer.acceptedContinuation` | returned alongside the offer entry; the UI presents it immediately after a successful `accept_mission` at that offer (Tansy remote acceptance → Cutter claim) |
-| Active (turn-in NPC) | **Turn-in** | `MissionTurnIn.dialogueId` | `active` / `ready_for_completion` + every requirement holds (the stage turns the interaction into a completion attempt; busy is distinguished below) |
+| Active (turn-in NPC) | **Turn-in** | `MissionTurnIn.dialogueId` | `active` / `ready_for_completion` + every requirement holds (the stage turns the interaction into a completion attempt; busy is distinguished below). Also the fallback for a reminder or busy moment, but only one the Mission declares in `dialogue.omitted` (§9.4) |
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` or `"carried_unique_item"` |
@@ -395,6 +395,47 @@ persistent idle dialogue — it is immediate one-shot presentation after success
 Capacity and completion beats are presentation only — the authoritative
 completion stamp, consumption, and reward already committed when they become
 visible.
+
+#### 9.4 Lifecycle coverage is deliberate (#324)
+
+A Mission that validates technically can still play nonsensically: a reminder
+slot left empty used to present the turn-in opening, so a player who had not
+finished the work heard dialogue written for handing it in. The framework now
+makes every turn-in-NPC moment a deliberate choice.
+
+- **Reachable moments derive from content** (`missionLifecycleMoments` in
+  `game/domain/missions.ts`): one reminder per requirement kind the Mission
+  authors (`equipped_item` → equipment, `carried_stack` / `carried_unique_item` →
+  carried, `tracked_activity` → tracked activity, `repair_target_complete` →
+  repair, `npc_conversation` → conversation), plus `busy` and
+  `completion_presentation`, which every Mission reaches. `at_location` has no
+  reminder, so validation requires it to name the turn-in location.
+- **Each reachable moment authors its sequence or is declared omitted.**
+  `MissionDialogue.omitted` lists `{ moment, reason }` entries; the reason is
+  reviewer-facing content metadata, never shown to players. An omitted reminder
+  or `busy` presents the turn-in opening (with its completion command, which the
+  server refuses until the turn-in really is available); an omitted
+  `completion_presentation` returns to the hub after success.
+- **Not applicable is not the same as forgotten.** A slot or declaration for a
+  moment no requirement can reach is dead content and fails validation, as do a
+  declaration beside an authored sequence, a duplicate, and an empty reason.
+- **The resolver agrees.** `resolveNpcConversationWith` falls back to the
+  turn-in only for a declared moment; an undeclared gap yields no Mission entry
+  at all rather than the wrong scene. Validation makes that unreachable for
+  production content.
+- **Objective checks only.** Turn-in-NPC sequences must belong to the turn-in
+  NPC; a completion presentation must contain a beat for every reward grant (a
+  `skill_xp` beat of the same skill and amount, an `item` beat per granted item
+  and quantity; Credits come from the runtime receipt tile, §9.2); and a Mission
+  whose reward or acceptance effect can be refused for capacity authors both
+  capacity sequences, while one that cannot authors neither. Prose is never
+  inspected — pronouns, knowledge, timing and order are the narrative pass in
+  §13.
+
+Shipped omissions are both `busy`: Walk It Off (nothing can keep a character
+busy at The Jag before they hold the Cutter it grants) and Curly Must-Stash
+(its approved design authors no busy beat). `tests/unit/mission-lifecycle-coverage.test.ts`
+pins that list, so a new omission is visible in review.
 
 #### 9.2 A mandatory conversation is a one-time story event
 
@@ -527,6 +568,26 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 3. **NPC / equipment / action** — once inside (or immediately, for a target with no Local Place), the NPC's own Talk control, the equipment affordance, or the authored action becomes the target.
 
 Arriving at a step removes that step's guidance and hands off to the next; the player's current World Location, and a Local Place the player has already entered, never themselves carry a target once their handoff is complete. This handoff applies to accepted progression (green) and turn-in (blue) alike, and turn-in entrances are their **own** blue target (`turnInLocalPlaceIds`) — distinct from an active target's green entrance (`localPlaceIds`) even when it is the same physical door. Available (blue) offers never guide a door or a World Location — availability remains local discovery only (see above).
+
+### The guidance rule: the next unambiguous actionable target
+
+> Mission guidance points to the **next unambiguous actionable progression
+> target**, not merely the eventual destination.
+
+- One clear required NPC, location, control or action → guidance points there.
+- A repair target the player carries useful material for → the repair site is
+  actionable and is guided.
+- A repair target still needing material the player carries none of → no
+  guidance; the repair site is where the work ends, not what to do next (§5.1).
+- Several legitimate acquisition paths (mine, refine, fabricate, buy, trade) →
+  no invented route (below).
+- With no waypoint, the objective and status copy still tell the player what to
+  acquire or do: the requirement's objective, a repair's material rows, and the
+  Mission strip's Still needed line.
+
+The rule is applied by the generic projection from requirement kinds and
+authored `recommendedActionId`s alone, never from prose, and a new Mission
+cannot opt out of it.
 
 ### Ambiguous acquisition never invents guidance
 
@@ -747,20 +808,38 @@ The Issue #148 maintenance script is separate from normal runtime continuation. 
 
 An ordinary mission is one that uses already-supported semantics: authored content plus the generic projection / routing / guidance / generic commands (§2). It should not require server, wiring, or client routing changes to adopt.
 
-### Checklist
+### New Mission authoring checklist
 
-An ordinary mission using existing semantics should generally require:
+Follow this from fresh context before a Mission is handed off for implementation or review. It is a short pass to prevent omissions, not a form to fill in; skip what genuinely does not apply.
 
-1. **Identity and presentation** — stable mission/dialogue IDs, title, and summary; add only genuinely needed item/NPC/location/action IDs.
-2. **Discovery semantics** — prerequisite versus explicit continuation, whether the mission is manually discoverable, and every authored offer route or immediate post-acceptance continuation.
-3. **Ordered requirements and guidance** — requirement order, live-state versus tracked-activity semantics, stable tracked key/positive target where applicable, and recommended action guidance.
-4. **Turn-in semantics** — NPC, location, stationary requirement, objective copy, and whether the turn-in is distinct from any requirement location.
-5. **Reward and presentation** — exactly-once reward shape, capacity/refusal behavior where applicable, and the one-shot completion presentation.
-6. **Active dialogue ownership** — offer-NPC active follow-up, turn-in reminders/busy dialogue, and `activeNpcDialogue` for relevant off-path/revisit NPCs who need contextual state while the mission is active.
-7. **Persistent story state** — `completedNpcDialogue` for every relevant NPC, including which later mission should supersede that dialogue so completed story state cannot regress.
-8. **Persistence rollout** — migration ownership, acceptance/continuation initialization, existing-character migration or backfill behavior, and idempotence/rollback expectations.
-9. **Manual preview checks** — refresh/reload, partial progress, success and failure attempts, stopped/restarted activity, turn-in gating, exactly-once reward, completion presentation close, and post-completion revisits to relevant NPCs.
-10. **Focused automated coverage** — definition validation, projection/guidance precedence, active/completed routing, persistence/concurrency at the correct integration layer, and the complete player journey when a new mission changes it.
+1. **Shape** — stable mission/dialogue IDs, title and summary; prerequisite versus explicit continuation; every offer route; ordered requirements; turn-in NPC, location and objective copy; at most one reward (or none, deliberately); capacity refusals when a grant can be refused. Add only genuinely needed item/NPC/location/action IDs.
+2. **Lifecycle dialogue** — walk each moment and author it or declare it omitted (§9.4):
+   1. offer;
+   2. acceptance continuation, when the offer should flow straight on;
+   3. an active reminder for every requirement kind, and every state that reminder can be read in (nothing done, part done, mid-activity);
+   4. busy at the turn-in NPC;
+   5. turn-in opening;
+   6. one-shot completion presentation;
+   7. reward presentation and its position in that scene;
+   8. ordinary post-completion follow-up (`completedNpcDialogue`), when the NPC should acknowledge the finished work;
+   9. contextual active dialogue (`activeNpcDialogue`) at other NPCs, only when one has a real reason to react.
+3. **Narrative continuity pass** — read the whole chain in player order, scene after scene, not as isolated strings (canon from `docs/npc-canon.md`). Check that:
+   - pronouns and referents are established before use;
+   - the NPC only knows what they could know right now;
+   - no line assumes travel or elapsed time that may not have happened;
+   - location and background match the scene;
+   - no line asks the player to answer when no response or choice exists;
+   - scenes still make sense played immediately back to back;
+   - completion dialogue and reward beats appear in the intended order;
+   - post-completion dialogue still makes sense opened right after completion;
+   - reminders assume no more progress than the player may have made.
+
+   This is a human and product check; validation never inspects prose.
+4. **Guidance** — for each requirement, confirm what the projection will guide and that it is the next unambiguous actionable target (§10); where nothing should glow, confirm the objective copy alone tells the player what to acquire or do.
+5. **Completion and after** — the reward is exactly-once; any continuation, world change or unlock derives from the completion record; story dialogue that supersedes older dialogue cannot regress.
+6. **Persistence rollout** — migration ownership, acceptance/continuation initialization, any existing-character backfill, and idempotence/rollback expectations.
+7. **Focused tests** — registry validation (including §9.4 coverage), projection/guidance at each phase, active/completed routing, persistence/concurrency at the correct integration layer, and the player journey when the Mission changes it (`docs/testing-strategy.md`).
+8. **Human playtest of the full chain** — offer → every reminder → busy → turn-in → completion → post-completion revisit, including refresh/reload, partial progress, success and failure attempts, stopped/restarted activity, and talking again immediately after each step.
 
 ### It should not normally require
 
@@ -811,7 +890,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Turn-in:** `Tansy` at `The Jag`, stationary only. No duplicated `at_location: The Jag` requirement needed for eligibility (§7). `turnIn.objective: "Talk to Tansy Rusk"`.
 - **Reward:** one `item` — the Salvage Cutter. Registry validates it is a unique item because the generic completion path executes only that shape (§8).
 - **Continuation:** `continuationMissionId: cutYourTeeth` (§3.1). Completing Walk It Off atomically accepts Cut Your Teeth — no second acceptance click.
-- **Dialogue:** offer sequences plus `completionPresentation` (`tansyAfterClaim`, which presents the already-granted Cutter via an `item` beat) and `capacitySlots` / `capacityMass` refusal branches that the server selects generically after a `capacity` refusal. The Cutter claim's `Claim Cutter` control copy is authored on `turnIn.actionLabel`, not on the sequence.
+- **Dialogue:** offer sequences plus `completionPresentation` (`tansyAfterClaim`, which presents the already-granted Cutter via an `item` beat) and `capacitySlots` / `capacityMass` refusal branches that the server selects generically after a `capacity` refusal. `busy` is declared omitted (§9.4): nothing can keep a character busy at The Jag before they hold the Cutter. The Cutter claim's `Claim Cutter` control copy is authored on `turnIn.actionLabel`, not on the sequence.
 - **Guidance + explorer-first:** no prerequisite, so at Crash Site blue targets Wade and at The Jag blue targets Tansy — each derived from the matching authored offer at the current location while not yet accepted.
 
 ### Cut Your Teeth — equip-and-collect
@@ -925,7 +1004,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Two exactly-once payments, no third:** `acceptEffect: { kind: "credits", amount: 150 }` and `reward: { kind: "credits", amount: 150 }` — 300 in total, with no separate materials allowance. Each is shown as the shared Credits tile only from its own confirmed receipt (§9.2), placed after Curly's line that hands it over (`creditsReceiptAfterBeats: 1`).
 - **Requirement:** one `repair_target_complete` observing Curly's mount (`curly_stash_mount`), a Mission-authorized target inside HH B&B with exactly The Jag Tier-1 mount's recipe — 6 Refined Ferrite + 3 Slag, six sections, 300 Welding XP paid by the work itself, ordinary Clean Pass. The Mission adds no XP.
 - **The mount is Curly's.** It is never a site stash, never storage the player can open, and never an item the player receives. The B&B's **Build Stash Mount** activity appears only while the repair is authorized and unfinished and disappears the moment the last section lands; guidance then hands off to Curly, and his room's art is already the finished one before he pays.
-- **Turn-in:** Curly at Holo Hollow, `actionLabel: "COLLECT PAYMENT"`. **Dialogue:** offer, accepted continuation, repair reminder (identical for no, partial, or complete materials), turn-in, completion presentation, post-completion follow-up, and the topics **Seeing the Worlds** (always) and **Back Home** (after completion). No busy beat is authored, so a busy character hears the turn-in itself.
+- **Turn-in:** Curly at Holo Hollow, `actionLabel: "COLLECT PAYMENT"`. **Dialogue:** offer, accepted continuation, repair reminder (identical for no, partial, or complete materials), turn-in, completion presentation, post-completion follow-up, and the topics **Seeing the Worlds** (always) and **Back Home** (after completion). No busy beat is authored, declared as a `busy` omission (§9.4), so a busy character hears the turn-in itself.
 
 ### Wheel Be Right Back — a manual offer, a ship repair, and parts from anywhere
 

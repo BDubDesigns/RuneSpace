@@ -177,6 +177,9 @@ describe.each(repairMissions)(
     it("gives no destination while the player carries none of what is missing", () => {
       const empty = project(entry, observe(entry.targetId, { materials: partial }));
       expect(empty.guidance).toBeUndefined();
+      // The repair site is the eventual destination, not the next actionable
+      // target (#324); the objective alone still names what is needed.
+      expect(empty.currentObjective).toBeTruthy();
       expect(deriveMissionGuidanceTargets([empty]).repairTargetIds.has(entry.targetId)).toBe(false);
 
       // Nor from anywhere else: there is no location to send the player to.
