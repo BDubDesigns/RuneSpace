@@ -3,7 +3,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
-import { REPAIR_TARGET_IDS } from "@/game/config/foundations";
+import { MISSION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { REPAIR_TARGETS } from "@/game/content/repair-targets";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
@@ -70,15 +70,21 @@ function repairOf(targetId: string, phase: "offline" | "repair" | "complete"): R
 function setState(
   cargo: "offline" | "repair" | "complete",
   gear: "offline" | "repair" | "complete",
+  propulsion: "offline" | "repair" | "complete" = "offline",
+  missions: readonly { missionId: string; state: string }[] = [],
 ) {
   const cargoRepair = repairOf(REPAIR_TARGET_IDS.cargoHold, cargo);
   play.state = {
     characterId: "character",
-    missions: [],
+    missions,
     activeAction: undefined,
     repairs: {
       [REPAIR_TARGET_IDS.cargoHold]: cargoRepair,
       [REPAIR_TARGET_IDS.landingGear]: repairOf(REPAIR_TARGET_IDS.landingGear, gear),
+      [REPAIR_TARGET_IDS.propulsionSystem]: repairOf(
+        REPAIR_TARGET_IDS.propulsionSystem,
+        propulsion,
+      ),
     },
     cargoHold: {
       repair: cargoRepair,
@@ -101,6 +107,14 @@ const landingGear = () =>
       weldingPrompt: "Weld them.",
     }),
   );
+const propulsion = () =>
+  renderToStaticMarkup(
+    React.createElement(ShipSystemPanel, {
+      targetId: REPAIR_TARGET_IDS.propulsionSystem,
+      materialsPrompt: "Bring the parts.",
+      weldingPrompt: "Weld them.",
+    }),
+  );
 const cargoHold = () => renderToStaticMarkup(React.createElement(CargoHoldPanel));
 
 describe("a ship system's state is only its repair target's projection", () => {
@@ -115,7 +129,9 @@ describe("a ship system's state is only its repair target's projection", () => {
 
   it("is driven by authorization and completion alone: no Mission is named in the shell", () => {
     const source = readFileSync("features/ship/ShipSystemPanel.tsx", "utf8");
-    expect(source).not.toMatch(/MISSION_IDS|missionId|wheel_be|holdItTogether/i);
+    // No particular Mission: the generic completed-Missions helper (#330) is the
+    // only Mission-shaped thing the shell may use, and it names none.
+    expect(source).not.toMatch(/MISSION_IDS|missionId\b|wheel_be|holdItTogether|thrust/i);
     expect(source).not.toMatch(/REPAIR_TARGET_IDS/);
   });
 });
@@ -211,7 +227,9 @@ describe("after completion", () => {
     setState("complete", "complete");
     const markup = landingGear();
     expect(markup).toContain('data-ship-system-state="complete"');
-    expect(markup).toContain("Landing gear restored. Propulsion offline.");
+    expect(markup).toContain("Landing gear restored.");
+    // It says only what the gear is; the Propulsion System reports its own state (#330).
+    expect(markup).not.toContain("Propulsion");
     expect(markup).not.toContain("data-repair-work-panel");
     expect(markup).not.toContain("<button");
   });
@@ -225,5 +243,88 @@ describe("after completion", () => {
     expect(markup).toContain("3 / 32 SLOTS OCCUPIED");
     expect(markup).toContain("OPEN CARGO HOLD");
     expect(markup).not.toContain("data-repair-work-panel");
+  });
+});
+
+describe("the Propulsion System (#330)", () => {
+  const thrustIssues = (state: string) => [{ missionId: MISSION_IDS.thrustIssues, state }];
+  // Every flight affordance the slice deliberately does not build.
+  const noFlight = [
+    "Flight Controls",
+    "Launch",
+    "Board Ship",
+    "Stillreach",
+    "fuel",
+    "Fuel",
+    "reserve",
+    "data-ship-flight",
+  ];
+
+  it("is a compact damaged system with no recipe, controls or hint before it is authorized", () => {
+    setState("complete", "complete", "offline");
+    const markup = propulsion();
+    expect(markup).toContain('data-ship-system="propulsion_system"');
+    expect(markup).toContain('data-ship-system-state="offline"');
+    expect(markup).toContain(">Propulsion System<");
+    expect(markup).toContain("The propulsion system is damaged and cannot be repaired yet.");
+    for (const hidden of [
+      "<button",
+      "data-repair-work-panel",
+      "Drive Mount",
+      "Galvaferrite",
+      "Mounting Bracket",
+      "Wire Spool",
+      "Welding 8",
+      "Wade",
+      ...noFlight,
+    ]) {
+      expect(markup, hidden).not.toContain(hidden);
+    }
+  });
+
+  it("is visible from the start, even before the Landing Gear is repaired", () => {
+    setState("offline", "offline", "offline");
+    expect(propulsion()).toContain('data-ship-system-state="offline"');
+  });
+
+  it("offers the standard repair presentation once the Mission authorizes it", () => {
+    setState("complete", "complete", "repair", thrustIssues("active"));
+    const markup = propulsion();
+    expect(markup).toContain('data-ship-system-state="repair"');
+    expect(markup).toContain("data-repair-work-panel");
+    for (const name of ["Drive Mount", "Galvaferrite", "Mounting Bracket", "Galvanic Wire Spool"]) {
+      expect(markup, name).toContain(name);
+    }
+    for (const hidden of noFlight) expect(markup, hidden).not.toContain(hidden);
+  });
+
+  it("reads 'Report to Wade' once repaired and before the turn-in, with no controls", () => {
+    for (const missions of [thrustIssues("ready_for_completion"), thrustIssues("active")]) {
+      setState("complete", "complete", "complete", missions);
+      const markup = propulsion();
+      expect(markup).toContain('data-ship-system-state="complete"');
+      expect(markup).toContain("Propulsion restored. Report to Wade.");
+      expect(markup).not.toContain("Ship flight-ready");
+      expect(markup).not.toContain("data-repair-work-panel");
+      expect(markup).not.toContain("<button");
+      for (const hidden of noFlight) expect(markup, hidden).not.toContain(hidden);
+    }
+  });
+
+  it("reads 'Ship flight-ready' after the turn-in, still with no flight control", () => {
+    setState("complete", "complete", "complete", thrustIssues("completed"));
+    const markup = propulsion();
+    expect(markup).toContain("Propulsion restored. Ship flight-ready.");
+    expect(markup).not.toContain("Report to Wade");
+    expect(markup).not.toContain("<button");
+    expect(markup).not.toContain("data-repair-work-panel");
+    for (const hidden of noFlight) expect(markup, hidden).not.toContain(hidden);
+  });
+
+  it("leaves the Cargo Hold and Landing Gear intact beside it", () => {
+    setState("complete", "complete", "complete", thrustIssues("completed"));
+    expect(cargoHold()).toContain('data-ship-system-state="complete"');
+    expect(landingGear()).toContain("Landing gear restored.");
+    expect(landingGear()).not.toContain("Propulsion");
   });
 });

@@ -56,6 +56,8 @@ describe("recipesUnlockedBetween", () => {
       ACTION_IDS.powerCellFabrication,
       ACTION_IDS.loadsteelCutterFabrication,
       ACTION_IDS.wheelAssemblyFabrication,
+      // Fabrication 8, in authored order: the Drive Mount (#330), then the Harness.
+      ACTION_IDS.driveMountFabrication,
       ACTION_IDS.freightHarnessFabrication,
     ]);
   });

@@ -525,6 +525,10 @@ Current production conventions:
   derivatives are `public/npc-art/curly-*.png` (one shared 1086x1448 canvas,
   the neutral master scaled down to match, never up) and
   `public/location-scenes/curly-room-{before,after}.webp` (a 15:8 centre crop)
+- the Crash Site's approved crashed and repaired Rivet Utility Shuttle scenes
+  (#330) are 1536x384 lossy WebP derivatives in `public/location-scenes/`
+  (`crash-site-crashed.webp`, `crash-site-repaired.webp`); their unaltered
+  masters are kept in `assets/location-scenes/`
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

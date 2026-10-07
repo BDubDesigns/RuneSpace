@@ -144,6 +144,16 @@ const itemPresentations = {
     textFallback: "WA",
     artworkSrc: "/item-art/wheel-assembly.webp",
   },
+  // The Propulsion System's mounting interface (#330).
+  [ITEM_IDS.driveMount]: {
+    displayName: "Drive Mount",
+    pluralName: "Drive Mounts",
+    accessibleDescription:
+      "Heavy steel drive mount, a welded cylindrical housing between two square bolted flanges, with a splined socket at one end and a copper-collared power connector on a short armoured lead",
+    textFallback: "DM",
+    artworkSrc: "/item-art/drive-mount.webp",
+    description: "A reinforced powered mount that secures the ship's drive to its frame.",
+  },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {
     displayName: "Uncut Quartz",

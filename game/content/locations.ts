@@ -19,7 +19,8 @@ import {
  * registry.
  *
  * - Crash Site: wreck / start location (Cargo Hold Welding after issue #89;
- *   no mining after issue #83; Landing Gear Welding after issue #322).
+ *   no mining after issue #83; Landing Gear Welding after issue #322; Propulsion
+ *   System Welding and its repaired scene variant after issue #330).
  * - Abandoned Processing Yard: Ferrite Refining (issue #81).
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  * - The Long Scramble (#83): intentionally barren traversal tile.
@@ -33,6 +34,13 @@ import {
  *   first location whose player-facing state changes durably — see its
  *   `stateVariants` and `game/domain/location-state`.
  */
+/**
+ * The Crash Site state variant that shows the repaired ship (#330). Named once so
+ * the Crash Site's conversation backdrop reads the same variant rather than
+ * restating what it requires.
+ */
+export const CRASH_SITE_SHIP_RESTORED_VARIANT_ID = "crash_site_ship_restored";
+
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
@@ -46,21 +54,49 @@ const locationDefinitions = [
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.holoHollow,
     ],
-    // Both Crash Site repairs: the Cargo Hold, and the Landing Gear (#322). Listing
-    // the Landing Gear is what lets Mission guidance walk a player elsewhere back
-    // to the one place it can be welded.
-    availableActionIds: [ACTION_IDS.cargoHoldWelding, ACTION_IDS.landingGearWelding],
+    // The Crash Site's three repairs: the Cargo Hold, the Landing Gear (#322) and the
+    // Propulsion System (#330). Listing each is what lets Mission guidance walk a
+    // player elsewhere back to the one place it can be welded.
+    availableActionIds: [
+      ACTION_IDS.cargoHoldWelding,
+      ACTION_IDS.landingGearWelding,
+      ACTION_IDS.propulsionWelding,
+    ],
+    // The ship is physically restored the moment the Propulsion System repair
+    // completes (#330), per character and from the repair's own durable
+    // completion, so another character's repair never changes this one's wreck
+    // and there is no second flag or global art swap. Cargo Hold and Landing Gear
+    // restoration change no scene: the ship is one wreck until its drive is fixed.
+    stateVariants: [
+      {
+        id: CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+        requires: { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
+        description:
+          "Your ship stands repaired on its landing gear in the mud and scrap, its propulsion restored.",
+        scene: {
+          // The approved matched pair to the crashed scene: same camera, framing
+          // and lighting, delivered at its native 1536x384 4:1 resolution.
+          asset: "/location-scenes/crash-site-repaired.webp" as const,
+          width: 1536,
+          height: 384,
+          alt: "The repaired Rivet Utility Shuttle standing on its landing gear on wet ground, hull panels patched and whole, a mesa and a spired outpost behind it",
+          focal: { x: 50, y: 50 } as const,
+        },
+      },
+    ],
     dormantActivities: [],
     presentation: {
       mapIconKey: "crash_site_deposit" as const,
       layout: "crash_site" as const,
       localMap: { axial: { q: 0, r: 1 }, label: "Crash Site" },
       scene: {
-        asset: "/location-scenes/crash-site.webp" as const,
-        width: 1920,
-        height: 480,
-        alt: "Fractured dark hull of a derelict craft resting on wet rocky ground at a sparse outpost, salvage crane nearby",
-        focal: { x: 50, y: 42 } as const,
+        // The approved heavily damaged Rivet Utility Shuttle (#330), replacing the
+        // legacy wreck; delivered at its native 1536x384 4:1 resolution.
+        asset: "/location-scenes/crash-site-crashed.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "The crashed Rivet Utility Shuttle slumped in the mud, hull panels torn open to its drive, a mesa and a spired outpost behind it",
+        focal: { x: 50, y: 50 } as const,
       },
     },
   },
@@ -225,6 +261,7 @@ const locationDefinitions = [
       ACTION_IDS.powerCellFabrication,
       ACTION_IDS.loadsteelCutterFabrication,
       ACTION_IDS.wheelAssemblyFabrication,
+      ACTION_IDS.driveMountFabrication,
       ACTION_IDS.freightHarnessFabrication,
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
@@ -233,6 +270,7 @@ const locationDefinitions = [
       ACTION_IDS.powerCellTinkering,
       ACTION_IDS.loadsteelCutterTinkering,
       ACTION_IDS.wheelAssemblyTinkering,
+      ACTION_IDS.driveMountTinkering,
       ACTION_IDS.freightHarnessTinkering,
     ],
     merchantId: MERCHANT_IDS.wadeRusk,

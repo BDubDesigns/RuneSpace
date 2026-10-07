@@ -19,7 +19,9 @@ import {
   WORK_ORDER_IDS,
   type WorkOrderId,
 } from "@/game/config/foundations";
+import { getMission } from "@/game/content/missions";
 import { REPAIR_TARGETS } from "@/game/content/repair-targets";
+import { missionSkillPrerequisiteLevel } from "@/game/domain/missions";
 import { getWorkOrder, WORK_ORDERS } from "@/game/content/work-orders";
 import {
   cleanPassFromPersisted,
@@ -1003,6 +1005,15 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
               acceptedAt: start,
             })
             .onConflictDoNothing();
+          // A Mission-authorized repair may also need the personal Welding its
+          // Mission requires (#330).
+          if (target.authorization.requiresMissionWeldingLevel) {
+            const required = missionSkillPrerequisiteLevel(
+              getMission(target.authorization.missionId)!,
+              SKILL_IDS.welding,
+            );
+            await setWeldingLevel(character.id, required!);
+          }
         } else {
           await setWeldingLevel(character.id, target.authorization.level);
           const prerequisite = target.authorization.requiresCompletedTargetId;

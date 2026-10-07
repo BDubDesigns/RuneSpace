@@ -467,6 +467,7 @@ describe("the Crew Stop as a place and as a repair target", () => {
       REPAIR_TARGET_IDS.crewStop,
       REPAIR_TARGET_IDS.deepJagCaveIn,
       REPAIR_TARGET_IDS.landingGear,
+      REPAIR_TARGET_IDS.propulsionSystem,
       REPAIR_TARGET_IDS.siteStashTheJag,
       REPAIR_TARGET_IDS.siteStashRuskRecovery,
       REPAIR_TARGET_IDS.siteStashProcessingYard,

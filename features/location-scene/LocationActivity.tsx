@@ -115,8 +115,9 @@ function primaryActivity(
     case LOCATION_IDS.crashSite:
       // The crashed ship's systems (#322): every one is visible from the start as
       // a damaged system, and a Mission only decides whether it can be repaired.
-      // They share one presentation (`ShipSystemPanel`); a future Propulsion
-      // system is one more entry here.
+      // They share one presentation (`ShipSystemPanel`); the Propulsion System
+      // (#330) is one more entry here. Restoring it offers no flight control, so
+      // nothing here appears or changes when it is finished except its status.
       return (
         <>
           <CargoHoldPanel />
@@ -124,6 +125,11 @@ function primaryActivity(
             materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
             targetId={REPAIR_TARGET_IDS.landingGear}
             weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
+          />
+          <ShipSystemPanel
+            materialsPrompt="The drive mounts and the frame reinforcement go in first. Hand over what you are carrying and bring the rest when you come back."
+            targetId={REPAIR_TARGET_IDS.propulsionSystem}
+            weldingPrompt="Mounts seated, frame braced. What is left is welding the drive back into the ship."
           />
         </>
       );

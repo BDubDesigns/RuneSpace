@@ -216,7 +216,11 @@ describe("Deep Jag's three world states", () => {
 
   it("opens no other location's state, so the boundary stays narrow", () => {
     const stateful = LOCATIONS.filter((location) => location.stateVariants.length > 0);
-    expect(stateful.map((location) => location.id)).toEqual([LOCATION_IDS.deepJag]);
+    // The Crash Site joined Deep Jag with its one repaired-ship scene (#330).
+    expect(stateful.map((location) => location.id)).toEqual([
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.deepJag,
+    ]);
   });
 });
 
@@ -465,9 +469,10 @@ describe("the new materials and who buys them", () => {
     }
   });
 
-  it("gives Galvaferrite exactly one consumer: the Deep Jag stash mount (#284)", () => {
-    // It is sellable and stockpilable; no recipe takes it as an input, and the
-    // only repair that asks for it is the Deep Jag site stash mount.
+  it("gives Galvaferrite exactly two repair consumers: the Deep Jag stash mount and the Propulsion System", () => {
+    // It is sellable and stockpilable; no Refining recipe takes it as an input.
+    // The repairs that ask for it directly are the Deep Jag site stash mount
+    // (#284) and the ship's Propulsion System (#330).
     for (const recipe of refiningRecipes(balance)) {
       expect(recipe.inputs.map((input) => input.itemId)).not.toContain(ITEM_IDS.galvaferrite);
     }
@@ -476,6 +481,9 @@ describe("the new materials and who buys them", () => {
         target.materials.some((material) => material.itemId === ITEM_IDS.galvaferrite),
       )
       .map((target) => target.targetId);
-    expect(consumers).toEqual([REPAIR_TARGET_IDS.siteStashDeepJag]);
+    expect(consumers).toEqual([
+      REPAIR_TARGET_IDS.siteStashDeepJag,
+      REPAIR_TARGET_IDS.propulsionSystem,
+    ]);
   });
 });

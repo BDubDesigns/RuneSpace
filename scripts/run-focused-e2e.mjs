@@ -75,6 +75,7 @@ export const FOCUSED_PHASES = [
   "curly-must-stash",
   "wheel-be-right-back",
   "mission-pinning",
+  "thrust-issues",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

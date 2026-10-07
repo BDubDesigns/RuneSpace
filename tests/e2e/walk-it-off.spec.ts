@@ -78,7 +78,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(dialogue.locator("[data-dialogue-speaker-role]")).toHaveText(
     "Holo Hollow recovery & salvage operator",
   );
-  await expect(dialogue.locator('img[alt*="Fractured dark hull"]')).toBeVisible();
+  await expect(dialogue.locator('img[alt*="crashed Rivet Utility Shuttle"]')).toBeVisible();
   await expect(dialogue.locator('img[alt*="Wade Rusk"]')).toBeVisible();
   await expect(dialogue.getByRole("button", { name: "Restart dialogue" })).toBeVisible();
   await dialogue.locator("[data-dialogue-text]").click();

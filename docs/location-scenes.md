@@ -54,6 +54,14 @@ Derived from the three supplied source images via repository-local optimization 
 | DeWhat? Emergency Power Annex | `img_b54f385f2859.png` (bunker capsule / cyan arcane light) | 2508×627 (2.1 MB PNG) | `power-annex.webp` | 1920×480 | ~95,352 |
 | **Total** |  |  |  |  | **~348 kB** (lossy WebP q80, ~95% saving vs 6.9 MB source PNGs) |
 
+The Crash Site's legacy scene above was replaced by Thrust Issues (#330) with the
+approved crashed **Rivet Utility Shuttle** (`crash-site-crashed.webp`, 1536×384,
+the location's base scene) and its matched repaired counterpart
+(`crash-site-repaired.webp`, the location's one state variant, shown only after
+that character's Propulsion System repair completes). Both are WebP derivatives
+of retained masters in `assets/location-scenes/`; there are no intermediate ship
+states. `game/content/locations.ts` is authoritative for the current paths.
+
 This table records the original issue #78 set. Later scenes (The Long
 Scramble, The Jag, Holo Hollow, and Holo Hollow's Local Places) are recorded in
 `game/content/locations.ts` and `game/content/local-places.ts`, which are

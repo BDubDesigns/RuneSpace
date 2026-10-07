@@ -112,7 +112,11 @@ describe.each(repairMissions)(
     if (!primary) throw new Error(`${entry.displayName} authors no repair materials`);
     const multiMaterial = secondary !== undefined;
     const somePrimary = Math.max(1, primary.quantity - 5);
-    const someSecondary = secondary ? Math.max(1, secondary.quantity - 3) : 0;
+    // Always short of the full quantity, so a one-unit second material (the
+    // Propulsion System's Galvaferrite) is still outstanding rather than covered.
+    const someSecondary = secondary
+      ? Math.min(Math.max(1, secondary.quantity - 3), secondary.quantity - 1)
+      : 0;
     /** Partial installation of this recipe's own materials. */
     const partial = {
       [primary.itemId]: somePrimary,

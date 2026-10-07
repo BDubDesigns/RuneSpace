@@ -13,6 +13,8 @@ import type { RepairTargetDefinition } from "@/game/content/repair-targets";
 export function validateRepairTargets(
   targets: readonly RepairTargetDefinition[],
   knownMissionIds: ReadonlySet<string>,
+  /** A Mission's required Welding level, when startup can look Missions up (#330). */
+  missionWeldingLevel?: (missionId: string) => number | undefined,
 ): void {
   for (const target of targets) {
     const where = `Repair target "${target.id}"`;
@@ -28,6 +30,18 @@ export function validateRepairTargets(
     if (authorization.kind === "mission") {
       if (!knownMissionIds.has(authorization.missionId)) {
         throw new Error(`${where} is authorized by unknown mission "${authorization.missionId}".`);
+      }
+      // A repair that reads its Mission's Welding level is only meaningful if
+      // that Mission actually requires one; otherwise it would silently gate on
+      // nothing.
+      if (
+        authorization.requiresMissionWeldingLevel &&
+        missionWeldingLevel &&
+        missionWeldingLevel(authorization.missionId) === undefined
+      ) {
+        throw new Error(
+          `${where} requires its Mission's Welding level, but "${authorization.missionId}" requires none.`,
+        );
       }
     } else {
       if (!Number.isInteger(authorization.level) || authorization.level < 1) {
@@ -51,4 +65,26 @@ export function validateRepairTargets(
       }
     }
   }
+}
+
+/**
+ * What a finished repair target reads as (#330): its authored `completedStatus`,
+ * or its `reportedStatus` once the Mission that authorizes it has been turned in.
+ *
+ * Both facts already exist. The repair's own completion decides that the target
+ * is in this state at all, and the Mission's completion (the caller's
+ * `deriveCompletedMissionIds`) decides which line, so the physical restoration
+ * and the story never need a flag of their own and a shared presentation never
+ * has to name a Mission.
+ */
+export function completedRepairStatus(
+  definition: Pick<RepairTargetDefinition, "authorization" | "completedStatus" | "reportedStatus">,
+  completedMissionIds: ReadonlySet<string>,
+): string {
+  const { authorization } = definition;
+  const reported =
+    definition.reportedStatus !== undefined &&
+    authorization.kind === "mission" &&
+    completedMissionIds.has(authorization.missionId);
+  return (reported ? definition.reportedStatus : definition.completedStatus) ?? "Operational.";
 }

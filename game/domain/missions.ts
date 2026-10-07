@@ -720,6 +720,19 @@ export function unmetMissionSkillPrerequisite(
 }
 
 /**
+ * The level a Mission's authored prerequisites require of one skill, or
+ * `undefined` when it names none (#330). Lets other rules, such as a repair that
+ * needs the Welding level its Mission required, read the level from the one
+ * place it is authored instead of restating it.
+ */
+export function missionSkillPrerequisiteLevel(
+  definition: MissionDefinition,
+  skillId: string,
+): number | undefined {
+  return definition.prerequisiteSkillLevels?.find((entry) => entry.skillId === skillId)?.level;
+}
+
+/**
  * Whether every authored skill-level prerequisite currently holds (#207, #209).
  *
  * Exported because projection and the authoritative acceptance command must

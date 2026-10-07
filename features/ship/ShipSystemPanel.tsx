@@ -5,6 +5,8 @@ import { usePlay } from "@/features/play/PlayContext";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { getRepairTarget } from "@/game/content/repair-targets";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { completedRepairStatus } from "@/game/domain/repair-targets";
 
 /**
  * Where a ship system is in its life (#322), read from nothing but its repair
@@ -32,7 +34,7 @@ const RESTORED_ANNOUNCEMENT_MS = 3_600;
 
 /**
  * The one presentation every major system on the crashed ship shares: the
- * Cargo Hold, the Landing Gear, and whatever the ship's engine becomes.
+ * Cargo Hold, the Landing Gear and the Propulsion System.
  *
  * Visible damaged system → repair authorized → the standard repair presentation
  * → completed system. Progression changes whether a system is actionable, never
@@ -122,7 +124,7 @@ export function ShipSystemPanel({
             className="text-sm font-semibold text-[color:var(--rs-text-secondary)]"
             data-ship-system-status="complete"
           >
-            {definition.completedStatus ?? "Operational."}
+            {completedRepairStatus(definition, deriveCompletedMissionIds(state.missions))}
           </p>
           {children?.({ justCompleted })}
         </>

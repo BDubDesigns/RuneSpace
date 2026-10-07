@@ -76,6 +76,8 @@ describe("the Tier-1 Tinkering set and its exact values", () => {
       ACTION_IDS.powerCellTinkering,
       ACTION_IDS.loadsteelCutterTinkering,
       ACTION_IDS.wheelAssemblyTinkering,
+      // Fabrication 8: the Drive Mount (#330), then the Freight Harness.
+      ACTION_IDS.driveMountTinkering,
       ACTION_IDS.freightHarnessTinkering,
     ]);
     const dismantled = tinkeringActionIds(balance).map((id) => target(id).recipe.actionId);

@@ -60,6 +60,9 @@ const itemIds = {
   // Wheel Be Right Back (#322). A Fabrication 5 stackable ship component: tradable
   // like any other stack, so a character who never fabricates can still install it.
   wheelAssembly: asContentId("wheel_assembly"),
+  // Thrust Issues (#330). A Fabrication 8 stackable ship component, tradable like
+  // any other stack: the Propulsion repair consumes it with no provenance check.
+  driveMount: asContentId("drive_mount"),
   // Mining Secondary Finds (#308): rough gemstones a successful extraction can
   // turn up alongside the source's ordinary ore.
   uncutQuartz: asContentId("uncut_quartz"),
@@ -111,6 +114,9 @@ const missionIds = {
   // Wade's landing-gear job (#322): the midpoint ship repair between the Cargo
   // Hold and the future Propulsion work. Offered manually after Brace Yourself.
   wheelBeRightBack: asContentId("wheel_be_right_back"),
+  // Wade's propulsion job (#330): the final physical repair of the ship. Offered
+  // manually after Wheel Be Right Back, at personal Welding 8.
+  thrustIssues: asContentId("thrust_issues"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -266,6 +272,15 @@ const dialogueIds = {
   wadeWheelBeRightBackTurnIn: asContentId("wade_rusk_wheel_be_right_back_turn_in"),
   wadeWheelBeRightBackCompletion: asContentId("wade_rusk_wheel_be_right_back_completion"),
   wadePostWheelBeRightBack: asContentId("wade_rusk_post_wheel_be_right_back"),
+  // Thrust Issues (#330): the offer, the reminder while the Propulsion System is
+  // unfinished, the "finish what you're doing" beat, the turn-in opening, the
+  // locked completion, and his follow-up afterwards.
+  wadeThrustIssuesOffer: asContentId("wade_rusk_thrust_issues_offer"),
+  wadeThrustIssuesRepairReminder: asContentId("wade_rusk_thrust_issues_repair_reminder"),
+  wadeThrustIssuesBusy: asContentId("wade_rusk_thrust_issues_busy"),
+  wadeThrustIssuesTurnIn: asContentId("wade_rusk_thrust_issues_turn_in"),
+  wadeThrustIssuesCompletion: asContentId("wade_rusk_thrust_issues_completion"),
+  wadePostThrustIssues: asContentId("wade_rusk_post_thrust_issues"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -346,6 +361,9 @@ const conversationBackgroundIds = {
   // welded in. The room is conversation scenery, never a navigable place.
   curlyRoomBefore: asContentId("curly_room_before"),
   curlyRoomAfter: asContentId("curly_room_after"),
+  // The Crash Site seen from a conversation once the ship's propulsion is repaired
+  // (#330): the crashed scene resolves to this one from that repair's completion.
+  crashSiteExteriorRepaired: asContentId("crash_site_exterior_repaired"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -392,6 +410,8 @@ export const ACTION_IDS = {
   curlyStashMountWelding: asContentId("curly_stash_mount_welding"),
   // Welding the ship's Landing Gear at the Crash Site (#322).
   landingGearWelding: asContentId("landing_gear_welding"),
+  // Welding the ship's Propulsion System at the Crash Site (#330).
+  propulsionWelding: asContentId("propulsion_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -414,11 +434,14 @@ export const ACTION_IDS = {
   freightHarnessFabrication: asContentId("freight_harness_fabrication"),
   // The Fabrication 5 Wheel Assembly and its ordinary Tinkering target (#322).
   wheelAssemblyFabrication: asContentId("wheel_assembly_fabrication"),
+  // The Fabrication 8 Drive Mount and its ordinary Tinkering target (#330).
+  driveMountFabrication: asContentId("drive_mount_fabrication"),
   galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
   powerCellTinkering: asContentId("power_cell_tinkering"),
   loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),
   freightHarnessTinkering: asContentId("freight_harness_tinkering"),
   wheelAssemblyTinkering: asContentId("wheel_assembly_tinkering"),
+  driveMountTinkering: asContentId("drive_mount_tinkering"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -487,6 +510,10 @@ export const REPAIR_TARGET_IDS = {
   // after the Cargo Hold. Its completion is the authoritative fact the Crash Site
   // status reads; there is no second `landing_gear_restored` flag anywhere.
   landingGear: asContentId("landing_gear"),
+  // The ship's propulsion at the Crash Site (#330). Its completion is the one
+  // authoritative physical fact that the ship is restored: the Crash Site scene
+  // and status read it, and there is no second `flight_ready` flag anywhere.
+  propulsionSystem: asContentId("propulsion_system"),
 } as const satisfies Record<string, ContentId>;
 
 /**

@@ -9,6 +9,57 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #330 — Thrust Issues and the restored ship.
+    slug: "thrust-issues",
+    title: "Thrust Issues",
+    publishedAt: "2026-10-07T10:30:00-07:00",
+    summary:
+      "Wade has the last ship repair for anyone with Welding 8: fix the drive. It brings the Drive Mount, a Propulsion System to weld at the Crash Site, and a ship that finally looks like a ship.",
+    hero: {
+      src: "/location-scenes/crash-site-repaired.webp",
+      alt: "The repaired Rivet Utility Shuttle standing on its landing gear on wet ground, hull panels patched and whole, a mesa and a spired outpost behind it",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      [
+        "Once you have finished Wheel Be Right Back and reached Welding level 8, Wade has one big problem left for you: the drive. He says it survived the crash better than it had any right to, and the mounts holding it didn't. Nobody hands you the job; you take it from him at Rusk Recovery yourself. See ",
+        { text: "Missions", articleSlug: "missions" },
+        " for the details.",
+      ],
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.driveMount }, side: "right" },
+      [
+        "The job needs 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, installed at the Crash Site and welded in sixteen passes. The Drive Mount is new: a Fabrication 8 recipe at the ",
+        { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+        " that takes 2 Galvaferrite and 1 Galvanic Wire Spool, and, like any other part, can be taken apart again by Tinkering. You never need Fabrication or Refining levels of your own to do the job. Buy the materials, trade for the Mounts or be given them. The welding is always yours, and it takes Welding level 8.",
+      ],
+      [
+        'The moment the last pass lands, the ship is repaired: the Crash Site shows it standing on its own landing gear instead of lying in the mud, and the Propulsion System panel reads "Propulsion restored. Report to Wade." Report to him and it reads "Propulsion restored. Ship flight-ready." The passes pay their usual Welding XP and Wade adds nothing on top. Your ship is your own, so it only changes when you fix it. See ',
+        { text: "Cargo Hold & Welding", articleSlug: "cargo-hold-and-welding" },
+        " for the recipe.",
+      ],
+      "The ship is physically restored, but you cannot fly it yet. There are no flight controls and nowhere to go yet. That comes later.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Thrust Issues, a job Wade offers at Rusk Recovery once Wheel Be Right Back is finished and you have Welding level 8: repair the ship's propulsion system at the Crash Site, then report to him.",
+          "The Propulsion System repair at the Crash Site: 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, then sixteen welding passes.",
+          "The Drive Mount, a Fabrication 8 recipe (2 Galvaferrite and 1 Galvanic Wire Spool, 28.8 seconds, 200 Fabrication XP) that stacks two to a slot and can be traded or Tinkered.",
+          "A repaired ship at the Crash Site once the Propulsion System is welded.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Crash Site's wreck has new art.",
+          'The Landing Gear panel now reads "Landing gear restored."; the ship\'s propulsion reports its own state.',
+        ],
+      },
+    ],
+  },
+  {
     // Issue #325 — Mission pinning and the refreshed Mission Log.
     slug: "pin-it",
     title: "Pin it",

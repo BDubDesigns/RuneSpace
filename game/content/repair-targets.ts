@@ -14,8 +14,10 @@ import {
  * What reveals a repair target's controls (#284 generalized this from the
  * original Mission-only rule).
  *
- * - `mission`: the named Mission has been ACCEPTED. A finished repair stays
- *   usable regardless of Mission state.
+ * - `mission`: the named Mission has been ACCEPTED and, when
+ *   `requiresMissionWeldingLevel` is set, the character's personal Welding level
+ *   has reached the Welding level that Mission itself requires. A finished repair
+ *   stays usable regardless of Mission state or level.
  * - `welding_level`: the character's personal Welding level has reached
  *   `level` and, when authored, `requiresCompletedTargetId` is itself
  *   complete (Deep Jag's stash mount needs the passage open first). No other
@@ -23,7 +25,19 @@ import {
  *   Refining, or Fabrication.
  */
 export type RepairAuthorization =
-  | { kind: "mission"; missionId: MissionId }
+  | {
+      kind: "mission";
+      missionId: MissionId;
+      /**
+       * The permanent work also needs the personal Welding level the authorizing
+       * Mission already requires of its offer (#330), read from that Mission's
+       * `prerequisiteSkillLevels`, so the level has exactly one home. Enforced
+       * by the one repair-access predicate, so the controls and the commands
+       * agree and no command holds a level of its own. Absent for a repair that
+       * asks no skill of the hands doing it.
+       */
+      requiresMissionWeldingLevel?: true;
+    }
   | { kind: "welding_level"; level: number; requiresCompletedTargetId?: RepairTargetId };
 
 /**
@@ -64,6 +78,14 @@ export type RepairTargetDefinition = {
    * read from the repair's own completion rather than from a second flag.
    */
   completedStatus?: string;
+  /**
+   * What the finished system reads as once its authorizing Mission has been
+   * turned in (#330), replacing `completedStatus` from then on. Lets a system
+   * say "report back" until the story has caught up with the physical repair,
+   * from the repair's completion and the Mission's own completion — never a
+   * third flag. Only meaningful for a Mission-authorized target.
+   */
+  reportedStatus?: string;
   /**
    * What a ship system reads as while it is damaged and no job has authorized
    * its repair (#322). Used by the shared ship-system panel, so a system is
@@ -118,7 +140,34 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
       [ITEM_IDS.galvanicWireSpool]: "actuation and sensor wiring",
     },
     offlineStatus: "The landing gear is damaged and cannot be repaired yet.",
-    completedStatus: "Landing gear restored. Propulsion offline.",
+    // Says only what the landing gear is. The Propulsion System reports its own
+    // state (#330), so this line never has to be corrected when that changes.
+    completedStatus: "Landing gear restored.",
+  },
+  {
+    // The ship's propulsion (#330), the capstone of the physical restoration.
+    // Its completion is the one fact that the ship is restored: the Crash Site
+    // scene (`game/content/locations`) and this status both read it, and the
+    // Mission turn-in is the separate narrative fact `reportedStatus` reads.
+    // Finishing it opens no flight control, route or fuel system.
+    id: REPAIR_TARGET_IDS.propulsionSystem,
+    displayName: "Propulsion System",
+    locationId: LOCATION_IDS.crashSite,
+    // Welding 8 is Thrust Issues' own offer gate; the repair reads it from there.
+    authorization: {
+      kind: "mission",
+      missionId: MISSION_IDS.thrustIssues,
+      requiresMissionWeldingLevel: true,
+    },
+    materialNotes: {
+      [ITEM_IDS.driveMount]: "the powered interface between the drive and the hull",
+      [ITEM_IDS.galvaferrite]: "reinforcement for the damaged frame",
+      [ITEM_IDS.mountingBracket]: "ship-side mounting hardware",
+      [ITEM_IDS.galvanicWireSpool]: "ship-side wiring",
+    },
+    offlineStatus: "The propulsion system is damaged and cannot be repaired yet.",
+    completedStatus: "Propulsion restored. Report to Wade.",
+    reportedStatus: "Propulsion restored. Ship flight-ready.",
   },
   // Site stash mounts (#284): permanent, per-character, one per authored site.
   // Same tier, same Welding gate, same recipe wherever it is built.

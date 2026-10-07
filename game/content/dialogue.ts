@@ -1964,6 +1964,83 @@ const dialogue = {
     presentsAtCurrentVenue: true,
     beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Landing gear's done. Engine isn't.")],
   },
+  // Thrust Issues (#330). Wade at his own yard again, in the same register: short
+  // declaratives, no exclamation marks, approval as a shorter sentence. The offer,
+  // the reminder and the two completion lines are the locked copy, verbatim. The
+  // busy beat, the turn-in opening and the follow-up are the only authored
+  // additions, kept to what the repair itself already says.
+  [DIALOGUE_IDS.wadeThrustIssuesOffer]: {
+    id: DIALOGUE_IDS.wadeThrustIssuesOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Hm. Landing gear's holding. Means there's one big problem left.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.concerned,
+        "Drive itself survived better than it had any right to. Mounts didn't. Both are shot. Frame around them took a hit, too. You try to put thrust through what's there now, best case it tears itself loose.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You'll need two Drive Mounts. Galvaferrite work. One more Galvaferrite for the damaged frame. Two Mounting Brackets. One Galvanic Wire Spool for the ship-side wiring. Then you weld the whole thing back together.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.scowl,
+        "Once you get that fixed, you'll finally be able to get your beater ship off my front lawn.",
+      ),
+    ],
+  },
+  // Said whenever the player comes back with the Propulsion System unfinished,
+  // whether nothing is installed, part of it is, or the weld is under way.
+  [DIALOGUE_IDS.wadeThrustIssuesRepairReminder]: {
+    id: DIALOGUE_IDS.wadeThrustIssuesRepairReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Two Drive Mounts. One Galvaferrite. Two Mounting Brackets. One Galvanic Wire Spool. Crash Site. Try not to make the hole bigger.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeThrustIssuesBusy]: {
+    id: DIALOGUE_IDS.wadeThrustIssuesBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You're in the middle of something. Finish it, then tell me about the drive.",
+      ),
+    ],
+  },
+  // REPORT REPAIR has already been chosen and the player has no response beat
+  // here, so Wade states rather than asks.
+  [DIALOGUE_IDS.wadeThrustIssuesTurnIn]: {
+    id: DIALOGUE_IDS.wadeThrustIssuesTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Mounts seated. Frame welded. Good.")],
+  },
+  // The locked completion. There is no reward beat: the work already paid its
+  // Welding XP section by section, and the Mission adds nothing.
+  [DIALOGUE_IDS.wadeThrustIssuesCompletion]: {
+    id: DIALOGUE_IDS.wadeThrustIssuesCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.scowl, "But now it's a ship."),
+    ],
+  },
+  // His ordinary follow-up wherever he stands. It restates only the locked
+  // verdict, so it promises no flight, fuel or destination.
+  [DIALOGUE_IDS.wadePostThrustIssues]: {
+    id: DIALOGUE_IDS.wadePostThrustIssues,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Still looks like hell. But it's a ship.")],
+  },
   // Return the Favor (#232) — the locked offer scene from the Fabrication
   // design. Tansy teaches the station; Wade supplies the shop's shorthand.
   [DIALOGUE_IDS.tansyReturnTheFavorOffer]: {

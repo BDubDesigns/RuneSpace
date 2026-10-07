@@ -24,12 +24,14 @@ import {
   type RepairTargetState,
 } from "@/game/domain/welding-repair";
 import { UNSTARTED_REPAIR } from "@/server/welding";
+import { SKILL_IDS } from "@/game/config/foundations";
 import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import { LOCATIONS } from "@/game/content/locations";
 import { validateLocationStateVariants } from "@/game/domain/location-state";
 import {
+  missionSkillPrerequisiteLevel,
   projectMission,
   validateMissionDefinitions,
   type MissionObservation,
@@ -65,7 +67,14 @@ validateLocalPlaceAccess(
 // Authored repair targets are validated on the same module-load boundary: a
 // target naming an unknown location, Local Place, or authorizing Mission would
 // otherwise fail inside a player transaction rather than visibly at startup.
-validateRepairTargets(REPAIR_TARGETS, new Set(MISSIONS.map((mission) => mission.id)));
+validateRepairTargets(
+  REPAIR_TARGETS,
+  new Set(MISSIONS.map((mission) => mission.id)),
+  (missionId) => {
+    const mission = MISSIONS.find((candidate) => candidate.id === missionId);
+    return mission && missionSkillPrerequisiteLevel(mission, SKILL_IDS.welding);
+  },
+);
 
 // Authored Work Orders are validated on the same boundary (#207). This is the
 // check that makes the payout rule real rather than advisory: every authored
