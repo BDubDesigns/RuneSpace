@@ -1003,6 +1003,10 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
               acceptedAt: start,
             })
             .onConflictDoNothing();
+          // A Mission-authorized repair may also need personal Welding (#330).
+          if (target.authorization.minimumWeldingLevel !== undefined) {
+            await setWeldingLevel(character.id, target.authorization.minimumWeldingLevel);
+          }
         } else {
           await setWeldingLevel(character.id, target.authorization.level);
           const prerequisite = target.authorization.requiresCompletedTargetId;

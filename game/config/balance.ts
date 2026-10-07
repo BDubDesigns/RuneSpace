@@ -380,6 +380,25 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(12),
     }),
+    /**
+     * The ship's Propulsion System at the Crash Site (#330): the Galvaferrite-tier
+     * capstone after the Cargo Hold and Landing Gear. Like the Landing Gear it
+     * consumes finished components. The two Drive Mounts embed four Galvaferrite
+     * and two Wire Spools, so a self-produced project is 5 Galvaferrite, 3 Wire
+     * Spools and 2 Mounting Brackets in total, but the repair itself consumes
+     * only what is listed here.
+     */
+    propulsion: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.propulsionSystem),
+      actionId: z.literal(ACTION_IDS.propulsionWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.driveMount), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(1) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+      ]),
+      repairIncrements: z.literal(16),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -541,6 +560,23 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(1) }),
         ]),
       }),
+      /**
+       * The Propulsion System's mounting interface (#330): a Fabrication 8
+       * Galvaferrite recipe. Its 2,900 g is exactly the two 950 g Galvaferrite and
+       * the 1,000 g Wire Spool it is made of.
+       */
+      driveMount: z.object({
+        actionId: z.literal(ACTION_IDS.driveMountFabrication),
+        outputItemId: z.literal(ITEM_IDS.driveMount),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(8),
+        durationTicks: z.literal(48),
+        baseXp: z.literal(200),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+        ]),
+      }),
       /** The Fabrication 8 capstone (#233): an advanced +6-slot container attachment. */
       freightHarness: z.object({
         actionId: z.literal(ACTION_IDS.freightHarnessFabrication),
@@ -619,6 +655,11 @@ const balanceSchema = z.object({
       wheelAssembly: z.object({
         actionId: z.literal(ACTION_IDS.wheelAssemblyTinkering),
         recipeActionId: z.literal(ACTION_IDS.wheelAssemblyFabrication),
+      }),
+      // Ordinary derived Tinkering (#330); the Drive Mount has no exception.
+      driveMount: z.object({
+        actionId: z.literal(ACTION_IDS.driveMountTinkering),
+        recipeActionId: z.literal(ACTION_IDS.driveMountFabrication),
       }),
       freightHarness: z.object({
         actionId: z.literal(ACTION_IDS.freightHarnessTinkering),
@@ -825,6 +866,16 @@ const balanceSchema = z.object({
     wheelAssembly: z.object({
       itemId: z.literal(ITEM_IDS.wheelAssembly),
       massGrams: z.literal(1_550),
+      stackLimit: z.literal(2),
+    }),
+    /**
+     * The Drive Mount (#330): 2,900 g, conserved through its authored inputs, and
+     * two to a stack so the Propulsion System's whole mount requirement is one
+     * carried stack with no Mission-specific inventory behaviour.
+     */
+    driveMount: z.object({
+      itemId: z.literal(ITEM_IDS.driveMount),
+      massGrams: z.literal(2_900),
       stackLimit: z.literal(2),
     }),
     freightHarness: z.object({
@@ -1106,6 +1157,17 @@ const defaults = balanceSchema.parse({
       ],
       repairIncrements: 12,
     },
+    propulsion: {
+      targetId: REPAIR_TARGET_IDS.propulsionSystem,
+      actionId: ACTION_IDS.propulsionWelding,
+      materials: [
+        { itemId: ITEM_IDS.driveMount, quantity: 2 },
+        { itemId: ITEM_IDS.galvaferrite, quantity: 1 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+        { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+      ],
+      repairIncrements: 16,
+    },
   },
   cargoHold: {
     capacitySlots: 32,
@@ -1209,6 +1271,18 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.mountingBracket, quantity: 1 },
         ],
       },
+      driveMount: {
+        actionId: ACTION_IDS.driveMountFabrication,
+        outputItemId: ITEM_IDS.driveMount,
+        outputQuantity: 1,
+        minimumLevel: 8,
+        durationTicks: 48,
+        baseXp: 200,
+        inputs: [
+          { itemId: ITEM_IDS.galvaferrite, quantity: 2 },
+          { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+        ],
+      },
       freightHarness: {
         actionId: ACTION_IDS.freightHarnessFabrication,
         outputItemId: ITEM_IDS.freightHarness,
@@ -1266,6 +1340,10 @@ const defaults = balanceSchema.parse({
       wheelAssembly: {
         actionId: ACTION_IDS.wheelAssemblyTinkering,
         recipeActionId: ACTION_IDS.wheelAssemblyFabrication,
+      },
+      driveMount: {
+        actionId: ACTION_IDS.driveMountTinkering,
+        recipeActionId: ACTION_IDS.driveMountFabrication,
       },
       freightHarness: {
         actionId: ACTION_IDS.freightHarnessTinkering,
@@ -1344,6 +1422,7 @@ const defaults = balanceSchema.parse({
     },
     galvanicWireSpool: { itemId: ITEM_IDS.galvanicWireSpool, massGrams: 1_000, stackLimit: 3 },
     wheelAssembly: { itemId: ITEM_IDS.wheelAssembly, massGrams: 1_550, stackLimit: 2 },
+    driveMount: { itemId: ITEM_IDS.driveMount, massGrams: 2_900, stackLimit: 2 },
     freightHarness: {
       itemId: ITEM_IDS.freightHarness,
       massGrams: 9_000,

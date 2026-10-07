@@ -38,7 +38,7 @@ const gear = balance.repairTargets.landingGear;
 // and its repair interior exists only while the job is authorized and unfinished.
 const GEAR_SYSTEM = `[data-ship-system="${REPAIR_TARGET_IDS.landingGear}"]`;
 const GEAR_PANEL = `[data-repair-work-panel="${REPAIR_TARGET_IDS.landingGear}"]`;
-const STATUS = "Landing gear restored. Propulsion offline.";
+const STATUS = "Landing gear restored.";
 
 async function weldingXp(characterId: string) {
   return (

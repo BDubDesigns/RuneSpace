@@ -27,11 +27,19 @@ export type ConversationBackgroundDefinition = {
   repaired?: { repairTargetId: RepairTargetId; backgroundId: ConversationBackgroundId };
 };
 
-const crashSiteScene = getLocation(LOCATION_IDS.crashSite)?.presentation.scene;
+const crashSiteLocation = getLocation(LOCATION_IDS.crashSite);
+const crashSiteScene = crashSiteLocation?.presentation.scene;
+// The repaired ship (#330) is the Crash Site's own state variant, so the location
+// registry stays the one place the scene is authored.
+const crashSiteRepairedScene = crashSiteLocation?.stateVariants.find(
+  (variant) => variant.requires.completedRepairTargetId === REPAIR_TARGET_IDS.propulsionSystem,
+)?.scene;
 const theJagScene = getLocation(LOCATION_IDS.theJag)?.presentation.scene;
 
-if (!crashSiteScene || !theJagScene) {
-  throw new Error("Walk It Off conversation backgrounds require Crash Site and The Jag scenes");
+if (!crashSiteScene || !crashSiteRepairedScene || !theJagScene) {
+  throw new Error(
+    "Conversation backgrounds require the Crash Site (crashed and repaired) and The Jag scenes",
+  );
 }
 
 /** People-free conversation surfaces reuse the authoritative location scenes. */
@@ -41,6 +49,18 @@ export const CONVERSATION_BACKGROUNDS = [
     locationId: LOCATION_IDS.crashSite,
     asset: crashSiteScene.asset,
     alt: crashSiteScene.alt,
+    // The same before/after rule as Curly's room: the ship in a conversation is
+    // the ship as this character has left it (#330).
+    repaired: {
+      repairTargetId: REPAIR_TARGET_IDS.propulsionSystem,
+      backgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExteriorRepaired,
+    },
+  },
+  {
+    id: CONVERSATION_BACKGROUND_IDS.crashSiteExteriorRepaired,
+    locationId: LOCATION_IDS.crashSite,
+    asset: crashSiteRepairedScene.asset,
+    alt: crashSiteRepairedScene.alt,
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.theJagExterior,

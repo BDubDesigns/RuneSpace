@@ -30,7 +30,7 @@ describe("issue #102 authored NPC and mission boundaries", () => {
 
   it("keeps conversation backgrounds independently replaceable", () => {
     expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.crashSiteExterior)?.asset).toBe(
-      "/location-scenes/crash-site.webp",
+      "/location-scenes/crash-site-crashed.webp",
     );
     expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.theJagExterior)?.asset).toBe(
       "/location-scenes/the-jag.png",

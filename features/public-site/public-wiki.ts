@@ -527,7 +527,7 @@ const authoredWikiArticles = [
     title: "Cargo Hold & Welding",
     category: "work",
     summary:
-      "Repairing the ship's Cargo Hold and Landing Gear, what the Cargo Hold gives you once it's welded shut, what else you can weld, and the stashes you can build at your work sites.",
+      "Repairing the ship's Cargo Hold, Landing Gear and Propulsion System, what the Cargo Hold gives you once it's welded shut, what else you can weld, and the stashes you can build at your work sites.",
     sections: [
       {
         paragraphs: [
@@ -583,8 +583,14 @@ const authoredWikiArticles = [
           [
             "Back at the Crash Site, the ship has a second repair after the Cargo Hold: the Landing Gear. It is part of ",
             { text: "Wheel Be Right Back", articleSlug: "missions" },
-            ', and it sits beside the Cargo Hold from the start as a damaged system. Its repair opens up once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored. Propulsion offline." The ship looks just as wrecked as before, and nothing about it lets you fly.',
+            ', and it sits beside the Cargo Hold from the start as a damaged system. Its repair opens up once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored." The ship looks just as wrecked as before, and nothing about it lets you fly.',
           ],
+          [
+            "The last major repair is the ship's Propulsion System, and it sits beside the Cargo Hold and Landing Gear from the start as another damaged system. It belongs to ",
+            { text: "Thrust Issues", articleSlug: "missions" },
+            ", and its repair opens up once you have taken that job from Wade. You need Welding level 8 to take the job and to do the work. It takes 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, then sixteen passes. You can buy or trade for any of the parts, and you don't need Fabrication or Refining levels to install them, but the welding is always yours.",
+          ],
+          'The moment the sixteenth pass lands the ship is physically restored: the Crash Site shows it repaired, and the Propulsion System panel reads "Propulsion restored. Report to Wade." Report to him and it reads "Propulsion restored. Ship flight-ready." The sixteen passes pay their usual Welding XP and Wade adds nothing on top. The ship has no flight controls yet, so there is still nowhere to fly it.',
           [
             "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",
             { text: "practice as much as you like", articleSlug: "practice-welding" },
@@ -880,6 +886,11 @@ const authoredWikiArticles = [
             "; it weighs 1.55 kg and stacks only two to a slot. You can sell, trade or hand one to somebody who never touched the station, and it works the same for them.",
           ],
           [
+            "Drive Mount (Fabrication 8) — 2 Galvaferrite and 1 Galvanic Wire Spool. 28.8 seconds, 200 Fabrication XP. A reinforced powered mount that secures the ship's drive to its frame; you need two for the ship's ",
+            { text: "Propulsion System", articleSlug: "cargo-hold-and-welding" },
+            ". It weighs 2.9 kg and stacks only two to a slot. Nobody sells one, but you can trade one, and it works the same for somebody who never touched the station.",
+          ],
+          [
             "Freight Harness (Fabrication 8) — 4 Galvaferrite and 2 Mounting Brackets. 36 seconds, 270 Fabrication XP. An advanced container that adds six ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
             " slots in either container attachment, at a hefty 9 kg.",
@@ -922,6 +933,7 @@ const authoredWikiArticles = [
           "Power Cells (Fabrication 5) — a pair at a time, never one alone: 75 Fabrication XP, 36 seconds, 1 Scrap Metal.",
           "Loadsteel Cutter (Fabrication 5) — 180 Fabrication XP, 54 seconds, 2 Scrap Metal.",
           "Wheel Assembly (Fabrication 5) — 100 Fabrication XP, 43.2 seconds, 3 Scrap Metal.",
+          "Drive Mount (Fabrication 8) — 200 Fabrication XP, 57.6 seconds, 2 Scrap Metal.",
           "Freight Harness (Fabrication 8) — 270 Fabrication XP, 72 seconds, 3 Scrap Metal.",
         ],
       },
@@ -1006,6 +1018,11 @@ const authoredWikiArticles = [
             { text: "weld the Landing Gear", articleSlug: "cargo-hold-and-welding" },
             " in twelve passes, then report to Wade. Worth 250 Welding XP on top of the passes.",
           ],
+          [
+            "Thrust Issues — once you have finished Wheel Be Right Back and reached Welding level 8, Wade offers to fix the ship's drive at Rusk Recovery. Bring 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool to the Crash Site, ",
+            { text: "weld the Propulsion System", articleSlug: "cargo-hold-and-welding" },
+            " in sixteen passes, then report to Wade. The passes are the whole reward.",
+          ],
         ],
       },
       {
@@ -1060,6 +1077,18 @@ const authoredWikiArticles = [
             ", buy them, trade for them or be given them, and the same goes for the Mounting Brackets and the Galvanic Wire Spool. You always do the welding yourself.",
           ],
           "You can install the parts across as many visits as you like, and what goes in stays in. When the twelfth pass lands the Landing Gear is done for good, and Wade has 250 Welding XP for you on top of the 600 the passes earned. It doesn't make the ship fly: the engine is still dead, and the Crash Site says so.",
+        ],
+      },
+      {
+        heading: "Thrust Issues in detail",
+        paragraphs: [
+          "Wade won't come find you for this one either, and finishing Wheel Be Right Back doesn't start it: reach Welding level 8, walk out to Rusk Recovery and take it from him when you want it. Below level 8 he has nothing to offer you for it. It asks for nothing else first — no Fabrication or Refining level, and you don't need A Cut Above.",
+          [
+            "Where the parts come from is up to you. You can make Drive Mounts at Fabrication 8 at the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            ", trade for them or be given them, and the same goes for the Galvaferrite, the Mounting Brackets and the Galvanic Wire Spool. You always do the welding yourself, and you need Welding level 8 to do it.",
+          ],
+          "You can install the parts across as many visits as you like, and what goes in stays in. When the sixteenth pass lands the ship is repaired for good and the Crash Site shows it, before you have even spoken to Wade. Reporting to him is a separate step, and it adds nothing: no extra XP, no Credits and no item. The repair is the reward. The ship is restored, but nothing lets you fly it yet.",
         ],
       },
       {
@@ -1291,7 +1320,7 @@ const authoredWikiArticles = [
         list: [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
-          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
+          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear, the Propulsion System or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
           [
             "Fabrication — each finished piece at the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
@@ -1378,6 +1407,11 @@ const authoredWikiArticles = [
             "Once you have finished Brace Yourself, he has a ship job for you too: ",
             { text: "Wheel Be Right Back", articleSlug: "missions" },
             ", rebuilding the landing gear at the Crash Site. He will not tell you where to get the parts, only what you need.",
+          ],
+          [
+            "Once you have finished that and you are a good enough welder, he has the last ship job for you: ",
+            { text: "Thrust Issues", articleSlug: "missions" },
+            ", fixing the drive. He is no more sentimental about the ship than he ever was. He would like it off his front lawn.",
           ],
           [
             "Get good enough and that changes. Once you can weld at a real level, Wade puts you on his ",

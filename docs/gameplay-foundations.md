@@ -418,6 +418,7 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Stash Mount: Deep Jag (#284) | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 750 |
 | Curly's Stash Mount: HH B&B (#292) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
 | Landing Gear (Crash Site, #322) | 2 Wheel Assemblies + 2 Mounting Brackets + 1 Galvanic Wire Spool | 12 | 600 |
+| Propulsion System (Crash Site, #330) | 2 Drive Mounts + 1 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Wire Spool | 16 | 800 |
 
 Curly's mount is The Jag's Tier-1 job, authored as its own entry, done for an
 NPC: it is authorized by accepting **Curly Must-Stash**, lives inside HH B&B,
@@ -435,13 +436,50 @@ fabricated, bought and traded parts are identical and the installing character
 needs no Fabrication or Refining level — only the Welding the work itself
 trains. It uses the global Welding cadence, the global 50 XP per section and
 the ordinary Clean Pass. Its authored `completedStatus` — "Landing gear
-restored. Propulsion offline." — is what the ship-system panel (below) reads
-when the repair is complete; completion unlocks no flight, route or fuel behaviour and
-adds no ship art or location-state variant.
+restored." — is what the ship-system panel (below) reads when the repair is
+complete; it says only what the gear is, and the Propulsion System reports its
+own state, so it never has to be corrected when that changes. Completion unlocks
+no flight, route or fuel behaviour and adds no ship art or location-state
+variant.
+
+The Propulsion System (#330) is the Crash Site's third repair and the capstone
+of the ship's physical restoration, authorized by accepting **Thrust Issues**:
+the Galvaferrite-tier step after the Ferrite-tier Cargo Hold and the
+Galvanic-tier Landing Gear. Like the Landing Gear it consumes finished
+components by item ID with no provenance, so fabricated, bought and traded Drive
+Mounts are identical and the installing character needs no Fabrication or
+Refining level. The two Drive Mounts embed 4 Galvaferrite and 2 Galvanic Wire
+Spools, so a self-produced project is 5 Galvaferrite, 3 Wire Spools and 2
+Mounting Brackets in total — but the repair consumes only the listed materials,
+never that expanded total. It uses the global Welding cadence, the global 50 XP
+per section (16 sections, 800 base Welding XP) and the ordinary Clean Pass, with
+**no** Mission completion XP, Credits or item: the repair is its own reward.
+
+It is the first Mission-authorized repair that also needs a skill of the hands
+doing it. `authorization: { kind: "mission", missionId, minimumWeldingLevel }`
+adds a personal Welding level to the Mission's acceptance, read by the one
+`loadRepairAccess` predicate — so the controls, contribution and Welding
+commands all agree, and there is no Propulsion-specific check in a command. The
+Mission's own `prerequisiteSkillLevels` (Welding 8) gates the offer, and a unit
+test pins the two to the same level so a Mission cannot be accepted and then
+never worked. A finished repair stays usable whatever the level or Mission state.
+
+The repair's completion is **the** physical fact that the ship is restored.
+Nothing duplicates it: there is no persisted `flight_ready` boolean to drift.
+The Crash Site's one state variant (`crash_site_ship_restored`, #330) requires
+that completion, and the status line reads it together with the Mission's own
+completion — `completedStatus` ("Propulsion restored. Report to Wade.") until
+Thrust Issues is turned in, then the target's `reportedStatus` ("Propulsion
+restored. Ship flight-ready."), through `completedRepairStatus`
+(`game/domain/repair-targets`). Both are per character, because both facts are.
+Restoring the ship opens **no** flight control, Launch or Board Ship action,
+destination, fuel or reserve: first flight, the next world and the fuel economy
+are separate later slices that can consume the repair completion and the
+Mission turn-in.
 
 ### Ship systems: one presentation at the Crash Site (issue #322)
 
-The Cargo Hold, the Landing Gear and whatever the ship's engine becomes are
+The Cargo Hold, the Landing Gear and the Propulsion System (#330) are
 **visible physical systems of the crashed ship**, and they share one
 presentation and state model, `features/ship/ShipSystemPanel.tsx`: *visible
 damaged system → Mission authorizes the repair → the standard repair
@@ -456,8 +494,9 @@ actionable, never whether the player can see that the ship has it.
   `RepairWorkPanel` (embedded), so every system's materials, Welding meter,
   Clean Pass, skill row and carried-material context look and behave alike.
 - **Complete**: the same panel stays, showing the target's authored
-  `completedStatus`, plus any system-specific content passed in as children —
-  the Cargo Hold's storage, unchanged.
+  `completedStatus` (or its `reportedStatus` once its Mission is turned in, via
+  `completedRepairStatus`), plus any system-specific content passed in as
+  children — the Cargo Hold's storage, unchanged.
 
 The state is read from the repair target's own projection (`repairAvailable`,
 `complete`) through `deriveShipSystemState`; there is no second flag and the
@@ -466,8 +505,23 @@ Jag brace, the Crew Stop and the stash mounts are not parts of the player's ship
 and keep the plain repair panel. Moving the Cargo Hold onto the standard repair
 presentation retired its bespoke material, Welding and Reward cards and its
 separate commit-confirmation step; the install control now names the exact
-amounts it takes, as every other repair does. A future Propulsion system is one
-more registry entry and one more panel at the Crash Site.
+amounts it takes, as every other repair does. The Propulsion System (#330) was
+exactly one more registry entry and one more panel at the Crash Site.
+
+### The Crash Site's two scenes (issue #330)
+
+The Crash Site shows the approved **Rivet Utility Shuttle** in two matched 1536 ×
+384 scenes: `public/location-scenes/crash-site-crashed.webp` (the heavily damaged
+wreck, which replaced the legacy Crash Site art) and
+`crash-site-repaired.webp`, with the unaltered masters retained under
+`assets/location-scenes/`. The crashed scene is the location's base scene and
+the whole of the ship's presentation through the Cargo Hold and Landing Gear
+repairs — there are no intermediate ship-art states. The repaired scene is the
+single state variant above, so a character who finishes the Propulsion System
+sees it the moment the last Welding section lands and another character at the
+same site still sees their own wreck. Crash Site conversation backdrops follow
+the same repair (`crashSiteExterior` resolves to `crashSiteExteriorRepaired`),
+through the existing `repaired` background rule.
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
@@ -952,6 +1006,7 @@ recipe and not a Tinkering target.
 | Power Cells | 5 | 1 Galvanic Stock → 2 Power Cells | 30 ticks / 18 s | 75 |
 | Loadsteel Cutter | 5 | 2 Galvaferrite + 1 Galvanic Wire Spool + 1 Power Cell → 1 Loadsteel Cutter (8,000 g, unique) | 45 ticks / 27 s | 180 |
 | Wheel Assembly | 5 | 3 Refined Ferrite + 1 Galvanic Stock + 1 Mounting Bracket → 1 Wheel Assembly (1,550 g, stack 2) | 36 ticks / 21.6 s | 100 |
+| Drive Mount | 8 | 2 Galvaferrite + 1 Galvanic Wire Spool → 1 Drive Mount (2,900 g, stack 2) | 48 ticks / 28.8 s | 200 |
 | Freight Harness | 8 | 4 Galvaferrite + 2 Mounting Brackets → 1 Freight Harness (9,000 g, unique) | 60 ticks / 36 s | 270 |
 
 Reaching the level is the whole gate: no Mission, NPC permission or personal
@@ -976,6 +1031,12 @@ none of those is an inventory item.
   Mounting Bracket), and a stack of two is the Landing Gear's whole wheel
   requirement. It is open at Fabrication 5 by level alone — accepting Wheel Be
   Right Back unlocks nothing — and it is a normal Tinkering target.
+- **The Drive Mount** (#330) is an ordinary tradable stack: its 2,900 g is
+  exactly its inputs (2 x 950 g Galvaferrite + a 1,000 g Wire Spool), and a
+  stack of two is the Propulsion System's whole mount requirement. It is open at
+  Fabrication 8 by level alone — accepting Thrust Issues unlocks nothing — and
+  it is a normal Tinkering target. It has no merchant stock, buyback or price:
+  buying its materials is valid, but nothing sells a Drive Mount.
 - **The Freight Harness** is an advanced container attachment: +6 Inventory
   slots in either of the two existing container slots, carried at its full
   9 kg — not a carry-capacity upgrade.
@@ -1072,8 +1133,9 @@ exception: Galvanic Wire Spool 45 XP / 28.8 s / 1 Scrap and Power Cells 75 XP /
 36 s / 1 Scrap (a complete batch of **two** Cells — one Cell alone is never
 Tinkered) and Loadsteel Cutter 180 XP / 54 s / 2 Scrap, all at Fabrication 5;
 Wheel Assembly (#322) 100 XP / 43.2 s / 3 Scrap at Fabrication 5 (five input
-units, rounded up) and Freight Harness 270 XP / 72 s / 3 Scrap at Fabrication 8.
-Neither Direct Scrap recipe is a target.
+units, rounded up), Drive Mount (#330) 200 XP / 57.6 s / 2 Scrap and Freight
+Harness 270 XP / 72 s / 3 Scrap at Fabrication 8. Neither Direct Scrap recipe is
+a target.
 
 It follows Practice Welding's cycle model: a cycle commits — destroys — its batch
 the instant it begins, so a refresh can neither duplicate nor dodge the

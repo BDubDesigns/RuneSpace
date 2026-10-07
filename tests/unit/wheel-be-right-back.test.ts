@@ -219,12 +219,16 @@ describe("the Landing Gear repair target", () => {
     expect(Object.keys(target?.materialNotes ?? {}).sort()).toEqual(
       [ITEM_IDS.wheelAssembly, ITEM_IDS.mountingBracket, ITEM_IDS.galvanicWireSpool].sort(),
     );
-    expect(target?.completedStatus).toBe("Landing gear restored. Propulsion offline.");
+    expect(target?.completedStatus).toBe("Landing gear restored.");
   });
 
-  it("introduces no new ship art, location variant, flight or route state", () => {
+  it("changes no ship art, flight or route state: only Propulsion swaps the scene (#330)", () => {
     const crashSite = getLocation(LOCATION_IDS.crashSite)!;
-    expect(crashSite.stateVariants).toEqual([]);
+    // The one Crash Site variant is the repaired ship, and it needs the Propulsion
+    // System's completion, so neither the Cargo Hold nor the Landing Gear moves it.
+    expect(crashSite.stateVariants.map((variant) => variant.requires)).toEqual([
+      { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
+    ]);
     const finished = resolveLocationState(crashSite, {
       acceptedMissionIds: new Set([MISSION_IDS.wheelBeRightBack]),
       completedRepairTargetIds: new Set([REPAIR_TARGET_IDS.landingGear]),

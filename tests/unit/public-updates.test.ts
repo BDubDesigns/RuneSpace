@@ -118,9 +118,62 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Mission pinning Update as the newest, linking the Missions page", () => {
+  it("publishes the Thrust Issues Update as the newest, linking its Wiki pages", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("thrust-issues");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("pin-it")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    // Player-facing: the job, the parts, the gate and the honest status.
+    const text = JSON.stringify(latest);
+    for (const label of [
+      "Thrust Issues",
+      "Wade",
+      "Welding level 8",
+      "Drive Mount",
+      "Fabrication 8",
+      "Propulsion restored. Report to Wade.",
+      "Propulsion restored. Ship flight-ready.",
+    ]) {
+      expect(text).toContain(label);
+    }
+    // It describes physical restoration only: no flight, destination or fuel is
+    // advertised, and the former planning name never reaches players.
+    expect(text).not.toMatch(/\bquests?\b|Coupler|Stillreach|\bfuel\b/i);
+    expect(text).toContain("cannot fly it yet");
+    // Its hero is the approved repaired scene at its canonical art home.
+    expect(latest.hero).toMatchObject({
+      src: "/location-scenes/crash-site-repaired.webp",
+      width: 1536,
+      height: 384,
+    });
+    expect(existsSync(`public${latest.hero!.src}`)).toBe(true);
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Missions", articleSlug: "missions" });
+    expect(links).toContainEqual({
+      text: "Fabrication Station",
+      articleSlug: "fabrication-and-tinkering",
+    });
+    expect(links).toContainEqual({
+      text: "Cargo Hold & Welding",
+      articleSlug: "cargo-hold-and-welding",
+    });
+    // The item figure resolves from the canonical item registry, not a path.
+    expect(latest.body).toContainEqual({
+      kind: "figure",
+      art: { kind: "item", itemId: ITEM_IDS.driveMount },
+      side: "right",
+    });
+  });
+
+  it("publishes the Mission pinning Update, linking the Missions page", () => {
+    // A newer Update has shipped since (#330), so it is found by slug.
+    const latest = getPublicUpdate("pin-it")!;
     expect(latest.slug).toBe("pin-it");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("how-to-get-it")!.publishedAt),

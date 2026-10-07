@@ -29,6 +29,13 @@ export function validateRepairTargets(
       if (!knownMissionIds.has(authorization.missionId)) {
         throw new Error(`${where} is authorized by unknown mission "${authorization.missionId}".`);
       }
+      const { minimumWeldingLevel } = authorization;
+      if (
+        minimumWeldingLevel !== undefined &&
+        (!Number.isInteger(minimumWeldingLevel) || minimumWeldingLevel < 1)
+      ) {
+        throw new Error(`${where} has an invalid Welding level gate ${minimumWeldingLevel}.`);
+      }
     } else {
       if (!Number.isInteger(authorization.level) || authorization.level < 1) {
         throw new Error(`${where} has an invalid Welding level gate ${authorization.level}.`);
@@ -51,4 +58,27 @@ export function validateRepairTargets(
       }
     }
   }
+}
+
+/**
+ * What a finished repair target reads as (#330): its authored `completedStatus`,
+ * or its `reportedStatus` once the Mission that authorizes it has been turned in.
+ *
+ * Both facts already exist. The repair's own completion decides that the target
+ * is in this state at all, and the Mission's completion decides which line, so
+ * the physical restoration and the story never need a flag of their own and a
+ * shared presentation never has to name a Mission.
+ */
+export function completedRepairStatus(
+  definition: Pick<RepairTargetDefinition, "authorization" | "completedStatus" | "reportedStatus">,
+  missions: readonly { missionId: string; state: string }[],
+): string {
+  const { authorization } = definition;
+  const reported =
+    definition.reportedStatus !== undefined &&
+    authorization.kind === "mission" &&
+    missions.some(
+      (mission) => mission.missionId === authorization.missionId && mission.state === "completed",
+    );
+  return (reported ? definition.reportedStatus : definition.completedStatus) ?? "Operational.";
 }

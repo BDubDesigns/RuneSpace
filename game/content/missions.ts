@@ -1302,6 +1302,68 @@ export const WHEEL_BE_RIGHT_BACK: MissionDefinition = {
 };
 
 /**
+ * Thrust Issues — Wade's propulsion job (#330).
+ *
+ * The final physical repair of the player's ship: Wheel Be Right Back's
+ * landing gear was the midpoint. Wade offers it by hand at Rusk Recovery once
+ * Wheel Be Right Back is complete and the player has personal Welding 8, and it
+ * is never that Mission's continuation. Welding 8 is both an offer gate here and
+ * the repair target's own `minimumWeldingLevel`, so the work cannot be forged
+ * past it. Nothing else is required: no Refining or Fabrication level, no
+ * Cargo Hold prerequisite repeated, and no component provenance, because
+ * Wheel Be Right Back's own ancestry already proves the earlier chapter and the
+ * Drive Mounts may be fabricated, bought or traded for.
+ *
+ * The requirement observes the Propulsion System repair target and nothing
+ * else. The repair is its own reward: its sixteen sections pay 800 Welding XP as
+ * they land, and the Mission adds no XP, Credits or item. Completing the repair
+ * restores the ship physically (the Crash Site scene and status read that
+ * completion); this Mission's turn-in is the separate narrative fact. Neither
+ * opens flight, a travel route or fuel, which are later slices.
+ */
+export const THRUST_ISSUES: MissionDefinition = {
+  id: MISSION_IDS.thrustIssues,
+  title: "Thrust Issues",
+  summary: "Repair the ship's propulsion system at the Crash Site, then report to Wade Rusk.",
+  prerequisiteMissionId: MISSION_IDS.wheelBeRightBack,
+  prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 8 }],
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.wadeThrustIssuesOffer,
+      actionLabel: "FIX THE DRIVE",
+      // No acceptance effect and no continuation: the parts are the player's to
+      // find, and the offer already ends on the shopping list.
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.propulsionSystem,
+      objective: "Repair the Propulsion System at the Crash Site",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Report the repaired Propulsion System to Wade Rusk at Rusk Recovery",
+    dialogueId: DIALOGUE_IDS.wadeThrustIssuesTurnIn,
+    actionLabel: "REPORT REPAIR",
+  },
+  // No reward: the repair's own Welding XP is the whole of the payout.
+  dialogue: {
+    repairReminderDialogueId: DIALOGUE_IDS.wadeThrustIssuesRepairReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeThrustIssuesBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeThrustIssuesCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostThrustIssues },
+  ],
+};
+
+/**
  * A Cut Above — Tansy's Fabrication 5 lesson at The Jag (#233).
  *
  * What it teaches is a rule, not a recipe: new recipes unlock as Fabrication
@@ -1494,6 +1556,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Wade's landing-gear job (#322): after Brace Yourself, offered by hand, with
   // no skill gate and no dependence on A Cut Above.
   WHEEL_BE_RIGHT_BACK,
+  // Wade's propulsion job (#330): after Wheel Be Right Back, offered by hand, at
+  // Welding 8, with no Refining or Fabrication gate.
+  THRUST_ISSUES,
   // Tansy's Fabrication 5 lesson (#233): after Brace Yourself, at Fabrication 5.
   A_CUT_ABOVE,
   // The optional branch sits after the main chain: it is never a prerequisite

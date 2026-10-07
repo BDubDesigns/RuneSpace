@@ -98,6 +98,39 @@ describe("item sources — Fabrication, Refining, Mining", () => {
     expect(sources.at(-1)?.kind).toBe("player_trade");
   });
 
+  it("Drive Mount resolves to its Fabrication 8 recipe and player trade, and no merchant (#330)", () => {
+    const recipe = balance.fabrication.recipes.driveMount;
+    const fabricationEight = { levels: { [SKILL_IDS.fabrication]: 8 } };
+    const [source] = of(
+      resolveItemSources(ITEM_IDS.driveMount, facts(fabricationEight)),
+      "fabricate",
+    );
+    expect(source).toEqual({
+      kind: "fabricate",
+      recipeActionId: recipe.actionId,
+      skillId: balance.fabrication.skillId,
+      minimumLevel: 8,
+      locationIds: [LOCATION_IDS.ruskRecovery],
+      inputs: recipe.inputs.map((input) => ({ ...input })),
+      outputQuantity: 1,
+      access: { state: "available" },
+    });
+    // Below Fabrication 8 it is listed, locked behind the level, never hidden.
+    const [locked] = of(
+      resolveItemSources(ITEM_IDS.driveMount, facts({ levels: { [SKILL_IDS.fabrication]: 7 } })),
+      "fabricate",
+    );
+    expect(locked?.access).toEqual({
+      state: "locked",
+      gates: [{ kind: "skill_level", skillId: balance.fabrication.skillId, level: 8 }],
+    });
+    // No retail source exists, and trading is the only other way to hold one.
+    const sources = resolveItemSources(ITEM_IDS.driveMount, facts(fabricationEight));
+    expect(of(sources, "merchant")).toEqual([]);
+    expect(of(sources, "player_trade")).toHaveLength(1);
+    expect(isItemTransferable(ITEM_IDS.driveMount)).toBe(true);
+  });
+
   it("Galvanic Stock resolves to its Refining recipe at the Processing Yard", () => {
     const sources = resolveItemSources(ITEM_IDS.galvanicStock, facts());
     const recipe = balance.refining.recipes.galvanicStock;

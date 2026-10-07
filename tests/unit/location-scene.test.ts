@@ -31,7 +31,7 @@ describe("location scene registry (issue #78)", () => {
 
   it("authoritative current location selects the correct scene (no filename guessing)", () => {
     expect(getLocation(LOCATION_IDS.crashSite)?.presentation.scene.asset).toBe(
-      "/location-scenes/crash-site.webp",
+      "/location-scenes/crash-site-crashed.webp",
     );
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.presentation.scene.asset).toBe(
       "/location-scenes/processing-yard.webp",
@@ -50,7 +50,7 @@ describe("location scene registry (issue #78)", () => {
     const destination = LOCATION_IDS.abandonedProcessingYard;
     // Correct: scene for origin is shown (truthful while traveling)
     expect(resolveLocationScene(getLocation, origin)?.asset).toBe(
-      "/location-scenes/crash-site.webp",
+      "/location-scenes/crash-site-crashed.webp",
     );
     // The helper does not conflate destination with current during transit;
     // callers must pass currentLocationId, never destination.

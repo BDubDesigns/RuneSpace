@@ -459,7 +459,7 @@ simply an unclaimed port here.
   `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
   `travel`, `walk-it-off`, `cut-your-teeth`, `refining`, `bounded-runs`,
   `rusk-recovery`, `fabrication`, `work-orders`,
-  `gameplay-access`, `account-verification`, `social-shell`, `public-chat`, `whispers-safety`, `moderation`, `player-trading`, `system-notices`, `chat-social-polish`, `desktop-workspace`, `site-stash`, `curly-must-stash`, `wheel-be-right-back`, and `mission-pinning` (the focused runner also puts the fixed loopback test
+  `gameplay-access`, `account-verification`, `social-shell`, `public-chat`, `whispers-safety`, `moderation`, `player-trading`, `system-notices`, `chat-social-polish`, `desktop-workspace`, `site-stash`, `curly-must-stash`, `wheel-be-right-back`, `mission-pinning`, and `thrust-issues` (the focused runner also puts the fixed loopback test
   operator on the admin allowlist, as the canonical runner does). To run one Travel test in
   isolation, use the same disposable lifecycle with `travel`:
 

@@ -30,14 +30,21 @@ export function deriveRepairAccess(
   return { complete, repairAvailable: complete || authorizingMissionAccepted };
 }
 
+async function weldingLevel(transaction: DatabaseTransaction, characterId: string) {
+  const thresholds = skillLevelThresholds(SKILL_IDS.welding);
+  if (!thresholds) throw new Error("Welding has no level curve.");
+  return characterSkillLevel(transaction, characterId, SKILL_IDS.welding, thresholds);
+}
+
 /**
  * Loads the authorization signal used by repair presentation and commands.
  *
- * A Mission-authorized target reads that Mission's acceptance. A Welding-level
- * target (#284) reads the character's PERSONAL Welding level through the same
- * curve the projection displays, plus the completion of any prerequisite
- * target (Deep Jag's mount needs the passage braced open). Both are read under
- * the caller's character lock.
+ * A Mission-authorized target reads that Mission's acceptance, plus the
+ * character's personal Welding level when the target authors one (#330). A
+ * Welding-level target (#284) reads the character's PERSONAL Welding level
+ * through the same curve the projection displays, plus the completion of any
+ * prerequisite target (Deep Jag's mount needs the passage braced open). Both
+ * are read under the caller's character lock.
  */
 export async function loadRepairAccess(
   transaction: DatabaseTransaction,
@@ -59,11 +66,17 @@ export async function loadRepairAccess(
         ),
       )
       .for("update");
-    return deriveRepairAccess(repair, rows[0]?.acceptedAt != null);
+    let authorized = rows[0]?.acceptedAt != null;
+    // A Mission-authorized repair may also ask for personal Welding (#330). It is
+    // read here, beside the acceptance, so the controls and every command ask
+    // the same question and no command holds a level of its own.
+    if (authorized && authorization.minimumWeldingLevel !== undefined) {
+      authorized =
+        (await weldingLevel(transaction, characterId)) >= authorization.minimumWeldingLevel;
+    }
+    return deriveRepairAccess(repair, authorized);
   }
-  const thresholds = skillLevelThresholds(SKILL_IDS.welding);
-  if (!thresholds) throw new Error("Welding has no level curve.");
-  const level = await characterSkillLevel(transaction, characterId, SKILL_IDS.welding, thresholds);
+  const level = await weldingLevel(transaction, characterId);
   let authorized = level >= authorization.level;
   if (authorized && authorization.requiresCompletedTargetId) {
     const prerequisite = await transaction

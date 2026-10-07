@@ -18,6 +18,12 @@ clients.
   below 4 cleared, trimmed to its content, scaled to a 576 px long edge, centred
   on a 640×640 transparent canvas and saved as lossless WebP. Nothing was
   regenerated, recomposed or recoloured.
+- `drive-mount.png` is the approved 1254×1254 transparent render of the Drive
+  Mount (#330), generated under the former Drive Coupler name. The committed
+  derivative `public/item-art/drive-mount.webp` follows the same convention as
+  the Wheel Assembly: alpha noise below 4 cleared, trimmed to its content, scaled
+  to a 576 px long edge, centred on a 640×640 transparent canvas and saved as
+  lossless WebP. Nothing was regenerated, recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).
