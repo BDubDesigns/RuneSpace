@@ -14,6 +14,7 @@ import {
   seedAdminOperator,
   seedNonAdminUser,
 } from "./admin-session";
+import { useDistinctClientIp } from "./account-helpers";
 import { openUtility, utilitySurface } from "./fixtures";
 
 const FIXTURE_CHARACTER = "Operator Probe GADGET";
@@ -115,6 +116,8 @@ test.describe("admin operator console", () => {
 
   async function login(page: Page) {
     const seeded = await seedAdminOperator();
+    // Sign-in is rate limited per client IP; every browser here is its own client.
+    await useDistinctClientIp(page);
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(seeded.email);
     await page.getByLabel("Password", { exact: true }).fill(seeded.password);
@@ -375,6 +378,8 @@ test.describe("admin operator console", () => {
     page,
   }) => {
     const seeded = await seedNonAdminUser();
+    // Sign-in is rate limited per client IP; every browser here is its own client.
+    await useDistinctClientIp(page);
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(seeded.email);
     await page.getByLabel("Password", { exact: true }).fill(seeded.password);
@@ -406,6 +411,8 @@ test.describe("admin operator console", () => {
     // /sign-in UI, so the browser holds a genuine, non-admin session cookie.
     const seeded = await seedNonAdminUser();
     await seedAdminOperator();
+    // Sign-in is rate limited per client IP; every browser here is its own client.
+    await useDistinctClientIp(page);
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(seeded.email);
     await page.getByLabel("Password", { exact: true }).fill(seeded.password);
