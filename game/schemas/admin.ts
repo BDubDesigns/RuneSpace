@@ -58,12 +58,18 @@ export const AdminDeleteUniqueItemRequestSchema = z.object({
   itemInstanceId: z.string().uuid(),
 });
 
+/**
+ * A stackable ADD ITEM quantity. The one definition of a valid quantity: the
+ * request boundary and the console's pre-submit check both use it.
+ */
+export const AdminStackQuantitySchema = z.number().int().positive();
+
 /** ADD ITEM — canonical item id plus stackable quantity. */
 export const AdminAddItemRequestSchema = z.object({
   characterId,
   itemId: ItemIdSchema,
-  /** For stackables only: positive integer <= the canonical stack limit. */
-  quantity: z.number().int().positive().optional(),
+  /** For stackables only: a positive whole number. Unique items send none. */
+  quantity: AdminStackQuantitySchema.optional(),
 });
 
 /** RESET ONE MISSION + authored descendants. */
@@ -77,11 +83,14 @@ export const AdminResetAllMissionsRequestSchema = z.object({
   characterId,
 });
 
+/** An absolute total XP value: the one definition shared with the console's pre-submit check. */
+export const AdminTotalXpSchema = z.number().int().nonnegative();
+
 /** SET TOTAL XP — canonical skill, absolute non-negative whole integer. */
 export const AdminSetSkillXpRequestSchema = z.object({
   characterId,
   skillId: SkillIdSchema,
-  totalXp: z.number().int().nonnegative(),
+  totalXp: AdminTotalXpSchema,
 });
 
 /**

@@ -7,6 +7,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { FormField } from "@/components/ui/FormField";
 import { Panel } from "@/components/ui/Panel";
 import { adminSearchCharacters, type AdminSearchResult } from "@/server/admin-actions";
+import { adminCharacterInspectorHref } from "./admin-routes";
 
 type Result = Extract<AdminSearchResult, { results?: unknown }>;
 
@@ -69,7 +70,7 @@ export function AdminSearch() {
               <button
                 type="button"
                 className="rs-focus w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-left text-sm transition hover:border-[color:var(--rs-accent)]"
-                onClick={() => router.push(`/admin/characters/${character.id}`)}
+                onClick={() => router.push(adminCharacterInspectorHref(character.id))}
               >
                 <span className="font-medium text-[color:var(--rs-text-primary)]">
                   {character.displayName}

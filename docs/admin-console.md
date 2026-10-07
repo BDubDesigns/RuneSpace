@@ -30,6 +30,26 @@ admin access.
   server-side Better Auth session, never from client-supplied input.
 - There is intentionally **no admin link in ordinary player bottom navigation**;
   direct `/admin` access is acceptable for v1.
+- The one permitted admin-only link on a player surface is **Edit in Admin** on
+  the player's own Character surface (#333; see "Character shortcut" below). It
+  is a convenience, never an authorization.
+
+### Character shortcut (#333)
+
+The Character surface (`features/characters/CharacterPanel.tsx`, shared by the
+phone modal and the docked desktop panel) shows a compact **Edit in Admin** link
+beside the character's identity block **if and only if** the viewer is on the
+allowlist. The Play page (`app/play/[characterId]/page.tsx`) decides this
+server-side with `isAdminUserId` from `server/admin-auth.ts` — the same
+check `requireAdmin` uses, not a second copy of the rule — and passes down only
+the resulting inspector href (`adminCharacterInspectorHref`, the single home of
+the `/admin/characters/{characterId}` route), built from the active
+character's id. Nothing about the allowlist, a role, or a browser-supplied
+value reaches the client, an ordinary player is given no href and no link, and
+because the href is recomputed for each Play route, Switch Character always
+retargets it. Hiding the link authorizes nothing: `/admin/characters/{id}`
+and every command behind it still call `requireAdmin` themselves, so an
+ordinary player who types the URL gets the safe 403 page.
 
 To enable an operator locally, put their Better Auth user id in
 `RUNESPACE_ADMIN_USER_IDS`. Never commit real production IDs to `.env.example`
@@ -125,13 +145,63 @@ entering a command is **not** an operator mutation and is never logged.
 | Carried/Cargo REMOVE 1 / REMOVE STACK | `removed_stack_quantity` | Exact identity (`stackId`) + verified `expectedQuantity`; never substitutes another stack. |
 | FORCE UNEQUIP | `force_unequipped_item` | Capacity-validated (`planEquipmentChange`); an equipped unique must be unequipped before deletion. |
 | Delete unique item | `removed_unique_item` | Exact instance deletion (carried or Cargo); equipped uniques are refused until force-unequipped. |
-| ADD ITEM | `added_stackable_item` / `added_unique_item` | Canonical item ids, capacity-preflighted, unique charge initialized canonically. v1 carries only. |
+| ADD ITEM | `added_stackable_item` / `added_unique_item` | Any canonical inventory item (see "Item catalog"). Canonical item ids, capacity-preflighted, unique charge initialized canonically. v1 carries only. |
 | Reset from here (per mission) | `reset_mission_chain` | Console control shown on each authored-mission row; clears the selected mission and its transitive prerequisite descendants (`missionChainResetScope`). |
 | RESET ALL MISSIONS | `reset_all_missions` | Clears only the selected character's mission rows. |
 | SET TOTAL XP | `set_skill_xp` | Absolute value; only skills with an approved progression curve (`skillLevelThresholds`). The picker lists exactly the skills the Character surface presents (`xpSettableSkills`, built on the shared `presentedSkills` rule: curve + canonical presentation), so a new approved skill appears without an admin edit. |
 
 Every command returns the refreshed authoritative `PlayGameplayState`, which the
 inspector swaps in place.
+
+### Item catalog (#333)
+
+ADD ITEM offers **every** item with an authoritative inventory definition —
+stackables and uniques, including advanced materials, components, gems, tools
+and containers. The list is derived, never maintained for the console: ids and
+kind (stack or unique) come from `inventoryItemDefinitions()`
+(`game/config/balance.ts`, the same definitions `getItemDefinition` resolves),
+and display names from item presentation, in `adminGrantableItems()`
+(`features/admin/admin-format.ts`). A newly authored item therefore appears
+with no admin edit, and nothing in `features/admin/` restates an item id,
+name, mass, stack limit or charge default. The picker is ordered by display
+name and has a name filter.
+
+Grant semantics are unchanged and still enforced only by the server command:
+a stackable takes a positive whole quantity (omitted means one) and respects the
+item's stack limit, carried slots and carry mass; a unique item is granted one
+instance, with no quantity (an explicit quantity is refused) and with charge
+initialized canonically (`getItemMaximumCharge`, the same rule Fabrication and
+Mission rewards use). An unknown item, an invalid quantity, or insufficient
+capacity is refused under the character lock with no partial grant and no audit
+row; the console reports the refusal. There is deliberately no capacity bypass,
+no grant-all, and no mission-completion shortcut.
+
+## Inspector organization (#333)
+
+The per-character inspector shows one section at a time, as an ARIA tab list
+(roving tab stop, arrow / Home / End navigation, touch-sized targets). The strip
+scrolls inside itself, so every tab is reachable at phone width with no
+page-level horizontal overflow. Each tab holds the state **and** the controls
+that change it:
+
+| Tab | Contents |
+| --- | --- |
+| Overview | Identity and owner, location, current action and Travel state, STOP, TELEPORT. |
+| Inventory | Carried inventory with ADD / REMOVE ITEM, Equipment with FORCE UNEQUIP, Cargo hold with its remove controls, and every unique instance. |
+| Missions | Authored-mission records and the RESET FROM HERE / RESET ALL controls. |
+| Skills | Skill XP, level and progress, and SET TOTAL XP. |
+| Account | Account access and Early Access controls (issue #223) with the account's access history. |
+| Moderation | The selected account's moderation panel (issue #248). |
+| History | The character's operator audit history. |
+
+The identity, **Refresh state**, and the latest mutation result stay above the
+tab content (the tab strip and the result remain in view while a long section
+scrolls). The authoritative snapshot lives above the tabs, so a tab switch
+never discards refreshed state; it also mutates nothing — an unsubmitted form
+or armed confirmation is simply dropped, never submitted. The Moderation tab
+loads no case or sensitive data until its own **Show moderation history**
+control is used, exactly as before, so adding a tab broadens neither moderation
+access nor the privileged-access log.
 
 ## Account and global access controls (Issue #223)
 
@@ -253,16 +323,22 @@ progress, and the recent operator history.
   `tests/unit/mission-reset-scope.test.ts`,
   `tests/unit/admin-surface.test.ts` (production surface exposes no bypass seam),
   `tests/unit/admin-destinations.test.ts` (every offered teleport destination
-  resolves canonically), `tests/unit/operator-audit-target.test.ts` (issue
+  resolves canonically), `tests/unit/admin-offered-items.test.ts` (the ADD ITEM
+  catalog is derived from the canonical item definitions and restates no id), `tests/unit/operator-audit-target.test.ts` (issue
   #223 target shapes).
 - PostgreSQL integration: `tests/integration/admin-operator.test.ts` exercises
   reconcile/interrupt/audit/command-layer rejection, Mining-tool FORCE UNEQUIP
   invalidation, Cargo stack removal reloading post-mutation state, authored-only
   mission reset, and fail-closed unsupported-action interruption, against a real
-  database. Issue #223 access controls, their atomic audit, no-op silence, and
+  database. It also grants every canonical item (#333) — each stackable and each
+  unique — and proves capacity, quantity and unique-quantity refusals leave no
+  partial grant or audit row; `tests/integration/admin-session-proof.test.ts`
+  proves a non-admin is refused ADD ITEM. Issue #223 access controls, their atomic audit, no-op silence, and
   non-admin refusal are in `tests/integration/gameplay-access.test.ts`; the
   audit migration replay is `tests/integration/gameplay-access-migration.test.ts`.
 - Browser: the admin console has an E2E spec whose deterministic admin-session
   bootstrap is gated on a proof (see the PR notes); the rest of #113 is not
-  gated on that fixture. The issue #223 controls are exercised end to end in
+  gated on that fixture. It also covers the inspector tabs (keyboard, phone and
+  desktop width, no overflow), full-catalog grants, and the Edit in Admin link
+  for an operator and its absence for an ordinary player. The issue #223 controls are exercised end to end in
   `tests/e2e/gameplay-access.spec.ts`.

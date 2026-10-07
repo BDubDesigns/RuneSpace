@@ -160,10 +160,12 @@ function NewsControl({ unread }: { unread: boolean }) {
  * rail and `PlayUtilityWorkspace` renders the phone's modal Drawers instead.
  */
 function PlayRail({
+  adminInspectorHref,
   characterId,
   characterName,
   characterPortrait,
 }: {
+  adminInspectorHref?: string;
   characterId: string;
   characterName: string;
   characterPortrait: CharacterPortraitPresentation;
@@ -174,6 +176,7 @@ function PlayRail({
     <>
       {desktop === true ? <MissionObjectivesRegion state={state} /> : null}
       <PlayUtilityWorkspace
+        adminInspectorHref={adminInspectorHref}
         characterId={characterId}
         characterName={characterName}
         characterPortrait={characterPortrait}
@@ -198,11 +201,19 @@ function PlayTopBar({ newsUnread, mapControl }: { newsUnread: boolean; mapContro
 }
 
 export function PlayScreen({
+  adminInspectorHref,
   characterName,
   characterPortrait,
   initialState,
   newsUnread,
 }: {
+  /**
+   * Set by the server only when the viewer is an operator (#333): the existing
+   * inspector for this character, shown as the Character surface's Edit in
+   * Admin link. Absent for everyone else. It is a convenience, never the
+   * authorization — the admin routes authorize independently.
+   */
+  adminInspectorHref?: string;
   characterName: string;
   /** Resolved server-side through the narrow portrait boundary (#65, #98). */
   characterPortrait: CharacterPortraitPresentation;
@@ -212,6 +223,7 @@ export function PlayScreen({
   return (
     <PlayProvider initialState={initialState}>
       <PlayWorkspace
+        adminInspectorHref={adminInspectorHref}
         characterName={characterName}
         characterPortrait={characterPortrait}
         newsUnread={newsUnread}
@@ -221,10 +233,12 @@ export function PlayScreen({
 }
 
 function PlayWorkspace({
+  adminInspectorHref,
   characterName,
   characterPortrait,
   newsUnread,
 }: {
+  adminInspectorHref?: string;
   characterName: string;
   characterPortrait: CharacterPortraitPresentation;
   newsUnread: boolean;
@@ -265,6 +279,7 @@ function PlayWorkspace({
               bottomNav={<PlayFooter />}
               desktopRail={
                 <PlayRail
+                  adminInspectorHref={adminInspectorHref}
                   characterId={characterId}
                   characterName={characterName}
                   characterPortrait={characterPortrait}

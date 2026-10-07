@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PlayScreen } from "@/features/play/PlayScreen";
+import { adminCharacterInspectorHref } from "@/features/admin/admin-routes";
+import { isAdminUserId } from "@/server/admin-auth";
 import { auth } from "@/server/auth";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 import { requireCurrentUser, requirePlayerAccount, OwnershipError } from "@/server/ownership";
@@ -33,10 +35,14 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   let portrait: CharacterPortraitPresentation = { kind: "placeholder" };
   let playState;
   let newsUnread = false;
+  let adminInspectorHref: string | undefined;
   try {
     const user = await requireCurrentUser(await headers());
     const character = await requirePlayableOwnedCharacter(user.id, characterId);
     displayName = character.displayName;
+    // Operator-only convenience (#333), decided here by the same server-only
+    // allowlist the admin routes enforce. The inspector authorizes again.
+    if (isAdminUserId(user.id)) adminInspectorHref = adminCharacterInspectorHref(character.id);
     playState = await getPlayGameplayState(user.id, characterId);
     // Account-level (issue #156): derived from the same player account for
     // every character, never from this specific character.
@@ -56,6 +62,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
 
   return (
     <PlayScreen
+      adminInspectorHref={adminInspectorHref}
       characterName={displayName}
       characterPortrait={portrait}
       initialState={playState!}

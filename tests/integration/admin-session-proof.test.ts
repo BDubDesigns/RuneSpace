@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   seedAdminOperator,
@@ -123,6 +123,35 @@ suite("admin session bootstrap + authorization-negative proof (real PostgreSQL)"
     await expect(adminCommands.stopCurrentAction(headers, character.id)).rejects.toBeInstanceOf(
       AdminError,
     );
+    // ADD ITEM covers the whole catalog (#333), so the non-admin refusal is
+    // proven for a stackable and a unique grant that the former starter list
+    // never offered: no stack, no instance, no audit.
+    await expect(
+      adminCommands.addItem(headers, character.id, "drive_mount", 1),
+    ).rejects.toBeInstanceOf(AdminError);
+    await expect(
+      adminCommands.addItem(headers, character.id, "freight_harness", undefined),
+    ).rejects.toBeInstanceOf(AdminError);
+    const granted = await db
+      .select({ id: rune.inventoryStacks.id })
+      .from(rune.inventoryStacks)
+      .where(
+        and(
+          eq(rune.inventoryStacks.characterId, character.id),
+          eq(rune.inventoryStacks.itemId, "drive_mount"),
+        ),
+      );
+    expect(granted).toHaveLength(0);
+    const harnesses = await db
+      .select({ id: rune.itemInstances.id })
+      .from(rune.itemInstances)
+      .where(
+        and(
+          eq(rune.itemInstances.characterId, character.id),
+          eq(rune.itemInstances.itemId, "freight_harness"),
+        ),
+      );
+    expect(harnesses).toHaveLength(0);
     const audit = await db
       .select()
       .from(rune.operatorAuditLogs)

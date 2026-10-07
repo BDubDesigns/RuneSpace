@@ -174,10 +174,13 @@ function UtilityTabs({
  * of this, and is untouched by any switch.
  */
 export function PlayUtilityWorkspace({
+  adminInspectorHref,
   characterId,
   characterName,
   characterPortrait,
 }: {
+  /** The operator-only Edit in Admin target, passed through to the Character surface (#333). */
+  adminInspectorHref?: string;
   characterId: string;
   characterName: string;
   characterPortrait: CharacterPortraitPresentation;
@@ -263,6 +266,7 @@ export function PlayUtilityWorkspace({
       case "character":
         return (
           <CharacterPanel
+            adminInspectorHref={adminInspectorHref}
             characterName={characterName}
             onClose={() => closeUtilityPanel("character")}
             portrait={characterPortrait}
@@ -356,6 +360,7 @@ export function PlayUtilityWorkspace({
         />
       ) : active === "character" ? (
         <CharacterPanel
+          adminInspectorHref={adminInspectorHref}
           characterName={characterName}
           docked={docked}
           onClose={() => closeUtilityPanel("character")}

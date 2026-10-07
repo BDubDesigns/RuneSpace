@@ -1727,6 +1727,20 @@ export function getItemDefinition(
   return { itemId: item.itemId, kind: "unique", massGrams: item.massGrams };
 }
 
+/**
+ * Every authored inventory item definition, in authored order. The one place a
+ * consumer that must cover the WHOLE catalog (the operator ADD ITEM picker)
+ * enumerates items, so a newly authored item appears without a second list.
+ */
+export function inventoryItemDefinitions(
+  balance = getEffectiveGameBalance(),
+): readonly ItemDefinition[] {
+  return Object.values(balance.items).flatMap((item) => {
+    const definition = getItemDefinition(item.itemId, balance);
+    return definition ? [definition] : [];
+  });
+}
+
 export function standardSkillLevelThresholds(
   balance = getEffectiveGameBalance(),
 ): readonly LevelThreshold[] {

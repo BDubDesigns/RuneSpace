@@ -39,6 +39,7 @@ import type { PlayGameplayState } from "@/server/play";
  * selection or management experience.
  */
 export function CharacterPanel({
+  adminInspectorHref,
   characterName,
   portrait,
   state,
@@ -47,6 +48,12 @@ export function CharacterPanel({
   presentation = "modal",
   docked,
 }: {
+  /**
+   * Present only for an operator viewer (#333): the existing admin inspector for
+   * this character. The server decides who gets it; the admin page authorizes
+   * the request again regardless.
+   */
+  adminInspectorHref?: string;
   characterName: string;
   portrait: CharacterPortraitPresentation;
   state: PlayGameplayState;
@@ -80,6 +87,16 @@ export function CharacterPanel({
           >
             <CreditsAmount amount={state.credits} />
           </p>
+          {adminInspectorHref ? (
+            <ActionLink
+              className="mt-2 px-3 py-1 text-xs"
+              data-character-admin-link=""
+              href={adminInspectorHref}
+              intent="secondary"
+            >
+              Edit in Admin
+            </ActionLink>
+          ) : null}
         </div>
       </div>
       <h3 className="mt-5 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">
