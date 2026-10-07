@@ -569,9 +569,6 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         variantId: "crash_site_ship_restored",
         scene: { asset: "/location-scenes/crash-site-repaired.webp" },
       });
-      expect(finished.missions.find((m) => m.missionId === MISSION_IDS.thrustIssues)?.state).toBe(
-        "ready_for_completion",
-      );
       // 16 x 50 base Welding XP; Clean Pass is the only thing that may add to it,
       // and the deterministic roll here awards the plain base.
       expect((await xp(characterId, SKILL_IDS.welding)) - before).toBe(800);

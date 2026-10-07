@@ -139,22 +139,23 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   // Everything through Wheel Be Right Back, with the Cargo Hold and Landing Gear
   // repaired: the ship is still one wreck until its drive is fixed. Fabrication
   // and Refining are left at their starting level, and Welding one short of 8.
-  await db
-    .insert(characterMissions)
-    .values(
-      [
-        MISSION_IDS.walkItOff,
-        MISSION_IDS.cutYourTeeth,
-        MISSION_IDS.wasteNot,
-        MISSION_IDS.holdItTogether,
-        MISSION_IDS.keepTheChange,
-        MISSION_IDS.tenThousandHours,
-        MISSION_IDS.returnTheFavor,
-        MISSION_IDS.breakItDown,
-        MISSION_IDS.braceYourself,
-        MISSION_IDS.wheelBeRightBack,
-      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
-    );
+  await db.insert(characterMissions).values(
+    [
+      MISSION_IDS.walkItOff,
+      MISSION_IDS.cutYourTeeth,
+      MISSION_IDS.wasteNot,
+      MISSION_IDS.holdItTogether,
+      MISSION_IDS.keepTheChange,
+      MISSION_IDS.tenThousandHours,
+      // Wade's other Welding-gated offer: left open it would keep his Talk
+      // control "available" from Welding 5 up and hide what this test checks.
+      MISSION_IDS.tenThousandOneHours,
+      MISSION_IDS.returnTheFavor,
+      MISSION_IDS.breakItDown,
+      MISSION_IDS.braceYourself,
+      MISSION_IDS.wheelBeRightBack,
+    ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+  );
   await finishRepair(characterId, REPAIR_TARGET_IDS.cargoHold);
   await finishRepair(characterId, REPAIR_TARGET_IDS.landingGear);
   await setSkillXp(characterId, SKILL_IDS.welding, xpForLevel(7));
@@ -388,7 +389,9 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await expect(scene.locator("img")).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   const cargo = page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`);
   await expect(cargo).toHaveAttribute("data-ship-system-state", "complete");
-  await expect(cargo.getByText("Cargo Hold operational.")).toBeVisible();
+  await expect(cargo.locator('[data-ship-system-status="complete"]')).toHaveText(
+    "Cargo Hold operational.",
+  );
   await expect(system.getByRole("button")).toHaveCount(0);
   await noFlight();
 
