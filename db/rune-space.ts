@@ -488,6 +488,38 @@ export const characterMissionProgress = pgTable(
   ],
 );
 
+/**
+ * Mission pinning (#325): one row per accepted Mission the player has chosen
+ * not to show in Current Missions. Absence means pinned, so a newly accepted or
+ * auto-continued Mission is pinned without its acceptance writing anything here.
+ *
+ * A presentation preference only, never Mission progression: nothing that
+ * decides requirements, guidance, dialogue, completion, or rewards reads it.
+ * The row follows its Mission record, so resetting a Mission also resets its
+ * pin.
+ */
+export const characterMissionUnpins = pgTable(
+  "character_mission_unpins",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    missionId: text("mission_id").notNull(),
+    unpinnedAt: timestamp("unpinned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.missionId],
+      name: "character_mission_unpins_pk",
+    }),
+    foreignKey({
+      columns: [table.characterId, table.missionId],
+      foreignColumns: [characterMissions.characterId, characterMissions.missionId],
+      name: "character_mission_unpins_mission_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
 /** A bounded player-facing stop status, not an attempt history. */
 export const characterMiningState = pgTable("character_mining_state", {
   characterId: text("character_id")

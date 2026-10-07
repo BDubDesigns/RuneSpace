@@ -252,7 +252,7 @@ describe("how counts read", () => {
 });
 
 function stateOf(...missions: MissionProjection[]) {
-  return { missions } as unknown as PlayGameplayState;
+  return { missions, unpinnedMissionIds: [] } as unknown as PlayGameplayState;
 }
 
 function strip(...missions: MissionProjection[]) {

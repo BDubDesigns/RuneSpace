@@ -348,6 +348,16 @@ export const CompleteMissionRequestSchema = z.object({
   npcId: ContentId,
 });
 /**
+ * Mission pinning (#325): which accepted Mission, and whether the player wants
+ * it shown in Current Missions. A presentation preference; the server checks
+ * only that the Mission is the character's and still active.
+ */
+export const MissionPinRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  missionId: ContentId,
+  pinned: z.boolean(),
+});
+/**
  * Narrow identity for the generic mandatory-conversation command. The dialogue
  * is part of the intent so the server can confirm the played scene is the one
  * the mission actually authored for that NPC; it grants nothing by itself.

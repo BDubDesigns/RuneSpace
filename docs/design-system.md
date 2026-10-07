@@ -61,8 +61,8 @@ rendered at this width — they are replaced, not shrunk.
   location art, and the rail never holds it.
 - **Rail, upper part: Current Missions.** The same authoritative
   `MissionGuidanceStrips`, mounted once, in a region that renders nothing with
-  no accepted Mission, caps its height (`min(24dvh, 12rem)`) and scrolls inside
-  itself, and offers a collapse control when there are several. It must never
+  no pinned active Mission (#325), caps its height (`min(24dvh, 12rem)`) and scrolls inside
+  itself, and offers a collapse control when there are several pinned. It must never
   push Chat's composer out of the viewport.
 - **Rail, lower part: the utility workspace.** A four-tab list with exactly the
   player-facing labels **Chat, Inventory, Character, Missions**, and one docked
@@ -462,8 +462,20 @@ are non-beveled too: each strip is a dark `--rs-surface-panel` row carrying the
 shared `.rs-mission-guidance` (work) or blue (turn-in) class directly, so its
 border, text colour, outline, and exterior glow come from the same tokens and
 are never clipped; body text stays `--rs-text-primary` for legibility. The stack
-is normal flow under the Play header, not sticky. Semantics live in
-`docs/missions.md` §10.
+is normal flow under the Play header, not sticky. Each strip's **Unpin** control
+(#325) is a borderless 44px icon button in the strip's own colour — a filled
+pin, never an X — whose target hangs into the strip's padding so it adds no
+height. Semantics live in `docs/missions.md` §10.
+
+The Mission Log's cards (#325) reuse the same two meanings quietly rather than
+the strips' outline and glow: `.rs-mission-card[data-mission-phase]` sets
+`--rs-mission-phase-color` from the guidance (green) or available (blue) token,
+which colours only a 2px left edge, the small `.rs-mission-phase-plate` text
+label (Active / Turn in, so colour is never the only signal), and the rule and
+label of the `.rs-mission-objective-block` Current Objective block. Completed
+cards set no phase and stay neutral. The header's Pin toggle is an icon
+`ActionButton` that latches in `primary`, like every toggle that belongs to no
+skill, with a constant `Pin <Mission>` name and `aria-pressed`.
 
 Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
 apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own

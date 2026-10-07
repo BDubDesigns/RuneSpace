@@ -24,7 +24,7 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|fabrication|fabrication-advanced|gameplay-access|holo-hollow|inventory-equip|location-population|mining|moderation|overlay|player-trading|public-chat|refining|rusk-recovery|signout|site-stash|social-shell|system-notices|travel|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
+  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|fabrication|fabrication-advanced|gameplay-access|holo-hollow|inventory-equip|location-population|mining|mission-pinning|moderation|overlay|player-trading|public-chat|refining|rusk-recovery|signout|site-stash|social-shell|system-notices|travel|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
 
 /**

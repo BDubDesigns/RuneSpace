@@ -945,7 +945,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "The Mission Log keeps track of every job you've accepted: what's left to do, what's ready to turn in, and what you've already finished.",
+          "The Mission Log keeps track of every job you've accepted: what's left to do, what's ready to turn in, and what you've already finished. Each active job shows whether it's Active or ready to Turn in, and opening one leads with its Current Objective before the full list of what it needs.",
         ],
       },
       {
@@ -1076,7 +1076,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, Renn offers Cutting Costs in town, and Wade offers Wheel Be Right Back at Rusk Recovery. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you accept starts pinned: it gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Tap the pin on a strip to unpin it when you don't need to see it for a while. The job stays accepted and keeps counting your progress; highlights, the Map and handing it in all work as normal. Pin it back from the Mission Log at any time. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, Renn offers Cutting Costs in town, and Wade offers Wheel Be Right Back at Rusk Recovery. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {

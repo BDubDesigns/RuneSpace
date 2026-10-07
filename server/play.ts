@@ -140,6 +140,7 @@ import {
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
 import { loadAutoDiscardSlag } from "@/server/character-preferences";
+import { loadUnpinnedMissionIds } from "@/server/mission-pins";
 import {
   createRefiningResolver,
   e2eRefiningRandom,
@@ -944,6 +945,13 @@ export type PlayGameplayState = {
    * projection carries its own copy.
    */
   autoDiscardSlag: boolean;
+  /**
+   * The Missions this character has unpinned (#325). Absence means pinned, so
+   * this lists only explicit overrides. A presentation preference that decides
+   * which active Missions Current Missions shows, and nothing else: `missions`
+   * and every guidance target are projected without it.
+   */
+  unpinnedMissionIds: readonly string[];
   /** The Work Orders terminal's authoritative visibility and state (#190). */
   workOrders: WorkOrdersProjection;
   cargoHold: CargoHoldState;
@@ -2543,6 +2551,7 @@ export async function stateFromTransaction(
     repairs,
     practice,
     autoDiscardSlag: await loadAutoDiscardSlag(transaction, characterId),
+    unpinnedMissionIds: await loadUnpinnedMissionIds(transaction, characterId),
     workOrders,
     practiceError,
     cargoHold: {

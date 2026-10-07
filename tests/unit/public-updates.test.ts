@@ -118,9 +118,30 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the item-sources Update as the newest, without hinting at undiscovered content", () => {
+  it("publishes the Mission pinning Update as the newest, linking the Missions page", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("pin-it");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("how-to-get-it")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    for (const label of ["Unpin", "Pin", "Mission Log", "Current Objective", "starts pinned"]) {
+      expect(text).toContain(label);
+    }
+    // Pinning is presentation only: the Update never implies a job is paused or dropped.
+    expect(text).not.toMatch(/\babandon|\bpaused?\b|\bquests?\b/i);
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Missions", articleSlug: "missions" });
+  });
+
+  it("publishes the item-sources Update, without hinting at undiscovered content", () => {
+    // Newer Updates have shipped since (#325), so it is found by slug.
+    const latest = getPublicUpdate("how-to-get-it")!;
     expect(latest.slug).toBe("how-to-get-it");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("wheel-be-right-back")!.publishedAt),

@@ -3,15 +3,15 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import type { PlayGameplayState } from "@/server/play";
-import { guidanceMissions, MissionGuidanceStrips } from "./MissionGuidanceStrips";
+import { MissionGuidanceStrips, pinnedGuidanceMissions } from "./MissionGuidanceStrips";
 
 /**
  * Current Missions as the desktop rail's persistent objectives region (#286).
  * The authoritative `MissionGuidanceStrips` are the only content: this adds
  * only the bounds a sidebar needs.
  *
- * - It renders nothing at all with no accepted Mission, so a character without
- *   one is not given a reserved empty box.
+ * - It renders nothing at all with no pinned active Mission (#325), so a
+ *   character without one is not given a reserved empty box.
  * - Its height is capped and scrolls inside itself, so many Missions never push
  *   the utility workspace — and Chat's composer — out of the viewport.
  * - With more than one Mission it can be collapsed to a single header row;
@@ -23,7 +23,7 @@ import { guidanceMissions, MissionGuidanceStrips } from "./MissionGuidanceStrips
  */
 export function MissionObjectivesRegion({ state }: { state: PlayGameplayState }) {
   const [collapsed, setCollapsed] = useState(false);
-  const count = guidanceMissions(state).length;
+  const count = pinnedGuidanceMissions(state).length;
   if (count === 0) return null;
   const collapsible = count > 1;
   const showStrips = !collapsible || !collapsed;

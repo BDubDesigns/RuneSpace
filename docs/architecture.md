@@ -201,9 +201,9 @@ includes the roughly 1024px laptop width (no cramped forced dock).
   name, as the phone launcher does, so a pinned trade request is never out of
   sight just because Inventory is the open utility.
 - **Objectives and Map.** `MissionObjectivesRegion` bounds the authoritative
-  `MissionGuidanceStrips` for the rail: nothing at all with no accepted
-  Mission, a height cap that scrolls inside itself, and a collapse control when
-  there are several (collapsing unmounts the strips). The Map control is a
+  `MissionGuidanceStrips` for the rail: nothing at all with no pinned active
+  Mission (#325), a height cap that scrolls inside itself, and a collapse
+  control when several are pinned (collapsing unmounts the strips). The Map control is a
   Play-only Location | Map slide switch (`PlayViewSwitch`) in the global top bar,
   left of News and Sign out, and opens the same `?surface=map` surface (there is no
   second Map), and while Map shows it is the one return control (the panel
