@@ -77,6 +77,7 @@ function setState(
   play.state = {
     characterId: "character",
     missions,
+    unpinnedMissionIds: [],
     activeAction: undefined,
     repairs: {
       [REPAIR_TARGET_IDS.cargoHold]: cargoRepair,

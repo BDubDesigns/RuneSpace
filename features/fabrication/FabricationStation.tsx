@@ -11,7 +11,7 @@ import { TinkerMode } from "@/features/fabrication/TinkerMode";
 import type { StationResultBeat } from "@/features/fabrication/station-results";
 import { useStationResultBeat } from "@/features/fabrication/use-station-results";
 import { usePlay } from "@/features/play/PlayContext";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 
 type StationMode = "fabricate" | "tinker" | "recipes";
 
@@ -37,7 +37,7 @@ export function FabricationStation() {
   const tinkering = state.tinkering;
   const tinkerBusy = tinkering.active || tinkering.cycle !== undefined;
   const [mode, setMode] = useState<StationMode>(tinkerBusy ? "tinker" : "fabricate");
-  const guidance = deriveMissionGuidanceTargets(state.missions);
+  const guidance = derivePinnedGuidanceTargets(state);
   const tinkerGuided = guidance.activities.has("tinkering");
   const beat = useStationResultBeat(state.characterId, station.run, tinkering.run);
 

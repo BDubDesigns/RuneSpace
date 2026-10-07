@@ -9,7 +9,7 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { usePlay } from "@/features/play/PlayContext";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import {
@@ -101,7 +101,7 @@ export function RepairWorkPanel({
 
   const contribution = plannedContribution(repair.materials);
   const contributionSummary = describeMaterialQuantities(contribution, repair.materials);
-  const guided = deriveMissionGuidanceTargets(state.missions).repairTargetIds.has(targetId);
+  const guided = derivePinnedGuidanceTargets(state).repairTargetIds.has(targetId);
   const attemptDurationMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
   const elapsed = activeWelding
     ? Math.max(0, now - new Date(state.activeAction!.progressStartedAt).getTime())

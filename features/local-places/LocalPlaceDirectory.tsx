@@ -15,11 +15,8 @@ import {
   type LocalPlaceSurface,
 } from "@/game/domain/local-places";
 import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
-import {
-  deriveCompletedMissionIds,
-  deriveMissionGuidanceTargets,
-  localPlaceGuidanceMeaning,
-} from "@/game/domain/missions";
+import { deriveCompletedMissionIds, localPlaceGuidanceMeaning } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { localPlaceHref } from "./navigation";
 
 /**
@@ -47,7 +44,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   // An accepted Mission whose target NPC lives inside one of these places
   // guides that place's entrance — green for remaining work, blue when that NPC
   // is the turn-in; the NPC takes over once the player is inside.
-  const guidance = deriveMissionGuidanceTargets(state.missions);
+  const guidance = derivePinnedGuidanceTargets(state);
   // A place something inside it can permanently change shows its repaired copy
   // and artwork here too, so the town listing never disagrees with the place.
   const completedRepairTargetIds = deriveCompletedRepairTargetIds(Object.values(state.repairs));

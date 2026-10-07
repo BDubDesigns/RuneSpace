@@ -27,7 +27,7 @@ import {
   BOUNDED_RUN_MAX,
   type BoundedRunSelection,
 } from "@/game/domain/bounded-run";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import {
   finishCurrentFabricationAction,
   lockInManualOverrideAction,
@@ -68,7 +68,7 @@ export function FabricateMode() {
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const active = station.workpiece;
   const isActive = Boolean(active);
-  const guidance = deriveMissionGuidanceTargets(state.missions);
+  const guidance = derivePinnedGuidanceTargets(state);
   const activeRecipe = station.recipes.find(
     (candidate) => candidate.actionId === active?.recipeActionId,
   );

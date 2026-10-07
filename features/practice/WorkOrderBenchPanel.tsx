@@ -11,7 +11,7 @@ import { SkillProgressRow } from "@/features/shared/activity-context";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import {
   startWorkOrderWeldingAction,
   stopWorkOrderWeldingAction,
@@ -45,9 +45,7 @@ export function WorkOrderBenchPanel({ active }: { active: ActiveWorkOrderProject
     return () => window.clearInterval(clock);
   }, [welding]);
 
-  const guided = deriveMissionGuidanceTargets(state.missions).actionIds.has(
-    ACTION_IDS.workOrderWelding,
-  );
+  const guided = derivePinnedGuidanceTargets(state).actionIds.has(ACTION_IDS.workOrderWelding);
   const started = active.sectionsCompleted > 0;
 
   function applyResult(result: WorkOrderActionResult) {

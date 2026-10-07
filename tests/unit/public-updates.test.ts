@@ -118,10 +118,19 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Thrust Issues Update as the newest, linking its Wiki pages", () => {
+  it("publishes the Pins Quiet the Highlights Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("thrust-issues");
+    expect(latest.slug).toBe("pins-quiet-the-highlights");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("thrust-issues")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(JSON.stringify(latest)).toContain("Pin it again from the Mission Log");
+  });
+
+  it("publishes the Thrust Issues Update, linking its Wiki pages", () => {
+    const latest = getPublicUpdate("thrust-issues")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("pin-it")!.publishedAt),
     );

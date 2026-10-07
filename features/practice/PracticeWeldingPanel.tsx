@@ -17,7 +17,7 @@ import {
 } from "@/game/domain/bounded-run";
 import { getEffectiveGameBalance, practiceSectionXp } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import {
@@ -118,9 +118,7 @@ export function PracticeWeldingPanel() {
   // The bench is scenery until the Mission that opens it is accepted.
   if (!practice.unlocked) return null;
 
-  const guided = deriveMissionGuidanceTargets(state.missions).actionIds.has(
-    ACTION_IDS.practiceWelding,
-  );
+  const guided = derivePinnedGuidanceTargets(state).actionIds.has(ACTION_IDS.practiceWelding);
   const canStartFresh = practice.scrapAvailable >= practice.scrapPerWeld;
   const resumable = practice.cycleActive;
 
