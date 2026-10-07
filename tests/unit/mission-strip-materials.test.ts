@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { ITEM_IDS, LOCATION_IDS, REPAIR_TARGET_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { itemQuantityLabel } from "@/game/content/item-presentation";
-import { BRACE_YOURSELF, WHEEL_BE_RIGHT_BACK } from "@/game/content/missions";
+import { BRACE_YOURSELF, OUT_OF_THE_WEATHER, WHEEL_BE_RIGHT_BACK } from "@/game/content/missions";
 import {
   deriveMissionGuidanceTargets,
   projectMission,
@@ -33,6 +33,7 @@ vi.mock("@/features/play/PlayContext", () => ({
 const balance = getEffectiveGameBalance();
 const gear = getRepairTargetBalance(REPAIR_TARGET_IDS.landingGear, balance);
 const caveIn = getRepairTargetBalance(REPAIR_TARGET_IDS.deepJagCaveIn, balance);
+const crewStop = getRepairTargetBalance(REPAIR_TARGET_IDS.crewStop, balance);
 const accepted = { acceptedAt: new Date("2026-10-06T00:00:00.000Z") };
 
 const NAMES = new Map<string, string>([
@@ -94,6 +95,20 @@ function braceMission(options: { installed?: Quantities; carried?: Quantities } 
     LOCATION_IDS.theJag,
     true,
     observe(REPAIR_TARGET_IDS.deepJagCaveIn, caveIn, options),
+    true,
+  );
+}
+
+/** Out of the Weather: the Crew Stop repair, whose recipe is one material (#326). */
+function crewStopMission(
+  options: { installed?: Quantities; carried?: Quantities; welded?: number } = {},
+) {
+  return projectMission(
+    OUT_OF_THE_WEATHER as MissionDefinition,
+    accepted,
+    LOCATION_IDS.holoHollow,
+    true,
+    observe(REPAIR_TARGET_IDS.crewStop, crewStop, options),
     true,
   );
 }
@@ -202,10 +217,23 @@ describe("which materials are still needed", () => {
         label: "Wheel Assembly",
         current: 0,
         target: 2,
+        satisfied: false,
         carried: 2,
       },
-      { itemId: ITEM_IDS.mountingBracket, label: "Mounting Bracket", current: 0, target: 2 },
-      { itemId: ITEM_IDS.galvanicWireSpool, label: "Galvanic Wire Spool", current: 0, target: 1 },
+      {
+        itemId: ITEM_IDS.mountingBracket,
+        label: "Mounting Bracket",
+        current: 0,
+        target: 2,
+        satisfied: false,
+      },
+      {
+        itemId: ITEM_IDS.galvanicWireSpool,
+        label: "Galvanic Wire Spool",
+        current: 0,
+        target: 1,
+        satisfied: false,
+      },
     ]);
     expect(carrying.currentObjective).toBe("Install repair materials at the Landing Gear");
   });
@@ -345,5 +373,134 @@ describe("repair-target map guidance is unchanged by the strip line", () => {
       carried: { [ITEM_IDS.wheelAssembly]: 3 },
     });
     expect([...deriveMissionGuidanceTargets([surplus]).repairTargetIds]).toEqual([]);
+  });
+});
+
+describe("the Mission Log offers item sources without touching the Mission (#326)", () => {
+  const log = (projection: MissionProjection) =>
+    renderToStaticMarkup(
+      React.createElement(MissionLogPanel, {
+        state: stateOf(projection),
+        onClose: () => undefined,
+        presentation: "docked",
+        triggerRef: { current: null },
+      }),
+    );
+  const triggers = (markup: string) =>
+    [...markup.matchAll(/data-item-sources-trigger="([^"]+)"/g)].map((match) => match[1]);
+
+  it("puts a named Sources control on every unmet material row", () => {
+    const markup = log(wheelMission());
+    expect(triggers(markup).sort()).toEqual(
+      [ITEM_IDS.wheelAssembly, ITEM_IDS.mountingBracket, ITEM_IDS.galvanicWireSpool].sort(),
+    );
+    expect(markup).toContain('aria-label="How to get Wheel Assembly"');
+    expect(markup).toContain('aria-label="How to get Galvanic Wire Spool"');
+  });
+
+  it("offers none for a material that is fully installed", () => {
+    const markup = log(wheelMission({ installed: { [ITEM_IDS.mountingBracket]: 2 } }));
+    expect(triggers(markup)).not.toContain(ITEM_IDS.mountingBracket);
+    expect(triggers(markup)).toContain(ITEM_IDS.wheelAssembly);
+  });
+
+  it("keeps the compact Current Missions strip free of source detail", () => {
+    expect(strip(wheelMission())).not.toContain("data-item-sources");
+  });
+
+  it("leaves the projection and its guidance exactly as authored", () => {
+    const projection = wheelMission({ carried: { [ITEM_IDS.wheelAssembly]: 1 } });
+    const before = structuredClone(projection);
+    const guidanceBefore = [...deriveMissionGuidanceTargets([projection]).repairTargetIds];
+    log(projection);
+    expect(projection).toEqual(before);
+    expect([...deriveMissionGuidanceTargets([projection]).repairTargetIds]).toEqual(guidanceBefore);
+  });
+});
+
+describe("a single-material repair offers Sources like every other unmet item (#326)", () => {
+  const [material] = crewStop.materials;
+  const log = (projection: MissionProjection) =>
+    renderToStaticMarkup(
+      React.createElement(MissionLogPanel, {
+        state: stateOf(projection),
+        onClose: () => undefined,
+        presentation: "docked",
+        triggerRef: { current: null },
+      }),
+    );
+  const triggers = (markup: string) =>
+    [...markup.matchAll(/data-item-sources-trigger="([^"]+)"/g)].map((match) => match[1]);
+  const requirementOf = (projection: MissionProjection) =>
+    projection.requirements!.find((entry) => entry.repairTargetId === REPAIR_TARGET_IDS.crewStop)!;
+
+  it("is a genuine single-material recipe", () => {
+    expect(crewStop.materials).toHaveLength(1);
+  });
+
+  it("projects the repair's own material and shows one named Sources control", () => {
+    const projection = crewStopMission({ installed: { [material!.itemId]: 5 } });
+    expect(requirementOf(projection).itemId).toBe(material!.itemId);
+    const markup = log(projection);
+    expect(triggers(markup)).toEqual([material!.itemId]);
+    expect(markup).toContain('aria-label="How to get Refined Ferrite"');
+  });
+
+  it("drops the control once the material is installed, with no state of its own", () => {
+    const projection = crewStopMission({ installed: { [material!.itemId]: material!.quantity } });
+    expect(requirementOf(projection).itemId).toBeUndefined();
+    expect(triggers(log(projection))).toEqual([]);
+    // Welding and complete repairs offer none either.
+    expect(
+      triggers(
+        log(crewStopMission({ installed: { [material!.itemId]: material!.quantity }, welded: 3 })),
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves the objective, progress and carried detail exactly as they were", () => {
+    const projection = crewStopMission({
+      installed: { [material!.itemId]: 5 },
+      carried: { [material!.itemId]: 7 },
+    });
+    const requirement = requirementOf(projection);
+    expect(requirement.progress).toEqual({ current: 5, target: material!.quantity });
+    expect(requirement.detail).toBe("Carrying: 7 Refined Ferrite");
+    expect(requirement.objective).toBe(
+      `Install Refined Ferrite at the Crew Stop — 5 / ${material!.quantity}`,
+    );
+    expect(requirement.materials).toBeUndefined();
+    // The log still renders the same objective and detail text, plus the control.
+    const markup = log(projection);
+    expect(markup).toContain(
+      `Install Refined Ferrite at the Crew Stop — 5 / ${material!.quantity}`,
+    );
+    expect(markup).toContain("Carrying: 7 Refined Ferrite");
+  });
+
+  it("keeps the compact strip and guidance unchanged", () => {
+    const projection = crewStopMission({
+      installed: { [material!.itemId]: 5 },
+      carried: { [material!.itemId]: 7 },
+    });
+    const markup = strip(projection);
+    expect(markup).not.toContain("data-item-sources");
+    // One material states itself on the objective: no shopping-list line.
+    expect(markup).not.toContain("data-mission-strip-needed");
+    expect(stillNeededMaterials(projection)).toEqual([]);
+    // Carrying something useful still points at the repair, exactly as before.
+    expect([...deriveMissionGuidanceTargets([projection]).repairTargetIds]).toEqual([
+      REPAIR_TARGET_IDS.crewStop,
+    ]);
+  });
+
+  it("leaves a multi-material repair's rows and controls as they were", () => {
+    const projection = wheelMission();
+    const requirement = projection.requirements!.find((entry) => entry.materials)!;
+    expect(requirement.itemId).toBeUndefined();
+    expect(requirement.materials).toHaveLength(3);
+    expect(triggers(log(projection)).sort()).toEqual(
+      [ITEM_IDS.wheelAssembly, ITEM_IDS.mountingBracket, ITEM_IDS.galvanicWireSpool].sort(),
+    );
   });
 });

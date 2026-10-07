@@ -7,6 +7,7 @@ import {
 } from "@/game/domain/equipment";
 import type { StackState } from "@/game/domain/inventory";
 import {
+  isItemTransferable,
   isValidCreditOffer,
   isValidStackQuantity,
   otherTradeSide,
@@ -128,6 +129,7 @@ function settleableOffer(
   }
   const offeredStacks = new Map<string, number>();
   for (const line of offer.stacks) {
+    if (!isItemTransferable(line.itemId, balance)) return undefined;
     if (getItemDefinition(line.itemId, balance)?.kind !== "stack") return undefined;
     if (!isValidStackQuantity(line.quantity)) return undefined;
     offeredStacks.set(line.itemId, (offeredStacks.get(line.itemId) ?? 0) + line.quantity);
@@ -140,6 +142,7 @@ function settleableOffer(
   for (const id of new Set(offer.itemInstanceIds)) {
     const instance = side.instances.find((candidate) => candidate.id === id);
     if (!instance || equipped.has(id) || side.cargoInstanceIds.has(id)) return undefined;
+    if (!isItemTransferable(instance.itemId, balance)) return undefined;
     if (getItemDefinition(instance.itemId, balance)?.kind !== "unique") return undefined;
     items.push({ itemInstanceId: id, itemId: instance.itemId });
   }

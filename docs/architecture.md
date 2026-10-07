@@ -744,6 +744,51 @@ control asks a #266/#267 server action, and the browser renders only what
   server; a same-account profile shows Trade without Whisper, Report, or
   Block.
 
+## Item sources (Issue #326)
+
+"How can I get this item?" is answered by one projection, `resolveItemSources`
+in `game/domain/item-sources.ts`, keyed by item ID. It is a **projection, not a
+registry**: it holds no recipe, price, location or chance of its own and joins
+the content that already owns each way of getting an item.
+
+| Source | Derived from |
+| --- | --- |
+| Fabricate / Refine | `fabricationRecipes()` / `refiningRecipes()` in `game/config/balance.ts` |
+| Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds` |
+| Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source) |
+| Daily claim | `POWER_ANNEX_CLAIM` in `game/domain/power-annex.ts`, which `server/power-annex.ts` also reads |
+| Scavenge | `SCAVENGE_OUTCOMES` (qualitative only: no odds are exposed) |
+| Player trade | `isItemTransferable` in `game/domain/player-trade.ts` |
+
+- **Location** is never authored on a recipe: an action's host comes from
+  `locationsOfferingAction` (`game/domain/location-state.ts`) over the
+  character's already-resolved `locationStates`, joined by action ID. Refining
+  is hosted by its console action, so every recipe takes that location.
+- **Discovery versus capability.** A source the character has not been shown
+  (the Fabrication Station before its Mission is accepted, a merchant before
+  theirs, a mine that exists only in a location's opened state) is **omitted**,
+  never hinted at. A source they know of but cannot use (a recipe above their
+  skill level) is **listed locked** with its concrete gate. Order: usable, then
+  the occasional walking find, then locked, then player trade.
+- **Transferability** is the one item-level rule, `isItemTransferable`: whether
+  this item type may take part in a player trade in principle. The offer
+  commands, the settlement planner, the trade surface's offerable lists and the
+  reference all ask it; where a copy of the item is (equipped, Cargo Hold,
+  stash, carried) stays a separate per-character check.
+- **Not acquisition sources:** Mission and dialogue rewards, admin grants, a
+  failed Refining attempt's byproducts, Practice Welding's Slag, Tinkering's
+  recovered Scrap and Work Order payouts. The module imports none of them, and a
+  unit test pins that.
+- **Where it runs.** Pure and client-importable: `features/item-sources/`
+  derives the character's facts from the Play projection already on screen
+  (`itemSourceFactsFromState`) and presents them through `ItemSourcesDetails`,
+  `ItemSourcesDrawer` and the compact `ItemSourcesButton`. There is no route,
+  persistence or per-item payload. Recipe ingredients drill down through the same
+  surface, and an item already on the drill-down path is not offered again.
+- **Entry point.** The Mission Log (`docs/missions.md`, "Item sources in the
+  Mission Log"). Inventory details, recipe rows and Wiki links can reuse
+  `ItemSourcesButton` later. The public Wiki keeps its hand-written tables.
+
 ## Where minigames fit
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.

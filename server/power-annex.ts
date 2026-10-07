@@ -7,10 +7,10 @@ import {
   inventoryStacks,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS } from "@/game/config/foundations";
 import {
+  POWER_ANNEX_CLAIM,
   POWER_ANNEX_REWARD_SOURCE_ID,
-  POWER_CELL_DAILY_ALLOTMENT,
   pacificResetDate,
 } from "@/game/domain/power-annex";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
@@ -99,7 +99,7 @@ export async function claimPowerCells(
       };
     }
 
-    if (character.currentLocationId !== LOCATION_IDS.emergencyPowerAnnex) {
+    if (character.currentLocationId !== POWER_ANNEX_CLAIM.locationId) {
       return {
         state: await stateForClaim(transaction, character.id, now),
         claim: {
@@ -127,7 +127,7 @@ export async function claimPowerCells(
         claim: {
           status: "already_claimed",
           resetDate,
-          quantity: POWER_CELL_DAILY_ALLOTMENT,
+          quantity: POWER_ANNEX_CLAIM.quantity,
         },
       };
     }
@@ -153,8 +153,8 @@ export async function claimPowerCells(
     });
     const plan = planExactStackAddition(
       stacks,
-      ITEM_IDS.powerCell,
-      POWER_CELL_DAILY_ALLOTMENT,
+      POWER_ANNEX_CLAIM.itemId,
+      POWER_ANNEX_CLAIM.quantity,
       balance.items.powerCell.stackLimit,
       Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
       Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
@@ -196,7 +196,7 @@ export async function claimPowerCells(
         claim: {
           status: "already_claimed",
           resetDate,
-          quantity: POWER_CELL_DAILY_ALLOTMENT,
+          quantity: POWER_ANNEX_CLAIM.quantity,
         },
       };
     }
@@ -205,7 +205,7 @@ export async function claimPowerCells(
 
     return {
       state: await stateForClaim(transaction, character.id, now),
-      claim: { status: "claimed", resetDate, quantity: POWER_CELL_DAILY_ALLOTMENT },
+      claim: { status: "claimed", resetDate, quantity: POWER_ANNEX_CLAIM.quantity },
     };
   });
 }

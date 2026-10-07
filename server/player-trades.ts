@@ -30,6 +30,7 @@ import {
   effectiveTradeRequestStatus,
   effectiveTradeSessionStatus,
   hasTradeConsent,
+  isItemTransferable,
   isRepeatedTradeRequester,
   isValidCreditOffer,
   isValidStackQuantity,
@@ -1088,7 +1089,7 @@ export async function addTradeOfferStack(
   return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
     const frozen = refuseUnlessComposing(context);
     if (frozen) return frozen;
-    if (getItemDefinition(itemId)?.kind !== "stack") {
+    if (!isItemTransferable(itemId) || getItemDefinition(itemId)?.kind !== "stack") {
       return refused("invalid_offer", OFFER_COPY.stackItem);
     }
     if (!isValidStackQuantity(quantity)) {
@@ -1218,6 +1219,7 @@ export async function addTradeOfferItem(
       equipped ||
       stored ||
       stashed ||
+      !isItemTransferable(instance.itemId) ||
       getItemDefinition(instance.itemId)?.kind !== "unique"
     ) {
       return refused("invalid_offer", OFFER_COPY.uniqueItem);

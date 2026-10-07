@@ -485,8 +485,14 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     expect(requirementOf(stored)?.objective).toBe("Install repair materials at the Cargo Hold");
     expect(requirementOf(stored)?.progress).toBeUndefined();
     expect(requirementOf(stored)?.materials).toEqual([
-      { itemId: ITEM_IDS.refinedFerrite, label: "Refined Ferrite", current: 8, target: 15 },
-      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6 },
+      {
+        itemId: ITEM_IDS.refinedFerrite,
+        label: "Refined Ferrite",
+        current: 8,
+        target: 15,
+        satisfied: false,
+      },
+      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6, satisfied: false },
     ]);
     // Nothing useful in hand: the framework invents no destination.
     expect(

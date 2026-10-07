@@ -535,8 +535,14 @@ describe("issue #124 semantic mission guidance projection", () => {
     expect(materialPhase.currentObjective).toBe("Install repair materials at the Cargo Hold");
     expect(materialPhase.requirements?.[0]?.progress).toBeUndefined();
     expect(materialPhase.requirements?.[0]?.materials).toEqual([
-      { itemId: ITEM_IDS.refinedFerrite, label: "Refined Ferrite", current: 8, target: 15 },
-      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6 },
+      {
+        itemId: ITEM_IDS.refinedFerrite,
+        label: "Refined Ferrite",
+        current: 8,
+        target: 15,
+        satisfied: false,
+      },
+      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6, satisfied: false },
     ]);
 
     // Materials in, welding outstanding: the objective becomes the welding.

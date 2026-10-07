@@ -13,6 +13,34 @@
  * acceptance).
  */
 
+import {
+  getEffectiveGameBalance,
+  getItemDefinition,
+  type EffectiveGameBalance,
+} from "@/game/config/balance";
+
+/**
+ * Whether this item TYPE may take part in a player trade at all (#326): the one
+ * durable, item-level eligibility rule.
+ *
+ * It answers "can this kind of item be traded in principle", never "can this
+ * character offer it right now". Where a particular copy is — equipped, in the
+ * Cargo Hold, installed at a site stash — and whether it is carried stay with
+ * the offer and settlement checks, because they are facts about one character's
+ * current state. Both those enforcement points and the item-source reference's
+ * "Player trade" entry ask this predicate, so a future bound, restricted or
+ * Mission-only item is excluded from both by changing only this rule.
+ *
+ * Today every item with an authoritative inventory definition is transferable;
+ * an item with no definition is not an item at all.
+ */
+export function isItemTransferable(
+  itemId: string,
+  balance: EffectiveGameBalance = getEffectiveGameBalance(),
+): boolean {
+  return getItemDefinition(itemId, balance) !== undefined;
+}
+
 /** Every tunable number in the request/session contract lives here. */
 export const PLAYER_TRADE_POLICY = {
   /** An untouched pending request expires after 20 seconds. */

@@ -600,6 +600,24 @@ It is ordinary document flow (never sticky or fixed) and scrolls away normally.
   The pre-existing Open Equipment shortcut stays inside the strip whose Mission
   currently targets equipment.
 
+### Item sources in the Mission Log (Issue #326)
+
+A Mission says what it needs; the item says how it can be obtained. Where the
+Mission Log shows an unmet item (a carried-stack requirement, or a repair
+recipe's unfinished material row) it adds a **Sources** control that opens the
+shared item-source details (`features/item-sources/`). It reads the `itemId` the
+requirement projection already carries, so **nothing is authored on a
+Mission**: no recipe hint, price, location or tradeability. Opening the details
+is a read-only reference; it never changes Mission state, guidance, progress or
+the strips, and the compact Current Missions strips carry no source detail.
+
+Because a Mission never picks a production route, neither do the sources: all
+discoverable methods are listed. The resolver and its rules are owned by
+`docs/architecture.md` ("Item sources"). A repair with several materials names each on its own row; one with a single
+material projects that material's `itemId` on the requirement while it is still
+being installed, and both get the same control. Once the material is installed
+the projection stops naming it, so the control disappears with it.
+
 ## 11. Explorer-first behavior
 
 **Walk It Off can simultaneously advertise both Wade (Crash Site) and Tansy (The Jag) as available mission interactions.**

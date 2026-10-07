@@ -152,12 +152,17 @@ describe.each(repairMissions)(
             label: itemName(material.itemId),
             current: partial[material.itemId] ?? 0,
             target: material.quantity,
+            satisfied: (partial[material.itemId] ?? 0) >= material.quantity,
             carried: 40,
           })),
         );
         expect(requirement?.objective).toBe(`Install repair materials at the ${entry.displayName}`);
+        // Each material is named on its own row; the requirement names none.
+        expect(requirement?.itemId).toBeUndefined();
       } else {
         expect(requirement?.materials).toBeUndefined();
+        // The one material is the repair's own item, so a surface can name it (#326).
+        expect(requirement?.itemId).toBe(primary.itemId);
         expect(requirement?.progress).toEqual({
           current: somePrimary,
           target: primary.quantity,
@@ -220,6 +225,8 @@ describe.each(repairMissions)(
       expect(requirement?.progress).toEqual({ current: 3, target: entry.recipe.repairIncrements });
       expect(requirement?.materials).toBeUndefined();
       expect(requirement?.detail).toBeUndefined();
+      // Every material is installed: nothing is left to obtain, so none is named.
+      expect(requirement?.itemId).toBeUndefined();
       // Carrying nothing no longer matters: there is one place the work happens.
       expect(projection.guidance).toMatchObject({ repairTargetId: entry.targetId });
     });

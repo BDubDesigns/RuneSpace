@@ -213,7 +213,12 @@ export type MissionRequirementStatus = {
    * requirements; both values are clamped to the authored target.
    */
   progress?: { current: number; target: number };
-  /** The item this requirement observes, when it observes one. */
+  /**
+   * The item this requirement observes, when it observes one: an item
+   * requirement's item, or a repair's single material while that material is
+   * still being installed. A repair with several materials names each on its
+   * `materials` row instead.
+   */
   itemId?: string;
   /** The location this requirement observes, when it observes one. */
   locationId?: string;
@@ -247,6 +252,8 @@ export type MissionRequirementStatus = {
     label: string;
     current: number;
     target: number;
+    /** Installed material already covers the requirement (the repair's own rule). */
+    satisfied: boolean;
     carried?: number;
   }[];
 };
@@ -862,6 +869,9 @@ function projectRequirement(
       ...(phase === "materials" && materials.length === 1 && only
         ? {
             progress: { current: only.contributed, target: only.required },
+            // The one material is still the repair's own item; present only
+            // while it is still being installed, exactly like its progress.
+            itemId: only.itemId,
             ...(carriedOf(only.itemId) > 0
               ? { detail: `Carrying: ${carriedOf(only.itemId)} ${nameOf(only.itemId)}` }
               : {}),
@@ -874,6 +884,7 @@ function projectRequirement(
               label: nameOf(material.itemId),
               current: material.contributed,
               target: material.required,
+              satisfied: material.contributed >= material.required,
               ...(carriedOf(material.itemId) > 0 && material.contributed < material.required
                 ? { carried: carriedOf(material.itemId) }
                 : {}),
