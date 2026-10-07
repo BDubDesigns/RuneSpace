@@ -2,11 +2,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { MissionProjection } from "@/game/domain/missions";
-import {
-  isMissionPinned,
-  MissionGuidanceStrips,
-  pinnedGuidanceMissions,
-} from "@/features/missions/MissionGuidanceStrips";
+import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
+import { isMissionPinned, pinnedGuidanceMissions } from "@/features/missions/mission-pins";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionObjectivesRegion } from "@/features/missions/MissionObjectivesRegion";
 import type { PlayGameplayState } from "@/server/play";

@@ -2,15 +2,17 @@
 
 import { Pin } from "lucide-react";
 import { useRef } from "react";
-import type { MissionProjection } from "@/game/domain/missions";
 import { Feedback } from "@/components/ui/Feedback";
 import { itemQuantityLabel } from "@/game/content/item-presentation";
-import { missionGuidancePhase, stillNeededMaterials } from "@/game/domain/missions";
+import {
+  MISSION_STANDING_LABELS,
+  missionGuidancePhase,
+  stillNeededMaterials,
+} from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
 import { usePlay } from "@/features/play/PlayContext";
+import { pinnedGuidanceMissions } from "./mission-pins";
 import { useMissionPin } from "./useMissionPin";
-
-type AcceptedMission = MissionProjection & { state: "active" | "ready_for_completion" };
 
 /**
  * The compact Mission guidance stack at the top of every Play surface: one
@@ -29,26 +31,6 @@ type AcceptedMission = MissionProjection & { state: "active" | "ready_for_comple
  * Unpinning changes nothing else about the Mission; the Mission Log pins it
  * back.
  */
-export function guidanceMissions(state: PlayGameplayState): AcceptedMission[] {
-  return state.missions.filter(
-    (mission): mission is AcceptedMission =>
-      mission.state === "active" || mission.state === "ready_for_completion",
-  );
-}
-
-/**
- * Whether the player has this Mission pinned (#325). Absence of an unpin is
- * pinned, so every newly accepted or auto-continued Mission starts pinned.
- */
-export function isMissionPinned(state: PlayGameplayState, missionId: string): boolean {
-  return !state.unpinnedMissionIds.includes(missionId);
-}
-
-/** The active Missions Current Missions shows: accepted, not completed, pinned. */
-export function pinnedGuidanceMissions(state: PlayGameplayState): AcceptedMission[] {
-  return guidanceMissions(state).filter((mission) => isMissionPinned(state, mission.missionId));
-}
-
 export function MissionGuidanceStrips({
   state,
   className,
@@ -111,7 +93,7 @@ export function MissionGuidanceStrips({
                     {mission.title}
                   </span>
                   <span className="text-[10px] tracking-[0.14em]" data-mission-strip-phase>
-                    {phase === "turn_in" ? "Turn in" : "Active"}
+                    {MISSION_STANDING_LABELS[phase]}
                   </span>
                 </p>
                 <p

@@ -20,6 +20,8 @@ import type { PlayGameplayState } from "@/server/play";
 vi.mock("@/features/play/PlayContext", () => ({
   usePlay: () => ({ openInventory: () => undefined }),
 }));
+// The strips and the Log carry the pin command (#325); none runs here.
+vi.mock("@/server/actions", () => ({}));
 
 /**
  * The compact Mission strip's "Still needed" line (#322).

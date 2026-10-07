@@ -3,7 +3,8 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import type { PlayGameplayState } from "@/server/play";
-import { MissionGuidanceStrips, pinnedGuidanceMissions } from "./MissionGuidanceStrips";
+import { MissionGuidanceStrips } from "./MissionGuidanceStrips";
+import { pinnedGuidanceMissions } from "./mission-pins";
 
 /**
  * Current Missions as the desktop rail's persistent objectives region (#286).

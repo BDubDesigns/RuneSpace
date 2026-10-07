@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import resolveConfig from "tailwindcss/resolveConfig";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import tailwindConfig from "@/tailwind.config";
 import { GameShell } from "@/components/ui/GameShell";
 import { UtilitySurface } from "@/components/ui/UtilitySurface";
@@ -29,6 +29,10 @@ import {
   type PlayUtilityId,
 } from "@/features/play/utility-workspace";
 import type { PlayGameplayState } from "@/server/play";
+
+// The objectives region's strips carry the Unpin command (#325); no server
+// action runs in these markup tests.
+vi.mock("@/server/actions", () => ({}));
 
 /**
  * Issue #286 — the desktop Play workspace's pure rules and the structural

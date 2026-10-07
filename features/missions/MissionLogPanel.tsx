@@ -12,9 +12,13 @@ import { XpAmount } from "@/components/ui/XpAmount";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemSourcesButton } from "@/features/item-sources/ItemSourcesButton";
-import { missionGuidancePhase, type MissionProjection } from "@/game/domain/missions";
+import {
+  MISSION_STANDING_LABELS,
+  missionGuidancePhase,
+  type MissionProjection,
+} from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
-import { isMissionPinned } from "./MissionGuidanceStrips";
+import { guidanceMissions, isMissionPinned } from "./mission-pins";
 import { useMissionPin } from "./useMissionPin";
 
 function formatCompletedDate(completedAt: Date | null | undefined): string | undefined {
@@ -84,7 +88,6 @@ function MissionEntry({
   state: PlayGameplayState;
 }) {
   const completed = mission.state === "completed";
-  const ready = mission.state === "ready_for_completion";
   // The same phase the strips colour by: green work, blue turn-in.
   const phase = completed ? undefined : missionGuidancePhase(mission);
   const completedDate = completed ? formatCompletedDate(mission.completedAt) : undefined;
@@ -118,7 +121,7 @@ function MissionEntry({
                 className="rs-mission-phase-plate px-1.5 py-px font-display text-[10px] font-bold uppercase leading-4 tracking-[0.14em]"
                 data-mission-log-phase
               >
-                {completed ? "Completed" : phase === "turn_in" ? "Turn in" : "Active"}
+                {MISSION_STANDING_LABELS[phase ?? "completed"]}
               </span>
               {completedDate ? (
                 <span className="text-xs text-[color:var(--rs-text-muted)]">{completedDate}</span>
@@ -158,7 +161,7 @@ function MissionEntry({
               <CardLabel className="rs-mission-objective-block__label">Current objective</CardLabel>
               <p
                 className="mt-0.5 text-sm font-semibold leading-snug text-[color:var(--rs-text-primary)]"
-                data-mission-log-next={ready ? "turn-in" : "objective"}
+                data-mission-log-next={phase === "turn_in" ? "turn-in" : "objective"}
               >
                 {mission.currentObjective}
               </p>
@@ -286,9 +289,9 @@ export function MissionLogPanel({
   presentation?: UtilityPresentation;
   docked?: DockedUtilityRegion;
 }) {
-  const active = state.missions.filter(
-    (mission) => mission.state === "active" || mission.state === "ready_for_completion",
-  );
+  // The same active list Current Missions filters by pin, so the Missions
+  // offered a Pin toggle are exactly the ones a strip can show.
+  const active = guidanceMissions(state);
   const completed = state.missions.filter((mission) => mission.state === "completed");
   const [expandedId, setExpandedId] = useState<string | undefined>(
     focusedMissionId ??
