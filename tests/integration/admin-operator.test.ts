@@ -823,6 +823,9 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       (candidate) => candidate.kind === "unique",
     )) {
       const { character } = await makeCharacter();
+      // The first command provisions the character's starter state; a refused
+      // grant is measured against that, not against the bare fixture.
+      await adminCommands.addItemAsAdmin(ADMIN, character.id, "not_an_item", undefined);
       const before = await db
         .select({ id: rune.itemInstances.id })
         .from(rune.itemInstances)

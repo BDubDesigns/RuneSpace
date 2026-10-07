@@ -437,16 +437,16 @@ export function AdminInventoryTab({
             {state.uniqueInstances.map((instance) => (
               <li
                 key={instance.instanceId}
-                className="flex items-center justify-between gap-2"
+                className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1"
                 data-testid="admin-unique-instance"
               >
-                <span className="text-[color:var(--rs-text-primary)]">
+                <span className="min-w-0 text-[color:var(--rs-text-primary)]">
                   {itemLabel(instance.itemId)}
                   <span className="block break-all font-mono text-[10px] text-[color:var(--rs-text-muted)]">
                     {instance.itemId} · instance {instance.instanceId}
                   </span>
                 </span>
-                <span className="text-right text-[color:var(--rs-text-muted)]">
+                <span className="min-w-0 break-all text-right text-[color:var(--rs-text-muted)]">
                   {instance.location}
                   {instance.currentCharge !== undefined
                     ? ` · charge ${instance.currentCharge}`

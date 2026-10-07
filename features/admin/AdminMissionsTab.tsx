@@ -24,7 +24,7 @@ function MissionRecords({ missions }: { missions: readonly AdminMissionDetail[] 
         >
           <div className="flex flex-wrap items-center gap-x-2">
             <span className="font-medium">{mission.title}</span>
-            <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+            <span className="min-w-0 break-all text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
               {mission.missionId}
             </span>
             <span
@@ -39,7 +39,7 @@ function MissionRecords({ missions }: { missions: readonly AdminMissionDetail[] 
               {mission.stale ? "stale" : mission.status}
             </span>
           </div>
-          <div className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
+          <div className="mt-1 break-words text-xs text-[color:var(--rs-text-muted)]">
             {mission.prerequisiteMissionId ? `Requires ${mission.prerequisiteMissionId} · ` : ""}
             {mission.status === "not_accepted"
               ? "not accepted"
