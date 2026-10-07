@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #325 — Mission pinning and the refreshed Mission Log.
+    slug: "pin-it",
+    title: "Pin it",
+    publishedAt: "2026-10-06T20:45:00-07:00",
+    summary:
+      "You can now unpin a job from the strips at the top of the screen and pin it back from the Mission Log. The Mission Log itself has been tidied up so what to do next stands out.",
+    body: [
+      [
+        "Some jobs wait a long time before you can do anything about them, and until now every one you had accepted kept its strip at the top of the screen. Now each strip has a pin. Tap it and that strip goes away. The job does not: it stays accepted in the Mission Log and keeps counting everything you do toward it. See ",
+        { text: "Missions", articleSlug: "missions" },
+        " for how jobs work.",
+      ],
+      "Unpinning only changes what the strips show. People still light up when they have something for you, the Map still marks where to go, a finished job still turns blue, and handing it in works exactly as before. Pin it again from the Mission Log whenever you like and its strip comes straight back with your current progress. Every job you take on starts pinned, including the ones that follow straight on from the last.",
+      "The Mission Log has had a tidy-up too. Each job says plainly whether it is Active or ready to Turn in, the pin sits in its header so you never need to open a job to change it, and an open job leads with its Current Objective before the full list of what it needs. Finished jobs stay in their own section, closed until you want them.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "An Unpin button on every Current Missions strip, which hides that strip without affecting the job.",
+          "A Pin button on every active job in the Mission Log, to pin or unpin it from there.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Every newly accepted job starts pinned.",
+          "Mission Log jobs show Active or Turn in at a glance and lead with their Current Objective, with the full list of requirements under Progress.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #326 — item sources in the Mission Log.
     slug: "how-to-get-it",
     title: "How to get it",

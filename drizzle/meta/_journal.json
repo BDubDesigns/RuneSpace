@@ -302,6 +302,13 @@
       "when": 1791216401343,
       "tag": "0042_travel_turn_back_scavenge_suppression",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791344707572,
+      "tag": "0043_mission_unpins",
+      "breakpoints": true
     }
   ]
 }

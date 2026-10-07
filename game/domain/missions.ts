@@ -1004,6 +1004,18 @@ export function missionGuidancePhase(
   return projection.stage?.requirementsSatisfied ? "turn_in" : "work";
 }
 
+/**
+ * The player-facing word for where a Mission stands, shared by every surface
+ * that names it in text — the Current Missions strips, the Mission Log, and
+ * the conversation hub's Mission entries — so colour is never the only signal
+ * and no two surfaces word it differently.
+ */
+export const MISSION_STANDING_LABELS: Record<MissionGuidancePhase | "completed", string> = {
+  work: "Active",
+  turn_in: "Turn in",
+  completed: "Completed",
+};
+
 /** One repair material the player still has to obtain. */
 export type StillNeededMaterial = { itemId: string; label: string; remaining: number };
 

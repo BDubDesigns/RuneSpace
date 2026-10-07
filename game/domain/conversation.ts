@@ -15,6 +15,7 @@ import {
 import { getNpc } from "@/game/content/npcs";
 import {
   lifecycleDialogueId,
+  MISSION_STANDING_LABELS,
   missionOmitsMoment,
   reminderMomentFor,
   type MissionState,
@@ -135,9 +136,9 @@ export type NpcConversationEntry =
 
 const ROLE_LABELS: Record<MissionConversationRole, string> = {
   offer: "Available",
-  active: "Active",
-  turn_in: "Turn in",
-  completed: "Completed",
+  active: MISSION_STANDING_LABELS.work,
+  turn_in: MISSION_STANDING_LABELS.turn_in,
+  completed: MISSION_STANDING_LABELS.completed,
 };
 
 /**

@@ -347,6 +347,39 @@ body {
     drop-shadow(0 0 12px var(--rs-mission-guidance-glow));
 }
 
+/*
+ * Mission Log cards (#325). An active card names its phase with the strips'
+ * own meanings — green work, blue turn-in — but quietly: an edge accent, a
+ * small text plate, and the Current Objective block's rule, never the strips'
+ * outline and glow. The Log is a record to read, not a stack of live targets.
+ * The plate's text always carries the phase, so colour is never the only
+ * signal. A completed card has no phase and stays neutral.
+ */
+.rs-mission-card[data-mission-phase="work"] {
+  --rs-mission-phase-color: var(--rs-mission-guidance-color);
+}
+
+.rs-mission-card[data-mission-phase="turn_in"] {
+  --rs-mission-phase-color: var(--rs-mission-available-color);
+}
+
+.rs-mission-card[data-mission-phase] {
+  border-left-color: var(--rs-mission-phase-color);
+}
+
+.rs-mission-phase-plate {
+  border: 1px solid currentColor;
+  color: var(--rs-mission-phase-color, var(--rs-text-muted));
+}
+
+.rs-mission-objective-block {
+  border-left: 2px solid var(--rs-mission-phase-color, var(--rs-border-structural));
+}
+
+.rs-mission-objective-block__label {
+  color: var(--rs-mission-phase-color, var(--rs-text-muted));
+}
+
 /* Hybrid plated-signage: mounted industrial placards (shared).
    Smoked dark navy/charcoal, partially transparent so art breathes through,
    chamfered corners via var(--rs-bevel-small), double border (outer + inner

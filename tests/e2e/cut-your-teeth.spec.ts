@@ -231,8 +231,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(page.locator("[data-mission-strip-also]")).toHaveCount(0);
 
-  // The detailed Mission Log retains all authored requirements and omits the
-  // current objective when it is already represented by the checklist.
+  // The detailed Mission Log retains all authored requirements under Progress,
+  // and leads with the Current Objective even when the checklist repeats it
+  // (#325).
   await page.getByRole("button", { name: "Missions" }).click();
   const progressLog = page.getByRole("dialog", { name: "Mission Log" });
   const progressCut = progressLog.locator('[data-mission-log-entry="cut_your_teeth"]');
@@ -240,7 +241,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(progressCut.locator("[data-mission-log-requirements]")).toContainText(
     "Complete 5 Mining attempts — 5 / 5",
   );
-  await expect(progressCut.locator("[data-mission-log-next]")).toHaveCount(0);
+  await expect(progressCut.locator("[data-mission-log-next]")).toHaveText(
+    "Get a full stack of Ferrite Shale — 3 / 10",
+  );
   await page.keyboard.press("Escape");
 
   // Restore the full stack: every requirement holds and guidance moves to the
@@ -353,7 +356,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   const wasteProgressLog = page.getByRole("dialog", { name: "Mission Log" });
   const wasteProgress = wasteProgressLog.locator('[data-mission-log-entry="waste_not"]');
   await expect(wasteProgress.locator("[data-mission-log-requirements] li")).toHaveCount(1);
-  await expect(wasteProgress.locator("[data-mission-log-next]")).toHaveCount(0);
+  await expect(wasteProgress.locator("[data-mission-log-next]")).toHaveText(
+    "Complete 5 Refining attempts at the Abandoned Processing Yard — 0 / 5",
+  );
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Missions" }).click();
   const log = page.getByRole("dialog", { name: "Mission Log" });

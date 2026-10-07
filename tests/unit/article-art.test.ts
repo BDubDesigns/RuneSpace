@@ -126,10 +126,11 @@ describe("canonical article art", () => {
         },
       }),
     );
-    // The index lists every Update; the homepage shows only the newest (#326).
+    // The index lists every Update; the homepage shows only the newest (#325).
     expect(index).toContain("Wheel Be Right Back");
+    expect(index).toContain("How to get it");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("How to get it");
+      expect(markup).toContain("Pin it");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("uncut-topaz.webp");
       // Newer Updates open with an item figure of their own (#322, #326); like

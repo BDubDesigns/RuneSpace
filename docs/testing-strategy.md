@@ -79,7 +79,8 @@ small number of critical mobile player journeys.
   the desktop Play workspace and its viewport matrix (`desktop-workspace`, #286), and
   character-owned site stashes (`site-stash`, #284), and Curly's paid HH B&B
   commission (`curly-must-stash`, #292), and Wade's landing-gear job
-  (`wheel-be-right-back`, #322). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`wheel-be-right-back`, #322), and Mission pinning with the Mission Log
+  (`mission-pinning`, #325). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

@@ -26,6 +26,7 @@ The framework deliberately does not attempt to support every future mission shap
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission`, `acknowledgeMissionConversation` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction` / `acknowledgeMissionConversationAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` / `AcknowledgeMissionConversationRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue` | Sequences are pure presentation content (no `action`). |
 | NPC conversation resolution | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation`; authored topics in `game/content/conversation-topics.ts` | The one canonical conversation model (§9); see `docs/npc-conversations.md`. |
+| Mission pinning (presentation preference, #325) | `db/rune-space.ts` — `characterMissionUnpins`; `server/mission-pins.ts` — `loadUnpinnedMissionIds`; `server/mission-pin-commands.ts` — `setMissionPinned`; `server/actions.ts` — `setMissionPinnedAction`; `game/schemas/gameplay.ts` — `MissionPinRequestSchema`; `features/missions/mission-pins.ts` — `guidanceMissions`, `isMissionPinned`, `pinnedGuidanceMissions` | Absence means pinned; only an explicit unpin is stored, keyed by character and Mission and cascading with the Mission record. Surfaced as `state.unpinnedMissionIds`. Never read by projection, guidance, dialogue, completion, or rewards. See §10, "Mission pinning". |
 | Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`, `CargoHoldPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
@@ -622,10 +623,11 @@ first content under the Play header, by `features/missions/MissionGuidanceStrips
 from `PlayConsole` — so it leads Location, Local Place, Journey, and Map alike.
 It is ordinary document flow (never sticky or fixed) and scrolls away normally.
 
-- One strip per accepted, non-completed Mission (`active` /
-  `ready_for_completion`) in the authoritative Mission order; unaccepted,
-  available, and completed Missions never appear, and an empty stack renders
-  nothing. There is no selected, tracked, or primary Mission.
+- One strip per accepted, non-completed, **pinned** Mission (`active` /
+  `ready_for_completion`, #325) in the authoritative Mission order;
+  unaccepted, available, completed, and unpinned Missions never appear, and an
+  empty stack renders nothing — no placeholder objective. There is no selected,
+  tracked, or primary Mission.
 - Each strip's colour is its semantic phase, `missionGuidancePhase(projection)`
   (`game/domain/missions.ts`): `work` (green, `.rs-mission-guidance`) while an
   authored requirement remains, `turn_in` (blue, the shared blue treatment)
@@ -656,8 +658,65 @@ It is ordinary document flow (never sticky or fixed) and scrolls away normally.
   `data-mission-phase="work" | "turn_in"` and never `data-mission-guidance`,
   which stays reserved for the controls and places a player acts on.
 - Strips are informational: no click-to-track/select/open-Log, no collapse.
-  The pre-existing Open Equipment shortcut stays inside the strip whose Mission
-  currently targets equipment.
+  Each carries exactly two possible controls: the pre-existing Open Equipment
+  shortcut, inside the strip whose Mission currently targets equipment, and an
+  **Unpin** control (#325, below).
+
+### Mission pinning (Issue #325)
+
+Pinning answers one question — *"show this Mission's current objective in
+Current Missions?"* — and nothing else. It is a per-character presentation
+preference, never Mission progression.
+
+- **Every newly accepted Mission starts pinned**, including one accepted
+  automatically through `continuationMissionId`. Acceptance never asks.
+- **Absence means pinned.** `character_mission_unpins` stores only an explicit
+  unpin, one row per character and Mission, so acceptance (manual or
+  continuation) writes nothing and needs no coupling to the preference. The row
+  cascades with its `character_missions` record, so an admin Mission reset also
+  resets the pin. A row may outlive the work (a Mission completed while
+  unpinned keeps it); it is harmless, because only active Missions are ever
+  asked about.
+- **One write path.** `setMissionPinned` (`setMissionPinnedAction`) pins by
+  deleting the row and unpins by inserting it; both are idempotent. It refuses
+  an unknown, unaccepted, or completed Mission and touches nothing but the
+  preference. Due work resolves first, as for every command.
+- **One value, two surfaces.** `state.unpinnedMissionIds` is read through
+  `isMissionPinned` / `pinnedGuidanceMissions` by both Current Missions (strips
+  and the desktop objectives region, whose count and collapse header follow the
+  pinned set) and the Mission Log. Neither keeps a client-side copy: a change
+  appears when the authoritative state returns, and a refusal or failure keeps
+  the previous state with ordinary feedback.
+- **Unpinned changes nothing else.** Requirements, the projection, every
+  guidance target and colour (NPCs, doors, the Map, actions, equipment),
+  dialogue routing, completion, rewards, the Missions turn-in badge, and world
+  state behave exactly as if the Mission were pinned. Completed Missions never
+  appear in Current Missions whatever their old preference. There is no pin
+  limit, no exclusive "tracked" Mission, and no separate hidden-objective
+  concept.
+- **Controls.** Each strip has an `Unpin <Mission>` icon button (a pin, never
+  an X, so it cannot read as abandon); unpinning moves focus to the next
+  strip's Unpin, or with none left to the Missions entry point. Every active
+  Mission Log card has a `Pin <Mission>` toggle (`aria-pressed`) in its header,
+  so pinning and unpinning never need the card expanded. Completed cards have
+  none.
+
+### The Mission Log (Issue #325)
+
+The Log (`features/missions/MissionLogPanel.tsx`) keeps active and completed
+Missions in separate sections, Completed collapsed by default. An active card's
+header carries the title, a small phase plate in the strips' own meanings —
+**Active** (green work) or **Turn in** (blue handoff), from
+`missionGuidancePhase` — the expand control, and the Pin toggle beside it,
+never inside it. Expanded, the briefing reads first in secondary text, then a
+**Current objective** block (the card's strongest content, always shown, even
+when the checklist repeats it), then the requirement checklist under a quieter
+**Progress** label: repair material rows, counters, carried context, and item
+Sources all come from the generic projection unchanged. Active cards never
+preview a reward; completed cards keep their completion date and the reward
+actually earned. Presentation tokens live in `app/globals.css`
+(`.rs-mission-card`, `.rs-mission-phase-plate`, `.rs-mission-objective-block`);
+see `docs/design-system.md`.
 
 ### Item sources in the Mission Log (Issue #326)
 

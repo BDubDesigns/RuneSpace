@@ -31,6 +31,7 @@ import {
   type LoadPowerCellResult,
 } from "@/server/mining-commands";
 import { setAutoDiscardSlagPreference } from "@/server/character-preference-commands";
+import { setMissionPinned, type MissionPinResult } from "@/server/mission-pin-commands";
 import { startRefining, stopRefining } from "@/server/refining-commands";
 import {
   finishCurrentFabrication,
@@ -185,6 +186,7 @@ import {
   PracticeCommandRequestSchema,
   StartPracticeRequestSchema,
   AutoDiscardSlagPreferenceRequestSchema,
+  MissionPinRequestSchema,
   WorkOrderAcceptRequestSchema,
   WorkOrderCommandRequestSchema,
   CleanPassClaimRequestSchema,
@@ -666,6 +668,31 @@ export async function setAutoDiscardSlagPreferenceAction(
         request.data.autoDiscardSlag,
       ),
     };
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type MissionPinActionResult = MissionPinResult | { error: string };
+
+/**
+ * Pin or unpin an accepted Mission (#325) — the one command both Current
+ * Missions and the Mission Log use. Presentation only; it never changes Mission
+ * progression.
+ */
+export async function setMissionPinnedAction(input: unknown): Promise<MissionPinActionResult> {
+  const request = MissionPinRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Mission pin command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await setMissionPinned(
+      user.id,
+      request.data.characterId,
+      request.data.missionId,
+      request.data.pinned,
+    );
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

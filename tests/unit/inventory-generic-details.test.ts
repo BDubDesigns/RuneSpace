@@ -123,6 +123,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       recentAttempts: [],
     },
     autoDiscardSlag: false,
+    unpinnedMissionIds: [],
     refiningRun: {
       selection: 1,
       attempts: 0,
