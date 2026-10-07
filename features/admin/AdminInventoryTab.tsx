@@ -9,6 +9,7 @@ import {
   adminRemoveCargoStackQuantity,
   adminRemoveCarriedStackQuantity,
 } from "@/server/admin-actions";
+import { AdminStackQuantitySchema } from "@/game/schemas/admin";
 import type { AdminInspectorState } from "@/server/admin-state";
 import type { PlayGameplayState } from "@/server/play";
 import { ConfirmAction } from "./ConfirmAction";
@@ -134,10 +135,11 @@ function AddItemControl({
     // items are always one-per-command, so no quantity is ever sent for them.
     let amount: number | undefined;
     if (!unique) {
-      amount = Number(quantity);
-      if (!Number.isInteger(amount) || amount < 1) {
+      const parsed = AdminStackQuantitySchema.safeParse(Number(quantity));
+      if (!parsed.success) {
         return bus("Quantity must be a positive whole number before adding.", "danger");
       }
+      amount = parsed.data;
     }
     setPending(true);
     try {
@@ -230,7 +232,7 @@ export function AdminInventoryTab({
    * in; a real change also refreshes the audit, while a refusal or no-op
    * reports the server's message and leaves the audit alone.
    */
-  async function settle<O extends { kind: string }>(
+  async function settle<O extends { kind: string; message?: string }>(
     response: { state: PlayGameplayState; outcome: O } | { error: string },
     changedKind: O["kind"],
     describe: (outcome: O) => string,
@@ -241,7 +243,7 @@ export function AdminInventoryTab({
       await refreshAll();
       bus(describe(response.outcome), "success");
     } else {
-      bus((response.outcome as { message?: string }).message ?? "Nothing changed.", "muted");
+      bus(response.outcome.message ?? "Nothing changed.", "muted");
     }
   }
 

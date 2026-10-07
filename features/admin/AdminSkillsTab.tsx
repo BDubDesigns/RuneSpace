@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { AdminTotalXpSchema } from "@/game/schemas/admin";
 import { adminSetSkillXp } from "@/server/admin-actions";
 import { ConfirmAction } from "./ConfirmAction";
 import { skillLabel, xpSettableSkills } from "./admin-format";
@@ -19,9 +20,9 @@ export function AdminSkillsTab(props: AdminTabProps) {
   const [pending, setPending] = useState(false);
 
   async function setXp() {
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < 0)
-      return bus("Total XP must be a non-negative integer.", "danger");
+    const parsedXp = AdminTotalXpSchema.safeParse(Number(value));
+    if (!parsedXp.success) return bus("Total XP must be a non-negative integer.", "danger");
+    const parsed = parsedXp.data;
     setPending(true);
     try {
       const response = await adminSetSkillXp({ characterId, skillId, totalXp: parsed });
@@ -43,11 +44,8 @@ export function AdminSkillsTab(props: AdminTabProps) {
   }
 
   const currentInSkill = play.skillTotalXp[skillId] ?? 0;
-  const parsedForConfirm = Number(value);
-  const differs =
-    Number.isInteger(parsedForConfirm) &&
-    parsedForConfirm >= 0 &&
-    parsedForConfirm !== currentInSkill;
+  const parsedForConfirm = AdminTotalXpSchema.safeParse(Number(value));
+  const differs = parsedForConfirm.success && parsedForConfirm.data !== currentInSkill;
 
   return (
     <div className="space-y-4">
@@ -97,7 +95,7 @@ export function AdminSkillsTab(props: AdminTabProps) {
               label="Set"
               confirmLabel="Confirm set"
               intent="secondary"
-              prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill} to ${parsedForConfirm}.`}
+              prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill} to ${differs ? parsedForConfirm.data : value}.`}
               onConfirm={setXp}
             />
           ) : (
