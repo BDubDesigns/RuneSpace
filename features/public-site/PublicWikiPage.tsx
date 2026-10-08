@@ -91,6 +91,16 @@ export function PublicWikiIndexPage() {
                     </Link>
                   </li>
                 ))}
+                {group.directories.map((directory) => (
+                  <li key={directory.path}>
+                    <Link
+                      className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center rounded-sm text-sm font-semibold text-[color:var(--rs-accent-primary)] underline underline-offset-4"
+                      href={directory.path}
+                    >
+                      {directory.title}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </Panel>
           ))}
@@ -169,7 +179,7 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
   );
 }
 
-function PublicWikiFrame({ children }: { children: ReactNode }) {
+export function PublicWikiFrame({ children }: { children: ReactNode }) {
   return (
     <PublicSiteShell footerLinks={publicSiteFooterLinks} navigation={publicSiteNavigation}>
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-16">

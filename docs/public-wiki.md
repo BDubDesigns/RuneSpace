@@ -20,7 +20,9 @@ Every article requires:
   `game/schemas/public-wiki.ts`. Each id has a player-facing label and a
   one-line description in `WIKI_CATEGORIES`, in the order the `/wiki` index
   renders them. A typo cannot create a heading, and a category with no
-  index-visible article fails validation at import time.
+  index-visible article fails the import-time `assertWikiCategoriesArePopulated`
+  check in `features/public-site/public-wiki.ts`, which runs when the module
+  loads rather than inside the schema.
 - `summary`: the short excerpt used as the page's meta description (and shown
   under the "Start here" spotlight).
 - `sections`: an ordered array of content blocks, each with an optional
@@ -116,8 +118,9 @@ cleanly into an existing article; otherwise update the most relevant existing
 article(s). Do not use a blanket "new feature = new article" rule, and do not
 create a page per internal registry/entity, item, action, or mechanic by
 default — a new page earns its place only when the genuinely new player-facing
-information volume warrants a standalone article. The Mission guides and
-named-character pages below are the two deliberate exceptions. Do not add
+information volume warrants a standalone article. The Mission guides,
+named-character pages and derived item reference below are the deliberate
+exceptions. Do not add
 empty placeholder pages for unshipped systems.
 
 ### Mission guides

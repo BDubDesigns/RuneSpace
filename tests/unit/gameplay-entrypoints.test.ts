@@ -66,6 +66,8 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/updates/[slug]/page.tsx": "public Updates",
   "app/wiki/page.tsx": "public Wiki",
   "app/wiki/[...slug]/page.tsx": "public Wiki",
+  "app/wiki/items/page.tsx": "public Wiki",
+  "app/wiki/items/[slug]/page.tsx": "public Wiki",
   "app/admin/page.tsx": "operator (requireAdmin); never player gameplay",
   "app/admin/characters/page.tsx": "operator (requireAdmin); never player gameplay",
   "app/admin/characters/[characterId]/page.tsx": "operator (requireAdmin); never player gameplay",
