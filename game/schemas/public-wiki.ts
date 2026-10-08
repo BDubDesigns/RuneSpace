@@ -124,13 +124,23 @@ export const WIKI_CATEGORIES: readonly {
 
 const wikiCategoryId = z.enum(WIKI_CATEGORY_IDS);
 
-/** The complete repository-authored Wiki article contract. */
+/**
+ * The complete repository-authored Wiki article contract.
+ *
+ * `showInIndex` controls only the `/wiki` landing page's category panels, never
+ * routing: an article with `showInIndex: false` is still a real `/wiki/<slug>`
+ * page, still returned by `getWikiArticles()`, and still a valid link target.
+ * Absent means shown. It exists for the one case where a directory article
+ * (Missions) already lists a family of guides, so the landing page links the
+ * directory once instead of repeating every guide.
+ */
 export const WikiArticleSchema = z
   .object({
     slug: wikiSlug,
     title: wikiText,
     category: wikiCategoryId,
     summary: wikiText,
+    showInIndex: z.boolean().optional(),
     sections: z.array(WikiArticleSectionSchema).min(1),
   })
   .strict();

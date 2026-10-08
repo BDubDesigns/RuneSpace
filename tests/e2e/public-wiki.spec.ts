@@ -27,6 +27,26 @@ const articleTitles = [
   "Safety & Privacy",
 ];
 
+/** Every Mission guide: title, then its permanent slug. */
+const missionGuides = [
+  ["Walk It Off", "mission-walk-it-off"],
+  ["Cut Your Teeth", "mission-cut-your-teeth"],
+  ["Waste Not", "mission-waste-not"],
+  ["Hold It Together", "mission-hold-it-together"],
+  ["Keep the Change", "mission-keep-the-change"],
+  ["10,000 Hours", "mission-10000-hours"],
+  ["Return the Favor", "mission-return-the-favor"],
+  ["Break It Down", "mission-break-it-down"],
+  ["Brace Yourself", "mission-brace-yourself"],
+  ["Wheel Be Right Back", "mission-wheel-be-right-back"],
+  ["Thrust Issues", "mission-thrust-issues"],
+  ["10,001 Hours", "mission-10001-hours"],
+  ["Out of the Weather", "mission-out-of-the-weather"],
+  ["A Cut Above", "mission-a-cut-above"],
+  ["Cutting Costs", "mission-cutting-costs"],
+  ["Curly Must-Stash", "mission-curly-must-stash"],
+] as const;
+
 /** The index's category headings, in the order the page renders them. */
 const categoryHeadings = [
   "Getting Started",
@@ -121,6 +141,65 @@ test.describe("public Wiki", () => {
     await expect(page.getByRole("heading", { name: "Wade Rusk", level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Where to find him", level: 2 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Tansy Rusk" })).toBeVisible();
+  });
+
+  test("links the Missions directory once and keeps the Mission guides off the index", async ({
+    page,
+  }) => {
+    await page.goto("/wiki");
+
+    await expect(page.getByRole("link", { name: "Missions", exact: true })).toHaveCount(1);
+    for (const [title] of missionGuides) {
+      await expect(page.getByRole("link", { name: title, exact: true })).toHaveCount(0);
+    }
+  });
+
+  test("lists all sixteen Mission guides on the hub and opens each as its own article", async ({
+    page,
+  }) => {
+    await page.goto("/wiki/missions");
+
+    expect(missionGuides).toHaveLength(16);
+    for (const [title, slug] of missionGuides) {
+      await expect(page.getByRole("link", { name: title, exact: true })).toHaveCount(1);
+      await expect(page.getByRole("link", { name: title, exact: true })).toHaveAttribute(
+        "href",
+        `/wiki/${slug}`,
+      );
+    }
+
+    await page.getByRole("link", { name: "Brace Yourself", exact: true }).click();
+    await expect(page).toHaveURL("/wiki/mission-brace-yourself");
+    await expect(page).toHaveTitle("Brace Yourself — RuneSpace Wiki");
+    await expect(page.getByRole("heading", { name: "Brace Yourself", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where it begins", level: 2 })).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      "/wiki/mission-brace-yourself",
+    );
+
+    // Every guide leads back to the hub.
+    await page.getByRole("link", { name: "Missions", exact: true }).first().click();
+    await expect(page).toHaveURL("/wiki/missions");
+  });
+
+  test("keeps the Missions hub and long and short guides contained on a narrow viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    for (const path of [
+      "/wiki/missions",
+      "/wiki/mission-waste-not",
+      "/wiki/mission-brace-yourself",
+      "/wiki/mission-thrust-issues",
+    ]) {
+      await page.goto(path);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+        path,
+      ).toBeLessThanOrEqual(390);
+    }
   });
 
   test("returns a normal 404 for an unknown Wiki slug", async ({ page }) => {

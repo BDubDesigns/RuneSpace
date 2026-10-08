@@ -6,10 +6,49 @@ import {
   getWikiArticlePath,
   getWikiArticles,
   getWikiStartHereArticle,
+  isWikiArticleIndexed,
   validatePublicWikiArticles,
   WIKI_START_HERE_SLUG,
+  type WikiArticle,
 } from "@/features/public-site/public-wiki";
+import { MISSIONS } from "@/game/content/missions";
 import { WIKI_CATEGORIES } from "@/game/schemas/public-wiki";
+
+/** The permanent slug of each shipped Mission's guide, keyed by Mission title (#339). */
+const MISSION_GUIDE_SLUGS = {
+  "Walk It Off": "mission-walk-it-off",
+  "Cut Your Teeth": "mission-cut-your-teeth",
+  "Waste Not": "mission-waste-not",
+  "Hold It Together": "mission-hold-it-together",
+  "Keep the Change": "mission-keep-the-change",
+  "10,000 Hours": "mission-10000-hours",
+  "10,001 Hours": "mission-10001-hours",
+  "Return the Favor": "mission-return-the-favor",
+  "Break It Down": "mission-break-it-down",
+  "Brace Yourself": "mission-brace-yourself",
+  "Wheel Be Right Back": "mission-wheel-be-right-back",
+  "Thrust Issues": "mission-thrust-issues",
+  "A Cut Above": "mission-a-cut-above",
+  "Out of the Weather": "mission-out-of-the-weather",
+  "Cutting Costs": "mission-cutting-costs",
+  "Curly Must-Stash": "mission-curly-must-stash",
+} as const;
+
+const missionGuideSlugs: readonly string[] = Object.values(MISSION_GUIDE_SLUGS);
+
+/** Every authored link segment in an article, in reading order. */
+function linkSegments(article: WikiArticle) {
+  const segments: { text: string; articleSlug: string }[] = [];
+  for (const section of article.sections) {
+    for (const entry of [...(section.paragraphs ?? []), ...(section.list ?? [])]) {
+      if (typeof entry === "string") continue;
+      for (const segment of entry) {
+        if (typeof segment !== "string") segments.push(segment);
+      }
+    }
+  }
+  return segments;
+}
 
 const baseArticle = {
   slug: "first-article",
@@ -182,16 +221,73 @@ describe("public Wiki content boundary", () => {
       expect(group.articles.length).toBeGreaterThan(0);
 
       const authoredOrder = getWikiArticles()
-        .filter((article) => article.category === group.id)
+        .filter((article) => article.category === group.id && isWikiArticleIndexed(article))
         .map((article) => article.slug);
       expect(group.articles.map((article) => article.slug)).toEqual(authoredOrder);
     }
   });
 
-  it("groups every article exactly once, losing none", () => {
+  it("groups every index-visible article exactly once, losing none", () => {
     const grouped = getWikiArticleGroups().flatMap((group) => group.articles.map((a) => a.slug));
+    const indexed = getWikiArticles()
+      .filter((article) => isWikiArticleIndexed(article))
+      .map((a) => a.slug);
 
-    expect([...grouped].sort()).toEqual([...getWikiArticles().map((a) => a.slug)].sort());
+    expect([...grouped].sort()).toEqual([...indexed].sort());
+    expect(new Set(grouped).size).toBe(grouped.length);
+  });
+
+  it("shows an article in the index unless it opts out with showInIndex: false", () => {
+    const [visible, explicitlyVisible, hidden] = validatePublicWikiArticles([
+      baseArticle,
+      { ...baseArticle, slug: "explicit", showInIndex: true },
+      { ...baseArticle, slug: "hidden", showInIndex: false },
+    ]);
+
+    expect(isWikiArticleIndexed(visible!)).toBe(true);
+    expect(isWikiArticleIndexed(explicitlyVisible!)).toBe(true);
+    expect(isWikiArticleIndexed(hidden!)).toBe(false);
+  });
+
+  it("rejects a non-boolean showInIndex", () => {
+    expect(() => validatePublicWikiArticles([{ ...baseArticle, showInIndex: "no" }])).toThrow();
+  });
+
+  it("still validates links from an index-hidden article", () => {
+    expect(() =>
+      validatePublicWikiArticles([
+        baseArticle,
+        {
+          ...baseArticle,
+          slug: "hidden",
+          showInIndex: false,
+          sections: [{ paragraphs: [["See ", { text: "Nowhere", articleSlug: "not-real" }, "."]] }],
+        },
+      ]),
+    ).toThrow('Wiki article "hidden" links to unknown article slug: not-real');
+  });
+
+  it("keeps an index-hidden article linkable from other articles", () => {
+    const articles = validatePublicWikiArticles([
+      { ...baseArticle, showInIndex: false },
+      {
+        ...baseArticle,
+        slug: "second-article",
+        sections: [
+          { paragraphs: [["See ", { text: "First", articleSlug: "first-article" }, "."]] },
+        ],
+      },
+    ]);
+
+    expect(articles).toHaveLength(2);
+  });
+
+  it("does not let a category made only of index-hidden articles pass as populated", () => {
+    expect(() =>
+      assertWikiCategoriesArePopulated(
+        validatePublicWikiArticles([{ ...baseArticle, showInIndex: false }]),
+      ),
+    ).toThrow(/^Wiki category has no articles: /);
   });
 
   it("resolves the index's start-here spotlight to a real authored article", () => {
@@ -241,6 +337,106 @@ describe("public Wiki content boundary", () => {
           }
         }
       }
+    }
+  });
+});
+
+describe("Mission guides (#339)", () => {
+  const hub = () => getWikiArticle("missions")!;
+
+  it("has exactly one guide per shipped Mission, and no guide without one", () => {
+    expect(MISSIONS.map((mission) => mission.title).sort()).toEqual(
+      Object.keys(MISSION_GUIDE_SLUGS).sort(),
+    );
+    expect(missionGuideSlugs).toHaveLength(16);
+    expect(new Set(missionGuideSlugs).size).toBe(16);
+
+    for (const [title, slug] of Object.entries(MISSION_GUIDE_SLUGS)) {
+      const guide = getWikiArticle(slug);
+      expect(guide, slug).toBeDefined();
+      expect(guide!.title).toBe(title);
+      expect(guide!.category).toBe("getting-started");
+      expect(getWikiArticlePath(guide!)).toBe(`/wiki/${slug}`);
+    }
+  });
+
+  it("keeps every guide routable but out of the index panels", () => {
+    const indexed = getWikiArticleGroups().flatMap((group) => group.articles.map((a) => a.slug));
+
+    for (const slug of missionGuideSlugs) {
+      expect(getWikiArticles().some((article) => article.slug === slug)).toBe(true);
+      expect(isWikiArticleIndexed(getWikiArticle(slug)!)).toBe(false);
+      expect(indexed).not.toContain(slug);
+    }
+  });
+
+  it("lists the Missions hub exactly once, under Getting Started", () => {
+    const groups = getWikiArticleGroups();
+    const listings = groups.flatMap((group) =>
+      group.articles.filter((article) => article.slug === "missions").map(() => group.id),
+    );
+
+    expect(listings).toEqual(["getting-started"]);
+    expect(isWikiArticleIndexed(hub())).toBe(true);
+  });
+
+  it("links each of the 16 guides from the hub exactly once", () => {
+    const hubTargets = linkSegments(hub()).map((segment) => segment.articleSlug);
+
+    for (const slug of missionGuideSlugs) {
+      expect(
+        hubTargets.filter((target) => target === slug),
+        slug,
+      ).toHaveLength(1);
+    }
+  });
+
+  it("links each guide's hub link text to the guide titled by that text", () => {
+    for (const segment of linkSegments(hub())) {
+      const expected = MISSION_GUIDE_SLUGS[segment.text as keyof typeof MISSION_GUIDE_SLUGS];
+      if (expected) expect(segment.articleSlug).toBe(expected);
+    }
+  });
+
+  it("links every guide back to the Missions hub", () => {
+    for (const slug of missionGuideSlugs) {
+      const targets = linkSegments(getWikiArticle(slug)!).map((segment) => segment.articleSlug);
+      expect(targets, slug).toContain("missions");
+    }
+  });
+
+  it("links every guide to the guide of the Mission it follows", () => {
+    for (const mission of MISSIONS) {
+      if (!mission.prerequisiteMissionId) continue;
+      const prerequisite = MISSIONS.find((other) => other.id === mission.prerequisiteMissionId)!;
+      const guide = getWikiArticle(
+        MISSION_GUIDE_SLUGS[mission.title as keyof typeof MISSION_GUIDE_SLUGS],
+      )!;
+      const targets = linkSegments(guide).map((segment) => segment.articleSlug);
+
+      expect(targets, `${mission.title} -> ${prerequisite.title}`).toContain(
+        MISSION_GUIDE_SLUGS[prerequisite.title as keyof typeof MISSION_GUIDE_SLUGS],
+      );
+    }
+  });
+
+  it("points every link that names a specific Mission at that Mission's guide, not the hub", () => {
+    for (const article of getWikiArticles()) {
+      for (const segment of linkSegments(article)) {
+        const guideSlug = MISSION_GUIDE_SLUGS[segment.text as keyof typeof MISSION_GUIDE_SLUGS];
+        if (guideSlug) {
+          expect(segment.articleSlug, `${article.slug}: "${segment.text}"`).toBe(guideSlug);
+        }
+      }
+    }
+  });
+
+  it("keeps general Mission Log help on the hub instead of repeating it in every guide", () => {
+    for (const slug of missionGuideSlugs) {
+      const headings = getWikiArticle(slug)!.sections.map((section) => section.heading);
+      expect(headings, slug).not.toContain("Following a job");
+      expect(headings, slug).not.toContain("Pinning a job");
+      expect(headings, slug).not.toContain("Talking to people");
     }
   });
 });
