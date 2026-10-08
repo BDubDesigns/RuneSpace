@@ -9,6 +9,30 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #335 — Mission pins quiet guidance too.
+    slug: "pins-quiet-the-highlights",
+    title: "Pins Quiet the Highlights",
+    publishedAt: "2026-10-07T14:00:00-07:00",
+    summary:
+      "Unpinning a job now hides its Map and in-game highlights along with its strip, so you can quiet a job you are not focusing on.",
+    body: [
+      [
+        "Unpinning a job used to hide only its strip at the top of the screen. Now it quiets the job's green and blue highlights too: Map destinations and arrows, building entrances, the talk button on the person you owe, and the controls it was pointing you toward. Pin it again from the Mission Log and everything for its current stage comes straight back. See ",
+        { text: "Missions", articleSlug: "missions" },
+        " for the details.",
+      ],
+      "Nothing about the job itself changes. It stays accepted, keeps counting your progress, and can be handed in the usual way. Nobody and nothing is hidden, only the highlight. Blue highlights for new jobs you haven't taken yet stay on, and if another pinned job points at the same place, it stays lit.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Unpinning a job now hides its Map and in-game guidance as well as its strip; pinning it again restores them.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #330 — Thrust Issues and the restored ship.
     slug: "thrust-issues",
     title: "Thrust Issues",

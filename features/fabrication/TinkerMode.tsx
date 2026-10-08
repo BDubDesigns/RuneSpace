@@ -24,7 +24,7 @@ import {
   BOUNDED_RUN_MAX,
   type BoundedRunSelection,
 } from "@/game/domain/bounded-run";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import {
   finishCurrentTinkeringAction,
   setTinkeringScrapPreferenceAction,
@@ -102,7 +102,7 @@ export function TinkerMode() {
     visible[0];
   const command = useStationCommand((next) => describe(next, target?.actionId));
   const running = tinkering.active;
-  const guided = deriveMissionGuidanceTargets(state.missions).activities.has("tinkering");
+  const guided = derivePinnedGuidanceTargets(state).activities.has("tinkering");
 
   useEffect(() => {
     if (!running) return;

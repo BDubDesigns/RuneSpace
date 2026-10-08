@@ -10,7 +10,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { formatMassGrams } from "@/game/domain/mass";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import type { PlayGameplayState } from "@/server/play";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
@@ -49,7 +49,7 @@ export function EquipmentPanel({
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching item's
   // equip affordance receives the treatment. No mission-ID branching here.
-  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
 
   const content = (
     <>

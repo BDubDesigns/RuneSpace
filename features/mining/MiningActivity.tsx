@@ -14,7 +14,7 @@ import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { RewardGrid } from "@/components/ui/RewardGrid";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/mining";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import type { MiningRunAttempt } from "@/server/mining";
 import type { MiningSourceProjection, PlayGameplayState } from "@/server/play";
 import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
@@ -255,7 +255,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   // Mission guidance is consumed from the ONE derived target set — this activity
   // never inspects mission IDs, objective prose, or drop tables to decide
   // whether Start Mining advances the active mission.
-  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
   const startMiningGuided =
     showMiningActivity &&
     !state.activeAction &&

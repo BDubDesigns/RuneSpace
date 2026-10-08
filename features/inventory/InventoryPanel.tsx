@@ -11,7 +11,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getItemMaximumCharge } from "@/game/config/balance";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { ITEM_IDS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { discardInventoryStackAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import {
@@ -99,7 +99,7 @@ export function InventoryPanel({
   // equipped-item requirement is the current unmet step, the matching carried
   // item's tile receives the treatment so the player finds the equip path.
   // No mission-ID branching here.
-  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
   const loadAvailability = derivePowerCellLoadAvailability(
     state,
     resolvedSelection,

@@ -26,7 +26,7 @@ The framework deliberately does not attempt to support every future mission shap
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission`, `acknowledgeMissionConversation` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction` / `acknowledgeMissionConversationAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` / `AcknowledgeMissionConversationRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue` | Sequences are pure presentation content (no `action`). |
 | NPC conversation resolution | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation`; authored topics in `game/content/conversation-topics.ts` | The one canonical conversation model (§9); see `docs/npc-conversations.md`. |
-| Mission pinning (presentation preference, #325) | `db/rune-space.ts` — `characterMissionUnpins`; `server/mission-pins.ts` — `loadUnpinnedMissionIds`; `server/mission-pin-commands.ts` — `setMissionPinned`; `server/actions.ts` — `setMissionPinnedAction`; `game/schemas/gameplay.ts` — `MissionPinRequestSchema`; `features/missions/mission-pins.ts` — `guidanceMissions`, `isMissionPinned`, `pinnedGuidanceMissions` | Absence means pinned; only an explicit unpin is stored, keyed by character and Mission and cascading with the Mission record. Surfaced as `state.unpinnedMissionIds`. Never read by projection, guidance, dialogue, completion, or rewards. See §10, "Mission pinning". |
+| Mission pinning (presentation preference, #325) | `db/rune-space.ts` — `characterMissionUnpins`; `server/mission-pins.ts` — `loadUnpinnedMissionIds`; `server/mission-pin-commands.ts` — `setMissionPinned`; `server/actions.ts` — `setMissionPinnedAction`; `game/schemas/gameplay.ts` — `MissionPinRequestSchema`; `features/missions/mission-pins.ts` — `guidanceMissions`, `isMissionPinned`, `pinnedGuidanceMissions`, `guidancePresentationMissions`, `derivePinnedGuidanceTargets`, `presentConversationEntries` | Absence means pinned; only an explicit unpin is stored, keyed by character and Mission and cascading with the Mission record. Surfaced as `state.unpinnedMissionIds`. Never read by projection, dialogue routing, completion, or rewards; read only by the presentation selection (`guidancePresentationMissions`, `derivePinnedGuidanceTargets`, `presentConversationEntries`) that decides which accepted Missions guide the Map and UI (#335). See §10, "Mission pinning". |
 | Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`, `CargoHoldPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
@@ -606,6 +606,8 @@ Not every technically possible acquisition path should be highlighted. Only the 
 
 Each consumer answers "am I that target, and with which meaning?":
 
+Every consumer reads targets through `derivePinnedGuidanceTargets(state)` (`features/missions/mission-pins.ts`), never `deriveMissionGuidanceTargets(state.missions)` directly: an unpinned accepted Mission is left out of the input (#335, see "Mission pinning").
+
 - **NPC Talk** — `npcGuidanceMeaning(targets, npc.id)` resolves `"active"` (`guidance.npcIds`), `"turn_in"` (`guidance.turnInNpcIds`), or `"available"` (`guidance.availableNpcIds`), with active-over-turn-in-over-available precedence. Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
 - **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (green only; the turn-in phase never targets equipment).
 - **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available (green only). An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
@@ -664,8 +666,7 @@ It is ordinary document flow (never sticky or fixed) and scrolls away normally.
 
 ### Mission pinning (Issue #325)
 
-Pinning answers one question — *"show this Mission's current objective in
-Current Missions?"* — and nothing else. It is a per-character presentation
+Pinning answers one question — *"show this Mission's objective strip and its Map/UI guidance?"* — and nothing else (#335 widened it from the strip alone). It is a per-character presentation
 preference, never Mission progression.
 
 - **Every newly accepted Mission starts pinned**, including one accepted
@@ -681,14 +682,24 @@ preference, never Mission progression.
   deleting the row and unpins by inserting it; both are idempotent. It refuses
   an unknown, unaccepted, or completed Mission and touches nothing but the
   preference. Due work resolves first, as for every command.
-- **One value, two surfaces.** `state.unpinnedMissionIds` is read through
-  `isMissionPinned` / `pinnedGuidanceMissions` by both Current Missions (strips
-  and the desktop objectives region, whose count and collapse header follow the
-  pinned set) and the Mission Log. Neither keeps a client-side copy: a change
-  appears when the authoritative state returns, and a refusal or failure keeps
-  the previous state with ordinary feedback.
-- **Unpinned changes nothing else.** Requirements, the projection, every
-  guidance target and colour (NPCs, doors, the Map, actions, equipment),
+- **One value, one selection boundary.** `state.unpinnedMissionIds` is read through
+  `isMissionPinned` by Current Missions (strips and the desktop objectives
+  region, via `pinnedGuidanceMissions`), the Mission Log, and the guidance
+  selection below. Nothing keeps a client-side copy: a change appears when the
+  authoritative state returns, and a refusal or failure keeps the previous state
+  with ordinary feedback.
+- **Pins control guidance (#335).** An unpinned accepted Mission contributes no
+  green work or blue turn-in guidance anywhere: Map hexes and MISSION / TURN IN
+  labels, edge arrows, Local Place entrances, NPC Talk (and the highlight on its
+  conversation entry), repair, activity, equipment and Inventory controls.
+  Every consumer calls `derivePinnedGuidanceTargets(state)`, which runs the
+  unchanged `deriveMissionGuidanceTargets` over `guidancePresentationMissions`
+  (every Mission except accepted-and-unpinned ones), so a target two pinned
+  Missions share survives unpinning either. Blue *available* offers belong to
+  Missions that are not accepted yet, are never filtered, and cannot be
+  unpinned. The hidden control, NPC, conversation, destination and action remain
+  fully usable; repinning restores the current stage's guidance immediately.
+- **Unpinned changes no progression.** Requirements, the projection,
   dialogue routing, completion, rewards, the Missions turn-in badge, and world
   state behave exactly as if the Mission were pinned. Completed Missions never
   appear in Current Missions whatever their old preference. There is no pin

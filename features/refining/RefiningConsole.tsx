@@ -35,7 +35,7 @@ import {
   describeQuantities,
   failedAttemptAwardLabel,
 } from "@/features/refining/attempt-copy";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import type { RefiningRunAttempt } from "@/server/refining";
 import type { RefiningRecipeProjection } from "@/server/play";
 import {
@@ -233,7 +233,7 @@ export function RefiningConsole() {
   // Mission guidance consumes the ONE derived target set: a Refining mission
   // authors `recommendedActionId` naming one recipe's action, and only that
   // recipe's tile and Start receive the treatment — no mission-ID branching.
-  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
   // Refine lists only what can begin now, plus a Mission-guided recipe with
   // what it is missing (#239); everything else the character knows is on
   // Recipes, so learned-but-unavailable recipes never push the run down.

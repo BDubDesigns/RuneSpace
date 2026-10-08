@@ -131,7 +131,7 @@ describe("canonical article art", () => {
     expect(index).toContain("How to get it");
     expect(index).toContain("Pin it");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Thrust Issues");
+      expect(markup).toContain("Pins Quiet the Highlights");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("uncut-topaz.webp");
       // Newer Updates open with an item figure of their own (#322, #326, #330);

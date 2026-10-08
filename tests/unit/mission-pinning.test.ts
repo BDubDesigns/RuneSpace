@@ -3,7 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { MissionProjection } from "@/game/domain/missions";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
-import { isMissionPinned, pinnedGuidanceMissions } from "@/features/missions/mission-pins";
+import type { NpcConversationEntry } from "@/game/domain/conversation";
+import {
+  derivePinnedGuidanceTargets,
+  guidancePresentationMissions,
+  isMissionPinned,
+  pinnedGuidanceMissions,
+  presentConversationEntries,
+} from "@/features/missions/mission-pins";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionObjectivesRegion } from "@/features/missions/MissionObjectivesRegion";
 import type { PlayGameplayState } from "@/server/play";
@@ -191,5 +198,70 @@ describe("the refreshed Mission Log", () => {
     expect(done).not.toContain("data-mission-log-pin");
     // The Completed section stays collapsed by default.
     expect(done).not.toContain('data-mission-log-entry="done"');
+  });
+});
+
+describe("pin-aware guidance selection (#335)", () => {
+  const withGuidance = (m: MissionProjection, guidance: MissionProjection["guidance"]) =>
+    ({ ...m, guidance }) as MissionProjection;
+  const A = withGuidance(ALPHA, { locationId: "site", npcId: "wade" });
+  const B = withGuidance(mission("bravo2", "Bravo Two", "active"), { locationId: "site" });
+  const T = withGuidance(BRAVO, { npcId: "tansy", turnIn: true });
+  const OFFER = withGuidance(mission("offer", "Offer", "not_accepted"), {
+    availableNpcIds: ["tansy"],
+  });
+
+  it("leaves everything in when nothing is unpinned", () => {
+    const s = stateOf([A, B, T, OFFER]);
+    expect(guidancePresentationMissions(s)).toHaveLength(4);
+  });
+
+  it("drops an unpinned active job's targets and keeps the rest", () => {
+    const targets = derivePinnedGuidanceTargets(stateOf([A, T, OFFER], ["alpha"]));
+    expect(targets.npcIds.has("wade")).toBe(false);
+    expect(targets.locationIds.has("site")).toBe(false);
+    expect(targets.turnInNpcIds.has("tansy")).toBe(true);
+    expect(targets.availableNpcIds.has("tansy")).toBe(true);
+  });
+
+  it("drops an unpinned turn-in job's blue guidance but keeps an independent offer", () => {
+    const targets = derivePinnedGuidanceTargets(stateOf([T, OFFER], ["bravo"]));
+    expect(targets.turnInNpcIds.size).toBe(0);
+    expect(targets.availableNpcIds.has("tansy")).toBe(true);
+  });
+
+  it("keeps a shared target until every job sharing it is unpinned", () => {
+    const missions = [A, B];
+    expect(derivePinnedGuidanceTargets(stateOf(missions, ["alpha"])).locationIds.has("site")).toBe(
+      true,
+    );
+    expect(
+      derivePinnedGuidanceTargets(stateOf(missions, ["alpha", "bravo2"])).locationIds.has("site"),
+    ).toBe(false);
+  });
+
+  it("restores guidance on repin without altering the projections", () => {
+    const missions = [A];
+    expect(derivePinnedGuidanceTargets(stateOf(missions, ["alpha"])).npcIds.size).toBe(0);
+    expect(derivePinnedGuidanceTargets(stateOf(missions)).npcIds.has("wade")).toBe(true);
+    expect(missions[0]).toBe(A);
+  });
+
+  it("strips only the highlight from an unpinned job's conversation entry", () => {
+    const entry = {
+      kind: "mission",
+      id: "e",
+      label: "Alpha Job",
+      role: "turn_in",
+      roleLabel: "Turn in",
+      dialogueId: "d",
+      missionId: "alpha",
+      guidance: "turn_in",
+      action: { kind: "complete_mission", label: "Hand in" },
+    } as unknown as NpcConversationEntry;
+    const [hidden] = presentConversationEntries(stateOf([A], ["alpha"]), [entry]);
+    expect(hidden).toMatchObject({ missionId: "alpha", action: { kind: "complete_mission" } });
+    expect("guidance" in hidden!).toBe(false);
+    expect(presentConversationEntries(stateOf([A]), [entry])[0]).toBe(entry);
   });
 });

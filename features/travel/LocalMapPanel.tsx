@@ -19,7 +19,8 @@ import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { travelErrorMessage } from "./travel-errors";
 import { usePlay } from "@/features/play/PlayContext";
-import { deriveMissionGuidanceTargets, type MissionGuidanceTargets } from "@/game/domain/missions";
+import type { MissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
@@ -528,7 +529,7 @@ export function LocalMapPanel({
 
   const currentLocationId = state.location.currentLocationId;
   // Accepted Missions only: available offers never reach the map.
-  const missionTargets = deriveMissionGuidanceTargets(state.missions);
+  const missionTargets = derivePinnedGuidanceTargets(state);
   const travel = state.travelState;
   const inTransit = Boolean(travel);
   const workActive = Boolean(state.activeAction);

@@ -14,11 +14,14 @@ import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import {
   deriveAcceptedMissionIds,
   deriveCompletedMissionIds,
-  deriveMissionGuidanceTargets,
   npcGuidanceMeaning,
   type MissionGuidanceMeaning,
 } from "@/game/domain/missions";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
+import {
+  derivePinnedGuidanceTargets,
+  presentConversationEntries,
+} from "@/features/missions/mission-pins";
 import { usePlay } from "@/features/play/PlayContext";
 
 /** Everything one resident's Local Contact row presents (#231). */
@@ -110,16 +113,19 @@ export function NpcInteractionPanel({
       : undefined
     : getLocationMerchant(locationId);
   const stationary = !state.activeAction && !state.travelState;
-  const guidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  const guidanceTargets = derivePinnedGuidanceTargets(state);
   const departed =
     conversationNpcId && !residents.some((npc) => npc.id === conversationNpcId)
       ? getNpc(conversationNpcId)
       : undefined;
   const contacts = [...residents, ...(departed ? [departed] : [])]
     .map((npc): ResidentContact => {
-      const entries = resolveNpcConversation(npc.id, state.missions, {
-        workOrdersRefreshUnlocked: state.workOrders.refresh.unlocked,
-      });
+      const entries = presentConversationEntries(
+        state,
+        resolveNpcConversation(npc.id, state.missions, {
+          workOrdersRefreshUnlocked: state.workOrders.refresh.unlocked,
+        }),
+      );
       return {
         npc,
         entries,

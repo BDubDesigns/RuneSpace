@@ -8,7 +8,7 @@ import { WorkbenchPanel } from "@/features/practice/WorkbenchPanel";
 import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
 import { fabricationActionIds, tinkeringActionIds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 
 type WorkArea = "workshop" | "fabrication";
 
@@ -36,7 +36,7 @@ export function RuskRecoveryWorkAreas() {
     state.tinkering.cycle !== undefined;
   const workshopBusy =
     actionId === ACTION_IDS.practiceWelding || actionId === ACTION_IDS.workOrderWelding;
-  const guidance = deriveMissionGuidanceTargets(state.missions);
+  const guidance = derivePinnedGuidanceTargets(state);
   const stationGuided =
     [...guidance.actionIds].some((id) =>
       [...fabricationActionIds(), ...tinkeringActionIds()].includes(id),

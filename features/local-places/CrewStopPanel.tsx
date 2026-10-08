@@ -9,7 +9,8 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
-import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { usePlay } from "@/features/play/PlayContext";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import {
@@ -82,7 +83,7 @@ export function CrewStopPanel() {
   const target = getRepairTargetBalance(TARGET_ID, balance);
   const repair = state.repairs[TARGET_ID];
   const activeWelding = state.activeAction?.actionId === target.actionId;
-  const guided = deriveMissionGuidanceTargets(state.missions).repairTargetIds.has(TARGET_ID);
+  const guided = derivePinnedGuidanceTargets(state).repairTargetIds.has(TARGET_ID);
   // The same authored rule the town surface asks: this place's rides are the
   // ones boarding here, and only once their unlocking Mission is completed.
   const rides = availableCrewHaulerRides({
