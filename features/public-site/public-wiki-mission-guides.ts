@@ -58,14 +58,12 @@ export const missionGuideArticles = [
     category: "getting-started",
     showInIndex: false,
     summary:
-      "Your first job: reach The Jag and talk to Tansy Rusk. Where it starts, what it hands you, and what comes next.",
+      "Your first Mission: reach The Jag and talk to Tansy Rusk. Where it starts, what it hands you, and what comes next.",
     sections: [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list, and the first job on it. Nothing has to be finished before you can take it.",
+            "The first Mission. Nothing has to be finished before you can take it, and it begins the starter chain.",
           ],
         ],
       },
@@ -76,16 +74,16 @@ export const missionGuideArticles = [
             wade,
             " offers it at the Crash Site, and sends you toward his niece at The Jag. If you walk to The Jag on your own first, ",
             tansy,
-            " offers the same job there, so you cannot miss it either way.",
+            " offers the same Mission there, so you cannot miss it either way.",
           ],
         ],
       },
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Wade at the Crash Site, or from Tansy once you reach The Jag.",
-          "Travel to The Jag on the Map. You need to be standing there when you hand the job in.",
-          "Talk to Tansy and choose Claim Cutter. If she was the one who offered the job, accepting leads straight into claiming it.",
+          "Take the Mission from Wade at the Crash Site, or from Tansy once you reach The Jag.",
+          "Travel to The Jag on the Map. You need to be standing there when you turn the Mission in.",
+          "Talk to Tansy and choose Claim Cutter. If she was the one who offered the Mission, accepting leads straight into claiming it.",
         ],
       },
       {
@@ -109,6 +107,7 @@ export const missionGuideArticles = [
           ],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -120,13 +119,7 @@ export const missionGuideArticles = [
       "Equip your Salvage Cutter, make five Mining attempts, and show Tansy Rusk a full stack of Ferrite Shale.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It teaches the Inventory-to-Equip step and the Mining loop.",
-          ],
-        ],
+        paragraphs: [["Teaches the Inventory-to-Equip step and the Mining loop."]],
       },
       {
         heading: "Where it begins",
@@ -163,20 +156,21 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
-          "100 Mining XP when you hand the job in.",
+          "100 Mining XP when you turn the Mission in.",
           "Nothing is taken: Tansy only looks at the shale, and you keep it.",
         ],
       },
       {
         heading: "Good to know",
         paragraphs: [
-          "The equipped Cutter and the shale are checked live. If you take the Cutter off or drop shale before you hand the job in, it goes back to asking for them.",
+          "The equipped Cutter and the shale are checked live. If you take the Cutter off or drop shale before you turn the Mission in, it goes back to asking for them.",
         ],
       },
       {
         heading: "What happens next",
         paragraphs: [["Finishing it starts ", toWasteNot, " automatically."]],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -188,13 +182,7 @@ export const missionGuideArticles = [
       "Make five Refining attempts at the Abandoned Processing Yard, then report to Wade Rusk at the Crash Site.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It teaches Refining, the other half of the early work loop.",
-          ],
-        ],
+        paragraphs: [["Teaches Refining, the other half of the early work loop."]],
       },
       {
         heading: "Where it begins",
@@ -227,6 +215,7 @@ export const missionGuideArticles = [
         heading: "What happens next",
         paragraphs: [["Reporting starts ", toHoldItTogether, " automatically."]],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -238,13 +227,7 @@ export const missionGuideArticles = [
       "Repair the Cargo Hold at the Crash Site, then report the finished repair to Wade Rusk.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It is the job that teaches you Welding and gives you the Cargo Hold.",
-          ],
-        ],
+        paragraphs: [["Teaches you Welding and gives you the Cargo Hold."]],
       },
       {
         heading: "Where it begins",
@@ -285,21 +268,22 @@ export const missionGuideArticles = [
         list: [
           "The usual Welding XP for each pass as you weld, 50 apiece.",
           "100 Welding XP more when you report to Wade.",
-          "The repaired Cargo Hold itself: 32 slots of storage at the Crash Site.",
+          "The repaired Cargo Hold, once the repair is finished: 32 slots of storage at the Crash Site.",
         ],
       },
       {
         heading: "What happens next",
         paragraphs: [
           [
-            "Nothing starts by itself. Finishing it is what makes two other jobs available, and neither is a continuation: ",
+            "Nothing starts by itself. Finishing it is what makes two other Missions available, and neither is a continuation: ",
             toKeepTheChange,
-            " is Wade's next job, and ",
+            " is Wade's next Mission, and ",
             toOutOfTheWeather,
-            " is an optional job from Renn. They do not depend on each other.",
+            " is an optional Mission from Renn. They do not depend on each other.",
           ],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -313,9 +297,7 @@ export const missionGuideArticles = [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. It is the first job you take on yourself rather than having it start for you.",
+            "After the starter run of automatic Missions, this is the first one you take on yourself.",
           ],
         ],
       },
@@ -337,7 +319,7 @@ export const missionGuideArticles = [
           [
             "Meet ",
             bix,
-            " at his shop in Holo Hollow. This is part of the job even if you already have three cells. Talking to him is all that is required; you never have to buy or sell anything.",
+            " at his shop in Holo Hollow. This is part of the Mission even if you already have three cells. Talking to him is all that is required; you never have to buy or sell anything.",
           ],
           [
             "Three ",
@@ -351,7 +333,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Wade at the Crash Site. He hands you the Credits straight away.",
+          "Take the Mission from Wade at the Crash Site. He hands you the Credits straight away.",
           "Walk to Holo Hollow and talk to Bix.",
           "Get three Power Cells.",
           "Take them to Tansy at The Jag and choose Hand Over Cells.",
@@ -360,7 +342,7 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
-          "36 Credits when you accept, as Wade's job budget — three cells at Bix's price of 12 each. They are yours: if you already have cells, or claim them free at the Annex, you keep whatever you do not spend. Nothing is reimbursed.",
+          "36 Credits when you accept, as Wade's budget for the Mission — three cells at Bix's price of 12 each. They are yours: if you already have cells, or claim them free at the Annex, you keep whatever you do not spend. Nothing is reimbursed.",
           "Nothing more when you finish. There is no second payout.",
         ],
       },
@@ -368,16 +350,17 @@ export const missionGuideArticles = [
         heading: "Good to know",
         list: [
           "Handing the cells over takes exactly three. Any extras you carry stay with you.",
-          "Finishing it ends with Tansy calling Wade to say you did the job properly. Wade moves back to his own yard at Rusk Recovery, and HH B&B opens to you.",
+          "Finishing it ends with Tansy calling Wade to say you did the work properly. Wade moves back to his own yard at Rusk Recovery, and HH B&B opens to you.",
         ],
       },
       {
         heading: "What opens up",
         list: [
-          [toTenThousandHours, " — Wade's next job, at Rusk Recovery."],
-          [toCurlyMustStash, " — an optional job from ", curly, " at HH B&B."],
+          [toTenThousandHours, " — Wade's next Mission, at Rusk Recovery."],
+          [toCurlyMustStash, " — an optional Mission from ", curly, " at HH B&B."],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -389,9 +372,7 @@ export const missionGuideArticles = [
       "Wade Rusk puts you on his bench at Rusk Recovery: six free Scrap Metal, three practice welds, and 50 Credits.",
     sections: [
       {
-        paragraphs: [
-          ["Part of the ", missions, " list. Accepting it is what opens Wade's Workbench to you."],
-        ],
+        paragraphs: [["Accepting it is what opens Wade's Workbench to you."]],
       },
       {
         heading: "Where it begins",
@@ -409,9 +390,9 @@ export const missionGuideArticles = [
         heading: "Walkthrough",
         list: [
           [
-            "Accept the job. Wade hands you six Scrap Metal, three welds' worth, and opens the ",
+            "Accept the Mission. Wade hands you six Scrap Metal, three welds' worth, and opens the ",
             practiceWelding("Workbench"),
-            " and his scrap counter. He hands over all six or none: if you do not have room, nothing is handed over and the job is not started, so make room and come back.",
+            " and his scrap counter. He hands over all six or none: if you do not have room, nothing is handed over and the Mission is not started, so make room and come back.",
           ],
           [
             "Complete 3 ",
@@ -449,6 +430,7 @@ export const missionGuideArticles = [
           ],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -457,16 +439,14 @@ export const missionGuideArticles = [
     category: "getting-started",
     showInIndex: false,
     summary:
-      "At Welding level 5 Wade Rusk opens the Work Orders board to you for good. Finish one paying job, then show him.",
+      "At Welding level 5 Wade Rusk opens the Work Orders board to you for good. Complete one paying Work Order, then show him.",
     sections: [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. This is not side work: it is how paid ",
+            "This is not side work: it is how paid ",
             workOrders("Work Orders"),
-            " become yours, and it runs independently of the Fabrication and Deep Jag jobs.",
+            " become yours, and it runs independently of the Fabrication and Deep Jag Missions.",
           ],
         ],
       },
@@ -489,9 +469,9 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Accept the job. This is the moment the Work Orders board becomes yours for good.",
+          "Accept the Mission. This is the moment the Work Orders board becomes yours for good.",
           [
-            "Take a job off the terminal beside the Workbench and finish it. Taking a job hands its materials over from your Inventory right away, so carry everything it asks for first. See ",
+            "Take a Work Order off the terminal beside the Workbench and finish it. Taking a Work Order hands its materials over from your Inventory right away, so carry everything it asks for first. See ",
             workOrders("Work Orders"),
             " for how the board works.",
           ],
@@ -501,16 +481,17 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
-          "The job's own Credits and Welding XP, paid when you finish the Work Order.",
+          "The Work Order's own Credits and Welding XP, paid when you finish it.",
           "10 Refined Ferrite and 5 Power Cells from Wade when you show him the work, handed over together or not at all. They have to fit in your Inventory — if they do not, make room and report again.",
         ],
       },
       {
         heading: "Good to know",
         paragraphs: [
-          "Accepting is the real unlock. Showing Wade the work is not a second gate: the board keeps working whether or not you have turned the job in.",
+          "Accepting is the real unlock. Showing Wade the work is not a second gate: the board keeps working whether or not you have turned the Mission in.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -524,9 +505,7 @@ export const missionGuideArticles = [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. It teaches ",
+            "Teaches ",
             fabrication("Fabrication"),
             ", and accepting it is what opens the Fabrication Station.",
           ],
@@ -548,7 +527,7 @@ export const missionGuideArticles = [
         heading: "What you need",
         list: [
           [
-            "Fabricate a Salvage Cutter at the Fabrication Station while the job is open: 5 Refined Ferrite and 1 ",
+            "Fabricate a Salvage Cutter at the Fabrication Station while the Mission is open: 5 Refined Ferrite and 1 ",
             powerCells("Power Cell"),
             ". A Cutter you already had, bought or were given does not count for this part, and neither does a workpiece that busts.",
           ],
@@ -558,7 +537,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Tansy.",
+          "Take the Mission from Tansy.",
           "Fabricate a Salvage Cutter at the Station.",
           "Talk to Tansy and choose Hand Over the Cutter. She will not take the one in your hand. The Cutter you just made is fine, and so is any other Salvage Cutter you are carrying.",
         ],
@@ -566,8 +545,9 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
+          "The Fabrication Station opens as soon as you accept.",
           "100 Fabrication XP when you hand the Cutter over. Fabricating it pays its own 65 Fabrication XP on top.",
-          "Tinkering opens when the job is done. Tansy takes the Cutter apart on the spot to show you how it works, and the Scrap from her demonstration stays with her.",
+          "Tinkering opens when the Mission is done. Tansy takes the Cutter apart on the spot to show you how it works, and the Scrap from her demonstration stays with her.",
         ],
       },
       {
@@ -576,7 +556,7 @@ export const missionGuideArticles = [
           [
             "You may use ",
             fabrication("Manual Override"),
-            " on this first Cutter. If a push wrecks the workpiece, the job just waits for another one.",
+            " on this first Cutter. If a push wrecks the workpiece, the Mission just waits for another one.",
           ],
         ],
       },
@@ -584,6 +564,7 @@ export const missionGuideArticles = [
         heading: "What happens next",
         paragraphs: [["Finishing it starts ", toBreakItDown, " automatically."]],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -595,15 +576,7 @@ export const missionGuideArticles = [
       "Tinker one piece at the Fabrication Station, then tell Tansy Rusk. The second half of her Fabrication lesson.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It teaches Tinkering, the other half of ",
-            fabrication("Fabrication"),
-            ".",
-          ],
-        ],
+        paragraphs: [["Teaches Tinkering, the other half of ", fabrication("Fabrication"), "."]],
       },
       {
         heading: "Where it begins",
@@ -651,6 +624,7 @@ export const missionGuideArticles = [
           ],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -664,9 +638,7 @@ export const missionGuideArticles = [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. This is not a side job: finishing it is the gate for ",
+            "A progression Mission, not an optional one: finishing it gates ",
             toWheelBeRightBack,
             ", ",
             toACutAbove,
@@ -704,7 +676,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Tansy at The Jag. Deep Jag has been on the Map from the start, marked CAVE-IN; once you accept, you can walk down to work on the passage.",
+          "Take the Mission from Tansy at The Jag. Deep Jag has been on the Map from the start, marked CAVE-IN; once you accept, you can walk down to work on the passage.",
           "Haul the material down over as many trips as you like and install it. What you install stays installed.",
           "Weld fifteen passes. The moment the fifteenth lands the passage is open: the map reads MINING, and you can mine Galvanite right there without going back up.",
           "Go back up to The Jag and tell Tansy the Deep Jag is open (Tell Tansy). Your 250 Welding XP is waiting whenever you head back.",
@@ -713,6 +685,7 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
+          "Access to Deep Jag as soon as you accept, so you can work on the passage.",
           "50 Welding XP for each pass as you weld, 750 in all.",
           "250 Welding XP from Tansy when you tell her.",
           [
@@ -725,11 +698,12 @@ export const missionGuideArticles = [
       {
         heading: "What opens up",
         list: [
-          [toWheelBeRightBack, " — Wade's landing-gear job. No skill gate."],
+          [toWheelBeRightBack, " — Wade's landing-gear Mission. No skill gate."],
           [toACutAbove, " — Tansy's Loadsteel Cutter lesson, at Fabrication level 5."],
           [toCuttingCosts, " — Renn's Loadsteel Cutter purchase. No skill gate."],
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -741,15 +715,7 @@ export const missionGuideArticles = [
       "Wade Rusk puts the ship's landing gear back under it: bring 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then weld twelve passes.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It is the middle step of restoring your ship, and it leads to ",
-            toThrustIssues,
-            ".",
-          ],
-        ],
+        paragraphs: [["The middle step of restoring your ship; it leads to ", toThrustIssues, "."]],
       },
       {
         heading: "Where it begins",
@@ -779,7 +745,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Wade at Rusk Recovery.",
+          "Take the Mission from Wade at Rusk Recovery.",
           "Install the parts at the Crash Site across as many visits as you like. What goes in stays in.",
           'Weld the twelve passes. When the twelfth lands the Landing Gear is done for good, and the panel reads "Landing gear restored."',
           "Talk to Wade at Rusk Recovery and choose Report Repair.",
@@ -800,8 +766,9 @@ export const missionGuideArticles = [
       },
       {
         heading: "What opens up",
-        paragraphs: [[toThrustIssues, " — Wade's last ship job, at Welding level 8."]],
+        paragraphs: [[toThrustIssues, " — Wade's last ship Mission, at Welding level 8."]],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -813,15 +780,7 @@ export const missionGuideArticles = [
       "At Welding level 8, Wade Rusk lets you fix the ship's drive: 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets, 1 Galvanic Wire Spool and sixteen passes. The repair is the whole reward.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It is the last repair of the ship, after ",
-            toWheelBeRightBack,
-            ".",
-          ],
-        ],
+        paragraphs: [["The last repair of the ship, after ", toWheelBeRightBack, "."]],
       },
       {
         heading: "Where it begins",
@@ -853,7 +812,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Wade at Rusk Recovery.",
+          "Take the Mission from Wade at Rusk Recovery.",
           "Install the parts at the Crash Site across as many visits as you like. What goes in stays in.",
           'Weld the sixteen passes. When the sixteenth lands the ship is repaired for good and the Crash Site shows it, before you have even spoken to Wade. The Propulsion System panel reads "Propulsion restored. Report to Wade."',
           'Talk to Wade at Rusk Recovery and choose Report Repair. The panel then reads "Propulsion restored. Ship flight-ready."',
@@ -872,6 +831,7 @@ export const missionGuideArticles = [
           "The ship is repaired, but it has no flight controls yet, so there is still nowhere to fly it.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -885,9 +845,7 @@ export const missionGuideArticles = [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. It is a separate advanced Fabrication opportunity, not part of the ship repairs, and it is a different job from ",
+            "A separate advanced Fabrication Mission, not part of the ship repairs, and different from ",
             toCuttingCosts,
             ".",
           ],
@@ -911,7 +869,7 @@ export const missionGuideArticles = [
         heading: "What you need",
         list: [
           [
-            "A Loadsteel Cutter with you. The recipe opens at Fabrication level 5 whether or not you ever take this job — accepting it unlocks nothing — and needs 2 Galvaferrite, 1 Galvanic Wire Spool and 1 Power Cell at the ",
+            "A Loadsteel Cutter with you. The recipe opens at Fabrication level 5 whether or not you ever take this Mission — accepting it unlocks nothing — and needs 2 Galvaferrite, 1 Galvanic Wire Spool and 1 Power Cell at the ",
             fabrication("Fabrication Station"),
             ". No Refining level is needed.",
           ],
@@ -920,8 +878,8 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Tansy at The Jag.",
-          "Get a Loadsteel Cutter, however you like. One you made earlier, made since, traded for or were given all work, carried or equipped, charged or not. If you already have one when you take the job, you can show her straight away.",
+          "Take the Mission from Tansy at The Jag.",
+          "Get a Loadsteel Cutter, however you like. One you made earlier, made since, traded for or were given all work, carried or equipped, charged or not. If you already have one when you take the Mission, you can show her straight away.",
           "Talk to Tansy at The Jag and choose Show Her the Cutter.",
         ],
       },
@@ -937,6 +895,7 @@ export const missionGuideArticles = [
           "If you have only one Cutter and also want Cutting Costs, show it to Tansy first: Renn keeps the one he buys.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -945,14 +904,12 @@ export const missionGuideArticles = [
     category: "getting-started",
     showInIndex: false,
     summary:
-      "An optional job from Renn Calder: repair the Crew Stop on the haul road with 20 Refined Ferrite and ten welding passes.",
+      "An optional Mission from Renn Calder: repair the Crew Stop on the haul road with 20 Refined Ferrite and ten welding passes.",
     sections: [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. It is genuinely optional: nothing hands it to you, nothing is waiting on it, and you can ignore it forever without closing anything off.",
+            "Genuinely optional: nothing hands it to you, nothing is waiting on it, and you can ignore it forever without closing anything off.",
           ],
         ],
       },
@@ -980,7 +937,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Accept the job from Renn.",
+          "Accept the Mission from Renn.",
           "Install the Refined Ferrite and weld the ten passes at the Crew Stop.",
           "Talk to Renn and choose Tell Renn.",
         ],
@@ -991,7 +948,7 @@ export const missionGuideArticles = [
           "50 Welding XP for each pass, 500 in all.",
           "250 Welding XP more when you tell Renn.",
           [
-            "The shelter stays repaired for good. The crews use it every workday and know who fixed it, so they let you ride the shift hauler out to The Jag for ",
+            "Once the repair is done, the shelter stays fixed for good. The crews use it every workday and know who fixed it, so they let you ride the shift hauler out to The Jag for ",
             link("5 Credits a trip", "travel-and-scavenging"),
             ". Only on the way out — the hauler comes back loaded with shale, so you walk home.",
           ],
@@ -1000,9 +957,10 @@ export const missionGuideArticles = [
       {
         heading: "Good to know",
         paragraphs: [
-          "This one costs you rather than paying you up front: the materials and the time are yours. Renn will not chase you about it, and the Crew Stop stays where it is however long you take. No Credits are paid, and no other job depends on it.",
+          "This one costs you rather than paying you up front: the materials and the time are yours. Renn will not chase you about it, and the Crew Stop stays where it is however long you take. No Credits are paid, and no other Mission depends on it.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -1014,17 +972,7 @@ export const missionGuideArticles = [
       "An optional hand-in after Brace Yourself: Renn Calder pays 500 Credits for a Loadsteel Cutter, and keeps it.",
     sections: [
       {
-        paragraphs: [
-          [
-            "Part of the ",
-            missions,
-            " list. It is optional, and it is gated by ",
-            toBraceYourself,
-            " — not by ",
-            toACutAbove,
-            ".",
-          ],
-        ],
+        paragraphs: [["Optional, and gated by ", toBraceYourself, " — not by ", toACutAbove, "."]],
       },
       {
         heading: "Where it begins",
@@ -1049,7 +997,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Renn.",
+          "Take the Mission from Renn.",
           "Make sure the Cutter you bring is not the one you are wearing.",
           "Talk to Renn in Holo Hollow and choose Hand Over the Cutter.",
         ],
@@ -1064,6 +1012,7 @@ export const missionGuideArticles = [
           "If you only have one Loadsteel Cutter and also want A Cut Above, show it to Tansy first. She only looks, and you keep it; Renn does not give it back.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
   {
@@ -1077,9 +1026,7 @@ export const missionGuideArticles = [
       {
         paragraphs: [
           [
-            "Part of the ",
-            missions,
-            " list. It is an optional commission: nothing requires it, and ignoring it changes nothing anywhere else.",
+            "An optional commission: nothing requires it, and ignoring it changes nothing anywhere else.",
           ],
         ],
       },
@@ -1104,7 +1051,7 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the job from Curly. He pays 150 Credits straight away.",
+          "Take the Mission from Curly. He pays 150 Credits straight away.",
           "Install the materials and weld the six passes at the B&B.",
           "Talk to Curly and choose Collect Payment.",
         ],
@@ -1112,16 +1059,17 @@ export const missionGuideArticles = [
       {
         heading: "What you get",
         list: [
-          "150 Credits when you take the job and another 150 when you collect, 300 in all.",
-          "The passes earn their own Welding XP as you go, 50 apiece. The job adds none on top.",
+          "150 Credits when you take the Mission and another 150 when you collect, 300 in all.",
+          "The passes earn their own Welding XP as you go, 50 apiece. The Mission adds none on top.",
         ],
       },
       {
         heading: "Good to know",
         paragraphs: [
-          "The finished mount holds Curly's container, in Curly's room. It is a job finished for him — not storage for you, and not one of your own site stashes.",
+          "The finished mount holds Curly's container, in Curly's room. It is work finished for him — not storage for you, and not one of your own site stashes.",
         ],
       },
+      { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
 ];

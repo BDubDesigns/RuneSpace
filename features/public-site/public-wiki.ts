@@ -956,12 +956,12 @@ const authoredWikiArticles = [
     title: "Missions",
     category: "getting-started",
     summary:
-      "How the Mission Log tracks your jobs, and a guide to each one: where it starts, what it needs, and what it pays.",
+      "How the Mission Log tracks your Missions, and a guide to each one: where it starts, what it needs, and what it pays.",
     sections: [
       {
         paragraphs: [
-          "The Mission Log keeps track of every job you've accepted: what's left to do, what's ready to turn in, and what you've already finished. Each active job shows whether it's Active or ready to Turn in, and opening one leads with its Current Objective before the full list of what it needs, with your progress on each requirement.",
-          "RuneSpace's jobs are not one straight list. There is a starter chain, branches that open up from it, jobs that wait on a skill level, and a few commissions that are genuinely optional. Every job below has its own guide covering where it starts, what it needs, what it pays and when. The order here is a reading order, not a requirement.",
+          "The Mission Log keeps track of every Mission you've accepted: what's left to do, what's ready to turn in, and what you've already finished. Each active Mission shows whether it's Active or ready to Turn in, and opening one leads with its Current Objective before the full list of what it needs, with your progress on each requirement.",
+          "RuneSpace's Missions are not one straight list. There is a starter chain, branches that open up from it, Missions that wait on a skill level, and a few commissions that are genuinely optional. Every Mission below has its own guide covering where it starts, what it needs, what it pays and when. The order here is a reading order, not a requirement.",
         ],
       },
       {
@@ -969,7 +969,7 @@ const authoredWikiArticles = [
         list: [
           [
             { text: "Walk It Off", articleSlug: "mission-walk-it-off" },
-            " — reach The Jag and talk to Tansy Rusk. The first job, with nothing needed first; it hands you a Salvage Cutter.",
+            " — reach The Jag and talk to Tansy Rusk. The first Mission, with nothing needed first; it hands you a Salvage Cutter.",
           ],
           [
             { text: "Cut Your Teeth", articleSlug: "mission-cut-your-teeth" },
@@ -985,7 +985,7 @@ const authoredWikiArticles = [
           ],
           [
             { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
-            " — Wade's apprentice job: meet Bix Weller and get three Power Cells to Tansy. Take it from Wade once Hold It Together is done.",
+            " — Wade's apprenticeship Mission: meet Bix Weller and get three Power Cells to Tansy. Take it from Wade once Hold It Together is done.",
           ],
           [
             { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
@@ -1011,7 +1011,7 @@ const authoredWikiArticles = [
         list: [
           [
             { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
-            " — reopen the cave-in at Deep Jag. Offered by Tansy at The Jag after Break It Down, at Mining 5 and Welding 5. This is not a side job: it leads on to three others.",
+            " — reopen the cave-in at Deep Jag. Offered by Tansy at The Jag after Break It Down, at Mining 5 and Welding 5. This is a progression Mission, not an optional one: it leads on to three others.",
           ],
           [
             { text: "Wheel Be Right Back", articleSlug: "mission-wheel-be-right-back" },
@@ -1036,7 +1036,7 @@ const authoredWikiArticles = [
           ],
           [
             { text: "A Cut Above", articleSlug: "mission-a-cut-above" },
-            " — a separate advanced Fabrication job: show Tansy a Loadsteel Cutter. Needs Brace Yourself and Fabrication 5.",
+            " — a separate advanced Fabrication Mission: show Tansy a Loadsteel Cutter. Needs Brace Yourself and Fabrication 5.",
           ],
           [
             { text: "Cutting Costs", articleSlug: "mission-cutting-costs" },
@@ -1049,34 +1049,35 @@ const authoredWikiArticles = [
         ],
       },
       {
-        heading: "How the jobs connect",
+        heading: "How Missions Connect",
         list: [
           "The starter chain runs from Walk It Off to Hold It Together, then through Keep the Change to 10,000 Hours.",
           "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
-          "Brace Yourself opens three jobs: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
+          "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
         ],
       },
       {
-        heading: "Taking and finishing a job",
+        heading: "Starting and Completing Missions",
         paragraphs: [
-          "Some jobs start by themselves: finishing one hands you the next, and there's nothing extra to accept. Everything else you take from the person who offers it — walk to them, talk to them, and choose the job from their list. Offered jobs wait for you to walk up and ask, and a job that waits on a skill level isn't offered until you've reached it.",
-          "Objectives update live as you meet them. When every objective on a job is met, talk to the person named in it to turn it in; that is when the reward arrives.",
+          "Some Missions start by themselves: finishing one hands you the next, and there's nothing extra to accept. Everything else you take from the person who offers it — walk to them, talk to them, and choose the Mission from their list. A Mission that waits on a skill level isn't offered until you've reached it.",
+          "Objectives update live as you meet them. When every objective on a Mission is met, talk to the person named in it to turn it in.",
+          "Rewards and unlocks arrive at different points, depending on the Mission. Some hand you Credits or materials the moment you accept; some pay XP as you do the work itself; some pay out when you turn them in; and some open something up once the work is done. A few pay nothing at turn-in: Keep the Change's Credits come when you accept it, and Thrust Issues' only reward is the Welding XP from the repair itself. Each guide says what arrives when.",
         ],
       },
       {
-        heading: "Pinning a job",
+        heading: "Pinning Missions",
         paragraphs: [
-          "Every job you accept starts pinned: it gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Tap the pin on a strip to unpin it when you don't need to see it for a while: the strip and the job's green and blue highlights on the Map and around the game go quiet together. The job stays accepted and keeps counting your progress, and everything you'd normally do (talking to people, the Map, handing it in) still works. Highlights for jobs you haven't taken yet stay on, and if another pinned job points at the same place it stays lit. Pin it back from the Mission Log at any time.",
+          "Every Mission you accept starts pinned: it gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Tap the pin on a strip to unpin it when you don't need to see it for a while: the strip and the Mission's green and blue highlights on the Map and around the game go quiet together. The Mission stays accepted and keeps counting your progress, and everything you'd normally do (talking to people, the Map, handing it in) still works. Highlights for Missions you haven't taken yet stay on, and if another pinned Mission points at the same place it stays lit. Pin it back from the Mission Log at any time.",
         ],
       },
       {
-        heading: "Following a job",
+        heading: "Following Mission Objectives",
         paragraphs: [
-          "Once you've accepted a job, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
-          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new job for you, or a finished job is ready to hand in. The moment every objective on a job is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted job's own destination is labeled MISSION the same way.",
-          "If that destination is scrolled out of view, the arrow at the edge of the Map pointing toward it turns green or blue to match, and goes back to normal once the place is on screen. A job someone is only offering never lights up the Map.",
-          "When a job can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
+          "Once you've accepted a Mission, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
+          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new Mission for you, or a finished Mission is ready to hand in. The moment every objective on a Mission is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted Mission's own destination is labeled MISSION the same way.",
+          "If that destination is scrolled out of view, the arrow at the edge of the Map pointing toward it turns green or blue to match, and goes back to normal once the place is on screen. A Mission someone is only offering never lights up the Map.",
+          "When a Mission can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
         ],
       },
       {
@@ -1085,7 +1086,7 @@ const authoredWikiArticles = [
           "Talk opens a list of the conversations you can have with that person right now, rather than a single fixed exchange.",
         ],
         list: [
-          "Anything tied to a job comes first, marked Available, Active, Turn in, or Completed. Available and Turn in are highlighted the same way they are out in the world.",
+          "Anything tied to a Mission comes first, marked Available, Active, Turn in, or Completed. Available and Turn in are highlighted the same way they are out in the world.",
           "Below that, Talk about lists subjects you can bring up any time. They're always replayable, and a few only appear once you've finished the work that would make the two of you talk about them.",
           "Back on the first line of a conversation, and Finish at the end, both return you to that person's list. Close leaves the conversation entirely.",
         ],

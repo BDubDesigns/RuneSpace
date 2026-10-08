@@ -75,6 +75,12 @@ Before adding or changing a fact, check the relevant authoritative content
 docs (`docs/gameplay-foundations.md`, `docs/missions.md`) rather than
 reasoning from memory or from prose.
 
+Terminology: Mission is the official name of the gameplay system (the Mission
+Log, objectives, prerequisites, guides). "Job", "work" and "commission" are fine
+where they describe what an NPC is asking for, and Work Order is the separate
+client-work system. Keep literal in-game labels ("Take the Job") exactly as
+they appear.
+
 Wiki prose is player-facing only. Use exact current in-game names for
 locations, missions, NPCs, items, and skills. Avoid implementation language
 (server authority, resolver, projection, schema, persistence transaction,
@@ -117,7 +123,7 @@ empty placeholder pages for unshipped systems.
 ### Mission guides
 
 There is one deliberate, narrow exception to the rule above. **Each currently
-shipped named Mission gets its own guide**, because players look a job up by name ("how do I
+shipped named Mission gets its own guide**, because players look a Mission up by name ("how do I
 get Brace Yourself", "does Cutting Costs need A Cut Above") and a single page
 for all sixteen buried the answer and mixed unrelated gates. The exception is
 scoped to exactly that:
@@ -127,7 +133,7 @@ scoped to exactly that:
   `mission-10000-hours`). It does not cover items, actions, repair targets, or
   any other registry, and it is not a precedent for a page per entity;
 - `/wiki/missions` stays the hub. It owns the general Mission Log, pinning, and
-  objective-guidance help and lists each guide once, grouped by how the jobs
+  objective-guidance help and lists each guide once, grouped by how the Missions
   actually connect, never as one linear list. Do not repeat that general help
   inside guides, and do not copy walkthroughs into NPC or other generic
   articles; link to the guide instead;
@@ -136,7 +142,7 @@ scoped to exactly that:
   `features/public-site/public-wiki-mission-guides.ts` only to keep
   `public-wiki.ts` readable. They join the same `authoredWikiArticles`
   collection, validation and routes as every other article;
-- a guide covers, as each applies: where the job begins and who offers it,
+- a guide covers, as each applies: where the Mission begins and who offers it,
   prerequisite Missions and skill levels, what it needs, a short walkthrough,
   what is paid and when, caveats, and links to the guides before and after it.
   Distinguish what the offer hands over, XP earned on the action itself, the
@@ -145,7 +151,7 @@ scoped to exactly that:
   what the Mission definition and repair recipes do, and write no reward the
   Mission does not pay;
 - a link that names a specific Mission points at that Mission's guide; a link
-  about the Mission Log or jobs in general points at `missions`.
+  about the Mission Log or Missions in general points at `missions`.
 
 A new shipped Mission adds a hub entry and a guide in the same PR; a changed
 Mission updates its guide (and any gate on the hub) in the same PR. The

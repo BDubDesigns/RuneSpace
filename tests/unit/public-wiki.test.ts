@@ -434,8 +434,8 @@ describe("Mission guides (#339)", () => {
   it("keeps general Mission Log help on the hub instead of repeating it in every guide", () => {
     for (const slug of missionGuideSlugs) {
       const headings = getWikiArticle(slug)!.sections.map((section) => section.heading);
-      expect(headings, slug).not.toContain("Following a job");
-      expect(headings, slug).not.toContain("Pinning a job");
+      expect(headings, slug).not.toContain("Following Mission Objectives");
+      expect(headings, slug).not.toContain("Pinning Missions");
       expect(headings, slug).not.toContain("Talking to people");
     }
   });
