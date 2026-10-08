@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, inventoryItemDefinitions } from "@/game/config/balance";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, MISSION_IDS } from "@/game/config/foundations";
 import {
   ITEM_CATEGORY_BY_ITEM_ID,
   ITEM_CATEGORY_IDS,
   validateItemCategories,
 } from "@/game/content/item-categories";
 import { MERCHANTS } from "@/game/content/merchants";
+import { KEEP_THE_CHANGE_CELL_COUNT } from "@/game/content/missions";
 import {
   buildItemReference,
   defaultItemReferenceRegistries,
@@ -197,7 +198,7 @@ describe("Wiki item pages", () => {
     const missions = cutter.usedIn.find((group) => group.heading === "Missions")!;
     const text = missions.lines.map(lineText).join("\n");
     expect(text).toMatch(/must be equipped/);
-    expect(text).toMatch(/is handed in|is kept/);
+    expect(text).toMatch(/hand in|is kept/);
   });
 
   it("keeps one-time payouts and failure byproducts out of the ordinary sources", () => {
@@ -306,5 +307,229 @@ describe("derivation from canonical data", () => {
         (use) => use.kind === "repair" && use.repairTargetId === "landing_gear",
       ),
     ).toBe(false);
+  });
+});
+
+const hrefs = (lines: readonly WikiItemLine[]) =>
+  lines.flatMap((line) => line.flatMap((s) => (typeof s === "string" ? [] : [s.href])));
+
+describe("Fabrication Station unlock", () => {
+  it("shows the station prerequisite beside, and apart from, the recipe's skill level", () => {
+    const page = buildWikiItemPage(ITEM_IDS.powerCell)!;
+    const facts = page.recipes[0]!.facts.map(lineText);
+    expect(facts[0]).toBe("Requires Fabrication 5");
+    expect(facts[1]).toContain("Needs the Fabrication Station");
+    expect(facts[1]).toContain("accepted Return the Favor");
+    expect(facts[1]).toContain("separate from the skill level");
+    expect(hrefs(page.recipes[0]!.facts)).toContain("/wiki/mission-return-the-favor");
+    // The acquisition line states it too.
+    expect(page.obtain.map(lineText).join("\n")).toContain("accepted Return the Favor");
+    expect(hrefs(page.obtain)).toContain("/wiki/mission-return-the-favor");
+  });
+
+  it("derives the Mission from the station authorization, not from item pages", () => {
+    const { registries } = doctoredRegistries();
+    registries.workstations = {
+      ...registries.workstations,
+      fabricationAuthorizingMissionId: MISSION_IDS.walkItOff,
+    };
+    const page = buildWikiItemPage(ITEM_IDS.mountingBracket, registries)!;
+    expect(hrefs(page.recipes[0]!.facts)).toContain("/wiki/mission-walk-it-off");
+    expect(hrefs(page.recipes[0]!.facts)).not.toContain("/wiki/mission-return-the-favor");
+    // Refining has no station gate.
+    expect(
+      buildWikiItemPage(ITEM_IDS.refinedFerrite)!
+        .recipes.flatMap((recipe) => recipe.facts)
+        .map(lineText)
+        .join("\n"),
+    ).not.toContain("Fabrication Station");
+  });
+});
+
+describe("Tinkering Scrap Metal", () => {
+  function tinkering(registries?: ItemReferenceRegistries) {
+    const source = buildItemReference(ITEM_IDS.scrapMetal, registries)!.sources.find(
+      (candidate) => candidate.kind === "tinkering",
+    );
+    if (source?.kind !== "tinkering") throw new Error("no Tinkering source");
+    return source;
+  }
+
+  it("pays one Scrap per two ingredient units, rounded up, for each eligible item", () => {
+    const source = tinkering();
+    const balance = getEffectiveGameBalance();
+    expect(source.targets.length).toBe(Object.keys(balance.tinkering.targets).length);
+    const units = (itemId: string) => {
+      const recipe = Object.values(balance.fabrication.recipes).find(
+        (candidate) => candidate.outputItemId === itemId,
+      )!;
+      return recipe.inputs.reduce((total, input) => total + input.quantity, 0);
+    };
+    for (const target of source.targets) {
+      expect(target.scrapYield).toBe(Math.ceil(units(target.dismantledItemId) / 2));
+    }
+    // Scrap Box: 1 Bracket + 2 Scrap + 3 Ferrite = 6 units -> 3 Scrap.
+    expect(source.targets.find((t) => t.dismantledItemId === ITEM_IDS.scrapBox)?.scrapYield).toBe(
+      3,
+    );
+  });
+
+  it("follows the formula when the balance changes, and explains the rules", () => {
+    const { registries, balance } = doctoredRegistries();
+    balance.tinkering.inputUnitsPerScrap = 3;
+    expect(
+      tinkering(registries).targets.find((t) => t.dismantledItemId === ITEM_IDS.scrapBox)
+        ?.scrapYield,
+    ).toBe(2);
+
+    const text = buildWikiItemPage(ITEM_IDS.scrapMetal)!.obtain.map(lineText).join("\n");
+    expect(text).toContain("consumes the dismantled item");
+    expect(text).toContain("only Scrap Metal, never the ingredients");
+    expect(text).toContain("completed Return the Favor");
+    expect(text).toContain("Auto-discard Scrap");
+    expect(text).toContain("Dismantle 1 Scrap Box (Fabrication 1) for 3 Scrap Metal.");
+    expect(text).toContain("Rusk Recovery");
+  });
+
+  it("is a source of Scrap Metal only", () => {
+    for (const itemId of shippedIds) {
+      const kinds = buildItemReference(itemId)!.sources.map((source) => source.kind);
+      expect(kinds.includes("tinkering"), itemId).toBe(itemId === ITEM_IDS.scrapMetal);
+    }
+  });
+});
+
+describe("Practice Welding Slag", () => {
+  it("documents Slag per weld, its Scrap cost, the unlock and the room rules", () => {
+    const text = buildWikiItemPage(ITEM_IDS.slag)!.obtain.map(lineText).join("\n");
+    expect(text).toContain("each complete practice weld of 10 sections spends 2 Scrap Metal");
+    expect(text).toContain("produces up to 2 Slag");
+    expect(text).toContain("accepted 10,000 Hours");
+    expect(text).toContain("Rusk Recovery");
+    expect(text).toContain("thrown out");
+    expect(text).toContain("Auto-discard Slag");
+    expect(hrefs(buildWikiItemPage(ITEM_IDS.slag)!.obtain)).toContain("/wiki/items/scrap-metal");
+  });
+
+  it("reads the quantities and unlock from the balance and workstation content", () => {
+    const { registries, balance } = doctoredRegistries();
+    balance.practiceWelding.slagPerWeld = 5;
+    balance.practiceWelding.scrapPerWeld = 3;
+    registries.workstations = {
+      ...registries.workstations,
+      practiceAuthorizingMissionId: MISSION_IDS.walkItOff,
+    };
+    const text = buildWikiItemPage(ITEM_IDS.slag, registries)!.obtain.map(lineText).join("\n");
+    expect(text).toContain("spends 3 Scrap Metal");
+    expect(text).toContain("up to 5 Slag");
+    expect(text).toContain("accepted Walk It Off");
+  });
+
+  it("is a Slag-only source that never joins the failure byproducts", () => {
+    for (const itemId of shippedIds) {
+      const reference = buildItemReference(itemId)!;
+      const has = reference.sources.some((source) => source.kind === "practice_welding");
+      expect(has, itemId).toBe(itemId === ITEM_IDS.slag);
+    }
+    const slag = buildItemReference(ITEM_IDS.slag)!;
+    expect(slag.byproducts.map((byproduct) => byproduct.recipeActionId).length).toBe(2);
+    expect(slag.oneTime).toEqual([]);
+  });
+});
+
+describe("Mission item quantities under Used In", () => {
+  const missionLine = (itemId: string, registries?: ItemReferenceRegistries) =>
+    buildWikiItemPage(itemId, registries)!
+      .usedIn.filter((group) => group.heading === "Missions")
+      .flatMap((group) => group.lines)
+      .map(lineText);
+
+  it("states an explicit quantity and what happens to it", () => {
+    expect(missionLine(ITEM_IDS.powerCell)).toContain(
+      `Keep the Change — carry and hand in ${KEEP_THE_CHANGE_CELL_COUNT} Power Cells.`,
+    );
+  });
+
+  it("resolves a full-stack requirement from the item's stack limit", () => {
+    expect(missionLine(ITEM_IDS.ferriteShale)).toContain(
+      "Cut Your Teeth — carry and show 10 Ferrite Shale (a full stack); it is kept.",
+    );
+    const { registries, balance } = doctoredRegistries();
+    balance.items.ferriteShale.stackLimit = 4;
+    expect(missionLine(ITEM_IDS.ferriteShale, registries)).toContain(
+      "Cut Your Teeth — carry and show 4 Ferrite Shale (a full stack); it is kept.",
+    );
+  });
+
+  it("follows an edited explicit quantity and keeps equipped distinct", () => {
+    const { registries } = doctoredRegistries();
+    registries.missions = registries.missions.map((mission) =>
+      mission.id === MISSION_IDS.keepTheChange
+        ? {
+            ...mission,
+            requirements: mission.requirements.map((requirement) =>
+              requirement.kind === "carried_stack" ? { ...requirement, quantity: 4 } : requirement,
+            ),
+          }
+        : mission,
+    );
+    expect(missionLine(ITEM_IDS.powerCell, registries)).toContain(
+      "Keep the Change — carry and hand in 4 Power Cells.",
+    );
+    expect(missionLine(ITEM_IDS.salvageCutter).join("\n")).toContain(
+      "Cut Your Teeth — Salvage Cutter must be equipped.",
+    );
+  });
+
+  it("links the Mission guide and does not repeat a repair a Mission only observes", () => {
+    const page = buildWikiItemPage(ITEM_IDS.powerCell)!;
+    const missions = page.usedIn.find((group) => group.heading === "Missions")!;
+    expect(hrefs(missions.lines)).toContain("/wiki/mission-keep-the-change");
+    // Hold It Together only observes the Cargo Hold repair, which Repairs already lists.
+    const refined = buildItemReference(ITEM_IDS.refinedFerrite)!;
+    expect(
+      refined.uses.some(
+        (use) => use.kind === "mission_requirement" && use.missionId === MISSION_IDS.holdItTogether,
+      ),
+    ).toBe(false);
+    expect(refined.uses.some((use) => use.kind === "repair")).toBe(true);
+  });
+});
+
+describe("source gating is unchanged for the in-game resolver", () => {
+  it("keeps Tinkering and Practice Welding out of the character-aware resolver", () => {
+    const everything: ItemSourceFacts = {
+      skillLevels: { fabrication: 99, refining: 99, mining: 99, welding: 99 },
+      acceptedMissionIds: new Set(Object.values(MISSION_IDS)),
+      completedMissionIds: new Set(Object.values(MISSION_IDS)),
+      fabricationStationUnlocked: true,
+      locationStates: Object.fromEntries(
+        defaultItemReferenceRegistries().locations.map((location) => [
+          location.id,
+          { availableActionIds: location.availableActionIds },
+        ]),
+      ),
+    };
+    for (const itemId of [ITEM_IDS.scrapMetal, ITEM_IDS.slag]) {
+      const kinds: string[] = resolveItemSources(itemId, everything).map((source) => source.kind);
+      expect(kinds).not.toContain("tinkering");
+      expect(kinds).not.toContain("practice_welding");
+    }
+  });
+
+  it("leaves the ordinary source kinds of Scrap Metal and Slag in their prior order", () => {
+    expect(buildItemReference(ITEM_IDS.scrapMetal)!.sources.map((s) => s.kind)).toEqual([
+      "fabricate",
+      "fabricate",
+      "merchant",
+      "tinkering",
+      "player_trade",
+    ]);
+    expect(buildItemReference(ITEM_IDS.slag)!.sources.map((s) => s.kind)).toEqual([
+      "refine",
+      "refine",
+      "practice_welding",
+      "player_trade",
+    ]);
   });
 });

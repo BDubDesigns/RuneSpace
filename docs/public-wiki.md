@@ -120,8 +120,7 @@ create a page per internal registry/entity, item, action, or mechanic by
 default — a new page earns its place only when the genuinely new player-facing
 information volume warrants a standalone article. The Mission guides,
 named-character pages and derived item reference below are the deliberate
-exceptions. Do not add
-empty placeholder pages for unshipped systems.
+exceptions. Do not add empty placeholder pages for unshipped systems.
 
 ### Mission guides
 
@@ -158,7 +157,61 @@ scoped to exactly that:
 
 A new shipped Mission adds a hub entry and a guide in the same PR; a changed
 Mission updates its guide (and any gate on the hub) in the same PR. The
-Items & Recipes catalog is separate future work and is not part of this.
+Items & Recipes reference below is separate from this.
+
+### Items & Recipes (derived reference)
+
+`/wiki/items` and `/wiki/items/<slug>` are **not editorial articles** and are
+not in `authoredWikiArticles`. They are a generated reference to the shipped
+item registry, and a deliberate exception to the "no page per registry entry"
+rule. It covers items only; it is not a precedent for a page per action,
+recipe, location or merchant, and there is still no separate recipe article.
+
+- **Eligible items** are `inventoryItemDefinitions()` in
+  `game/config/balance.ts` — the shipped inventory registry, not `ITEM_IDS`,
+  which also names IDs that are not shipped items. The directory lists each
+  exactly once; the slug is the stable item ID with `_` as `-`
+  (`wheel_assembly` → `wheel-assembly`), never the display name. Unknown slugs
+  and extra path segments 404.
+- **Four editorial categories** (`game/content/item-categories.ts`) classify what
+  an item *is*, never how it is obtained: Ores & Gemstones, Processed Materials,
+  Components & Supplies, Tools & Containers. `validateItemCategories` fails the
+  build when a shipped item has no category, a category names something that is
+  not shipped, or a category is empty. A newly shipped item therefore needs one
+  line there and nothing else.
+- **Nothing is hand-copied.** Mass, stack capacity, equipment facts, recipes,
+  prices, daily limits, Secondary Find odds, repair requirements and Mission
+  requirements are read from their owning registries by
+  `game/domain/item-reference.ts` and worded in
+  `features/public-site/public-item-wiki.ts`. Do not add a number to either
+  page's wording; change the registry and the Wiki follows.
+- **Page layout**, in order and only when applicable: header and Properties;
+  How to Obtain (ordinary sources, then separately labelled one-time Mission
+  payouts and Refining-failure byproducts); Recipes (every Fabrication or
+  Refining recipe that makes the item, with linked ingredients); Used In
+  (recipe inputs, repair materials, and Mission requirements with their exact
+  quantity, labelled as equipped, shown or handed in).
+- **Public, not character-aware.** The Wiki lists every shipped source and states
+  gates as requirements. It deliberately does not call the in-game resolver
+  (`game/domain/item-sources.ts`, #326), whose discovery rules hide what a given
+  character has not met; that behaviour is unchanged.
+- **Workstation unlocks.** A Fabrication recipe states the Fabrication Station's
+  unlock Mission (accepting it) separately from its skill level; both apply. The
+  Missions come from `RUSK_RECOVERY_CONTENT`, never from item pages. Scrap Metal
+  lists Tinkering (yield from `tinkeringScrapYield`, unlocked by completing its
+  Mission; the dismantled item is consumed) and Slag lists Practice Welding
+  (Scrap cost and Slag per weld from the Practice Welding balance, opened by
+  accepting its Mission; Slag that does not fit is thrown out). Practice Slag is
+  worded as a by-product that costs Scrap.
+- **Wording rules.** A Secondary Find chance is stated per *successful*
+  extraction, from its authored `oneIn`. Scavenging has no verified public
+  probability and is described qualitatively. A merchant's `buyPrice` (what they
+  pay the player) is never a source. Do not invent flavour text: only an item's
+  authored `description` is shown, and an item without one gets a plain summary
+  derived from its kind, group and mass.
+- **Not covered:** Work Order payouts are not an item source, and pages do not
+  yet list Tinkering or Practice Welding as *uses* of the items they consume.
+  Mission links point at the published Mission guides.
 
 ### Named-character pages
 

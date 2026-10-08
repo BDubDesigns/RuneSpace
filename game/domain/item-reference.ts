@@ -7,19 +7,22 @@ import {
   refiningRecipeIsDeterministic,
   refiningRecipes,
   repairTargetBalances,
+  tinkeringTargets,
   type EffectiveGameBalance,
   type EquipmentDefinition,
   type ItemDefinition,
   type RepairTargetBalance,
 } from "@/game/config/balance";
-import { ACTION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 import { LOCAL_PLACES } from "@/game/content/local-places";
 import { LOCATIONS } from "@/game/content/locations";
 import { MERCHANTS } from "@/game/content/merchants";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
+import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { REPAIR_TARGETS, type RepairTargetDefinition } from "@/game/content/repair-targets";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
 import { isItemTransferable } from "@/game/domain/player-trade";
+import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import type { FixedClaimSource } from "@/game/domain/item-sources";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
@@ -66,6 +69,11 @@ export type ItemReferenceRecipe =
       outputItemId: string;
       skillId: string;
       minimumLevel: number;
+      /**
+       * The Mission whose ACCEPTANCE opens the Fabrication Station. A separate
+       * requirement from `minimumLevel`: both must hold, independently.
+       */
+      stationOpensWithMissionId: string;
       locations: readonly ItemReferenceLocation[];
       inputs: readonly ItemReferenceInput[];
       outputQuantity: number;
@@ -125,6 +133,40 @@ export type ItemReferenceSource =
       quantity: number;
       cadence: "daily";
     }
+  | {
+      /**
+       * Dismantling a finished Fabrication item at the station. The item is
+       * consumed; only Scrap comes back. One entry per eligible item.
+       */
+      kind: "tinkering";
+      skillId: string;
+      locations: readonly ItemReferenceLocation[];
+      /** The Mission whose COMPLETION unlocks Tinkering. */
+      unlocksWithMissionId: string;
+      targets: readonly {
+        actionId: string;
+        dismantledItemId: string;
+        dismantledQuantity: number;
+        /** The Fabrication level the dismantled item's own recipe asks for. */
+        minimumLevel: number;
+        scrapYield: number;
+      }[];
+    }
+  | {
+      /**
+       * Completing practice welds at the Workbench. Slag is the by-product of
+       * practice that costs Scrap Metal each weld, not a purchase or a recipe.
+       */
+      kind: "practice_welding";
+      actionId: string;
+      skillId: string;
+      locations: readonly ItemReferenceLocation[];
+      /** The Mission whose ACCEPTANCE opens the Workbench. */
+      opensWithMissionId: string;
+      scrapPerWeld: number;
+      slagPerWeld: number;
+      sectionsPerWeld: number;
+    }
   | { kind: "scavenge" }
   | { kind: "player_trade" };
 
@@ -158,7 +200,10 @@ export type ItemReferenceUse =
       missionId: string;
       /** show: inspected only; consume: handed in; equip: must be equipped. */
       disposition: "show" | "consume" | "equip";
-      quantity?: number;
+      /** How many the requirement asks for. */
+      quantity: number;
+      /** The requirement is "one full stack": the quantity is the stack limit. */
+      fullStack?: true;
     };
 
 export type ItemReferenceProperties = {
@@ -186,6 +231,13 @@ export type ItemReferenceRegistries = {
   fixedClaims: readonly FixedClaimSource[];
   repairTargets: readonly RepairTargetDefinition[];
   missions: readonly MissionDefinition[];
+  /** Which Mission opens each of Wade's and Tansy's workstations. */
+  workstations: Pick<
+    typeof RUSK_RECOVERY_CONTENT,
+    | "fabricationAuthorizingMissionId"
+    | "tinkeringAuthorizingMissionId"
+    | "practiceAuthorizingMissionId"
+  >;
 };
 
 export function defaultItemReferenceRegistries(): ItemReferenceRegistries {
@@ -198,6 +250,7 @@ export function defaultItemReferenceRegistries(): ItemReferenceRegistries {
     fixedClaims: [POWER_ANNEX_CLAIM],
     repairTargets: REPAIR_TARGETS,
     missions: MISSIONS,
+    workstations: RUSK_RECOVERY_CONTENT,
   };
 }
 
@@ -250,6 +303,7 @@ export function publicRecipes(registries: ItemReferenceRegistries): readonly Ite
       outputItemId: recipe.outputItemId,
       skillId: balance.fabrication.skillId,
       minimumLevel: recipe.minimumLevel,
+      stationOpensWithMissionId: registries.workstations.fabricationAuthorizingMissionId,
       locations: locationsHostingAction(recipe.actionId, locations),
       inputs: inputsOf(recipe.inputs),
       outputQuantity: recipe.outputQuantity,
@@ -291,18 +345,34 @@ function materialsOf(target: RepairTargetBalance): readonly ItemReferenceInput[]
 }
 
 /** Mission requirements that name an item, without repeating a repair a Mission only observes. */
-function missionItemUses(itemId: string, missions: readonly MissionDefinition[]) {
+function missionItemUses(
+  itemId: string,
+  missions: readonly MissionDefinition[],
+  balance: EffectiveGameBalance,
+) {
   const uses: ItemReferenceUse[] = [];
   for (const mission of missions) {
     for (const requirement of mission.requirements) {
       if (requirement.kind === "equipped_item" && requirement.itemId === itemId) {
-        uses.push({ kind: "mission_requirement", missionId: mission.id, disposition: "equip" });
+        uses.push({
+          kind: "mission_requirement",
+          missionId: mission.id,
+          disposition: "equip",
+          quantity: 1,
+        });
       } else if (requirement.kind === "carried_stack" && requirement.itemId === itemId) {
+        // An omitted quantity means one full stack, resolved from the item's
+        // own stack limit exactly as Mission projection does.
+        const definition = getItemDefinition(itemId, balance);
+        const fullStack = requirement.quantity === undefined;
+        const quantity =
+          requirement.quantity ?? (definition?.kind === "stack" ? definition.stackLimit : 1);
         uses.push({
           kind: "mission_requirement",
           missionId: mission.id,
           disposition: requirement.turnIn === "show" ? "show" : "consume",
-          ...(requirement.quantity !== undefined ? { quantity: requirement.quantity } : {}),
+          quantity,
+          ...(fullStack ? { fullStack: true as const } : {}),
         });
       } else if (requirement.kind === "carried_unique_item" && requirement.itemId === itemId) {
         uses.push({
@@ -424,6 +494,49 @@ export function buildItemReference(
     });
   }
 
+  // Tinkering recovers Scrap from a finished item; the yield is the same
+  // universal rule the station applies (`tinkeringScrapYield`).
+  if (itemId === balance.tinkering.recoveredItemId) {
+    const targets = tinkeringTargets(balance).map((target) => ({
+      target,
+      locations: locationsHostingAction(target.actionId, registries.locations),
+    }));
+    const locations = targets
+      .flatMap((entry) => entry.locations)
+      .filter(
+        (location, index, all) =>
+          all.findIndex((other) => other.locationId === location.locationId) === index,
+      );
+    sources.push({
+      kind: "tinkering",
+      skillId: balance.tinkering.skillId,
+      locations,
+      unlocksWithMissionId: registries.workstations.tinkeringAuthorizingMissionId,
+      targets: targets.map(({ target }) => ({
+        actionId: target.actionId,
+        dismantledItemId: target.recipe.outputItemId,
+        dismantledQuantity: target.recipe.outputQuantity,
+        minimumLevel: target.recipe.minimumLevel,
+        scrapYield: tinkeringScrapYield(target.recipe, balance),
+      })),
+    });
+  }
+
+  // Practice Welding turns Scrap Metal into Slag, a few welds at a time.
+  if (itemId === ITEM_IDS.slag) {
+    const practice = balance.practiceWelding;
+    sources.push({
+      kind: "practice_welding",
+      actionId: practice.actionId,
+      skillId: practice.skillId,
+      locations: locationsHostingAction(practice.actionId, registries.locations),
+      opensWithMissionId: registries.workstations.practiceAuthorizingMissionId,
+      scrapPerWeld: practice.scrapPerWeld,
+      slagPerWeld: practice.slagPerWeld,
+      sectionsPerWeld: practice.sectionsPerWeld,
+    });
+  }
+
   if (registries.scavengeOutcomes.some((outcome) => outcome.itemId === itemId)) {
     sources.push({ kind: "scavenge" });
   }
@@ -468,7 +581,7 @@ export function buildItemReference(
       uses.push({ kind: "repair", repairTargetId: target.id, quantity: material.quantity });
     }
   }
-  uses.push(...missionItemUses(itemId, registries.missions));
+  uses.push(...missionItemUses(itemId, registries.missions, balance));
 
   return {
     itemId,

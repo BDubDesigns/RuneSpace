@@ -1,5 +1,5 @@
 import { getItemDefinition, inventoryItemDefinitions } from "@/game/config/balance";
-import { SKILL_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
   ITEM_CATEGORIES,
   ITEM_CATEGORY_BY_ITEM_ID,
@@ -181,11 +181,21 @@ function locationPhrase(locations: readonly ItemReferenceLocation[]): WikiItemLi
   return parts;
 }
 
+function stationRequirement(missionId: string): WikiItemLine {
+  return [
+    "Needs the Fabrication Station, which opens once you have accepted ",
+    missionLink(missionId),
+    ". This is separate from the skill level; you need both.",
+  ];
+}
+
 function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
   const facts: WikiItemLine[] = [
     [`Requires ${skillRequirement(recipe.skillId, recipe.minimumLevel)}`],
-    ["Where: ", ...locationPhrase(recipe.locations)],
   ];
+  // The station is a separate gate from the recipe's level: both apply.
+  if (recipe.kind === "fabricate") facts.push(stationRequirement(recipe.stationOpensWithMissionId));
+  facts.push(["Where: ", ...locationPhrase(recipe.locations)]);
   if (recipe.kind === "refine") {
     if (recipe.deterministic) {
       facts.push(["Always succeeds"]);
@@ -234,8 +244,19 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
         ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) — `,
         ...locationPhrase(recipe.locations),
         ".",
+        ...(recipe.kind === "fabricate"
+          ? [
+              " Needs the Fabrication Station, which opens once you have accepted ",
+              missionLink(recipe.stationOpensWithMissionId),
+              ".",
+            ]
+          : []),
       ];
     }
+    case "tinkering":
+    case "practice_welding":
+      // Worded by `sourceLines`, which can emit several bullets.
+      return [];
     case "mine":
       return source.role === "primary"
         ? ["Mine it — ", ...locationPhrase(source.locations), "."]
@@ -285,7 +306,44 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
   }
 }
 
-function useLine(use: ItemReferenceUse): { group: string; line: WikiItemLine } {
+/** One or more bullets for a source; Tinkering lists each eligible item. */
+function sourceLines(itemId: string, source: ItemReferenceSource): readonly WikiItemLine[] {
+  if (source.kind === "tinkering") {
+    const scrap = (quantity: number) => itemQuantityLabel(itemId, quantity, itemName(itemId));
+    return [
+      [
+        "Tinkering — dismantle a finished item at the Fabrication Station (",
+        ...locationPhrase(source.locations),
+        "). Tinkering unlocks once you have completed ",
+        missionLink(source.unlocksWithMissionId),
+        ". It consumes the dismantled item and gives back only Scrap Metal, never the ingredients. You need room for the Scrap unless Auto-discard Scrap is on, in which case it is thrown away; a Mining Cutter cannot be dismantled if it is your last usable one.",
+      ],
+      ...source.targets.map(
+        (target): WikiItemLine => [
+          "Dismantle ",
+          itemLink(target.dismantledItemId, target.dismantledQuantity),
+          ` (${skillRequirement(source.skillId, target.minimumLevel)}) for ${scrap(target.scrapYield)}.`,
+        ],
+      ),
+    ];
+  }
+  if (source.kind === "practice_welding") {
+    return [
+      [
+        `Practice Welding — a by-product, not a purchase: at the Workbench (`,
+        ...locationPhrase(source.locations),
+        `) each complete practice weld of ${source.sectionsPerWeld} sections spends `,
+        itemLink(ITEM_IDS.scrapMetal, source.scrapPerWeld),
+        ` and produces up to ${itemQuantityLabel(itemId, source.slagPerWeld, itemName(itemId))}. The Workbench opens once you have accepted `,
+        missionLink(source.opensWithMissionId),
+        ". Slag is kept while you have room and whatever does not fit is thrown out; with Auto-discard Slag on, all of it is.",
+      ],
+    ];
+  }
+  return [sourceLine(itemId, source)];
+}
+
+function useLine(itemId: string, use: ItemReferenceUse): { group: string; line: WikiItemLine } {
   switch (use.kind) {
     case "recipe_input":
       return {
@@ -307,12 +365,13 @@ function useLine(use: ItemReferenceUse): { group: string; line: WikiItemLine } {
       return { group: "Repairs", line };
     }
     case "mission_requirement": {
+      const label = `${itemQuantityLabel(itemId, use.quantity, itemName(itemId))}${use.fullStack ? " (a full stack)" : ""}`;
       const verb =
         use.disposition === "equip"
-          ? "must be equipped"
+          ? `${itemName(itemId)} must be equipped`
           : use.disposition === "show"
-            ? "must be carried and shown, and is kept"
-            : "must be carried and is handed in";
+            ? `carry and show ${label}; it is kept`
+            : `carry and hand in ${label}`;
       return {
         group: "Missions",
         line: [missionLink(use.missionId), ` — ${verb}.`],
@@ -387,7 +446,7 @@ export function buildWikiItemPage(
 
   const usedIn = new Map<string, WikiItemLine[]>();
   for (const use of reference.uses) {
-    const { group, line } = useLine(use);
+    const { group, line } = useLine(itemId, use);
     usedIn.set(group, [...(usedIn.get(group) ?? []), line]);
   }
 
@@ -430,7 +489,7 @@ export function buildWikiItemPage(
       reference,
       registries.balance.mining.powerCellBoost.speedMultiplier,
     ),
-    obtain: reference.sources.map((source) => sourceLine(itemId, source)),
+    obtain: reference.sources.flatMap((source) => sourceLines(itemId, source)),
     oneTime,
     byproducts,
     recipes: reference.recipes.map(recipeView),
