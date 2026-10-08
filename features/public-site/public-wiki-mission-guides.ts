@@ -841,7 +841,7 @@ export const missionGuideArticles = [
           [
             "2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, installed at the Crash Site. You can ",
             fabrication("fabricate"),
-            " Drive Mounts at Fabrication 8, or trade for them or be given them — nobody sells one — and the same goes for the other parts. Fabricating is not required.",
+            " Drive Mounts at Fabrication 8, or trade for them or be given them, and the same goes for the other parts. Fabricating is not required.",
           ],
           [
             "Sixteen ",

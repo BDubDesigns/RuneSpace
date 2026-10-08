@@ -1060,7 +1060,7 @@ const authoredWikiArticles = [
       {
         heading: "Taking and finishing a job",
         paragraphs: [
-          "Some jobs start by themselves: finishing one hands you the next, and there's nothing extra to accept. Everything else you take from the person who offers it — walk to them, talk to them, and choose the job from their list. Nobody comes to find you, and a job that waits on a skill level isn't offered until you've reached it.",
+          "Some jobs start by themselves: finishing one hands you the next, and there's nothing extra to accept. Everything else you take from the person who offers it — walk to them, talk to them, and choose the job from their list. Offered jobs wait for you to walk up and ask, and a job that waits on a skill level isn't offered until you've reached it.",
           "Objectives update live as you meet them. When every objective on a job is met, talk to the person named in it to turn it in; that is when the reward arrives.",
         ],
       },
