@@ -1,4 +1,5 @@
 import { WIKI_CATEGORIES, WikiArticleSchema } from "@/game/schemas/public-wiki";
+import { missionGuideArticles } from "./public-wiki-mission-guides";
 import { COMMUNITY_RULES_SLUG, SAFETY_PRIVACY_SLUG } from "./policy-links";
 import type { WikiArticle, WikiCategoryId, WikiParagraph } from "@/game/schemas/public-wiki";
 
@@ -107,7 +108,7 @@ const authoredWikiArticles = [
           ],
           [
             "Deep Jag — the lower workings, southwest of The Jag and reachable only from it. It shows on your map from the start, marked CAVE-IN, and you cannot walk into it: the passage is blocked by fallen rock until you reopen it during ",
-            { text: "Brace Yourself", articleSlug: "missions" },
+            { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
             ". After that it is an ordinary walk, and the map reads MINING.",
           ],
         ],
@@ -124,7 +125,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Once you've repaired the Crew Stop for Renn Calder in ",
-            { text: "Out of the Weather", articleSlug: "missions" },
+            { text: "Out of the Weather", articleSlug: "mission-out-of-the-weather" },
             ", the mining crews will let you ride their shift hauler out from Holo Hollow to The Jag.",
           ],
           "It costs 5 Credits every ride — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
@@ -193,7 +194,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Deep Jag, the lower workings southwest of The Jag, gives Galvanite once you have reopened it — see ",
-            { text: "Brace Yourself", articleSlug: "missions" },
+            { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
             ". It is harder rock and slower going: about nine seconds an attempt, with a lower chance of success that keeps improving until Mining 40. A success gives one or two Galvanite and noticeably more Mining experience than shale does.",
           ],
           "Galvanite is unusually conductive, but it does not generate power on its own. Your starter Salvage Cutter handles it, and a charged Power Cell speeds it up the same way. So does a Loadsteel Cutter.",
@@ -539,7 +540,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "The repair opens up once Wade Rusk puts you on the ",
-            { text: "Hold It Together", articleSlug: "missions" },
+            { text: "Hold It Together", articleSlug: "mission-hold-it-together" },
             " job, which arrives automatically after you finish Waste Not. Until then, the Cargo Hold just shows as damaged.",
           ],
         ],
@@ -571,7 +572,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Welding isn't a one-off button for your ship. Once you've learned it, it's something your character knows how to do, and there are other jobs that need it — starting with the Crew Stop in town, which you can repair during ",
-            { text: "Out of the Weather", articleSlug: "missions" },
+            { text: "Out of the Weather", articleSlug: "mission-out-of-the-weather" },
             ".",
           ],
           "Every welding job works the same way and uses the same skill: install its materials, then weld it in passes of about three seconds each, with each finished pass earning the same Welding XP. What changes from job to job is what material it needs and how many passes it takes. The Crew Stop needs 20 Refined Ferrite and ten passes.",
@@ -582,12 +583,12 @@ const authoredWikiArticles = [
           ],
           [
             "Back at the Crash Site, the ship has a second repair after the Cargo Hold: the Landing Gear. It is part of ",
-            { text: "Wheel Be Right Back", articleSlug: "missions" },
+            { text: "Wheel Be Right Back", articleSlug: "mission-wheel-be-right-back" },
             ', and it sits beside the Cargo Hold from the start as a damaged system. Its repair opens up once you have taken that job from Wade. It takes 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool, then twelve passes. You do the welding yourself, but you can buy or trade for any of the parts — you don\'t need Fabrication or Refining levels to install them. Once it is done, the Landing Gear panel reads "Landing gear restored." The ship looks just as wrecked as before, and nothing about it lets you fly.',
           ],
           [
             "The last major repair is the ship's Propulsion System, and it sits beside the Cargo Hold and Landing Gear from the start as another damaged system. It belongs to ",
-            { text: "Thrust Issues", articleSlug: "missions" },
+            { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
             ", and its repair opens up once you have taken that job from Wade. You need Welding level 8 to take the job and to do the work. It takes 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, then sixteen passes. You can buy or trade for any of the parts, and you don't need Fabrication or Refining levels to install them, but the welding is always yours.",
           ],
           'The moment the sixteenth pass lands the ship is physically restored: the Crash Site shows it repaired, and the Propulsion System panel reads "Propulsion restored. Report to Wade." Report to him and it reads "Propulsion restored. Ship flight-ready." The sixteen passes pay their usual Welding XP and Wade adds nothing on top. The ship has no flight controls yet, so there is still nowhere to fly it.',
@@ -677,9 +678,9 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Finish ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             " and Wade moves back to his own yard. Walk in and he will offer you ",
-            { text: "10,000 Hours", articleSlug: "missions" },
+            { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
             "; accepting it hands you six Scrap Metal and opens the workbench.",
           ],
           "He hands over all six pieces or none. Scrap stacks three to a slot, so six pieces take two inventory slots — if you have not got room for all six he will tell you to make room and come back, and nothing is handed over or started until you do. Those six are his to give and don't count against what he'll sell you in a day.",
@@ -766,9 +767,11 @@ const authoredWikiArticles = [
         heading: "Opening the board",
         paragraphs: [
           [
-            "Two things have to be true before Wade will put a customer's property in front of you: Welding level 5, and his own say-so. Once both hold, he offers you 10,001 Hours at Rusk Recovery. Accept it, and the board is yours for good — you do not need to turn the job in first. Turning it in afterward is just Wade looking at the finished work; the board keeps working the whole time either way. See ",
+            "Two things have to be true before Wade will put a customer's property in front of you: Welding level 5, and his own say-so. Once both hold, he offers you ",
+            { text: "10,001 Hours", articleSlug: "mission-10001-hours" },
+            " at Rusk Recovery. Accept it, and the board is yours for good — you do not need to turn the job in first. Turning it in afterward is Wade looking at the finished work and handing over some shop stock; the board keeps working the whole time either way. See ",
             { text: "Missions", articleSlug: "missions" },
-            " for where this sits in the wider job chain.",
+            " for where this sits among the other jobs.",
           ],
         ],
       },
@@ -828,7 +831,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Fabrication is making the piece you need out of processed stock — a bracket, a container, a tool. It is its own skill with its own level, and it happens at the Fabrication Station in Wade Rusk's yard at Rusk Recovery, right beside his welding workshop. Tansy Rusk teaches it: after ",
-            { text: "10,000 Hours", articleSlug: "missions" },
+            { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
             " she comes out to the yard, and taking on her job opens the station.",
           ],
           "Once the station is open, the yard shows two work areas to choose between — the Welding Workshop, with the practice bench and the Work Orders terminal, and the Fabrication Station. Only the one you pick is laid out on screen; Wade and Tansy stay where they are either way.",
@@ -953,211 +956,128 @@ const authoredWikiArticles = [
     title: "Missions",
     category: "getting-started",
     summary:
-      "The jobs Wade Rusk, Tansy Rusk, Renn Calder and Curly hand out, and how the Mission Log tracks them.",
+      "How the Mission Log tracks your Missions, and a guide to each one: where it starts, what it needs, and what it pays.",
     sections: [
       {
         paragraphs: [
-          "The Mission Log keeps track of every job you've accepted: what's left to do, what's ready to turn in, and what you've already finished. Each active job shows whether it's Active or ready to Turn in, and opening one leads with its Current Objective before the full list of what it needs.",
+          "The Mission Log keeps track of every Mission you've accepted: what's left to do, what's ready to turn in, and what you've already finished. Each active Mission shows whether it's Active or ready to Turn in, and opening one leads with its Current Objective before the full list of what it needs, with your progress on each requirement.",
+          "RuneSpace's Missions are not one straight list. There is a starter chain, branches that open up from it, Missions that wait on a skill level, and a few commissions that are genuinely optional. Every Mission below has its own guide covering where it starts, what it needs, what it pays and when. The order here is a reading order, not a requirement.",
         ],
       },
       {
-        heading: "The current chain",
+        heading: "Getting Established",
         list: [
           [
-            "Walk It Off — reach The Jag and talk to Tansy Rusk. Wade can also send you on your way from the Crash Site. Finishing this hands you a ",
-            { text: "Salvage Cutter", articleSlug: "inventory-and-equipment" },
-            ".",
+            { text: "Walk It Off", articleSlug: "mission-walk-it-off" },
+            " — reach The Jag and talk to Tansy Rusk. The first Mission, with nothing needed first; it hands you a Salvage Cutter.",
           ],
           [
-            "Cut Your Teeth — equip your Salvage Cutter, make five ",
-            { text: "Mining attempts", articleSlug: "mining-and-refining" },
-            ", then show Tansy a full stack of Ferrite Shale.",
+            { text: "Cut Your Teeth", articleSlug: "mission-cut-your-teeth" },
+            " — equip the Cutter, make five Mining attempts and show a full stack of Ferrite Shale. Starts by itself after Walk It Off.",
           ],
           [
-            "Waste Not — make five ",
-            { text: "Refining attempts", articleSlug: "mining-and-refining" },
-            " at the Abandoned Processing Yard, then report back to Wade at the Crash Site.",
+            { text: "Waste Not", articleSlug: "mission-waste-not" },
+            " — make five Refining attempts at the Abandoned Processing Yard, then report to Wade. Starts by itself after Cut Your Teeth.",
           ],
           [
-            "Hold It Together — ",
-            { text: "repair the Cargo Hold", articleSlug: "cargo-hold-and-welding" },
-            ", then report the finished repair to Wade.",
+            { text: "Hold It Together", articleSlug: "mission-hold-it-together" },
+            " — repair the Cargo Hold at the Crash Site. Starts by itself after Waste Not.",
           ],
           [
-            "Keep the Change — Wade makes you his apprentice and hands you 36 Credits to get Tansy three ",
-            { text: "Power Cells", articleSlug: "power-cells" },
-            ". Meet Bix Weller in town, then take the cells to Tansy at The Jag.",
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
+            " — Wade's apprenticeship Mission: meet Bix Weller and get three Power Cells to Tansy. Take it from Wade once Hold It Together is done.",
           ],
           [
-            "10,000 Hours — Wade moves back to his own yard at Rusk Recovery and offers you bench time. Accepting it hands you six Scrap Metal; complete three ",
-            { text: "practice welds", articleSlug: "practice-welding" },
-            " and show him the work.",
-          ],
-          [
-            "Return the Favor — once 10,000 Hours is done, Tansy comes out to Rusk Recovery. Take the job and she opens the ",
-            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
-            ": fabricate a Salvage Cutter there yourself, then hand her a Salvage Cutter. Worth 100 Fabrication XP.",
-          ],
-          [
-            "Break It Down — follows straight on from Return the Favor. ",
-            { text: "Tinker", articleSlug: "fabrication-and-tinkering" },
-            " one piece of anything you can take apart, then tell Tansy. Worth 250 Fabrication XP, and she heads back to The Jag afterwards.",
-          ],
-          [
-            "10,001 Hours — once you are Welding level 5, Wade offers you a paying job off his ",
-            { text: "Work Orders", articleSlug: "work-orders" },
-            " terminal at Rusk Recovery. Accepting it is what makes the board yours for good; finishing the job and showing him the work is just the formality. It does not need Return the Favor or Break It Down.",
-          ],
-          [
-            "A Cut Above — once you have finished Brace Yourself and reached Fabrication 5, Tansy at The Jag wants to see you build a ",
-            { text: "Loadsteel Cutter", articleSlug: "fabrication-and-tinkering" },
-            ". The recipe is already open at Fabrication 5 — taking the job doesn't unlock it, and you don't need any Refining. Show her a Loadsteel Cutter you're carrying or have equipped, however you came by it. She lets you keep it. Worth 500 Fabrication XP.",
-          ],
-          [
-            "Wheel Be Right Back — once you have finished Brace Yourself, Wade offers to put the ship's landing gear back under it at Rusk Recovery. Bring 2 Wheel Assemblies, 2 Mounting Brackets and 1 Galvanic Wire Spool to the Crash Site, ",
-            { text: "weld the Landing Gear", articleSlug: "cargo-hold-and-welding" },
-            " in twelve passes, then report to Wade. Worth 250 Welding XP on top of the passes.",
-          ],
-          [
-            "Thrust Issues — once you have finished Wheel Be Right Back and reached Welding level 8, Wade offers to fix the ship's drive at Rusk Recovery. Bring 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool to the Crash Site, ",
-            { text: "weld the Propulsion System", articleSlug: "cargo-hold-and-welding" },
-            " in sixteen passes, then report to Wade. The passes are the whole reward.",
+            { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
+            " — three practice welds at Wade's Workbench in Rusk Recovery. Take it from Wade there after Keep the Change.",
           ],
         ],
       },
       {
-        heading: "Side jobs",
-        paragraphs: [
-          "Not every job is part of the chain. A side job is entirely optional: nothing hands it to you, nothing is waiting on it, and you can ignore it forever without closing anything off.",
-        ],
+        heading: "Learning Fabrication",
         list: [
           [
-            "Out of the Weather — Renn Calder mentions that the Crew Stop out on the haul road is falling apart and nobody owns it enough to fix it. Repairing it takes 20 Refined Ferrite and ten ",
-            { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
-            ". Renn brings it up in town once you've finished Hold It Together — he isn't asking you to do anything about it, and you can decide to pitch in. You don't need Keep the Change first, and it never blocks it.",
+            { text: "Return the Favor", articleSlug: "mission-return-the-favor" },
+            " — fabricate a Salvage Cutter and hand Tansy one. Take it from her at Rusk Recovery after 10,000 Hours.",
           ],
           [
-            "Brace Yourself — Tansy Rusk has known about the cave-in below The Jag for years. Once you have finished Break It Down and reached both Mining 5 and Welding 5, she will ask you to help her reopen it back at The Jag: 25 Refined Ferrite and 5 ",
-            { text: "Power Cells", articleSlug: "power-cells" },
-            " hauled down to Deep Jag, then fifteen welding passes to set the brace. You do not need 10,001 Hours first — Work Orders and Deep Jag are two separate directions out of the same point.",
-          ],
-          [
-            "Cutting Costs — once Brace Yourself is done, Renn Calder in Holo Hollow will pay 500 Credits for a ",
-            { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
-            ". He doesn't care where it came from: one you made, one you were given or traded for, any you are carrying and not wearing. You don't need any Fabrication level or A Cut Above for it. He keeps the Cutter — he's buying it.",
-          ],
-          [
-            "Curly Must-Stash — once the HH B&B is open to you after Keep the Change, ",
-            { text: "Curly", articleSlug: "curly" },
-            " will hire you to build a mount for his storage container. He pays 150 Credits when you take the job and another 150 when you come back to tell him it's done. The mount takes 6 Refined Ferrite and 3 Slag and six ",
-            { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
-            ", which you do right there in the B&B; the passes earn their own Welding XP as you go. The container stays his, in his room — it isn't storage for you.",
+            { text: "Break It Down", articleSlug: "mission-break-it-down" },
+            " — Tinker one piece and tell Tansy. Starts by itself after Return the Favor.",
           ],
         ],
       },
       {
-        heading: "Brace Yourself in detail",
-        paragraphs: [
-          "Deep Jag sits on the map southwest of The Jag from the very beginning, marked CAVE-IN. You can look at it and you cannot go there: the passage is full of fallen rock. Tansy is not being coy about it — it simply was not worth attempting until you had enough hours behind a pick and a torch to be useful down there.",
-          "She has the brace and the jack, which are hers and stay hers. What she needs is the stock to build the support out of and somebody to weld it, and that is the job. You can haul the material down over as many trips as you like; what you install stays installed and never comes back out.",
+        heading: "Deep Jag & Ship Restoration",
+        list: [
           [
-            "The moment the fifteenth pass lands, the passage is open. The scene changes, the map reads MINING, and you can start mining ",
-            { text: "Galvanite", articleSlug: "mining-and-refining" },
-            " right there without going back up first. Tansy's 250 Welding XP is waiting for you at The Jag whenever you do head back — on top of the 750 the fifteen passes already earned.",
+            { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
+            " — reopen the cave-in at Deep Jag. Offered by Tansy at The Jag after Break It Down, at Mining 5 and Welding 5. This is a progression Mission, not an optional one: it leads on to three others.",
+          ],
+          [
+            { text: "Wheel Be Right Back", articleSlug: "mission-wheel-be-right-back" },
+            " — rebuild the ship's landing gear. Take it from Wade at Rusk Recovery after Brace Yourself.",
+          ],
+          [
+            { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
+            " — repair the ship's drive. Take it from Wade after Wheel Be Right Back, at Welding 8.",
           ],
         ],
       },
       {
-        heading: "Wheel Be Right Back in detail",
-        paragraphs: [
-          "Wade won't come find you for this one, and finishing Brace Yourself doesn't start it: walk out to Rusk Recovery and take it from him when you want it. It asks for nothing else first — no Welding level beyond what Brace Yourself already took, no Fabrication or Refining, and you don't need A Cut Above.",
+        heading: "Other Jobs & Opportunities",
+        list: [
           [
-            "Where the parts come from is up to you. You can make Wheel Assemblies at Fabrication 5 at the ",
-            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
-            ", buy them, trade for them or be given them, and the same goes for the Mounting Brackets and the Galvanic Wire Spool. You always do the welding yourself.",
+            { text: "10,001 Hours", articleSlug: "mission-10001-hours" },
+            " — Wade's paying Work Orders, and not side work: it is how the board becomes yours. Needs 10,000 Hours and Welding 5, but not Return the Favor or Break It Down.",
           ],
-          "You can install the parts across as many visits as you like, and what goes in stays in. When the twelfth pass lands the Landing Gear is done for good, and Wade has 250 Welding XP for you on top of the 600 the passes earned. It doesn't make the ship fly: the engine is still dead, and the Crash Site says so.",
-        ],
-      },
-      {
-        heading: "Thrust Issues in detail",
-        paragraphs: [
-          "Wade won't come find you for this one either, and finishing Wheel Be Right Back doesn't start it: reach Welding level 8, walk out to Rusk Recovery and take it from him when you want it. Below level 8 he has nothing to offer you for it. It asks for nothing else first — no Fabrication or Refining level, and you don't need A Cut Above.",
           [
-            "Where the parts come from is up to you. You can make Drive Mounts at Fabrication 8 at the ",
-            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
-            ", trade for them or be given them, and the same goes for the Galvaferrite, the Mounting Brackets and the Galvanic Wire Spool. You always do the welding yourself, and you need Welding level 8 to do it.",
+            { text: "Out of the Weather", articleSlug: "mission-out-of-the-weather" },
+            " — optional. Renn Calder offers a Crew Stop repair after Hold It Together.",
           ],
-          "You can install the parts across as many visits as you like, and what goes in stays in. When the sixteenth pass lands the ship is repaired for good and the Crash Site shows it, before you have even spoken to Wade. Reporting to him is a separate step, and it adds nothing: no extra XP, no Credits and no item. The repair is the reward. The ship is restored, but nothing lets you fly it yet.",
-        ],
-      },
-      {
-        heading: "Out of the Weather in detail",
-        paragraphs: [
-          "This one costs you rather than paying you up front: the materials and the time are yours. Renn won't chase you about it, and the Crew Stop stays where it is however long you take — you can put in some of the Refined Ferrite, go and get more, and come back.",
           [
-            "What you get is worth having. The shelter stays repaired for good, and because the crews use it every workday and know who fixed it, they'll let you ride the shift hauler out to The Jag for ",
-            { text: "5 Credits a trip", articleSlug: "travel-and-scavenging" },
-            ". Only on the way out, though — the hauler comes back loaded with shale, so you walk home. Renn also passes on 250 Welding XP on top of what the welding itself earned you.",
+            { text: "A Cut Above", articleSlug: "mission-a-cut-above" },
+            " — a separate advanced Fabrication Mission: show Tansy a Loadsteel Cutter. Needs Brace Yourself and Fabrication 5.",
+          ],
+          [
+            { text: "Cutting Costs", articleSlug: "mission-cutting-costs" },
+            " — optional. Renn pays 500 Credits for a Loadsteel Cutter once Brace Yourself is done. A Cut Above is not required.",
+          ],
+          [
+            { text: "Curly Must-Stash", articleSlug: "mission-curly-must-stash" },
+            " — an optional paid commission from Curly at HH B&B, once Keep the Change has opened the inn.",
           ],
         ],
       },
       {
-        heading: "How missions work in practice",
-        paragraphs: [
-          "Objectives update live as you meet them. Every job you accept starts pinned: it gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Tap the pin on a strip to unpin it when you don't need to see it for a while: the strip and the job's green and blue highlights on the Map and around the game go quiet together. The job stays accepted and keeps counting your progress, and everything you'd normally do (talking to people, the Map, handing it in) still works. Highlights for jobs you haven't taken yet stay on, and if another pinned job points at the same place it stays lit. Pin it back from the Mission Log at any time. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, Renn offers Cutting Costs in town, and Wade offers Wheel Be Right Back at Rusk Recovery. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+        heading: "How Missions Connect",
+        list: [
+          "The starter chain runs from Walk It Off to Hold It Together, then through Keep the Change to 10,000 Hours.",
+          "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
+          "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
+          "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
         ],
       },
       {
-        heading: "Following a job",
+        heading: "Starting and Completing Missions",
         paragraphs: [
-          "Once you've accepted a job, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
-          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new job for you, or a finished job is ready to hand in. The moment every objective on a job is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted job's own destination is labeled MISSION the same way.",
-          "If that destination is scrolled out of view, the arrow at the edge of the Map pointing toward it turns green or blue to match, and goes back to normal once the place is on screen. A job someone is only offering never lights up the Map.",
-          "When a job can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
+          "Some Missions start by themselves: finishing one hands you the next, and there's nothing extra to accept. Everything else you take from the person who offers it — walk to them, talk to them, and choose the Mission from their list. A Mission that waits on a skill level isn't offered until you've reached it.",
+          "Objectives update live as you meet them. When every objective on a Mission is met, talk to the person named in it to turn it in.",
+          "Rewards and unlocks arrive at different points, depending on the Mission. Some hand you Credits or materials the moment you accept; some pay XP as you do the work itself; some pay out when you turn them in; and some open something up once the work is done. A few pay nothing at turn-in: Keep the Change's Credits come when you accept it, and Thrust Issues' only reward is the Welding XP from the repair itself. Each guide says what arrives when.",
         ],
       },
       {
-        heading: "Keep the Change in detail",
+        heading: "Pinning Missions",
         paragraphs: [
-          "Wade's 36 Credits are a job budget, handed over when you accept. They're yours: three cells cost 36 Credits at Bix's price, but if you already have cells, or claim them free at the Annex, you keep whatever you don't spend. There's no second payout when you finish, and nothing is reimbursed.",
-          [
-            "Meeting Bix is part of the job even if you already have three cells — Wade wants his apprentice to know who keeps useful things on a shelf. Talking to him is all that's required; you never have to buy or sell anything. The three cells themselves can come from anywhere: your ",
-            { text: "Inventory", articleSlug: "inventory-and-equipment" },
-            ", the Annex, or Bix's shelf.",
-          ],
-          "Handing them over takes exactly three cells. Any extras you're carrying stay with you.",
+          "Every Mission you accept starts pinned: it gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Tap the pin on a strip to unpin it when you don't need to see it for a while: the strip and the Mission's green and blue highlights on the Map and around the game go quiet together. The Mission stays accepted and keeps counting your progress, and everything you'd normally do (talking to people, the Map, handing it in) still works. Highlights for Missions you haven't taken yet stay on, and if another pinned Mission points at the same place it stays lit. Pin it back from the Mission Log at any time.",
         ],
       },
       {
-        heading: "10,000 Hours in detail",
+        heading: "Following Mission Objectives",
         paragraphs: [
-          "Turning in Keep the Change ends with Tansy calling Wade to tell him you did the job properly, and Wade telling you to come by the shop. Nothing is accepted for you and nothing lights up on the map: Rusk Recovery has been walkable from the start, and the job is there when you walk in and talk to him.",
-          [
-            "Accepting it is the whole of the onboarding. He hands over six Scrap Metal — three welds' worth — and opens the ",
-            { text: "workbench", articleSlug: "practice-welding" },
-            " and his scrap counter at the same time. He will not let you near real client property yet.",
-          ],
-          "Any three genuine practice welds count, whatever scrap you used: his, scrap you already had, or scrap you bought back from him. Losing his scrap does not dead-end anything — buy two more and carry on. Showing him the finished work pays 50 Credits. The three welds already paid their own Welding XP, so there is no second helping.",
-        ],
-      },
-      {
-        heading: "Return the Favor in detail",
-        paragraphs: [
-          "Tansy gave you your first Cutter. This job is making one of your own — and it has to be one you actually fabricate while the job is open. A Cutter you already had, bought or were given does not count for that part.",
-          "The Cutter you hand her can be any Salvage Cutter you are carrying and not wearing, including the one you just made. She will not take the one in your hand. She takes it apart on the spot to show you how Tinkering works; the Scrap from her demonstration stays with her.",
-          [
-            "You may use ",
-            { text: "Manual Override", articleSlug: "fabrication-and-tinkering" },
-            " on the job. If a push wrecks the Cutter, the job just waits for another one.",
-          ],
-        ],
-      },
-      {
-        heading: "A Cut Above and Cutting Costs",
-        paragraphs: [
-          "A Cut Above only asks to see one. Any Loadsteel Cutter you have with you counts — one you made before taking the job, made since, bought, or were given, carried or equipped, charged or not. If you already have one when you take the job, you can show her straight away. One left in the Cargo Hold isn't with you, so it doesn't count. Tansy only looks — nothing is taken.",
-          "Cutting Costs is the opposite: Renn is buying a Cutter, not checking who built it, so any Loadsteel Cutter you are carrying and not wearing will do. He will not take the one in your hand, and he pays his 500 Credits once.",
+          "Once you've accepted a Mission, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
+          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new Mission for you, or a finished Mission is ready to hand in. The moment every objective on a Mission is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted Mission's own destination is labeled MISSION the same way.",
+          "If that destination is scrolled out of view, the arrow at the edge of the Map pointing toward it turns green or blue to match, and goes back to normal once the place is on screen. A Mission someone is only offering never lights up the Map.",
+          "When a Mission can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
         ],
       },
       {
@@ -1166,13 +1086,14 @@ const authoredWikiArticles = [
           "Talk opens a list of the conversations you can have with that person right now, rather than a single fixed exchange.",
         ],
         list: [
-          "Anything tied to a job comes first, marked Available, Active, Turn in, or Completed. Available and Turn in are highlighted the same way they are out in the world.",
+          "Anything tied to a Mission comes first, marked Available, Active, Turn in, or Completed. Available and Turn in are highlighted the same way they are out in the world.",
           "Below that, Talk about lists subjects you can bring up any time. They're always replayable, and a few only appear once you've finished the work that would make the two of you talk about them.",
           "Back on the first line of a conversation, and Finish at the end, both return you to that person's list. Close leaves the conversation entirely.",
         ],
       },
     ],
   },
+  ...missionGuideArticles,
   {
     slug: "holo-hollow",
     title: "Holo Hollow",
@@ -1242,7 +1163,7 @@ const authoredWikiArticles = [
           "Holo Hollow Community Assistance Center — the old Visitor Center, now handling local assistance and rations. Renn Calder is usually here.",
           [
             "Crew Stop — a covered roadside shelter on the haul road where the mining crews wait for the shift hauler out to The Jag. It starts out falling apart; you can ",
-            { text: "repair it", articleSlug: "missions" },
+            { text: "repair it", articleSlug: "mission-out-of-the-weather" },
             " with ",
             { text: "Welding", articleSlug: "cargo-hold-and-welding" },
             ", and afterwards the crews will give you a ",
@@ -1251,7 +1172,7 @@ const authoredWikiArticles = [
           ],
           [
             "HH B&B — a family bed-and-breakfast from the tourism years, now the town's working inn. Its rooms are held for locals and regular working crews, so the door stays shut to you until you've finished ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             " and the town knows who you are.",
           ],
         ],
@@ -1262,11 +1183,11 @@ const authoredWikiArticles = [
           [
             { text: "Wade Rusk", articleSlug: "wade-rusk" },
             ", who runs recovery and salvage, is at the Crash Site to begin with and at his own yard at Rusk Recovery once you finish ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             ". His niece ",
             { text: "Tansy Rusk", articleSlug: "tansy-rusk" },
             ", a field mechanic and miner, is based out at The Jag, though after ",
-            { text: "10,000 Hours", articleSlug: "missions" },
+            { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
             " she spends a while at Rusk Recovery teaching ",
             { text: "Fabrication", articleSlug: "fabrication-and-tinkering" },
             ".",
@@ -1333,25 +1254,25 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Some missions also grant skill XP when you complete them: ",
-            { text: "Cut Your Teeth", articleSlug: "missions" },
+            { text: "Cut Your Teeth", articleSlug: "mission-cut-your-teeth" },
             " grants +100 Mining XP, ",
-            { text: "Waste Not", articleSlug: "missions" },
+            { text: "Waste Not", articleSlug: "mission-waste-not" },
             " grants +100 Refining XP, ",
-            { text: "Hold It Together", articleSlug: "missions" },
+            { text: "Hold It Together", articleSlug: "mission-hold-it-together" },
             " grants +100 Welding XP, and ",
-            { text: "Out of the Weather", articleSlug: "missions" },
+            { text: "Out of the Weather", articleSlug: "mission-out-of-the-weather" },
             " grants +250 Welding XP on top of what the welding itself paid. ",
-            { text: "Return the Favor", articleSlug: "missions" },
+            { text: "Return the Favor", articleSlug: "mission-return-the-favor" },
             " grants +100 Fabrication XP, ",
-            { text: "Break It Down", articleSlug: "missions" },
+            { text: "Break It Down", articleSlug: "mission-break-it-down" },
             " +250, and ",
-            { text: "A Cut Above", articleSlug: "missions" },
+            { text: "A Cut Above", articleSlug: "mission-a-cut-above" },
             " +500. Not every mission pays in XP — ",
-            { text: "10,000 Hours", articleSlug: "missions" },
+            { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
             " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them, Renn pays 500 Credits for the Loadsteel Cutter in ",
-            { text: "Cutting Costs", articleSlug: "missions" },
+            { text: "Cutting Costs", articleSlug: "mission-cutting-costs" },
             ", and Curly pays 150 Credits when you take on ",
-            { text: "Curly Must-Stash", articleSlug: "missions" },
+            { text: "Curly Must-Stash", articleSlug: "mission-curly-must-stash" },
             " and 150 more when it's done.",
           ],
         ],
@@ -1383,7 +1304,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "To begin with, Wade is at the Crash Site, standing over your ship and revising his estimate downward. Once you finish ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             " he goes back to running his own yard at Rusk Recovery on the northwest edge of town, and that is where you will find him from then on.",
           ],
         ],
@@ -1405,12 +1326,12 @@ const authoredWikiArticles = [
           ],
           [
             "Once you have finished Brace Yourself, he has a ship job for you too: ",
-            { text: "Wheel Be Right Back", articleSlug: "missions" },
+            { text: "Wheel Be Right Back", articleSlug: "mission-wheel-be-right-back" },
             ", rebuilding the landing gear at the Crash Site. He will not tell you where to get the parts, only what you need.",
           ],
           [
             "Once you have finished that and you are a good enough welder, he has the last ship job for you: ",
-            { text: "Thrust Issues", articleSlug: "missions" },
+            { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
             ", fixing the drive. He is no more sentimental about the ship than he ever was. He would like it off his front lawn.",
           ],
           [
@@ -1489,7 +1410,7 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "Below the seam is Deep Jag, closed since the roof came down long before you arrived. Tansy has known about it the whole time and has never mentioned it, because there was nothing to mention until somebody could actually help her reopen it. Once you can, she offers ",
-            { text: "Brace Yourself", articleSlug: "missions" },
+            { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
             ": she brings the brace and the jack, you bring the stock and the torch.",
           ],
           "It is the closest she comes to asking for something for herself, and she does it in the same flat way she explains a tool — the work is what matters, and she assumes you already know that.",
@@ -1603,7 +1524,7 @@ const authoredWikiArticles = [
           ],
           [
             "Finish ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             " and the door is open to you.",
           ],
         ],
@@ -1647,7 +1568,7 @@ const authoredWikiArticles = [
             "Curly is his own contact inside the HH B&B, alongside ",
             { text: "Mara Kells", articleSlug: "mara-kells" },
             ", so you can talk to him once ",
-            { text: "Keep the Change", articleSlug: "missions" },
+            { text: "Keep the Change", articleSlug: "mission-keep-the-change" },
             " has opened the B&B to you.",
           ],
         ],
@@ -1657,10 +1578,10 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             "His first optional job, ",
-            { text: "Curly Must-Stash", articleSlug: "missions" },
+            { text: "Curly Must-Stash", articleSlug: "mission-curly-must-stash" },
             ", is to build a mount for the MYKEA SCHLEPPRAUM-8 he already owns, so it has somewhere to go in his room. It needs ",
             { text: "Welding", articleSlug: "cargo-hold-and-welding" },
-            " level 1, and the Missions page has the details.",
+            " level 1, and its guide has the details.",
           ],
         ],
       },
@@ -1925,16 +1846,29 @@ export function validatePublicWikiArticles(input: readonly unknown[]): readonly 
 }
 
 /**
- * Every declared category must actually have articles.
+ * Whether the `/wiki` landing page's category panels list this article.
+ * Visible unless an article explicitly opts out with `showInIndex: false`;
+ * routing, lookup, and link validation never consult this.
+ */
+export function isWikiArticleIndexed(article: Pick<WikiArticle, "showInIndex">): boolean {
+  return article.showInIndex !== false;
+}
+
+/**
+ * Every declared category must actually list articles on the index.
  *
  * A category with nothing in it would render an empty heading on the index, and
- * a category nobody authored into is a half-finished migration. This is a
- * property of the shipped corpus rather than of any collection, so it is
- * checked here at import time instead of inside `validatePublicWikiArticles`.
+ * a category nobody authored into is a half-finished migration. It counts only
+ * index-visible articles, because a category holding nothing but hidden guides
+ * would still render empty. This is a property of the shipped corpus rather
+ * than of any collection, so it is checked here at import time instead of
+ * inside `validatePublicWikiArticles`.
  */
 export function assertWikiCategoriesArePopulated(articles: readonly WikiArticle[]): void {
   for (const category of WIKI_CATEGORIES) {
-    if (!articles.some((article) => article.category === category.id)) {
+    if (
+      !articles.some((article) => article.category === category.id && isWikiArticleIndexed(article))
+    ) {
       throw new Error(`Wiki category has no articles: ${category.id}`);
     }
   }
@@ -1958,15 +1892,18 @@ export type WikiArticleGroup = {
 
 /**
  * The validated collection grouped for the index: categories in declared
- * order, each holding its articles in authored order. Every category is
- * guaranteed non-empty by `validatePublicWikiArticles`.
+ * order, each holding its index-visible articles in authored order. Articles
+ * with `showInIndex: false` are omitted here but remain routable. Every
+ * category is guaranteed non-empty by `assertWikiCategoriesArePopulated`.
  */
 export function getWikiArticleGroups(): readonly WikiArticleGroup[] {
   return WIKI_CATEGORIES.map((category) => ({
     id: category.id,
     label: category.label,
     description: category.description,
-    articles: wikiArticles.filter((article) => article.category === category.id),
+    articles: wikiArticles.filter(
+      (article) => article.category === category.id && isWikiArticleIndexed(article),
+    ),
   }));
 }
 

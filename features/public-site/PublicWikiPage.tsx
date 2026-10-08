@@ -17,9 +17,10 @@ import { WikiLinkedText } from "./WikiLinkedText";
  *
  * Deliberately navigational rather than a catalog: an intro, one prominent way
  * in for somebody who does not know what to read, and the categories as
- * compact panels of direct article links. Every article stays one tap from
- * here, so there are no category routes to click through and no second table
- * of contents above the panels — the panels are the contents.
+ * compact panels of direct article links. Every article is one tap from here,
+ * or from its directory article (the Mission guides hang off Missions), so
+ * there are no category routes to click through and no second table of
+ * contents above the panels — the panels are the contents.
  */
 export function PublicWikiIndexPage() {
   const groups = getWikiArticleGroups();
