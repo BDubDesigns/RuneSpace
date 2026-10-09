@@ -1883,11 +1883,26 @@ export function getWikiArticles(): readonly WikiArticle[] {
   return wikiArticles;
 }
 
+/** The derived Items & Recipes directory (#338): a route, not an authored article. */
+export const WIKI_ITEMS_PATH = "/wiki/items";
+
+/**
+ * Derived directories the index links beside a category's articles. Each is a
+ * generated route rather than prose, so it is not in `authoredWikiArticles`; the
+ * index lists it once and its pages link themselves.
+ */
+const WIKI_DIRECTORIES: readonly {
+  categoryId: WikiCategoryId;
+  title: string;
+  path: string;
+}[] = [{ categoryId: "gear-and-credits", title: "Items & Recipes", path: WIKI_ITEMS_PATH }];
+
 export type WikiArticleGroup = {
   id: WikiCategoryId;
   label: string;
   description: string;
   articles: readonly WikiArticle[];
+  directories: readonly { title: string; path: string }[];
 };
 
 /**
@@ -1903,6 +1918,9 @@ export function getWikiArticleGroups(): readonly WikiArticleGroup[] {
     description: category.description,
     articles: wikiArticles.filter(
       (article) => article.category === category.id && isWikiArticleIndexed(article),
+    ),
+    directories: WIKI_DIRECTORIES.filter((entry) => entry.categoryId === category.id).map(
+      ({ title, path }) => ({ title, path }),
     ),
   }));
 }

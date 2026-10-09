@@ -117,12 +117,54 @@ test.describe("public Wiki", () => {
     const browse = page.locator("section", {
       has: page.getByRole("heading", { name: "Browse by category", level: 2 }),
     });
-    await expect(browse.getByRole("listitem")).toHaveCount(articleTitles.length);
+    // The articles plus the one derived Items & Recipes directory link.
+    await expect(browse.getByRole("listitem")).toHaveCount(articleTitles.length + 1);
 
     // Every article is still one tap away — no category route in between.
     for (const title of articleTitles) {
       await expect(browse.getByRole("link", { name: title, exact: true })).toHaveCount(1);
     }
+  });
+
+  test("browses Items & Recipes from the index to an item and its ingredient", async ({ page }) => {
+    await page.goto("/wiki");
+    await page.getByRole("link", { name: "Items & Recipes", exact: true }).click();
+
+    await expect(page).toHaveURL("/wiki/items");
+    await expect(page.getByRole("heading", { name: "Items & Recipes", level: 1 })).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", "/wiki/items");
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+      "Ores & Gemstones",
+      "Processed Materials",
+      "Components & Supplies",
+      "Tools & Containers",
+    ]);
+    await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(20);
+
+    await page.getByRole("link", { name: "Wheel Assembly", exact: true }).click();
+    await expect(page).toHaveURL("/wiki/items/wheel-assembly");
+    await expect(page).toHaveTitle("Wheel Assembly — RuneSpace Wiki");
+    await expect(page.getByRole("heading", { name: "Wheel Assembly", level: 1 })).toBeVisible();
+    await expect(page.getByRole("img", { name: /wheel/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "← Items & Recipes" })).toHaveAttribute(
+      "href",
+      "/wiki/items",
+    );
+    for (const heading of ["Properties", "How to Obtain", "Recipes", "Used In"]) {
+      await expect(page.getByRole("heading", { name: heading, level: 2 })).toBeVisible();
+    }
+
+    await page
+      .getByRole("region", { name: "Recipes" })
+      .getByRole("link", { name: "3 Refined Ferrite", exact: true })
+      .click();
+    await expect(page).toHaveURL("/wiki/items/refined-ferrite");
+  });
+
+  test("404s an unknown item and extra item path segments", async ({ request }) => {
+    expect((await request.get("/wiki/items/not-an-item")).status()).toBe(404);
+    expect((await request.get("/wiki/items/wheel-assembly/extra")).status()).toBe(404);
+    expect((await request.get("/wiki/items/wheel_assembly")).status()).toBe(404);
   });
 
   test("keeps the landing page free of per-article summary cards", async ({ page }) => {
