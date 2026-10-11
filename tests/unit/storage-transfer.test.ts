@@ -154,6 +154,7 @@ function cargoState(): PlayGameplayState {
       recentAttempts: [],
     },
     autoDiscardSlag: false,
+    prioritizePrimaryResources: false,
     unpinnedMissionIds: [],
     refiningRun: {
       selection: 1,

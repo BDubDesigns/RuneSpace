@@ -37,6 +37,12 @@ small number of critical mobile player journeys.
   any parallel send can delete them. A test that keeps rows within two days of the
   90-day boundary, or prunes or sends with a clock ahead of real time, runs
   inside `withChatRetentionWindow`.
+- System announcements (a Mining find) are the third global case (#344): they
+  belong to no account or character, so a user's cleanup never reaches them and
+  no suite may count or delete "every non-player row". Scope reads and cleanup to
+  the names of the test's own characters with `systemAnnouncementsBy`
+  (`tests/integration/fixtures.ts`), and run a migration's database-wide data step
+  restricted to the one row the test seeded, asserting the restriction applied.
 - A multi-row read compared to an ordered expectation needs an `ORDER BY`
   (issue #280); unordered row order follows the query plan and physical layout.
 
@@ -81,7 +87,9 @@ small number of critical mobile player journeys.
   commission (`curly-must-stash`, #292), and Wade's landing-gear job
   (`wheel-be-right-back`, #322), Wade's propulsion job and the restored
   ship (`thrust-issues`, #330), and Mission pinning with the Mission Log
-  (`mission-pinning`, #325). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`mission-pinning`, #325), the dialogue-stepping helper's own harness
+  (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
+  setting and Ultra Rare shimmer (`oil-shale-mining`, #342). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

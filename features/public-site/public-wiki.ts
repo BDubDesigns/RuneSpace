@@ -85,13 +85,13 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has eight connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
+          "Holo Hollow currently has ten connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
         heading: "The local map",
         list: [
-          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, The Long Scramble, and the town of Holo Hollow.",
+          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, The Long Scramble, the South Access Track, and the town of Holo Hollow.",
           "Abandoned Processing Yard — connects to Crash Site and the Power Annex.",
           "DeWhat? Emergency Power Annex — connects to Crash Site, the Abandoned Processing Yard, and the town of Holo Hollow.",
           "The Long Scramble — connects to Crash Site, The Jag, and the town of Holo Hollow. It has no work of its own; it's just the way through.",
@@ -111,6 +111,8 @@ const authoredWikiArticles = [
             { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
             ". After that it is an ordinary walk, and the map reads MINING.",
           ],
+          "South Access Track — a muddy service road running south out of the Crash Site. It connects to Crash Site and The South Cut, has no work, shop or workstation of its own, and is just the way through.",
+          "The South Cut — an Oil Shale mine cut into black layered shale, at the far end of the South Access Track. It only connects to the Track, so reaching it from the Crash Site is two ordinary walks, about 48 seconds each way. Mining Oil Shale here needs Mining 5.",
         ],
       },
       {
@@ -185,7 +187,7 @@ const authoredWikiArticles = [
             ". It is its own tool rather than an improved Salvage Cutter, and it needs Mining 5 to equip or use. It is heavier, at 8 kg.",
           ],
           "It mines faster whether or not it is charged: a Ferrite Shale attempt takes about 4.8 seconds instead of six, and a Galvanite attempt about 7.2 instead of nine.",
-          "A Power Cell does something different for it than for the Salvage Cutter. A charged Salvage Cutter mines faster; a charged Loadsteel Cutter mines at the same speed, but every successful attempt gives one more ore than usual — two or three instead of one or two. If you only have room for the usual amount, you still get the usual amount. Your chance of success and the XP an attempt pays stay the same.",
+          "A Power Cell does something different for it than for the Salvage Cutter. A charged Salvage Cutter mines faster; a charged Loadsteel Cutter mines at the same speed, but every attempt that gives any ore gives one more than usual — two or three instead of one or two from a Ferrite Shale success. An attempt that gives nothing still gives nothing. If you only have room for the usual amount, you still get the usual amount. Your chance of success and the XP an attempt pays stay the same.",
           "One Power Cell gives it ten charged attempts, used up one per attempt whether it succeeds or not, just like the Salvage Cutter. A new Loadsteel Cutter comes off the machine with no charge. Once its charge runs out it keeps its faster base speed and loses only the extra ore.",
         ],
       },
@@ -201,13 +203,32 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Oil Shale at The South Cut",
+        paragraphs: [
+          [
+            "The South Cut is reached over the South Access Track, two walks south of the Crash Site (see ",
+            { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+            "), and you need Mining 5 to mine there. Oil Shale is heavy — 600g a piece, five to a tile — and each attempt takes a full minute, before your Cutter and any Power Cell change that. Your chance of success starts at 35% at Mining 1, the same as everywhere, and climbs until Mining 50, where it is certain; at Mining 5 it is 40.30%.",
+          ],
+          "A successful attempt gives two, three or four Oil Shale, equally likely, and 100 Mining experience. An attempt that misses the success chance is not wasted: it still gives one Oil Shale and 20 Mining experience. A charged Loadsteel Cutter adds one more Oil Shale to either outcome, so three to five on a success and two on a low yield, as long as there is room for it; with room for only the usual amount you still get the usual amount, and the experience is the same.",
+          "A success can also turn up a find: about one success in twenty gives an Uncut Sapphire, and about one in a hundred gives a Motherlode Slab. An attempt never gives both, and a missed attempt never finds either. A Sapphire adds its usual 30 Mining experience, so the attempt is 130 in all; a Motherlode Slab adds 150, so it is 250. The Slab is a single unbroken 12kg specimen of layered shale with an amber seam, it does not stack, and it is Ultra Rare: its tile shimmers wherever you carry it, and finding one posts an ULTRA RARE FIND System line in General saying who found it and where. A Sapphire from The South Cut is not announced.",
+        ],
+      },
+      {
+        heading: "Prioritize primary resources",
+        paragraphs: [
+          "Mining has one setting for what happens when your Inventory is nearly full, and it belongs to each character separately. It is Off by default, which is the safe choice: Mining will not start an attempt unless you have room for its smallest full success and for any one find it could turn up — at The South Cut, that is two Oil Shale and room for either a Sapphire or the 12kg Slab — so you never lose a find. The cost is that Mining stops sooner.",
+          "Turn Prioritize primary resources On and Mining keeps going as long as there is room for one ore. A success keeps as much of its ore as fits, down to one, and still counts as a full success with its full experience. A find is then only kept if there is room left after the ore. If there is not, it is lost for good — even an Ultra Rare one — with no experience, no announcement and no way to claim it later. Nothing is rerolled or swapped for something that would fit. A low-yield attempt is always exactly one Oil Shale. The setting applies to every kind of Mining, and changing it never rewrites an attempt that has already resolved.",
+        ],
+      },
+      {
         heading: "Rare finds",
         paragraphs: [
           "Now and then a successful attempt turns up something extra in the rock: a rough, uncut gemstone. It comes in addition to your ore, never instead of it, and a failed attempt never finds one. A find is rare — you can mine for a long while without seeing one — and an attempt turns up at most one.",
-          "The Jag can give Uncut Quartz or Uncut Topaz. Deep Jag can give Uncut Topaz or Uncut Sapphire. A find shows on the attempt's result as a purple-framed tile beside your ore — the gems keep that purple frame in your Inventory too — and the Mining experience on that result is one total: the ore's usual amount plus a bonus for the gem. Quartz adds 10, Topaz 20 and Sapphire 30, wherever you find them.",
-          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems.",
-          "Mining only starts, and keeps going, while you have room for your ore and for a find. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
-          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where. The other finds are yours alone to know about.",
+          "The Jag can give Uncut Quartz or Uncut Topaz. Deep Jag can give Uncut Topaz or Uncut Sapphire. The South Cut can give Uncut Sapphire or, far more rarely, a Motherlode Slab. A find shows on the attempt's result as a purple-framed tile beside your ore — the gems keep that purple frame in your Inventory too — and the Mining experience on that result is one total: the ore's usual amount plus a bonus for the gem. Quartz adds 10, Topaz 20 and Sapphire 30, wherever you find them.",
+          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems, and a low-yield attempt never finds one.",
+          "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
+          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
         ],
       },
       {
@@ -241,7 +262,8 @@ const authoredWikiArticles = [
           "Swapping Cutters stops a Mining run; start it again to mine with the one you just equipped.",
           "Refining needs its inputs on hand; stock up before heading to the Processing Yard.",
           "Galvanite is heavy — 400g a piece against shale's 100g — so a full trip out of Deep Jag is a much shorter one.",
-          "Leave a spare slot while you mine, so a rare find always has somewhere to go.",
+          "Leave a spare slot while you mine, so a rare find always has somewhere to go — or turn on Prioritize primary resources if you would rather keep mining and accept losing a find that has no room.",
+          "Oil Shale is 600g a piece, and a Motherlode Slab is 12kg: check your carrying weight before a long run at The South Cut.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
         ],
       },

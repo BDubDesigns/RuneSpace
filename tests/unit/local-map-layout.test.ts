@@ -63,8 +63,10 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
     // route is one-way, and there is no ride back to draw.
     // Deep Jag (#209) adds exactly one more: the reciprocal walk to The Jag,
     // which is the only place it connects to.
-    expect(geometry.undirectedRoutes).toHaveLength(10);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(21);
+    // The South Access Track and The South Cut (#342) add exactly two more: Crash
+    // Site <-> South Access Track and South Access Track <-> The South Cut.
+    expect(geometry.undirectedRoutes).toHaveLength(12);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(25);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

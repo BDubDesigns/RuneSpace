@@ -84,7 +84,7 @@ export function InventoryDetailsStats({ selection }: { selection: ResolvedInvent
         <StatRow
           dataStat="charged-yield"
           label="While charged"
-          value={`+${equipment.chargedEffect.units} ore per success`}
+          value={`+${equipment.chargedEffect.units} ore on any attempt that yields ore`}
         />
       ) : null}
     </>

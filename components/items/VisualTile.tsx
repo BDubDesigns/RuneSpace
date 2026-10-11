@@ -2,6 +2,7 @@ import Image from "next/image";
 import { useId, type ReactNode } from "react";
 import type { ItemRarity } from "@/game/content/item-presentation";
 import { ITEM_RARITY_STYLE } from "./item-rarity";
+import { RarityShimmer } from "./RarityShimmer";
 
 type VisualTileProps = {
   accessibleLabel: string;
@@ -16,7 +17,8 @@ type VisualTileProps = {
   badge?: string;
   /**
    * The item's authored rarity (#308). A rare tile takes the rarity outline
-   * unless the caller names its own accent (skill XP does).
+   * unless the caller names its own accent (skill XP does); Ultra Rare and above
+   * also carry the shared shimmer (#342).
    */
   rarity?: ItemRarity;
   background?: ReactNode;
@@ -106,6 +108,9 @@ export function VisualTile({
           </span>
         )}
       </span>
+      {/* Ultra Rare and above shimmer over the artwork zone (#342), under the
+          nameplate and plates so labels stay fully legible. */}
+      <RarityShimmer rarity={rarity} />
       {/* One reserved two-line label band for every item tile (#199): the band
           is the same height whether the name needs one line or two, so tiles
           stay aligned, and `line-clamp-2` spends the ellipsis only on a name

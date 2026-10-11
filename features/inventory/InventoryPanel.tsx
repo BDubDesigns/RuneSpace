@@ -398,7 +398,7 @@ export function InventoryPanel({
                       // What loading does is the equipped tool's own definition (#233).
                       <>
                         <li>{loadTool.maximumCharge} charged attempts</li>
-                        <li>+{loadTool.chargedEffect.units} ore per successful attempt</li>
+                        <li>+{loadTool.chargedEffect.units} ore on any attempt that yields ore</li>
                         <li>Attempt timing, success chance, and XP remain unchanged</li>
                       </>
                     ) : (

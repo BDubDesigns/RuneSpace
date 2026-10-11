@@ -18,6 +18,7 @@ import {
   SKILL_IDS,
 } from "@/game/config/foundations";
 import { expect, openNpcConversation, openTestCharacter, test } from "./fixtures";
+import { playDialogueToText as playToText } from "./dialogue-steps";
 
 /**
  * Issue #330 — Thrust Issues, played end to end at the canonical 390px mobile
@@ -92,22 +93,6 @@ async function finishRepair(characterId: string, targetId: string) {
     completedAt: new Date(),
     updatedAt: new Date(),
   });
-}
-
-/** Step through the open sequence until its text matches. */
-async function playToText(dialogue: import("@playwright/test").Locator, pattern: RegExp) {
-  const text = dialogue.locator("[data-dialogue-text]");
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    if ((await text.isVisible()) && pattern.test((await text.textContent()) ?? "")) return;
-    const next = dialogue.getByRole("button", { name: "Next" });
-    if (await next.isVisible()) {
-      if (await text.isVisible()) await text.click();
-      await next.click();
-      continue;
-    }
-    await dialogue.page().waitForTimeout(250);
-  }
-  await expect(text).toContainText(pattern);
 }
 
 /** Step through the open sequence until its terminal control appears. */

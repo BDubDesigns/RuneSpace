@@ -25,3 +25,23 @@ export async function loadAutoDiscardSlag(
     .limit(1);
   return rows[0]?.autoDiscardSlag ?? false;
 }
+
+/**
+ * The character-wide Prioritize primary resources preference (#342).
+ *
+ * Mining reads it at every attempt, under the character lock the resolver
+ * already holds, so what a resolution — including a lazy or offline one — sees
+ * is what the player last set. Off is the protective default for a character
+ * that has never changed it.
+ */
+export async function loadPrioritizePrimaryResources(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<boolean> {
+  const rows = await transaction
+    .select({ prioritizePrimaryResources: characters.prioritizePrimaryResources })
+    .from(characters)
+    .where(eq(characters.id, characterId))
+    .limit(1);
+  return rows[0]?.prioritizePrimaryResources ?? false;
+}

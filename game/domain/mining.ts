@@ -60,8 +60,29 @@ export function miningAwardFacts(balance: EffectiveGameBalance, source: MiningSo
     massGrams: item.massGrams,
     yieldMinimum: source.yieldMinimum,
     yieldMaximum: source.yieldMaximum,
+    /** What a roll that misses the success chance still earns, if the source authors one (#342). */
+    lowYield: source.lowYield,
     secondaryFinds: miningSecondaryFindFacts(balance, source),
   };
+}
+
+/**
+ * The most ore Prioritize primary resources ever insists on keeping (#342).
+ *
+ * With the setting On, an attempt may start whenever ONE primary ore fits, and a
+ * success keeps as much of its rolled yield as fits down to this floor. It is the
+ * rule's own constant rather than a source field: it is the same one unit for
+ * every authored source, and an authored source whose full-success minimum is
+ * already one (The Jag, Deep Jag) is unaffected by it.
+ */
+export const PRIORITIZED_PRIMARY_MINIMUM_UNITS = 1;
+
+/** Whether a character's Mining level opens a source (#342). The server's access gate. */
+export function miningSourceUnlocked(
+  miningLevel: number,
+  source: Pick<MiningSourceBalance, "requiredMiningLevel">,
+): boolean {
+  return miningLevel >= source.requiredMiningLevel;
 }
 
 /** One authored Secondary Find with the item facts resolution needs (#308). */
@@ -186,6 +207,14 @@ export function miningSuccessChanceBps(level: number, source: MiningSourceBalanc
 export type MiningSnapshot<Id = string> = {
   miningLevel: number;
   /**
+   * The character's Prioritize primary resources setting (#342), read under the
+   * same character lock as the resolution. Off, the default and when omitted,
+   * protects Secondary Finds: an attempt needs room for the source's full
+   * minimum yield AND any one find. On, an attempt needs room for one primary ore
+   * only and a find that then has no room is forfeited.
+   */
+  prioritizePrimaryResources?: boolean;
+  /**
    * The authored definition of the Mining tool actually equipped right now
    * (#233), or undefined when the Mining-tool slot holds none. Its duration,
    * charge and yield effects are read from here and nowhere else, so a lazily
@@ -220,7 +249,15 @@ export type MiningSecondaryFindAward = { itemId: string; quantity: number };
  * every Mining output is Ferrite Shale.
  */
 export type MiningResolvedAttempt = {
+  /** A true success: the source's own full yield, and the only outcome a Secondary Find rolls on. */
   success: boolean;
+  /**
+   * A roll that missed the success chance at a source that authors a low yield
+   * (#342): that ore (plus a charged Loadsteel Cutter's optional extra) and
+   * exactly its XP, never a find. Always false for a source with none, whose miss
+   * awards nothing.
+   */
+  lowYield: boolean;
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
   itemId: string;
@@ -277,15 +314,33 @@ export function boostedMiningAttemptDurationTicks(
 }
 
 /**
- * The ore a charged tool adds to a successful attempt's ordinarily resolved
- * yield (#233): the Loadsteel Cutter's one, and nothing for a tool whose
- * charge buys speed or for an uncharged attempt.
+ * The ore a charged tool adds to an attempt's ordinarily resolved yield (#233):
+ * the Loadsteel Cutter's one, and nothing for a tool whose charge buys speed or
+ * for an uncharged attempt.
+ *
+ * It applies to any attempt that produces primary ore: a full success and, at a
+ * source that authors one, a low yield (#342). It never creates ore from an
+ * attempt that produces none, so a dead miss at The Jag or Deep Jag stays empty.
+ * It is always an optional bonus, retained only as capacity allows.
  */
 export function miningChargedExtraYield(
   tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
   charged: boolean,
 ): number {
   return charged && tool?.chargedEffect.kind === "extra_yield" ? tool.chargedEffect.units : 0;
+}
+
+/**
+ * What a charged low yield awards at a source that authors one, as players read
+ * it (#342): the source's low-yield ore plus the tool's charged extra ore. Null
+ * for a source whose miss awards nothing, which a charge cannot change.
+ */
+export function miningChargedLowYieldQuantity(
+  source: Pick<MiningSourceBalance, "lowYield">,
+  tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
+  charged: boolean,
+): number | null {
+  return source.lowYield ? source.lowYield.quantity + miningChargedExtraYield(tool, charged) : null;
 }
 
 /**
@@ -334,13 +389,18 @@ export function miningNearMissBasisPoints(
 /**
  * Shared preflight for starting and resolving a Mining attempt.
  *
- * The inventory must be able to keep the source's MINIMUM primary yield plus
- * ANY ONE of its possible Secondary Finds (#308). Finds are mutually exclusive,
- * so each candidate is planned against the same snapshot rather than one after
- * another: a single free slot satisfies whichever find turns up, and no slot is
- * demanded per possible find. A find that rolls is therefore never one the
- * inventory could not keep. When candidates fail for different reasons, the
- * mass limit is reported, being the more actionable.
+ * Off (the default), the inventory must be able to keep the source's MINIMUM
+ * primary yield plus ANY ONE of its possible Secondary Finds (#308). Finds are
+ * mutually exclusive, so each candidate is planned against the same snapshot
+ * rather than one after another: a single free slot satisfies whichever find
+ * turns up, and no slot is demanded per possible find. A find that rolls is
+ * therefore never one the inventory could not keep. When candidates fail for
+ * different reasons, the mass limit is reported, being the more actionable.
+ *
+ * On (#342), only the one primary ore a success is guaranteed to retain has to
+ * fit. The player chose to forfeit a find that finds no room, so none is
+ * reserved for — but a primary ore is never silently discarded, so an attempt
+ * that could not keep even one is refused before any time, roll or XP is spent.
  */
 export function miningPreflightStopReason<Id>(
   snapshot: MiningSnapshot<Id>,
@@ -352,9 +412,13 @@ export function miningPreflightStopReason<Id>(
   if (!snapshot.tool || !miningToolUsable(snapshot.tool, snapshot.miningLevel))
     return "compatible_mining_tool_missing";
   const award = miningAwardFacts(balance, source);
-  const primary = stackBundleEntry(award, award.yieldMinimum);
+  const prioritized = snapshot.prioritizePrimaryResources === true;
+  const primary = stackBundleEntry(
+    award,
+    prioritized ? PRIORITIZED_PRIMARY_MINIMUM_UNITS : award.yieldMinimum,
+  );
   const candidates =
-    award.secondaryFinds.length > 0
+    !prioritized && award.secondaryFinds.length > 0
       ? award.secondaryFinds.map((find) => [primary, stackBundleEntry(find, find.quantity)])
       : [[primary]];
   let failure: "slots" | "mass" | undefined;
@@ -369,6 +433,25 @@ export function miningPreflightStopReason<Id>(
   }
   if (failure === undefined) return undefined;
   return failure === "mass" ? "carried_mass_capacity_reached" : "inventory_slots_full";
+}
+
+/**
+ * One successful attempt's primary quantity, drawn from the source's own range.
+ *
+ * A two-value range keeps the shipped coin-flip draw bit for bit. A wider range
+ * (Oil Shale's 2, 3 or 4) is one uniform integer draw, so every value is exactly
+ * as likely as every other: never two coin flips, which would favour the middle.
+ */
+function drawPrimaryQuantity(
+  award: { yieldMinimum: number; yieldMaximum: number },
+  random: MiningRandom,
+): number {
+  const span = award.yieldMaximum - award.yieldMinimum + 1;
+  if (span === 1) return award.yieldMinimum;
+  if (span === 2) return random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
+  if (!random.nextInteger)
+    throw new RangeError("A Mining yield wider than two values needs an integer random draw");
+  return award.yieldMinimum + random.nextInteger(span);
 }
 
 /**
@@ -415,8 +498,50 @@ export function resolveMining<Id>(input: {
   let failures = 0;
   const resolvedAttempts: MiningResolvedAttempt[] = [];
   const thresholdBasisPoints = miningSuccessChanceBps(snapshot.miningLevel, source);
+  const award = miningAwardFacts(balance, source);
+  const prioritized = snapshot.prioritizePrimaryResources === true;
+  // The least primary ore a success keeps: the source's full minimum, or one ore
+  // when the character chose to prioritize primary resources (#342).
+  const primaryFloor = prioritized ? PRIORITIZED_PRIMARY_MINIMUM_UNITS : award.yieldMinimum;
+  const applyPlan = (
+    plan: StackAdditionPlan<Id>,
+    facts: { massGrams: number },
+    awardedQuantity: number,
+  ) => {
+    for (const update of plan.updatedStacks) {
+      const stack = stacks.find((candidate) => candidate.id === update.id);
+      if (stack) stack.quantity = update.quantity;
+    }
+    for (const created of plan.createdStacks)
+      stacks.push({
+        // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
+        id: Symbol(`mining-stack-${resolvedAttempts.length}-${stacks.length}`) as unknown as Id,
+        ...created,
+        persisted: false,
+      });
+    slotsAvailable -= plan.createdStacks.length;
+    massAvailableGrams -= awardedQuantity * facts.massGrams;
+  };
+  const planEntries = (entries: readonly StackBundleEntry[]) =>
+    planExactStackAdditions(stacks, entries, slotsAvailable, massAvailableGrams);
+  /**
+   * The most primary ore, from `desired` down to `floor`, that fits (alongside
+   * `find`, when one must keep its place). Undefined when not even the floor fits.
+   */
+  const largestFittingPrimary = (
+    desired: number,
+    floor: number,
+    find: MiningSecondaryFindFacts | undefined,
+  ) => {
+    const findEntries = find ? [stackBundleEntry(find, find.quantity)] : [];
+    for (let quantity = desired; quantity >= floor; quantity -= 1) {
+      const plan = planEntries([stackBundleEntry(award, quantity), ...findEntries]);
+      if (plan.ok) return { quantity, plan };
+    }
+    return undefined;
+  };
   while (true) {
-    // A minimum successful yield must fit before chance is rolled.
+    // The attempt's guaranteed retention must fit before chance is rolled.
     const currentSnapshot = {
       ...snapshot,
       existingStacks: stacks,
@@ -450,14 +575,35 @@ export function resolveMining<Id>(input: {
     if (rolledBasisPoints >= thresholdBasisPoints) {
       failures += 1;
       if (boosted) remainingCutterCharge -= 1;
+      // A source that authors a low yield pays it for a missed roll (#342): its
+      // ore and exact XP, and never a Secondary Find roll. A charged Loadsteel
+      // Cutter's extra ore is an optional bonus on top of the ordinary low yield:
+      // retained as far as it fits, but never at the cost of the ordinary ore,
+      // which the preflight above proved fits (the source's full minimum, or one
+      // ore when prioritizing, is never less than the low yield). A source with no
+      // low yield awards no ore, so a charge has nothing to add to.
+      const lowYield = award.lowYield;
+      let lowYieldQuantity = 0;
+      if (lowYield) {
+        const primary = largestFittingPrimary(
+          lowYield.quantity + miningChargedExtraYield(tool, boosted),
+          lowYield.quantity,
+          undefined,
+        );
+        if (!primary)
+          throw new Error("Mining preflight admitted an attempt whose low yield cannot be kept");
+        lowYieldQuantity = primary.quantity;
+        applyPlan(primary.plan.plans[0]!, award, lowYieldQuantity);
+      }
       resolvedAttempts.push({
         success: false,
+        lowYield: lowYield !== null,
         rolledBasisPoints,
         thresholdBasisPoints,
         itemId: source.itemId,
-        quantityAwarded: 0,
+        quantityAwarded: lowYieldQuantity,
         secondaryFinds: [],
-        xpAwarded: 0,
+        xpAwarded: lowYield?.xp ?? 0,
         boosted,
         durationTicks,
         chargeConsumed: boosted,
@@ -465,69 +611,50 @@ export function resolveMining<Id>(input: {
       });
       continue;
     }
-    const award = miningAwardFacts(balance, source);
-    const rolledQuantity = random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
-    // One roll over the source's whole Secondary Find table, only on a success
-    // (#308). The preflight above proved the minimum yield fits beside ANY find,
-    // so whatever this draws can be kept; it is never rolled and then dropped.
-    const find = drawSecondaryFind(award.secondaryFinds, random);
-    const findEntries = find ? [stackBundleEntry(find, find.quantity)] : [];
-    const placement = (primaryQuantity: number) =>
-      planExactStackAdditions(
-        stacks,
-        [stackBundleEntry(award, primaryQuantity), ...findEntries],
-        slotsAvailable,
-        massAvailableGrams,
-      );
-    let quantity = rolledQuantity;
-    let placed = placement(quantity);
-    // The minimum-fit check authorizes this success. At a final partial stack or
-    // mass boundary, retain the valid minimum yield rather than partially adding
-    // a two-unit roll. A find that rolled keeps its place: it is part of every
-    // plan, so tight capacity shrinks the primary ore, never the find.
-    if (!placed.ok) {
-      quantity = award.yieldMinimum;
-      placed = placement(quantity);
-    }
-    if (!placed.ok)
-      throw new Error("Mining preflight admitted an attempt whose minimum yield cannot be kept");
-    // A charged tool's extra ore comes on top of that ordinarily resolved yield
-    // (#233), and only when it fits too: no room for the bonus keeps the
-    // ordinary result rather than falling back any further. It is PRIMARY ore
-    // only; a Secondary Find is never duplicated by it (#308).
-    const extra = miningChargedExtraYield(tool, boosted);
-    if (extra > 0) {
-      const withExtra = placement(quantity + extra);
-      if (withExtra.ok) {
-        quantity += extra;
-        placed = withExtra;
+    // The yield, then ONE roll over the source's whole Secondary Find table, both
+    // only on a true success (#308). The find is always rolled whatever the
+    // inventory looks like, so capacity can never steer which find drops.
+    const rolledQuantity = drawPrimaryQuantity(award, random);
+    const rolledFind = drawSecondaryFind(award.secondaryFinds, random);
+    // A charged tool's extra ore comes on top of the ordinarily resolved yield
+    // (#233), and only on a success. It is PRIMARY ore only; a Secondary Find is
+    // never duplicated by it (#308).
+    const desiredQuantity = rolledQuantity + miningChargedExtraYield(tool, boosted);
+    let quantity: number;
+    let find: MiningSecondaryFindFacts | undefined;
+    if (prioritized) {
+      // Primary first (#342): keep as much primary ore as fits, down to one, then
+      // offer the find whatever room is left. A find with none is forfeited
+      // outright: never rerolled, swapped for one that fits, or credited.
+      const primary = largestFittingPrimary(desiredQuantity, primaryFloor, undefined);
+      if (!primary)
+        throw new Error("Mining preflight admitted an attempt whose primary ore cannot be kept");
+      quantity = primary.quantity;
+      applyPlan(primary.plan.plans[0]!, award, quantity);
+      if (rolledFind) {
+        const placed = planEntries([stackBundleEntry(rolledFind, rolledFind.quantity)]);
+        if (placed.ok) {
+          find = rolledFind;
+          applyPlan(placed.plans[0]!, rolledFind, rolledFind.quantity);
+        }
       }
+    } else {
+      // The preflight proved the minimum yield fits beside ANY find, so a find
+      // that rolled keeps its place: it is part of every plan, and tight capacity
+      // shrinks the primary ore toward its minimum, never the find.
+      const primary = largestFittingPrimary(desiredQuantity, primaryFloor, rolledFind);
+      if (!primary)
+        throw new Error("Mining preflight admitted an attempt whose minimum yield cannot be kept");
+      quantity = primary.quantity;
+      find = rolledFind;
+      applyPlan(primary.plan.plans[0]!, award, quantity);
+      if (find) applyPlan(primary.plan.plans[1]!, find, find.quantity);
     }
-    const applyPlan = (
-      plan: StackAdditionPlan<Id>,
-      facts: { massGrams: number },
-      awardedQuantity: number,
-    ) => {
-      for (const update of plan.updatedStacks) {
-        const stack = stacks.find((candidate) => candidate.id === update.id);
-        if (stack) stack.quantity = update.quantity;
-      }
-      for (const created of plan.createdStacks)
-        stacks.push({
-          // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
-          id: Symbol(`mining-stack-${resolvedAttempts.length}-${stacks.length}`) as unknown as Id,
-          ...created,
-          persisted: false,
-        });
-      slotsAvailable -= plan.createdStacks.length;
-      massAvailableGrams -= awardedQuantity * facts.massGrams;
-    };
-    applyPlan(placed.plans[0]!, award, quantity);
-    if (find) applyPlan(placed.plans[1]!, find, find.quantity);
     successes += 1;
     if (boosted) remainingCutterCharge -= 1;
     resolvedAttempts.push({
       success: true,
+      lowYield: false,
       rolledBasisPoints,
       thresholdBasisPoints,
       itemId: award.itemId,

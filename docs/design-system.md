@@ -124,10 +124,12 @@ slightly larger text on `--rs-chat-promoted-surface` with a
 `--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
 "Promoted ad" — brighter than ordinary chat, never an alert.
 
-A System line (#308) — today a Mining RARE FIND announcement — is RuneSpace's own
+A System line (#308) — a Mining RARE FIND announcement, or ULTRA RARE FIND for an
+Ultra Rare item (#342) — is RuneSpace's own
 output and reads that way: the sender is the word "System" (never a player
 name), with a "RARE FIND" label in `--rs-rare-find-accent` and a 4px
-`--rs-rare-find-accent` left rim on `--rs-rare-find-surface`. It has no name
+`--rs-rare-find-accent` left rim on `--rs-rare-find-surface` (ULTRA RARE FIND uses
+`--rs-ultra-rare-find-accent` and `--rs-ultra-rare-find-surface`). It has no name
 button, no "…" toggle, and no Whisper / Report / Block. The label belongs to the
 *event*; it is not printed on item tiles.
 
@@ -143,6 +145,21 @@ recipes and a Mining reward. It is restrained — no glow or animation — never
 borrows `--rs-accent-success`, and is independent of whether finding the item
 is announced anywhere. A future Secondary Find is not automatically rare; its
 own presentation decides.
+
+**Ultra Rare (#342).** `ItemRarity` is `rare | ultra_rare`; no further tier is
+authored until one is needed. An `ultra_rare` item takes `--rs-item-ultra-rare-accent`
+on its tile border and `--rs-item-ultra-rare-stack-track` on its stack indicator
+and, unlike Rare, carries the **reusable continuous shimmer**: `RarityShimmer`
+(`components/items/RarityShimmer.tsx`) paints `.rs-item-shimmer` over the tile's
+artwork zone, under the nameplate and plates — one slow diagonal sheen every few
+seconds and three small sparkles on staggered, unequal cycles (4.2 s, 5.3 s,
+6.1 s), restrained so it reads at the 80 px tile on a phone without competing
+with the name or quantity. It is a UI treatment keyed off the item's authored
+rarity, **never baked into item art**, aria-hidden, pointer-transparent and
+clipped to the tile. `--rs-shimmer-strength` is the one dial a higher rarity can
+raise later. Under `prefers-reduced-motion` the sweep is dropped and the sparkles
+rest softly lit, so the item stays noticeable without moving. Plain Rare items
+(the gems) are unchanged: outline and stack colour only.
 
 **Stack items and rewards (#308).** `StackItemVisual`
 (`components/items/StackItemVisual.tsx`, formerly `InventoryStackVisual`) is the

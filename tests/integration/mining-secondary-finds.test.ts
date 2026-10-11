@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import {
@@ -18,6 +18,7 @@ import {
   createCharacterForUser,
   createTestUser,
   seedRepairTarget,
+  systemAnnouncementsBy,
 } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -45,6 +46,10 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
   let reports: typeof import("@/server/player-reports");
   let realtime: typeof import("@/server/realtime");
   const createdUsers: string[] = [];
+  // The names of the characters this test created. System rows belong to no
+  // user, and suites share one database and run concurrently, so announcements
+  // are read and cleaned up by these names only (see `systemAnnouncementsBy`).
+  const finders: string[] = [];
   const balance = getEffectiveGameBalance();
   const now = new Date("2026-10-01T00:00:00.000Z");
   const tick = (from: Date, ticks: number) => new Date(from.getTime() + ticks * GAME_TICK_MS);
@@ -63,8 +68,11 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
   });
 
   afterEach(async () => {
-    // System rows belong to no user, so a user's cleanup never reaches them.
-    await db.delete(rune.chatMessages).where(ne(rune.chatMessages.kind, "player"));
+    // System rows belong to no user, so a user's cleanup never reaches them; this
+    // test's own are removed by finder name, never every other suite's with them.
+    if (finders.length > 0)
+      await db.delete(rune.chatMessages).where(systemAnnouncementsBy(rune, finders));
+    finders.splice(0);
     for (const userId of createdUsers.splice(0))
       await cleanupTestUser(db, authSchema, rune, userId);
   });
@@ -93,6 +101,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
       userId,
       `Finder${userId.slice(0, 5)}`,
     );
+    finders.push(character.displayName);
     await play.getPlayGameplayState(userId, character.id, now, finding(119));
     if (at === LOCATION_IDS.deepJag) {
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.deepJagCaveIn, {
@@ -124,7 +133,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     db
       .select()
       .from(rune.chatMessages)
-      .where(eq(rune.chatMessages.kind, "rare_find"))
+      .where(and(eq(rune.chatMessages.kind, "rare_find"), systemAnnouncementsBy(rune, finders)))
       .orderBy(desc(rune.chatMessages.seq));
 
   async function miningXp(characterId: string) {
@@ -316,7 +325,9 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
             const inFlight = await transaction
               .select()
               .from(rune.chatMessages)
-              .where(eq(rune.chatMessages.kind, "rare_find"));
+              .where(
+                and(eq(rune.chatMessages.kind, "rare_find"), systemAnnouncementsBy(rune, finders)),
+              );
             expect(inFlight).toHaveLength(1);
             throw new Error("forced failure after resolution");
           },
@@ -409,7 +420,19 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
 
     // The migration's data step: the statement after its last breakpoint.
     const migration = readFileSync("drizzle/0041_mining_secondary_finds.sql", "utf8");
-    const backfill = migration.split("--> statement-breakpoint").at(-1)!;
+    const migrationBackfill = migration.split("--> statement-breakpoint").at(-1)!;
+    // The statement is database-wide while suites share one database and run
+    // concurrently, so this applies the migration's own statement restricted to
+    // the one row this test seeded. The guards prove the restriction really was
+    // applied to the statement under test.
+    const outerWhere = `WHERE jsonb_typeof("recent_attempts") = 'array'`;
+    expect(migrationBackfill.split(outerWhere)).toHaveLength(2);
+    expect(character.id).toMatch(/^[\w-]+$/);
+    const backfill = migrationBackfill.replace(
+      outerWhere,
+      `WHERE "character_id" = '${character.id}'\n\tAND jsonb_typeof("recent_attempts") = 'array'`,
+    );
+    expect(backfill).not.toBe(migrationBackfill);
     const recentAttempts = async () =>
       (
         await db

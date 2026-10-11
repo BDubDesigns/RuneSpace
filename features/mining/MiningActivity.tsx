@@ -17,7 +17,13 @@ import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import type { MiningRunAttempt } from "@/server/mining";
 import type { MiningSourceProjection, PlayGameplayState } from "@/server/play";
-import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
+import {
+  refreshPlayAction,
+  setPrioritizePrimaryResourcesPreferenceAction,
+  startMiningAction,
+  stopMiningAction,
+} from "@/server/actions";
+import { PrioritizePrimaryResourcesToggle } from "./PrioritizePrimaryResourcesToggle";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import {
@@ -68,6 +74,15 @@ function commandErrorMessage(error: NonNullable<PlayGameplayState["commandError"
   }[error];
 }
 
+function miningErrorMessage(
+  error: NonNullable<PlayGameplayState["miningError"]>,
+  requiredMiningLevel: number | undefined,
+) {
+  return {
+    mining_level_required: `Mining ${requiredMiningLevel ?? "a higher level"} is required to mine here.`,
+  }[error];
+}
+
 function percentage(basisPoints: number) {
   return (basisPoints / 100).toFixed(2);
 }
@@ -92,6 +107,8 @@ function latestAttemptAnnouncement(
     attempt.boosted && attempt.remainingCharge === 0
       ? " Power Cell depleted · Mining continues at normal speed."
       : "";
+  if (attempt.lowYield)
+    return `${catchUp}Low yield. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`;
   return attempt.success
     ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.secondaryFinds.map((find) => `${find.quantity} ${resolveItemPresentation(find.itemId, find.itemId).displayName} found. `).join("")}${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
     : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}. ${charge}${depleted}`;
@@ -109,17 +126,21 @@ function LatestAttemptResult({
   /** The equipped Mining tool's own maximum charge, when one is equipped (#233). */
   maximumCharge: number | undefined;
 }) {
-  const feedbackTone = feedback ? (attempt.success ? "success" : "danger") : "calm";
+  // A low yield is a smaller, honest payout rather than a win or a loss, so it
+  // takes neither result glow; its reward cards still rise.
+  const feedbackTone = attempt.lowYield ? "calm" : attempt.success ? "success" : "danger";
+  const outcome = attempt.success ? "success" : attempt.lowYield ? "low-yield" : "no-yield";
+  const outcomeLabel = attempt.success ? "Success" : attempt.lowYield ? "Low yield" : "No yield";
   return (
     <section
       aria-label="Latest mining attempt"
-      className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback ? `rs-result-feedback-${feedbackTone}` : ""}`}
+      className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback && feedbackTone !== "calm" ? `rs-result-feedback-${feedbackTone}` : ""}`}
       data-feedback-state={feedback ? "new" : "calm"}
-      data-result-outcome={attempt.success ? "success" : "no-yield"}
+      data-result-outcome={outcome}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="font-display text-sm uppercase tracking-wide">
-          Latest attempt: {attempt.success ? "Success" : "No yield"}
+          Latest attempt: {outcomeLabel}
         </p>
         {attemptsResolved > 1 ? (
           <p className="text-xs text-[color:var(--rs-text-secondary)]">
@@ -141,7 +162,7 @@ function LatestAttemptResult({
           Power Cell depleted · Mining continues at normal speed
         </p>
       ) : null}
-      {attempt.success ? (
+      {attempt.success || attempt.lowYield ? (
         <>
           <p className="mt-3 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
             Rewards
@@ -190,6 +211,14 @@ function LatestAttemptResult({
               );
             })}
           </RewardGrid>
+          {attempt.lowYield ? (
+            <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+              Missed a full yield by{" "}
+              {percentage(
+                miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints),
+              )}
+            </p>
+          ) : null}
         </>
       ) : (
         <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
@@ -233,7 +262,9 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
-  const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh">();
+  const [pendingCommand, setPendingCommand] = useState<
+    "start" | "stop" | "refresh" | "prioritize"
+  >();
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
@@ -252,6 +283,9 @@ export function MiningActivity({ characterName }: { characterName: string }) {
       : undefined;
   const otherActionActive = state.activeAction !== undefined && active === undefined;
   const showMiningActivity = source !== undefined && !state.travelState;
+  // The source's own level gate (#342). The server refuses a start below it from
+  // the stored Mining XP; this only keeps the button honest and says why.
+  const levelLocked = source !== undefined && state.mining.level < source.requiredMiningLevel;
   // Mission guidance is consumed from the ONE derived target set — this activity
   // never inspects mission IDs, objective prose, or drop tables to decide
   // whether Start Mining advances the active mission.
@@ -284,6 +318,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     if (result.state) {
       acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
+      else if (result.state.miningError)
+        setMessage(miningErrorMessage(result.state.miningError, source?.requiredMiningLevel));
       else if (result.state.stop && isMiningStop(result.state.stop))
         setMessage(miningStopMessage(result.state.stop.reason as MiningStopReason));
       else setMessage(undefined);
@@ -310,7 +346,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     });
   }
   function runForeground(
-    intent: "start" | "stop" | "refresh",
+    intent: "start" | "stop" | "refresh" | "prioritize",
     action: (id: string) => ReturnType<typeof refreshPlayAction>,
   ) {
     enqueueForeground(() => {
@@ -382,7 +418,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           </ActionButton>
         ) : (
           <MissionActionButton
-            disabled={otherActionActive}
+            disabled={otherActionActive || levelLocked}
             guidance={startMiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
@@ -403,6 +439,23 @@ export function MiningActivity({ characterName }: { characterName: string }) {
       <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
         Success chance: {percentage(source.successChanceBps)}%
       </p>
+      {levelLocked ? (
+        <div data-mining-level-gate={source.requiredMiningLevel}>
+          <Feedback tone="muted">
+            Mining {source.requiredMiningLevel} is required to mine {source.itemName} here. You are
+            Mining {state.mining.level}.
+          </Feedback>
+        </div>
+      ) : null}
+      {source.lowYield ? (
+        // A source that pays something for a missed roll says exactly what, from
+        // its authored values: the full-success range and the low-yield payout.
+        <p className="text-sm text-[color:var(--rs-text-secondary)]" data-mining-yield-summary>
+          Full success: {source.yieldMinimum}–{source.yieldMaximum} {source.itemName} ·{" "}
+          {source.successXp} Mining XP. Otherwise a low yield: {source.lowYield.quantity}{" "}
+          {source.itemName} · {source.lowYield.xp} Mining XP.
+        </p>
+      ) : null}
       {cutter &&
       (cutter.baseDurationMultiplierBps !== 10_000 || cutter.chargedEffect.kind !== "speed") ? (
         // A tool's own authored effects, read from its definition (#233). A
@@ -416,7 +469,10 @@ export function MiningActivity({ characterName }: { characterName: string }) {
             ? ` · ${durationMultiplierLabel(cutter.baseDurationMultiplierBps)} attempt time, charged or not`
             : ""}
           {cutter.chargedEffect.kind === "extra_yield"
-            ? ` · charged successes yield ${source.chargedYieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+            ? source.chargedLowYieldQuantity === null
+              ? ` · charged successes yield ${source.chargedYieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+              : // A source that pays a low yield names both charged outcomes (#342).
+                ` · charged: full success ${source.chargedYieldMinimum}–${source.chargedYieldMaximum}, low yield ${source.chargedLowYieldQuantity} ${source.itemName}`
             : ""}
         </p>
       ) : null}
@@ -451,6 +507,19 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           Another activity is active. Stop it before starting Mining.
         </Feedback>
       ) : null}
+      <PrioritizePrimaryResourcesToggle
+        disabled={foregroundBusy}
+        loading={foregroundBusy && pendingCommand === "prioritize"}
+        onToggle={(next) =>
+          runForeground("prioritize", (characterId) =>
+            setPrioritizePrimaryResourcesPreferenceAction({
+              characterId,
+              prioritizePrimaryResources: next,
+            }),
+          )
+        }
+        prioritizePrimaryResources={state.prioritizePrimaryResources}
+      />
       {latestAttempt ? (
         <LatestAttemptResult
           attempt={latestAttempt}

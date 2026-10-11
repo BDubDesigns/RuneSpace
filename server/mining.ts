@@ -32,11 +32,12 @@ import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import { type ActionResolver, type DatabaseTransaction } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
-import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { resolveItemPresentation, type ItemRarity } from "@/game/content/item-presentation";
 import { getLocation } from "@/game/content/locations";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { recordRareFindAnnouncement } from "@/server/public-system-messages";
 import { loadPlaySnapshot } from "@/server/play-state";
+import { loadPrioritizePrimaryResources } from "@/server/character-preferences";
 
 const systemRandom: MiningRandom = {
   nextBasisPoints: () => randomInt(10_000),
@@ -77,6 +78,8 @@ export type MiningRunAttempt = {
   sequence: number;
   resolvedAt: string;
   success: boolean;
+  /** A missed roll that still paid the source's low yield (#342). */
+  lowYield: boolean;
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
   itemId: string;
@@ -103,6 +106,8 @@ export type MiningRunState = {
 
 export type MiningSnapshot = {
   miningLevel: number;
+  /** The character's Prioritize primary resources setting (#342). */
+  prioritizePrimaryResources: boolean;
   /** The equipped Mining tool's authored definition, or undefined (#233). */
   tool?: MiningToolDefinition;
   existingStacks: readonly import("@/game/domain/inventory").StackState<string>[];
@@ -158,6 +163,9 @@ export async function loadMiningSnapshot(
     : undefined;
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
+    // Read under the same character lock as everything else the resolution uses,
+    // so a lazy or offline attempt resolves under the setting last committed.
+    prioritizePrimaryResources: await loadPrioritizePrimaryResources(transaction, characterId),
     ...(tool ? { tool: tool.definition } : {}),
     existingStacks: play.stacks,
     slotsAvailable: play.slotsAvailable,
@@ -170,6 +178,11 @@ export async function loadMiningSnapshot(
     equippedCutterInstanceId: cutter?.id,
     cutterCharge: tool ? normalizeCutterCharge(cutter?.currentCharge, tool.definition) : 0,
   };
+}
+
+function requiredRarity(itemId: string, rarity: ItemRarity | undefined): ItemRarity {
+  if (!rarity) throw new Error(`Announced Mining find "${itemId}" has no authored rarity`);
+  return rarity;
 }
 
 export function createMiningResolver(
@@ -304,10 +317,14 @@ export function createMiningResolver(
         if (!character || !location)
           throw new Error("A Mining announcement needs the character and the location it found at");
         for (const find of announced) {
+          const presentation = resolveItemPresentation(find.itemId, find.itemId);
           await recordRareFindAnnouncement(transaction, {
             characterName: character.displayName,
-            itemName: resolveItemPresentation(find.itemId, find.itemId).displayName,
+            itemName: presentation.displayName,
             locationName: location.displayName,
+            // An announceable find without an authored rarity is a content error,
+            // not a silent downgrade to an ordinary line.
+            rarity: requiredRarity(find.itemId, presentation.rarity),
             now: new Date(),
           });
         }

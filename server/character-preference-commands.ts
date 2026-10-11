@@ -52,3 +52,47 @@ export async function setAutoDiscardSlagPreference(
     now,
   );
 }
+
+/**
+ * Set the character-wide Prioritize primary resources preference (#342).
+ *
+ * Due work resolves first, under the setting it was earned under; the new value
+ * applies to attempts that resolve after this command, so a toggle can never
+ * rewrite a result that already happened. The character is derived from the
+ * authenticated owner and the value is a plain boolean, so neither a forged
+ * request nor a stale client can set it for another character or to anything
+ * else. It is a preference, not progression, and is available to any owned
+ * character: whether the player can reach a mine decides what they see, not
+ * whether the preference exists.
+ */
+export async function setPrioritizePrimaryResourcesPreference(
+  userId: string,
+  characterId: string,
+  prioritizePrimaryResources: boolean,
+  now = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<PlayGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+      await transaction
+        .update(characters)
+        .set({ prioritizePrimaryResources })
+        .where(eq(characters.id, context.character.id));
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        { successes: 0, failures: 0, awardedXp: 0 },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        now,
+      );
+    },
+    now,
+  );
+}

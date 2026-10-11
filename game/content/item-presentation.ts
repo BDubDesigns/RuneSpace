@@ -11,7 +11,13 @@ import { getItemDefinition } from "@/game/config/balance";
  * item reads as rare on every shared item visual; it is independent of how the
  * item is obtained and of whether finding it is announced anywhere.
  */
-export type ItemRarity = "rare";
+export type ItemRarity = "rare" | "ultra_rare";
+
+/** The player-facing label of each rarity, one place for the Wiki and any tag that names it. */
+export const ITEM_RARITY_LABELS = {
+  rare: "Rare",
+  ultra_rare: "Ultra Rare",
+} as const satisfies Record<ItemRarity, string>;
 
 export type ItemPresentation = {
   displayName: string;
@@ -153,6 +159,27 @@ const itemPresentations = {
     textFallback: "DM",
     artworkSrc: "/item-art/drive-mount.webp",
     description: "A reinforced powered mount that secures the ship's drive to its frame.",
+  },
+  // Skatboll Oil Shale Mining (#342). The art carries no baked sparkle: the Ultra
+  // Rare shimmer belongs to the shared item visuals, keyed off `rarity`.
+  [ITEM_IDS.oilShale]: {
+    displayName: "Oil Shale",
+    accessibleDescription:
+      "A cluster of glossy, dark, thinly layered shale pieces with rusty orange edges and oily, reflective faces",
+    textFallback: "OS",
+    artworkSrc: "/item-art/oil-shale.webp",
+    description: "Dark, thinly layered shale that still weeps a little oil. Heavy for its size.",
+  },
+  [ITEM_IDS.motherlodeSlab]: {
+    displayName: "Motherlode Slab",
+    pluralName: "Motherlode Slabs",
+    accessibleDescription:
+      "One large, unbroken slab of richly layered dark shale with a bright amber seam running through its cut face",
+    textFallback: "MS",
+    artworkSrc: "/item-art/motherlode-slab.webp",
+    rarity: "ultra_rare",
+    description:
+      "A single unbroken specimen of layered Oil Shale with an amber, oil-rich seam through it. Twelve kilograms of the real thing.",
   },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {

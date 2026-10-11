@@ -68,6 +68,10 @@ const itemIds = {
   uncutQuartz: asContentId("uncut_quartz"),
   uncutTopaz: asContentId("uncut_topaz"),
   uncutSapphire: asContentId("uncut_sapphire"),
+  // Skatboll Oil Shale Mining (#342): the primary ore The South Cut yields, and
+  // its single-specimen Ultra Rare secondary find.
+  oilShale: asContentId("oil_shale"),
+  motherlodeSlab: asContentId("motherlode_slab"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -387,6 +391,9 @@ export const ACTION_IDS = {
   // deliberately carries no per-action payload, so the action IS the durable
   // identity across refresh and offline resolution.
   galvaniteMining: asContentId("galvanite_mining"),
+  // Oil Shale Mining at The South Cut (#342), a third authored source under the
+  // same one-action-per-source rule.
+  oilShaleMining: asContentId("oil_shale_mining"),
   // Refining recipes follow that same established rule. The existing Refined
   // Ferrite recipe keeps its original action ID unchanged; the two new
   // authored recipes get their own, which is what makes the selected recipe
@@ -457,6 +464,10 @@ export const LOCATION_IDS = {
   // The first World Location whose player-facing state changes durably (#209).
   // One authored location, two presentations: see game/domain/location-state.
   deepJag: asContentId("deep_jag"),
+  // The Oil Shale road south of the Crash Site (#342): a travel-only buffer and
+  // the Mining-5 mine behind it.
+  southAccessTrack: asContentId("south_access_track"),
+  theSouthCut: asContentId("the_south_cut"),
 } as const satisfies Record<string, ContentId>;
 
 /**

@@ -163,6 +163,13 @@ export const characters = pgTable(
     // one activity's state. Default Off; read when an activity resolves, so a
     // change applies to work that resolves after it.
     autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
+    // The character-wide Prioritize primary resources preference (issue #342).
+    // It governs Mining's capacity behaviour at every source: Off (the default)
+    // protects Secondary Finds by requiring room for them before an attempt, On
+    // keeps primary ore first and forfeits a find that no longer fits. Read under
+    // the character lock when Mining resolves, so a change applies to work that
+    // resolves after it. It is a preference, never progression.
+    prioritizePrimaryResources: boolean("prioritize_primary_resources").notNull().default(false),
     // Walking Scavenge suppression (issue #312). Set when the player turns back
     // from a walking Journey, so cancelling cannot be used to reroll the random
     // Scavenge window; cleared only when a walking Journey arrives. A Crew Hauler
@@ -1376,7 +1383,8 @@ export const chatMessages = pgTable(
     channel: text("channel").notNull(),
     /**
      * What this row is (#308): `player` is a message a character sent, and
-     * `rare_find` is an automatic System announcement of a Mining find. A
+     * `rare_find` and `ultra_rare_find` are automatic System announcements of a
+     * Mining find, by the rarity of the item (#342). A
      * System row has NO sender: it is not a player, so it never borrows an
      * account, a character, or a made-up identity — the three sender columns
      * below are null exactly when the row is not a `player` message.
@@ -1400,7 +1408,10 @@ export const chatMessages = pgTable(
   },
   (table) => [
     check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade', 'whisper')`),
-    check("chat_messages_kind_check", sql`${table.kind} in ('player', 'rare_find')`),
+    check(
+      "chat_messages_kind_check",
+      sql`${table.kind} in ('player', 'rare_find', 'ultra_rare_find')`,
+    ),
     check(
       "chat_messages_sender_check",
       sql`(${table.kind} = 'player') = (${table.senderPlayerAccountId} is not null and ${table.senderCharacterId} is not null and ${table.senderCharacterName} is not null)

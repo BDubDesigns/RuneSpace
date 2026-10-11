@@ -27,14 +27,17 @@ export type MiningRewardCard =
  * the source's own ore, then each Secondary Find in resolved order, then the
  * attempt's combined Mining XP last. It maps over whatever exists — nothing
  * here knows how many finds today's content can award — and a failed attempt
- * has none.
+ * that awarded nothing has none.
  */
 export function miningRewardCards(
   attempt: Pick<MiningRunAttempt, "success" | "itemId" | "quantityAwarded" | "secondaryFinds"> & {
     xpAwarded: number;
+    lowYield?: boolean;
   },
 ): readonly MiningRewardCard[] {
-  if (!attempt.success) return [];
+  // A miss that awarded nothing has no cards; a low yield (#342) is a miss that
+  // still paid its ore and XP, and shows exactly that — never a find.
+  if (!attempt.success && attempt.lowYield !== true) return [];
   return [
     ...(attempt.quantityAwarded > 0
       ? [

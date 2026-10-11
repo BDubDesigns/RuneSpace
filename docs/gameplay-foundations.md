@@ -58,6 +58,11 @@ resolved attempt awards is recovered from the durable action ID.
 | --- | --- | ---: | --- | ---: | ---: |
 | Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
+| Oil Shale | The South Cut, **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
+
+Every source also authors a `requiredMiningLevel` (the personal access gate; 1
+for The Jag and Deep Jag, so neither is newly gated) and a `lowYield` (`null` for
+those two, whose miss still awards nothing).
 
 **The Mining tool is authored too (#233).** Whichever Cutter is in the one
 Mining-tool slot supplies its own requirement, charge ceiling, permanent
@@ -65,23 +70,27 @@ duration multiplier and **charged effect** through the equipment-definition
 boundary (see "Inventory and equipment"). A charged effect is one of two closed
 identities: `speed` — the one global Power Cell speed multiplier, applied to the
 tool's duration under the same whole-tick rounding — or `extra_yield` — ore
-added to each successful charged attempt. Never both.
+added to each charged attempt that produces primary ore. Never both.
 
-| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged success |
+| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged ore |
 | --- | --- | --- | --- | --- | --- |
-| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary 1–2 |
-| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: ordinary roll +1 — 2–3 |
+| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary: Ferrite and Galvanite 1–2, Oil Shale 2–4 (low yield 1) |
+| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: +1 on any attempt that yields ore — Ferrite and Galvanite success 2–3 (a dead miss stays empty), Oil Shale success 3–5, **low yield 2** |
 
 A charged Salvage Cutter is faster attempts (better Mining XP per hour); a
-charged Loadsteel Cutter is more ore per successful attempt (better ore and
-Power Cell efficiency). A charged attempt consumes one charge whether it
+charged Loadsteel Cutter is more ore per attempt that yields ore (better ore and
+Power Cell efficiency). At Mining 5 with unrestricted capacity a charged
+Loadsteel averages about 28.06 Oil Shale over ten attempts (22.09 before #342's
+low-yield bonus), while a charged Salvage Cutter stays faster per unit of time. A charged attempt consumes one charge whether it
 succeeds or fails, and one Cell still funds ten charged attempts. Neither tool's
-charge changes success chance or the XP an attempt pays. The Loadsteel Cutter's
-extra ore comes after the source's ordinary successful yield has resolved under
-the existing roll and fit rules (1 or 2, falling back to the minimum at a full
-stack or mass boundary), and is added only if that extra unit fits too — no
-room for the bonus keeps the ordinary result rather than falling back any
-further. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
+charge changes success chance or the XP an attempt pays (a charged low yield is
+still exactly 20 XP). The Loadsteel Cutter's extra ore is an **optional bonus,
+never a minimum**: it is added to the attempt's ordinarily resolved ore (a
+success's rolled yield, or a low yield's one) and retained as far as capacity
+allows, down to the ordinary amount. A source whose miss awards no ore (The Jag,
+Deep Jag) gives a charge nothing to add to, so a charged dead miss stays empty.
+No room for the bonus keeps the ordinary result, and an attempt is never
+refused or shortened because only its bonus does not fit. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
 the extra ore. Below its Mining 5 requirement a Loadsteel Cutter can neither be
 equipped nor used: Mining treats it as no usable tool.
 
@@ -110,6 +119,79 @@ The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
 summaries are retained. Starting a genuinely new Mining action resets this run.
 
+### Oil Shale at The South Cut (#342)
+
+Skatboll's first dedicated fuel-supply source, and the first source with a
+**personal Mining level gate**. It is one more `balance.mining.sources` entry
+read by the one resolver — not a second engine — so the existing Cutters, Power
+Cell charge, boosting, run history, active-action identity and lazy/offline
+resolution all apply unchanged.
+
+- **Where.** The South Cut, axial (0,3): a close, reinforced entrance cut into
+  black laminated oil shale. It is reached only over the travel-only **South
+  Access Track** (0,2), which is the Crash Site's southern neighbour: Crash Site
+  ↔ South Access Track ↔ The South Cut, two ordinary **40-tick / 24-second**
+  walking legs (48 seconds one way). Those two edges and their reverses are the
+  only edges this adds; the Track hosts no Mining, shop, NPC, Refining,
+  Fabrication, stash, repair or workstation, and eligible walking Scavenging
+  applies on both legs. The planned freight pad (1,1) and any shortcut are later
+  slices.
+- **Access.** Mining 5, enforced by the server when a run starts
+  (`miningSourceUnlocked`, read from the character's stored Mining XP): a Mining
+  4 character is refused with `miningError: "mining_level_required"` before any
+  action, time, roll or XP exists, however the request arrived. The gate does
+  **not** move the curve's anchor: success is interpolated from level **1**
+  (35%) to a guaranteed **Mining 50**, so Mining 5 is **40.30%** under the
+  shipped integer basis-point formula (Mining 4 would be 38.97%).
+- **Item.** Oil Shale: **600 g**, stacks to **5**. A normal attempt is **100
+  ticks (60 seconds)** before the equipped tool's and Power Cell's modifiers.
+- **Full success** (roll under the chance): uniformly **2, 3 or 4** Oil Shale
+  from **one** integer draw, plus **100** base Mining XP. A charged Loadsteel
+  Cutter adds its +1 (3–5), only as capacity allows.
+- **Low yield** (roll at or above the chance): exactly **1** Oil Shale and **20**
+  Mining XP — not zero ore and zero XP. It is still an unsuccessful attempt (it
+  counts under "low yield" in the run, never "successful"). It never rolls a
+  Secondary Find. A charged Loadsteel Cutter adds its +1 here too (a charged low
+  yield is **2** shale when that fits, otherwise the ordinary 1), the XP stays
+  exactly 20, and the attempt consumes exactly one charge. Both capacity modes
+  apply to the bonus the same way: it is retained only if it fits.
+- **Secondary finds** (true successes only, one mutually exclusive roll of 100):
+  **Uncut Sapphire 1/20** (the existing item and its intrinsic +30 XP, **no**
+  public announcement from this mine; Deep Jag's own announcement is unchanged),
+  **Motherlode Slab 1/100** (+150 XP, **ULTRA RARE FIND**), and **nothing 94%**.
+  A full success with a slab is 250 Mining XP (100 + 150), with a Sapphire 130.
+- **Motherlode Slab.** One unbroken specimen, **12,000 g, stack limit 1**,
+  `ultra_rare` presentation. It is not a new Mining primary. **Not** implemented
+  here, by decision: breaking a slab into Oil Shale, housing or display use,
+  dedicated NPC pricing or sale, fuel Refining, canister Fabrication, ship
+  travel or refuelling.
+
+#### Prioritize primary resources (#342)
+
+A **character-specific, persistent, server-authoritative** setting
+(`characters.prioritize_primary_resources`, **Off by default**), changed only by
+`setPrioritizePrimaryResourcesPreference` for the owned character and read under
+the character lock whenever Mining resolves, including a lazy or offline window.
+Due work resolves under the setting it was earned under; a change applies to
+attempts that resolve after it. It governs **every** authored source, and its
+whole meaning is the capacity check:
+
+| | **Off** (protective default) | **On** (explicit opt-in) |
+| --- | --- | --- |
+| An attempt may begin when | room for the source's **minimum full-success primary yield** (2 Oil Shale) **plus any one** possible find (a Sapphire *or* the 12 kg Slab) | room for **one** primary ore |
+| Otherwise | refused **before** time, roll or XP, with the existing accurate slots / mass stop reason | refused only if not even one primary fits |
+| A full success keeps | the rolled yield, shrinking toward the source minimum only as far as it must for a rolled find to keep its place | as much of the rolled yield (plus a charged bonus) as fits, **down to one**; classification and the full 100 XP stand |
+| A rolled find | always has room, by the preflight | gets only the capacity left **after** the primary; if it does not fit it is **silently forfeited** |
+
+A forfeited find earns **no** secondary XP, item, history entry, result tile,
+System line or achievement credit, and is not available to claim later: only
+items and XP actually committed are persisted. It is never rerolled, swapped for
+a find that would fit, or biased by capacity — the find is always drawn, and the
+placement happens after. The setting's label and help text say that **rare and
+even Ultra Rare finds can be permanently forfeited when storage is full**. A
+Ferrite Shale or Galvanite attempt is unchanged except that On lets it start on
+one free slot where Off would have wanted room for a find too.
+
 ### Secondary Finds (#308)
 
 A source may author a **Secondary Find table** (`secondaryFinds` on its
@@ -124,11 +206,13 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 | The Jag | Uncut Topaz | 1 / 60 | +20 | **yes** |
 | Deep Jag | Uncut Topaz | 1 / 35 | +20 | no |
 | Deep Jag | Uncut Sapphire | 1 / 55 | +30 | **yes** |
+| The South Cut (#342) | Uncut Sapphire | 1 / 20 | +30 | no |
+| The South Cut (#342) | Motherlode Slab | 1 / 100 | +150 | **yes**, as ULTRA RARE FIND |
 
 - **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
   over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
   is an integer drawn from the least common multiple of the table's
-  denominators (120 at The Jag, 385 at Deep Jag), and each entry owns a
+  denominators (120 at The Jag, 385 at Deep Jag, 100 at The South Cut), and each entry owns a
   consecutive span of it. One roll can therefore never award two finds, and no
   authored chance is rounded to basis points. Current content awards at most one
   find per success; the resolver does not encode that limit.
@@ -148,8 +232,9 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
   find is **never rolled and then discarded**: on a hit with tight capacity the
   find and the minimum ore are kept, and only the optional ore above the minimum
   (and a charged tool's extra ore) is reduced.
-- **Charged tools.** A charged Loadsteel Cutter's +1 is *primary ore only*; it
-  never duplicates a find. A future cutter may modify Secondary Find Chance or
+- **Charged tools.** A charged Loadsteel Cutter's +1 is *primary ore only*, on
+  any attempt that yields ore; it never duplicates a find, and a low yield rolls
+  none. A future cutter may modify Secondary Find Chance or
   yield explicitly, but that is not coupled to the primary-yield bonus.
 - **Run history.** A run's totals stay item-keyed ("Ferrite Shale gained",
   "Uncut Topaz found") with one combined Mining XP total.
@@ -162,6 +247,13 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
   (`components/ui/RewardGrid.tsx`). The gems are authored as `rare` item
   presentation (`docs/design-system.md`, "Item rarity"), so they read as rare
   in Inventory too; the RARE FIND label belongs to the General System line only.
+  The Motherlode Slab is `ultra_rare` (#342): the same shared visuals add the
+  reusable Ultra Rare shimmer, and its System line reads ULTRA RARE FIND.
+- **Capacity under Prioritize primary resources (#342).** The Off rule above is
+  the default. With the character's setting On, only one primary ore must fit,
+  the primary is placed first, and a rolled find that no longer fits is
+  forfeited without XP, history or announcement — see "Prioritize primary
+  resources". A find is announced only when it was actually committed.
 
 ## Bounded runs (issue #229)
 

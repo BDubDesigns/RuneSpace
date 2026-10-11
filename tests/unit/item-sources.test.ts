@@ -173,8 +173,13 @@ describe("item sources — Fabrication, Refining, Mining", () => {
     expect(topaz.every((source) => source.kind === "mine" && source.role === "secondary")).toBe(
       true,
     );
+    // Deep Jag's Galvanite table and The South Cut's Oil Shale table (#342) can
+    // both turn up a Sapphire.
     const sapphire = of(resolveItemSources(ITEM_IDS.uncutSapphire, facts()), "mine");
-    expect(sapphire).toHaveLength(1);
+    expect(sapphire.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
+      balance.mining.sources.galvanite.actionId,
+      balance.mining.sources.oilShale.actionId,
+    ]);
   });
 
   it("reports no odds for a Secondary Find or Scavenge", () => {
@@ -356,7 +361,12 @@ describe("item sources — discovery versus capability gates", () => {
   it("finds Deep Jag's mine only once its opened state resolves", () => {
     const closed = facts({ deepJagOpen: false });
     expect(of(resolveItemSources(ITEM_IDS.galvanite, closed), "mine")).toEqual([]);
-    expect(of(resolveItemSources(ITEM_IDS.uncutSapphire, closed), "mine")).toEqual([]);
+    // With Deep Jag closed, a Sapphire is still findable at The South Cut (#342).
+    expect(
+      of(resolveItemSources(ITEM_IDS.uncutSapphire, closed), "mine").map(
+        (source) => source.kind === "mine" && source.sourceActionId,
+      ),
+    ).toEqual([balance.mining.sources.oilShale.actionId]);
     expect(of(resolveItemSources(ITEM_IDS.galvanite, facts()), "mine")).toHaveLength(1);
   });
 });

@@ -88,7 +88,15 @@ describe("Wiki item catalog", () => {
     const groups = getWikiItemGroups();
     expect(groups.map((group) => group.id)).toEqual([...ITEM_CATEGORY_IDS]);
     expect(groups.map((group) => group.items.map((item) => item.name))).toEqual([
-      ["Ferrite Shale", "Galvanite", "Uncut Quartz", "Uncut Sapphire", "Uncut Topaz"],
+      [
+        "Ferrite Shale",
+        "Galvanite",
+        "Motherlode Slab",
+        "Oil Shale",
+        "Uncut Quartz",
+        "Uncut Sapphire",
+        "Uncut Topaz",
+      ],
       ["Galvaferrite", "Galvanic Stock", "Refined Ferrite", "Scrap Metal", "Slag"],
       ["Drive Mount", "Galvanic Wire Spool", "Mounting Bracket", "Power Cell", "Wheel Assembly"],
       ["Freight Harness", "Loadsteel Cutter", "MYKEA SCHLEPPRAUM-8", "Salvage Cutter", "Scrap Box"],

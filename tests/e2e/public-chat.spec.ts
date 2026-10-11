@@ -524,3 +524,47 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     await db.delete(rune.chatMessages).where(eq(rune.chatMessages.body, body));
   }
 });
+
+test("an ULTRA RARE FIND System line is the same senderless line with its own label (#342)", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize(WIDTHS[0]);
+  const player = await signInFreshPlayer(context);
+  const tag = randomUUID().slice(0, 8);
+  const body = `Finder ${tag} just found Motherlode Slab at The South Cut!`;
+  await db.insert(rune.chatMessages).values({
+    kind: "ultra_rare_find",
+    channel: "general",
+    body,
+    createdAt: new Date(Date.now() - 5_000),
+  });
+  try {
+    const dialog = await openChat(page, player.character.id);
+    const general = log(dialog, "General");
+    const line = general.locator('[data-chat-system="ultra_rare_find"]', { hasText: tag });
+    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
+    // History is still loading when Chat first opens: wait for either the line
+    // or the way to older pages before deciding which one to do.
+    await expect(line.or(olderButton)).toBeVisible();
+    while ((await line.count()) === 0) {
+      await expect(olderButton).toBeVisible();
+      const loaded = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/chat" &&
+          new URL(response.url()).searchParams.has("before"),
+      );
+      await olderButton.click();
+      await loaded;
+    }
+    await expect(line).toBeVisible();
+    await expect(line).toContainText("System");
+    await expect(line).toContainText("ULTRA RARE FIND");
+    await expect(line).toContainText(body);
+    await expect(line.getByRole("button")).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Whisper" })).toHaveCount(0);
+    await expectNoHorizontalOverflow(page, dialog);
+  } finally {
+    await db.delete(rune.chatMessages).where(eq(rune.chatMessages.body, body));
+  }
+});

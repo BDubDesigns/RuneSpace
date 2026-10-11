@@ -147,8 +147,8 @@ export function EquipmentPanel({
                       // A tool whose charge buys ore says so, and that its
                       // attempts are no faster for it (#233).
                       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                        While charged: +{tool.chargedEffect.units} ore per successful attempt ·
-                        attempt time unchanged
+                        While charged: +{tool.chargedEffect.units} ore on any attempt that yields
+                        ore · attempt time unchanged
                       </p>
                     )}
                     {!tool.usable ? (

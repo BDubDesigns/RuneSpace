@@ -475,6 +475,84 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(jagDirect.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
   });
 
+  it("walks Crash Site, South Access Track and The South Cut as two ordinary 24-second legs and no shortcut (#342)", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const direct = await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theSouthCut,
+      startedAt,
+    );
+    expect(direct.travelError).toBe("not_adjacent");
+    expect(direct.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
+
+    const toTrack = await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.southAccessTrack,
+      startedAt,
+    );
+    expect(toTrack.travelState).toMatchObject({
+      originLocationId: LOCATION_IDS.crashSite,
+      destinationLocationId: LOCATION_IDS.southAccessTrack,
+      mode: "walk",
+    });
+    // One tick short of 40 ticks / 24 seconds: still walking.
+    const walking = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:23.999Z"),
+    );
+    expect(walking.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
+    const atTrack = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(atTrack.location.currentLocationId).toBe(LOCATION_IDS.southAccessTrack);
+    // The Track offers no Mining, and no other activity either.
+    expect(atTrack.miningSource).toBeUndefined();
+    const refused = await miningCommands.startMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(refused.travelError).toBe("mining_unavailable_here");
+    expect(refused.activeAction).toBeUndefined();
+
+    const toCut = await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theSouthCut,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(toCut.travelState?.destinationLocationId).toBe(LOCATION_IDS.theSouthCut);
+    const atCut = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(atCut.location.currentLocationId).toBe(LOCATION_IDS.theSouthCut);
+    expect(atCut.miningSource?.itemId).toBe(ITEM_IDS.oilShale);
+
+    // The way back is the same two legs: the mine only connects to the Track.
+    const backDirect = await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.crashSite,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(backDirect.travelError).toBe("not_adjacent");
+    const backToTrack = await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.southAccessTrack,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(backToTrack.travelState?.destinationLocationId).toBe(LOCATION_IDS.southAccessTrack);
+  });
+
   it("rejects Mining at Crash Site and The Long Scramble, accepts only at The Jag", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");

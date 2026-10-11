@@ -16,6 +16,7 @@ import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { loadLocationState } from "@/server/location-state";
 import {
   miningPreflightStopReason,
+  miningSourceUnlocked,
   normalizeCutterCharge,
   type MiningRandom,
 } from "@/game/domain/mining";
@@ -68,7 +69,9 @@ function recentFrom(
  * The source is derived server-side from the location's resolved state (#209),
  * never supplied by the client: The Jag offers Ferrite Shale, and Deep Jag
  * offers Galvanite only once its brace is welded in. A location that offers no
- * Mining source simply refuses.
+ * Mining source simply refuses. A source's own Mining level gate (#342) is
+ * enforced here, from the character's stored Mining XP, so no request — however
+ * forged or remote — can start a run at a source the character has not unlocked.
  *
  * The shared owned-character lock first resolves any due active action work,
  * then this command starts Mining in the same transaction.
@@ -110,11 +113,14 @@ export async function startMining(
       const traveling = context.action?.actionId === ACTION_IDS.travel;
       const miningBlockedHere = source === undefined;
       const snapshot = await loadMiningSnapshot(transaction, context.character.id);
+      // The level gate refuses before any action row, time, roll or XP exists.
+      const levelBlocked =
+        source !== undefined && !miningSourceUnlocked(snapshot.miningLevel, source);
       const preflightStopReason =
-        context.action || traveling || miningBlockedHere || !source
+        context.action || traveling || miningBlockedHere || levelBlocked || !source
           ? undefined
           : miningPreflightStopReason(snapshot, getEffectiveGameBalance(), source);
-      if (!context.action && !preflightStopReason && source) {
+      if (!context.action && !preflightStopReason && !levelBlocked && source) {
         await transaction.insert(activeActions).values({
           characterId: context.character.id,
           actionId: source.actionId,
@@ -138,7 +144,7 @@ export async function startMining(
             set: freshRun,
           });
       }
-      if (!unsupportedAction && !preflightStopReason)
+      if (!unsupportedAction && !preflightStopReason && !levelBlocked)
         await transaction
           .insert(characterMiningState)
           .values({ characterId: context.character.id, lastStopReason: null })
@@ -161,6 +167,12 @@ export async function startMining(
         miningBlockedHere ? "mining_unavailable_here" : undefined,
         undefined,
         now,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        !context.action && levelBlocked ? { miningError: "mining_level_required" } : undefined,
       );
     },
     now,

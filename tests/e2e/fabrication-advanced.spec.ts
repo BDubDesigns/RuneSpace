@@ -410,7 +410,7 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   // Its charge buys ore, not the Salvage Cutter's faster attempts.
   await expect(tool).not.toContainText("Boosted attempt:");
   await expect(tool).toContainText(
-    "While charged: +1 ore per successful attempt · attempt time unchanged",
+    "While charged: +1 ore on any attempt that yields ore · attempt time unchanged",
   );
   await expectArtwork(
     equipment.getByRole("region", { name: "Mining tool" }),
@@ -473,7 +473,9 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   const details = inventory.getByRole("region", { name: "Loadsteel Cutter details" });
   await expect(details.locator('[data-stat="required-mining-level"]')).toContainText("Mining 5");
   await expect(details.locator('[data-stat="mining-time"]')).toContainText("0.8×");
-  await expect(details.locator('[data-stat="charged-yield"]')).toContainText("+1 ore per success");
+  await expect(details.locator('[data-stat="charged-yield"]')).toContainText(
+    "+1 ore on any attempt that yields ore",
+  );
   await expectArtwork(tile, "loadsteel-cutter.webp");
   await expect(details.getByText("9 of 10 charges remaining").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);

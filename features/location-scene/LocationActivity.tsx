@@ -93,6 +93,7 @@ function primaryActivity(
 ) {
   switch (locationId) {
     case LOCATION_IDS.theJag:
+    case LOCATION_IDS.theSouthCut:
       return <MiningActivity characterName={characterName} />;
     case LOCATION_IDS.deepJag:
       // One place, two jobs, and the repair's own completion decides which

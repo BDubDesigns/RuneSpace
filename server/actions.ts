@@ -30,7 +30,10 @@ import {
   loadMiningToolPowerCell,
   type LoadPowerCellResult,
 } from "@/server/mining-commands";
-import { setAutoDiscardSlagPreference } from "@/server/character-preference-commands";
+import {
+  setAutoDiscardSlagPreference,
+  setPrioritizePrimaryResourcesPreference,
+} from "@/server/character-preference-commands";
 import { setMissionPinned, type MissionPinResult } from "@/server/mission-pin-commands";
 import { startRefining, stopRefining } from "@/server/refining-commands";
 import {
@@ -186,6 +189,7 @@ import {
   PracticeCommandRequestSchema,
   StartPracticeRequestSchema,
   AutoDiscardSlagPreferenceRequestSchema,
+  PrioritizePrimaryResourcesPreferenceRequestSchema,
   MissionPinRequestSchema,
   WorkOrderAcceptRequestSchema,
   WorkOrderCommandRequestSchema,
@@ -666,6 +670,27 @@ export async function setAutoDiscardSlagPreferenceAction(
         user.id,
         request.data.characterId,
         request.data.autoDiscardSlag,
+      ),
+    };
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function setPrioritizePrimaryResourcesPreferenceAction(
+  input: unknown,
+): Promise<PlayActionResult> {
+  const request = PrioritizePrimaryResourcesPreferenceRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Prioritize primary resources setting." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await setPrioritizePrimaryResourcesPreference(
+        user.id,
+        request.data.characterId,
+        request.data.prioritizePrimaryResources,
       ),
     };
   } catch (error) {
