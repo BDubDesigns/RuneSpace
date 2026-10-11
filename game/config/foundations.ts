@@ -72,6 +72,11 @@ const itemIds = {
   // its single-specimen Ultra Rare secondary find.
   oilShale: asContentId("oil_shale"),
   motherlodeSlab: asContentId("motherlode_slab"),
+  // Fuel manufacturing (#343). Two distinct stackable items rather than one item
+  // with a fill state: the empty shell is fabricated and is what a failed
+  // Refining attempt returns; the full canister carries the 50 Fuel Units.
+  emptySmallFuelCanister: asContentId("empty_small_fuel_canister"),
+  fullSmallFuelCanister: asContentId("full_small_fuel_canister"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -405,6 +410,9 @@ export const ACTION_IDS = {
   // resolution exactly as a productive one does.
   ferriteShaleSlagRefining: asContentId("ferrite_shale_slag_refining"),
   galvaniteSlagRefining: asContentId("galvanite_slag_refining"),
+  // Fuel manufacturing (#343): the Abandoned Processing Yard's fuel recipe, under
+  // the same one-action-per-recipe rule as every other Refining recipe.
+  fullSmallFuelCanisterRefining: asContentId("full_small_fuel_canister_refining"),
   // Welding the brace/support assembly into the collapsed Deep Jag passage.
   deepJagWelding: asContentId("deep_jag_welding"),
   // Welding a site stash mount (#284), one action per mount for the same
@@ -443,6 +451,9 @@ export const ACTION_IDS = {
   wheelAssemblyFabrication: asContentId("wheel_assembly_fabrication"),
   // The Fabrication 8 Drive Mount and its ordinary Tinkering target (#330).
   driveMountFabrication: asContentId("drive_mount_fabrication"),
+  // The Fabrication 8 Empty Small Fuel Canister (#343). A direct 1:1 packaging
+  // recipe, not a Tinkering target.
+  emptySmallFuelCanisterFabrication: asContentId("empty_small_fuel_canister_fabrication"),
   galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
   powerCellTinkering: asContentId("power_cell_tinkering"),
   loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),

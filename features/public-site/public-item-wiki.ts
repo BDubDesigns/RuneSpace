@@ -202,11 +202,22 @@ function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
     if (recipe.deterministic) {
       facts.push(["Always succeeds"]);
     } else if (recipe.failure?.kind === "fixed_outputs") {
-      facts.push([
-        "Can fail. A failed attempt produces ",
-        ...joinLinks(recipe.failure.outputs.map((out) => itemLink(out.itemId, out.quantity))),
-        " instead.",
-      ]);
+      const { outputs, returned = [] } = recipe.failure;
+      const links = (list: readonly { itemId: string; quantity: number }[]) =>
+        joinLinks(list.map((out) => itemLink(out.itemId, out.quantity)));
+      // A failure can make something (Slag), hand some of the recipe's own
+      // inputs back (#343), or both; the wording follows what the data says.
+      const line: (string | { text: string; href: string })[] = ["Can fail."];
+      if (outputs.length > 0)
+        line.push(" A failed attempt produces ", ...links(outputs), " instead.");
+      if (returned.length > 0) {
+        line.push(
+          outputs.length > 0 ? " It also returns " : " A failed attempt returns ",
+          ...links(returned),
+          " to your inventory; the rest of the ingredients are lost.",
+        );
+      }
+      facts.push(line);
     } else if (recipe.failure?.kind === "one_input_returned") {
       facts.push(["Can fail. A failed attempt hands one of the ingredients back."]);
     } else {

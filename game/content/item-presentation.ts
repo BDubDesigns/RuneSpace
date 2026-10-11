@@ -1,5 +1,8 @@
 import { ITEM_IDS, type ItemId } from "@/game/config/foundations";
-import { getItemDefinition } from "@/game/config/balance";
+import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
+
+/** The Fuel Units a Full Small Fuel Canister carries: authored on the item, never restated. */
+const FULL_CANISTER_FUEL_UNITS = getEffectiveGameBalance().items.fullSmallFuelCanister.fuelUnits;
 
 /**
  * Player-facing item presentation is content, not a UI concern. UI consumers
@@ -180,6 +183,28 @@ const itemPresentations = {
     rarity: "ultra_rare",
     description:
       "A single unbroken specimen of layered Oil Shale with an amber, oil-rich seam through it. Twelve kilograms of the real thing.",
+  },
+  // Fuel manufacturing (#343). The two canisters are one silver cylinder family;
+  // the fill state is the physical red cap and red side locking bar, so the art
+  // has no baked label and the Full one's contents are said in words.
+  [ITEM_IDS.emptySmallFuelCanister]: {
+    displayName: "Empty Small Fuel Canister",
+    pluralName: "Empty Small Fuel Canisters",
+    accessibleDescription:
+      "Upright weathered silver steel fuel canister inside a protective collar, with an exposed brass valve and no red hardware",
+    textFallback: "EC",
+    artworkSrc: "/item-art/empty-small-fuel-canister.webp",
+    description:
+      "A bare steel canister with its valve shut and nothing inside. It is worth little until something fills it.",
+  },
+  [ITEM_IDS.fullSmallFuelCanister]: {
+    displayName: "Full Small Fuel Canister",
+    pluralName: "Full Small Fuel Canisters",
+    accessibleDescription:
+      "Upright weathered silver steel fuel canister inside a protective collar, with a bright red valve cap and a bright red vertical locking bar on its side",
+    textFallback: "FC",
+    artworkSrc: "/item-art/full-small-fuel-canister.webp",
+    description: `A red-capped canister, locked shut and filled with ${FULL_CANISTER_FUEL_UNITS} Fuel Units. Heavy for its size.`,
   },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {

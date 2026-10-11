@@ -331,6 +331,7 @@ engine.
 | Galvaferrite | 8 | 1 Refined Ferrite + 1 Galvanic Stock | 1 Galvaferrite | 12 | 35% at 1 → 100% at 30 | 35 / 7 |
 | Slag (from Shale) | 5 | 2 Ferrite Shale | 1 Slag | 6 | deterministic | 3 / — |
 | Slag (from Galvanite) | 5 | 2 Galvanite | 2 Slag | 8 | deterministic | 5 / — |
+| Full Small Fuel Canister (#343) | 8 | 10 Oil Shale + 1 Empty Small Fuel Canister | 1 Full Small Fuel Canister | 60 | 35% at 1 → 100% at 30 (50.68% at 8) | 100 / 20 |
 
 The two **deliberate Slag** recipes (#229) are utility processing, not
 training: each mirrors its productive recipe's failure output and pays that
@@ -383,11 +384,18 @@ returned input is presented as what the failure left — headed as a failure and
 labelled `produced by` / `returned by the failed attempt` — never as the
 recipe's crafted output.
 
-A failure is one of two authored shapes. **Fixed outputs** produce what the
-recipe names — 1 Slag for Refined Ferrite, 2 Slag for Galvanic Stock. **One
-input returned** hands exactly one of the inputs back, chosen 50/50, and loses
-the other; that is the Galvaferrite pour, and it is why the resolution's totals
-are item-keyed maps rather than a fixed trio of counters.
+A failure is one of two authored shapes. **Fixed outputs** give what the
+recipe names — 1 Slag for Refined Ferrite, 2 Slag for Galvanic Stock, or (#343)
+exactly 5 Oil Shale and the Empty Small Fuel Canister back for the fuel recipe.
+Whether a fixed output is *made* or *returned* is derived from the recipe, never
+from an item ID, wherever it is worded (the attempt copy reads the attempt's own
+consumed list; the public reference reads the recipe's inputs): an output that is
+also one of the recipe's own inputs is a returned input. Only Slag a failure
+makes is a byproduct, so a returned input is always a preserved award that gates
+the attempt and that Auto-discard Slag can never discard. **One input returned** hands exactly one of the inputs back,
+chosen 50/50, and loses the other; that is the Galvaferrite pour, and it is why
+the resolution's totals are item-keyed maps rather than a fixed trio of
+counters.
 
 The preflight simulates removing every input and then requires each mutually
 exclusive outcome's **preserved** awards to fit independently before any roll is
@@ -1102,6 +1110,7 @@ recipe and not a Tinkering target.
 | Wheel Assembly | 5 | 3 Refined Ferrite + 1 Galvanic Stock + 1 Mounting Bracket → 1 Wheel Assembly (1,550 g, stack 2) | 36 ticks / 21.6 s | 100 |
 | Drive Mount | 8 | 2 Galvaferrite + 1 Galvanic Wire Spool → 1 Drive Mount (2,900 g, stack 2) | 48 ticks / 28.8 s | 200 |
 | Freight Harness | 8 | 4 Galvaferrite + 2 Mounting Brackets → 1 Freight Harness (9,000 g, unique) | 60 ticks / 36 s | 270 |
+| Empty Small Fuel Canister (#343) | 8 | 1 Galvanic Stock → 1 Empty Small Fuel Canister (800 g, stack 5) | 30 ticks / 18 s | 75 |
 
 Reaching the level is the whole gate: no Mission, NPC permission or personal
 Refining level is involved, so Galvanic Stock or Galvaferrite acquired from
@@ -1134,6 +1143,58 @@ none of those is an inventory item.
 - **The Freight Harness** is an advanced container attachment: +6 Inventory
   slots in either of the two existing container slots, carried at its full
   9 kg — not a carry-capacity upgrade.
+
+### Fuel manufacturing (issue #343)
+
+Two recipes on the existing engines turn Skatboll's Oil Shale into fuel the
+player can carry. Neither is a new system: each is one authored entry, and there
+is no ship tank, refueling, Fuel Unit spending, flight, price or freight pad.
+
+- **Empty Small Fuel Canister** — Fabrication 8 at the existing Rusk Recovery
+  station: 1 Galvanic Stock → 1 canister, 30 ticks, 75 base XP (deliberately the
+  Power Cell recipe's duration and XP). Ordinary Fabrication never fails; Manual
+  Override, batches and Max behave exactly as for every recipe. It is not a
+  Tinkering target. The empty shell is 800 g — exactly the Stock it is made from
+  — and stacks to 5.
+- **Full Small Fuel Canister** — Refining 8 at the Abandoned Processing Yard's
+  one console: 10 Oil Shale + 1 Empty canister → 1 Full canister, 60 ticks
+  (36 s) whether it succeeds or fails, 100 XP on success and 20 on failure. The
+  chance is the Galvanic Stock / Galvaferrite curve unchanged — 3,500 bps at
+  Refining 1 to a guaranteed 10,000 at 30, so the level-8 unlock sits at 5,068
+  bps (50.68%) rather than restarting the climb. The Full canister is 6,000 g,
+  stacks to 2 and carries `fuelUnits: 50` on its item definition for a later
+  refueling slice; nothing reads that value yet.
+
+A failure is a `fixed_outputs` branch of two *returned inputs*: exactly 5 of the
+10 Oil Shale and the same shell come back, the other 5 shale are lost, and
+nothing else is produced — no Slag and no liquid or fuel item. Mass accounting:
+10 × 600 g + 800 g = 6,800 g in; a success leaves a 6,000 g canister (800 g of
+process waste is not an item), a failure leaves 3,000 g of shale and the 800 g
+shell (3,000 g lost).
+
+What the existing resolver already guarantees, and the #343 tests pin:
+
+- **Inputs are removed first.** Every outcome is then judged against the
+  inventory after removal, so a success (one canister) and a failure (5 shale +
+  1 shell) can never need more room than the ten shale and the shell just freed.
+  A completely full inventory at the mass ceiling can therefore run an attempt,
+  and a missing shell or shale refuses it before any roll, XP or consumption.
+- **Retries are one window.** A returned shell and shale are real stack state
+  inside the settlement window, so a Max or numbered run spends them again in the
+  next attempt exactly as lazy/offline resolution would: gross use can exceed
+  what was ever carried at once, but net inventory is conserved. A failed attempt
+  counts toward a numbered run like a success.
+- **Carried inventory only.** Nothing is drawn from the Cargo Hold, a stash or a
+  trade offer; items are ordinary stackable, tradable and stashable stacks with
+  no recipe-specific transfer rule and no merchant price.
+- **No client authority.** The selected recipe is the active action, the roll is
+  the server's, and level, location and quantity are re-checked in the command.
+
+The item art is the owner-approved pair of masters
+(`assets/item-art/{empty,full}-small-fuel-canister.png`): the Empty is a silver
+cylinder with a brass valve and no red hardware, the Full the same cylinder with
+a red cap and a red side locking bar. The production derivatives follow the
+Wheel Assembly convention (see `assets/item-art/README.md`).
 
 ### The workpiece is binding
 

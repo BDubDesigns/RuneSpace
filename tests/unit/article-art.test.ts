@@ -130,9 +130,12 @@ describe("canonical article art", () => {
     expect(index).toContain("Wheel Be Right Back");
     expect(index).toContain("How to get it");
     expect(index).toContain("Pin it");
+    expect(index).toContain("Oil Shale at The South Cut");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Oil Shale at The South Cut");
+      expect(markup).toContain("Fuel Canisters");
       expect(markup).not.toContain("rs-update-figure");
+      expect(markup).not.toContain("empty-small-fuel-canister.webp");
+      expect(markup).not.toContain("full-small-fuel-canister.webp");
       expect(markup).not.toContain("oil-shale.webp");
       expect(markup).not.toContain("motherlode-slab.webp");
       expect(markup).not.toContain("uncut-topaz.webp");

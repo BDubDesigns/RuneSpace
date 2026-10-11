@@ -546,6 +546,15 @@ Current production conventions:
   (640x640 canvas, 576 px long edge, lossless WebP, masters in `assets/item-art/`).
   The Motherlode Slab's art carries **no baked sparkle**: Ultra Rare shimmer is a UI
   treatment (`docs/design-system.md`, "Item rarity")
+- the Fuel manufacturing slice's two canisters (#343): the approved Empty and
+  Full Small Fuel Canister masters (1254x1254 PNG, kept unaltered in
+  `assets/item-art/`) and their derivatives in `public/item-art/`, prepared by the
+  same recipe as the Oil Shale and Wheel Assembly (alpha under 4 cleared, trimmed,
+  scaled to a 576 px long edge, centred on a 640x640 transparent canvas, lossless
+  WebP). They are tall objects, so the content is about 230x576 inside that
+  square, never stretched. The silver cylinder family is told apart by physical
+  hardware (the Full one's red cap and red side locking bar), never by a baked
+  label, so it still reads at the 80 px inventory size
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

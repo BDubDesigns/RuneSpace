@@ -49,6 +49,8 @@ describe("recipesUnlockedBetween", () => {
       ACTION_IDS.ferriteShaleSlagRefining,
       ACTION_IDS.galvaniteSlagRefining,
       ACTION_IDS.galvaferriteRefining,
+      // Refining 8, in authored order: Galvaferrite, then the fuel recipe (#343).
+      ACTION_IDS.fullSmallFuelCanisterRefining,
     ]);
     expect(unlocked(SKILL_IDS.fabrication, 1, 9)).toEqual([
       ACTION_IDS.galvanicScrapFabrication,
@@ -59,12 +61,16 @@ describe("recipesUnlockedBetween", () => {
       // Fabrication 8, in authored order: the Drive Mount (#330), then the Harness.
       ACTION_IDS.driveMountFabrication,
       ACTION_IDS.freightHarnessFabrication,
+      ACTION_IDS.emptySmallFuelCanisterFabrication,
     ]);
   });
 
   it("never repeats a recipe below the previous level", () => {
     expect(unlocked(SKILL_IDS.refining, 5, 7)).toEqual([]);
-    expect(unlocked(SKILL_IDS.refining, 6, 8)).toEqual([ACTION_IDS.galvaferriteRefining]);
+    expect(unlocked(SKILL_IDS.refining, 6, 8)).toEqual([
+      ACTION_IDS.galvaferriteRefining,
+      ACTION_IDS.fullSmallFuelCanisterRefining,
+    ]);
     expect(unlocked(SKILL_IDS.refining, 8, 20)).toEqual([]);
   });
 
@@ -90,6 +96,7 @@ describe("recipesUnlockedBetween", () => {
       ACTION_IDS.galvaniteSlagRefining,
       "future-refining-recipe",
       ACTION_IDS.galvaferriteRefining,
+      ACTION_IDS.fullSmallFuelCanisterRefining,
     ]);
   });
 });

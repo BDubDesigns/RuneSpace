@@ -9,6 +9,48 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #343 — Fuel manufacturing.
+    slug: "fuel-canisters",
+    title: "Fuel Canisters",
+    publishedAt: "2026-10-11T06:30:00-07:00",
+    summary:
+      "The Fabrication Station can now make Empty Small Fuel Canisters, and the Abandoned Processing Yard can refine Oil Shale into Full ones, 50 Fuel Units each, with a real chance of getting the canister back when it goes wrong.",
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.emptySmallFuelCanister },
+        side: "right",
+      },
+      [
+        "Oil Shale has something to turn into. At Fabrication 8, the Fabrication Station at Rusk Recovery makes an Empty Small Fuel Canister out of one Galvanic Stock: 18 seconds, 75 Fabrication experience, a dull steel cylinder with a brass valve that weighs 800g and stacks five to a slot. See ",
+        { text: "Fabrication & Tinkering", articleSlug: "fabrication-and-tinkering" },
+        " for the recipe.",
+      ],
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.fullSmallFuelCanister },
+        side: "left",
+      },
+      [
+        "At Refining 8, the Abandoned Processing Yard takes ten Oil Shale and one Empty canister and, in 36 seconds, tries to fill it. The chance of success is on the same climb as Galvanic Stock and Galvaferrite: 50.68% at Refining 8, certain at Refining 30. A success is one Full Small Fuel Canister, red-capped and holding 50 Fuel Units, plus 100 Refining experience. It weighs 6kg and stacks two to a slot. See ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " for the numbers.",
+      ],
+      "A failure costs you, but not the canister. You get 20 Refining experience and five of your ten Oil Shale back along with the same Empty canister, ready for another attempt. The other five Oil Shale are lost, there is no Slag, and Auto-discard Slag never touches what comes back.",
+      "Both canisters are ordinary items. You can carry, stash and trade them, and anyone can use one however they got it. Nothing uses Fuel Units yet and nobody buys canisters yet, so for now they are something to make, hold and trade.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Empty Small Fuel Canister, from one Galvanic Stock at the Fabrication Station at Fabrication 8: 18 seconds, 75 Fabrication experience, 800g, stacks five.",
+          "Full Small Fuel Canister, from ten Oil Shale and one Empty canister at the Abandoned Processing Yard at Refining 8: 36 seconds, 100 Refining experience, 50 Fuel Units, 6kg, stacks two.",
+          "A failed fuel attempt pays 20 Refining experience and returns five Oil Shale and the Empty canister.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #342 — Skatboll Oil Shale Mining.
     slug: "oil-shale-at-the-south-cut",
     title: "Oil Shale at The South Cut",

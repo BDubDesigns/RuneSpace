@@ -439,8 +439,10 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
       );
       expect(resolved.mapStatus).toBe(location.mapStatus);
     }
+    // Manufacturing fuel canisters (#343) is packaging, not flight: it authors
+    // no action that burns fuel, refuels a ship or moves one.
     const actions = JSON.stringify(Object.values(ACTION_IDS));
-    expect(actions).not.toMatch(/flight|launch|board_ship|fuel|canister/i);
+    expect(actions).not.toMatch(/flight|launch|board_ship|refuel|fuel_tank|fuel_unit/i);
   });
 });
 

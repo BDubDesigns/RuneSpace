@@ -118,14 +118,36 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Oil Shale at The South Cut Update as the newest", () => {
+  it("publishes the Fuel Canisters Update as the newest, announcing nothing unshipped", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("oil-shale-at-the-south-cut");
+    expect(latest.slug).toBe("fuel-canisters");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("oil-shale-at-the-south-cut")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    expect(text).toContain("50 Fuel Units");
+    expect(text).toContain("50.68%");
+    // No flight, refuelling or prices: those are later slices.
+    expect(text).toContain("Nothing uses Fuel Units yet");
+    expect(text).not.toMatch(/refuel|flight|launch|sells? canisters/i);
+    const figures = latest.body.flatMap((block) =>
+      typeof block === "object" && !Array.isArray(block) && block.kind === "figure"
+        ? [block.art]
+        : [],
+    );
+    expect(figures).toEqual([
+      { kind: "item", itemId: ITEM_IDS.emptySmallFuelCanister },
+      { kind: "item", itemId: ITEM_IDS.fullSmallFuelCanister },
+    ]);
+  });
+
+  it("keeps the Oil Shale at The South Cut Update published beneath it (#342)", () => {
+    const latest = getPublicUpdate("oil-shale-at-the-south-cut")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("pins-quiet-the-highlights")!.publishedAt),
     );
-    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     expect(JSON.stringify(latest)).toContain("Prioritize primary resources");
     // It uses the approved South Cut scene as its hero, at that file's real size.
     expect(latest.hero).toMatchObject({

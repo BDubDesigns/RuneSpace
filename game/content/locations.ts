@@ -268,6 +268,7 @@ const locationDefinitions = [
       ACTION_IDS.wheelAssemblyFabrication,
       ACTION_IDS.driveMountFabrication,
       ACTION_IDS.freightHarnessFabrication,
+      ACTION_IDS.emptySmallFuelCanisterFabrication,
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
       ACTION_IDS.salvageCutterTinkering,

@@ -31,6 +31,18 @@ clients.
   to a 576 px long edge, centred on a 640×640 transparent canvas and saved as
   lossless WebP. The art contains no baked sparkle: the Ultra Rare shimmer is
   applied by the UI. Nothing was regenerated, recomposed or recoloured.
+- `empty-small-fuel-canister.png` and `full-small-fuel-canister.png` are the
+  approved 1254×1254 transparent renders of the Empty and Full Small Fuel
+  Canisters (#343): a weathered silver cylinder with a brass valve, and the same
+  cylinder with a red valve cap and a red vertical side locking bar. They are
+  byte-identical to the owner-supplied masters. The committed derivatives follow
+  the Wheel Assembly convention — alpha noise below 4 cleared, near-opaque alpha
+  (252 and above) snapped to 255, trimmed to content (493×1236 and 506×1238),
+  scaled to a 576 px long edge (230×576 and 235×576), centred on a 640×640
+  transparent canvas and saved as lossless WebP — so the tall canister is never
+  stretched. The art carries no stamped word and no fuel chamber; the red
+  hardware is the fill-state cue. Nothing was regenerated, recomposed or
+  recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).
