@@ -90,8 +90,8 @@ small number of critical mobile player journeys.
   (`mission-pinning`, #325), the dialogue-stepping helper's own harness
   (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
   setting and Ultra Rare shimmer (`oil-shale-mining`, #342), and fuel manufacturing's
-Empty and Full Small Fuel Canister recipes, art and failure shape
-(`fuel-manufacturing`, #343). It intentionally excludes noncanonical `smoke`, `ownership`,
+  Empty and Full Small Fuel Canister recipes, art and failure shape
+  (`fuel-manufacturing`, #343). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

@@ -388,9 +388,10 @@ A failure is one of two authored shapes. **Fixed outputs** give what the
 recipe names — 1 Slag for Refined Ferrite, 2 Slag for Galvanic Stock, or (#343)
 exactly 5 Oil Shale and the Empty Small Fuel Canister back for the fuel recipe.
 Whether a fixed output is *made* or *returned* is derived from the recipe, never
-from an item ID, wherever it is worded (the attempt copy reads the attempt's own
-consumed list; the public reference reads the recipe's inputs): an output that is
-also one of the recipe's own inputs is a returned input. Only Slag a failure
+from an item ID, by one rule: `partitionFailureAwards` in `game/domain/refining.ts`
+(the attempt copy applies it to the attempt's own consumed list; the public
+reference to the recipe's authored inputs). An output that is also one of the
+inputs is a returned input. Only Slag a failure
 makes is a byproduct, so a returned input is always a preserved award that gates
 the attempt and that Auto-discard Slag can never discard. **One input returned** hands exactly one of the inputs back,
 chosen 50/50, and loses the other; that is the Galvaferrite pour, and it is why

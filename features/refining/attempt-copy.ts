@@ -1,4 +1,5 @@
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { partitionFailureAwards } from "@/game/domain/refining";
 import type { RefiningRunAttempt } from "@/server/refining";
 
 /**
@@ -38,9 +39,10 @@ export function describeQuantities(
  * discarded so a discarded Slag is never read as carried.
  */
 export function describeFailureOutcome(attempt: RefiningRunAttempt): string {
-  const consumedItemIds = new Set(attempt.consumed.map((input) => input.itemId));
-  const returned = attempt.awarded.filter((award) => consumedItemIds.has(award.itemId));
-  const produced = attempt.awarded.filter((award) => !consumedItemIds.has(award.itemId));
+  const { returned, produced } = partitionFailureAwards(
+    attempt.consumed.map((input) => input.itemId),
+    attempt.awarded,
+  );
   const discarded = attempt.discarded ?? [];
   const clauses: string[] = [];
   if (produced.length > 0) clauses.push(`${describeQuantities(produced, ", ")} produced`);
@@ -58,6 +60,9 @@ export function failedAttemptAwardLabel(
   attempt: RefiningRunAttempt,
   award: { itemId: string; quantity: number },
 ): string {
-  const returned = attempt.consumed.some((input) => input.itemId === award.itemId);
-  return `${award.quantity} ${itemName(award.itemId)} ${returned ? "returned" : "produced"} by the failed attempt`;
+  const { returned } = partitionFailureAwards(
+    attempt.consumed.map((input) => input.itemId),
+    [award],
+  );
+  return `${award.quantity} ${itemName(award.itemId)} ${returned.length > 0 ? "returned" : "produced"} by the failed attempt`;
 }

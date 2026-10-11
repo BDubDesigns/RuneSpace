@@ -33,6 +33,7 @@ import {
   refiningAffordableBatches,
   refiningAwardFacts,
   refiningPreflightStopReason,
+  partitionFailureAwards,
   refiningRecipeUnlocked,
   refiningSuccessChanceBps,
   resolveRefining,
@@ -839,6 +840,28 @@ describe("Recipe B — Refining 8: 10 Oil Shale + 1 Empty canister → 1 Full ca
       failure: { kind: "one_input_returned" },
     });
     expect(refiningRecipes(balance)).toHaveLength(6);
+  });
+});
+
+describe("the one rule for a failure's returned and produced awards", () => {
+  it("splits by the inputs taken, never by item ID", () => {
+    const awards = [
+      { itemId: SHALE, quantity: 5 },
+      { itemId: SLAG, quantity: 1 },
+      { itemId: EMPTY, quantity: 1 },
+    ];
+    expect(partitionFailureAwards([SHALE, EMPTY], awards)).toEqual({
+      returned: [
+        { itemId: SHALE, quantity: 5 },
+        { itemId: EMPTY, quantity: 1 },
+      ],
+      produced: [{ itemId: SLAG, quantity: 1 }],
+    });
+    // The same Slag is returned when Slag was an input.
+    expect(partitionFailureAwards([SLAG], awards).returned).toEqual([
+      { itemId: SLAG, quantity: 1 },
+    ]);
+    expect(partitionFailureAwards([], awards).returned).toEqual([]);
   });
 });
 

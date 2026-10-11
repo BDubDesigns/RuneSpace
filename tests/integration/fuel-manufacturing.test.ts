@@ -756,18 +756,6 @@ suite("issue #343 fuel manufacturing (real PostgreSQL)", () => {
     it("trade between players like any other stack, with no special case", async () => {
       const a: Player = await worker("Trade A", { location: LOCATION_IDS.ruskRecovery });
       const b: Player = await worker("Trade B", { location: LOCATION_IDS.ruskRecovery });
-      for (const who of [a, b]) {
-        const [pack] = await db
-          .insert(rune.itemInstances)
-          .values({ characterId: who.character.id, itemId: balance.items.starterContainer.itemId })
-          .returning();
-        await db.insert(rune.equippedItems).values({
-          characterId: who.character.id,
-          assignmentKind: "container",
-          suitSlotId: balance.carrying.containerSuitSlotIds[0],
-          itemInstanceId: pack!.id,
-        });
-      }
       await carry(a.character.id, FULL, 2, 2);
       await carry(a.character.id, EMPTY, 5, 5);
       const now = new Date("2026-10-11T12:00:00.000Z");
