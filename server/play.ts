@@ -100,6 +100,7 @@ import {
   miningSuccessChanceBps,
   miningToolUsable,
   miningYieldRange,
+  miningChargedLowYieldQuantity,
   normalizeCutterCharge,
   type MiningRandom,
   type MiningStopReason,
@@ -537,6 +538,8 @@ export type MiningSourceProjection = {
   /** A charged success's yield with the equipped tool: its ordinary range plus any extra ore (#233). */
   chargedYieldMinimum: number;
   chargedYieldMaximum: number;
+  /** A charged low yield's ore with the equipped tool (#342), or null when a miss awards none. */
+  chargedLowYieldQuantity: number | null;
 };
 
 /** The equipped Mining tool as Equipment and Mining present it (#233). */
@@ -2430,7 +2433,15 @@ export async function stateFromTransaction(
           lowYield: locationMiningSource.lowYield,
           ...(() => {
             const charged = miningYieldRange(locationMiningSource, equippedTool?.definition, true);
-            return { chargedYieldMinimum: charged.minimum, chargedYieldMaximum: charged.maximum };
+            return {
+              chargedYieldMinimum: charged.minimum,
+              chargedYieldMaximum: charged.maximum,
+              chargedLowYieldQuantity: miningChargedLowYieldQuantity(
+                locationMiningSource,
+                equippedTool?.definition,
+                true,
+              ),
+            };
           })(),
         }
       : undefined,

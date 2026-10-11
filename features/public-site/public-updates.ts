@@ -28,7 +28,7 @@ const authoredUpdates = [
         { text: "Mining & Refining", articleSlug: "mining-and-refining" },
         " for the numbers.",
       ],
-      "Oil Shale is heavy, 600g a piece and five to a tile, and each attempt takes a minute. A success gives two, three or four, equally likely, and 100 Mining experience. Your chance still starts at 35% at Mining 1 and only reaches certainty at Mining 50, so Mining 5 is 40.30%. An attempt that misses is no longer wasted: it still gives one Oil Shale and 20 Mining experience.",
+      "Oil Shale is heavy, 600g a piece and five to a tile, and each attempt takes a minute. A success gives two, three or four, equally likely, and 100 Mining experience. Your chance still starts at 35% at Mining 1 and only reaches certainty at Mining 50, so Mining 5 is 40.30%. An attempt that misses is no longer wasted: it still gives one Oil Shale and 20 Mining experience. A charged Loadsteel Cutter adds one more Oil Shale to either kind of attempt, so a charged low yield is two.",
       { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.motherlodeSlab }, side: "left" },
       "A success can turn up an Uncut Sapphire about one time in twenty, or, about one time in a hundred, a Motherlode Slab: a single unbroken 12kg specimen of layered shale with an amber seam through it. The Slab is the first Ultra Rare item. Its tile shimmers wherever you carry it, it adds 150 Mining experience, and finding one posts an ULTRA RARE FIND line in General for everyone to see. Sapphires from The South Cut are not announced.",
       "There is a new setting in Mining, Prioritize primary resources, and it is Off. Off is the careful choice: Mining will not start an attempt unless there is room for the ore and for any one find. On, Mining keeps going while there is room for a single ore, keeps as much ore as fits, and gives up any find that has no room left, for good, even an Ultra Rare one. It is set per character, and it applies to every mine.",
@@ -39,6 +39,7 @@ const authoredUpdates = [
         items: [
           "The South Access Track and The South Cut, two walks south of the Crash Site, with their own scenes and map markers.",
           "Oil Shale Mining at The South Cut, from Mining 5: a minute per attempt, two to four Oil Shale and 100 Mining experience on a success, one Oil Shale and 20 experience otherwise.",
+          "A charged Loadsteel Cutter adds one Oil Shale to any Oil Shale attempt that gives ore, a low yield included.",
           "The Motherlode Slab, a 12kg Ultra Rare find, and Uncut Sapphires at The South Cut.",
           "Ultra Rare items shimmer in Inventory, storage and results, and an ULTRA RARE FIND System line is posted in General when one is found.",
           "A per-character Prioritize primary resources setting in Mining.",

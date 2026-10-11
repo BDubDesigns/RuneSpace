@@ -417,7 +417,7 @@ function propertyRows(itemId: string, reference: ItemReference, powerCellSpeedMu
       value:
         equipment.chargedEffect.kind === "speed"
           ? `A charged attempt is ${powerCellSpeedMultiplier}× as fast`
-          : `A charged, successful attempt yields ${equipment.chargedEffect.units} extra ore`,
+          : `A charged attempt that yields ore yields ${equipment.chargedEffect.units} extra ore`,
     });
   }
   if (equipment?.kind === "container") {

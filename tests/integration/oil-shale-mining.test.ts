@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -8,7 +9,12 @@ import { PrioritizePrimaryResourcesPreferenceRequestSchema } from "@/game/schema
 import type { ChatMessageView } from "@/game/schemas/chat";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { createPlayResolver, ensurePlayProvisioning } from "@/server/play";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  systemAnnouncementsBy,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -31,9 +37,16 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let miningCommands: typeof import("@/server/mining-commands");
   let preferences: typeof import("@/server/character-preference-commands");
+  let equipment: typeof import("@/server/equipment");
   let chat: typeof import("@/server/chat");
   let realtime: typeof import("@/server/realtime");
   const createdUsers: string[] = [];
+  // The character names this test created. System announcements belong to no
+  // account, and suites run concurrently against one database, so every read and
+  // the cleanup below are scoped to these names (see `systemAnnouncementsBy`).
+  const finders: string[] = [];
+  const ownedByThisTest = (message: { body?: string }) =>
+    finders.some((name) => message.body?.startsWith(`${name} `));
   const balance = getEffectiveGameBalance();
   const oil = balance.mining.sources.oilShale;
   const thresholds = standardSkillLevelThresholds(balance);
@@ -51,12 +64,46 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
     play = await import("@/server/play");
     miningCommands = await import("@/server/mining-commands");
     preferences = await import("@/server/character-preference-commands");
+    equipment = await import("@/server/equipment");
     chat = await import("@/server/chat");
     realtime = await import("@/server/realtime");
   });
 
+  // Foreign System announcements, standing in for another concurrently running
+  // suite's rows: present for this whole file, so any unscoped read here ("no
+  // announcement at all") or unscoped cleanup would fail or destroy them.
+  const bystanders = ["rare_find", "ultra_rare_find"].map((kind) => ({
+    kind,
+    channel: "general",
+    body: `Bystander${randomUUID().slice(0, 8)} just found Motherlode Slab at The South Cut!`,
+  }));
+  beforeAll(async () => {
+    await db.insert(rune.chatMessages).values(bystanders);
+  });
+  afterAll(async () => {
+    const survivors = await db
+      .select({ body: rune.chatMessages.body })
+      .from(rune.chatMessages)
+      .where(
+        inArray(
+          rune.chatMessages.body,
+          bystanders.map((row) => row.body),
+        ),
+      );
+    await db.delete(rune.chatMessages).where(
+      inArray(
+        rune.chatMessages.body,
+        bystanders.map((row) => row.body),
+      ),
+    );
+    // This file's cleanup touched only its own finders' rows.
+    expect(survivors).toHaveLength(bystanders.length);
+  });
+
   afterEach(async () => {
-    await db.delete(rune.chatMessages).where(ne(rune.chatMessages.kind, "player"));
+    if (finders.length > 0)
+      await db.delete(rune.chatMessages).where(systemAnnouncementsBy(rune, finders));
+    finders.splice(0);
     for (const userId of createdUsers.splice(0))
       await cleanupTestUser(db, authSchema, rune, userId);
   });
@@ -96,6 +143,7 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
       userId,
       `${label}${userId.slice(0, 5)}`,
     );
+    finders.push(character.displayName);
     await play.getPlayGameplayState(userId, character.id, now, script());
     await db
       .update(rune.characterSkillXp)
@@ -123,7 +171,7 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
     db
       .select()
       .from(rune.chatMessages)
-      .where(eq(rune.chatMessages.kind, kind))
+      .where(and(eq(rune.chatMessages.kind, kind), systemAnnouncementsBy(rune, finders)))
       .orderBy(desc(rune.chatMessages.seq));
 
   async function miningXp(characterId: string) {
@@ -289,6 +337,8 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
         deliver: (envelope) => {
           if (envelope.type !== "chat.message") return;
           const message = envelope.data as ChatMessageView;
+          // Only this test's own announcement: another suite's may share the process.
+          if (!ownedByThisTest(message as { body?: string })) return;
           seen.push(
             db
               .select({ id: rune.chatMessages.id })
@@ -321,7 +371,11 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
       const unsubscribe = realtime.getRealtimeFanout().subscribe({
         scope: { playerAccountId: "observer", characterId: "observer" },
         deliver: (envelope) => {
-          if (envelope.type === "chat.message") delivered.push(envelope.data);
+          if (
+            envelope.type === "chat.message" &&
+            ownedByThisTest(envelope.data as { body?: string })
+          )
+            delivered.push(envelope.data);
         },
         close: () => {},
       });
@@ -336,7 +390,12 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
               const inFlight = await transaction
                 .select()
                 .from(rune.chatMessages)
-                .where(eq(rune.chatMessages.kind, "ultra_rare_find"));
+                .where(
+                  and(
+                    eq(rune.chatMessages.kind, "ultra_rare_find"),
+                    systemAnnouncementsBy(rune, finders),
+                  ),
+                );
               expect(inFlight).toHaveLength(1);
               throw new Error("forced failure after resolution");
             },
@@ -565,6 +624,161 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
     });
   });
 
+  describe("a charged Loadsteel Cutter's bonus ore", () => {
+    const toolSlot = { assignmentKind: "gear" as const, suitSlotId: "mining_tool" };
+    const LOADSTEEL_TICKS = 80;
+
+    /** Equip a Loadsteel Cutter holding `charge` (it needs Mining 5, which these characters have). */
+    async function equipLoadsteel(userId: string, characterId: string, charge: number) {
+      const [instance] = await db
+        .insert(rune.itemInstances)
+        .values({ characterId, itemId: ITEM_IDS.loadsteelCutter, currentCharge: charge })
+        .returning();
+      await equipment.changeEquipment(
+        userId,
+        characterId,
+        { kind: "equip", itemInstanceId: instance!.id, target: toolSlot },
+        now,
+      );
+      return instance!;
+    }
+    const chargeOf = async (instanceId: string) =>
+      (
+        await db
+          .select({ charge: rune.itemInstances.currentCharge })
+          .from(rune.itemInstances)
+          .where(eq(rune.itemInstances.id, instanceId))
+      )[0]!.charge;
+
+    it("pays a charged low yield 2 shale and 20 XP, and a charged success 3 to 5, offline", async () => {
+      const { userId, character } = await makeCharacter();
+      const cutter = await equipLoadsteel(userId, character.id, 10);
+      const random = script({
+        // success, low, low, success, success
+        basisPoints: [0, NEEDS_LOW_YIELD, NEEDS_LOW_YIELD, 0, 0],
+        // yields 2 -> 3, 3 -> 4 and 4 -> 5 with the charge; no finds
+        integers: [0, NO_FIND, 1, NO_FIND, 2, NO_FIND],
+      });
+      const projected = await miningCommands.startMining(userId, character.id, now, random);
+      expect(projected.miningSource).toMatchObject({
+        yieldMinimum: 2,
+        yieldMaximum: 4,
+        chargedYieldMinimum: 3,
+        chargedYieldMaximum: 5,
+        chargedLowYieldQuantity: 2,
+        lowYield: { quantity: 1, xp: 20 },
+      });
+      const state = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, LOADSTEEL_TICKS * 5),
+        random,
+      );
+      const attempts = state.run.recentAttempts;
+      expect(attempts.map((attempt) => attempt.quantityAwarded)).toEqual([3, 2, 2, 4, 5]);
+      expect(attempts.map((attempt) => attempt.xpAwarded)).toEqual([100, 20, 20, 100, 100]);
+      expect(attempts.every((attempt) => attempt.boosted && attempt.chargeConsumed)).toBe(true);
+      // Low yields never found anything.
+      expect(attempts.filter((attempt) => attempt.lowYield)).toHaveLength(2);
+      expect(attempts.every((attempt) => attempt.secondaryFinds.length === 0)).toBe(true);
+      expect(state.carriedByItemId[ITEM_IDS.oilShale]).toBe(3 + 2 + 2 + 4 + 5);
+      expect(state.run).toMatchObject({ attempts: 5, successes: 3, failures: 2, xpGained: 340 });
+      expect(await miningXp(character.id)).toBe(baseXp(5) + 340);
+      // Exactly one charge per attempt, whatever the outcome.
+      expect(await chargeOf(cutter.id)).toBe(5);
+      expect(await announcements("ultra_rare_find")).toEqual([]);
+    });
+
+    it("spends the last charge on a low yield and pays the ordinary one after it", async () => {
+      const { userId, character } = await makeCharacter();
+      const cutter = await equipLoadsteel(userId, character.id, 1);
+      const random = script({ basisPoints: [NEEDS_LOW_YIELD, NEEDS_LOW_YIELD] });
+      await miningCommands.startMining(userId, character.id, now, random);
+      const state = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, LOADSTEEL_TICKS * 2),
+        random,
+      );
+      expect(
+        state.run.recentAttempts.map((a) => [a.boosted, a.quantityAwarded, a.xpAwarded]),
+      ).toEqual([
+        [true, 2, 20],
+        [false, 1, 20],
+      ]);
+      expect(state.carriedByItemId[ITEM_IDS.oilShale]).toBe(3);
+      expect(await chargeOf(cutter.id)).toBe(0);
+    });
+
+    it("On: keeps the ordinary shale and full XP when only the bonus does not fit, then stops cleanly", async () => {
+      const { userId, character } = await makeCharacter();
+      const cutter = await equipLoadsteel(userId, character.id, 10);
+      await fillAllButOneSlot(character.id);
+      // The last slot is a shale stack at 4 of 5: room for exactly one more.
+      await db
+        .insert(rune.inventoryStacks)
+        .values({ characterId: character.id, itemId: ITEM_IDS.oilShale, quantity: 4 });
+      await preferences.setPrioritizePrimaryResourcesPreference(
+        userId,
+        character.id,
+        true,
+        now,
+        script(),
+      );
+      const random = script({ basisPoints: [NEEDS_LOW_YIELD, 0] });
+      await miningCommands.startMining(userId, character.id, now, random);
+      const state = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, LOADSTEEL_TICKS * 2),
+        random,
+      );
+      expect(state.run.recentAttempts).toHaveLength(1);
+      expect(state.run.recentAttempts[0]).toMatchObject({
+        lowYield: true,
+        quantityAwarded: 1,
+        xpAwarded: 20,
+        boosted: true,
+      });
+      expect(state.carriedByItemId[ITEM_IDS.oilShale]).toBe(5);
+      expect(await miningXp(character.id)).toBe(baseXp(5) + 20);
+      expect(await chargeOf(cutter.id)).toBe(9);
+      // The next attempt could not keep even one shale, so it never began.
+      expect(state.stop).toEqual({ activity: "mining", reason: "inventory_slots_full" });
+    });
+
+    it("Off: refuses before spending anything when there is no room for shale plus a find", async () => {
+      const { userId, character } = await makeCharacter();
+      await fillAllButOneSlot(character.id);
+      const cutter = await equipLoadsteel(userId, character.id, 10);
+      const state = await miningCommands.startMining(userId, character.id, now, script());
+      expect(state.stop).toEqual({ activity: "mining", reason: "inventory_slots_full" });
+      expect(state.activeAction).toBeUndefined();
+      expect(await chargeOf(cutter.id)).toBe(10);
+      expect(await miningXp(character.id)).toBe(baseXp(5));
+    });
+
+    it("leaves The Jag's dead miss empty: a charge is spent and buys no ore", async () => {
+      const { userId, character } = await makeCharacter(5, LOCATION_IDS.theJag);
+      const cutter = await equipLoadsteel(userId, character.id, 10);
+      const random = script({ basisPoints: [NEEDS_LOW_YIELD] });
+      await miningCommands.startMining(userId, character.id, now, random);
+      const state = await play.getPlayGameplayState(userId, character.id, tick(now, 8), random);
+      expect(state.run.recentAttempts[0]).toMatchObject({
+        success: false,
+        lowYield: false,
+        boosted: true,
+        chargeConsumed: true,
+        quantityAwarded: 0,
+        xpAwarded: 0,
+      });
+      expect(state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(0);
+      expect(await miningXp(character.id)).toBe(baseXp(5));
+      expect(await chargeOf(cutter.id)).toBe(9);
+      expect(state.miningSource?.chargedLowYieldQuantity).toBeNull();
+    });
+  });
+
   describe("offline and batched resolution", () => {
     it("resolves several attempts in one window with exact per-attempt accounting", async () => {
       const { userId, character } = await makeCharacter();
@@ -618,7 +832,19 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
 
       // The migration's data step: the statement after its last breakpoint.
       const migration = readFileSync("drizzle/0044_oil_shale_mining.sql", "utf8");
-      const backfill = migration.split("--> statement-breakpoint").at(-1)!;
+      const migrationBackfill = migration.split("--> statement-breakpoint").at(-1)!;
+      // The statement is database-wide, and suites share one database and run
+      // concurrently, so this test applies the migration's own statement but
+      // restricted to the one row it seeded. The guard proves the restriction
+      // really was applied to the statement under test, never a rewritten copy.
+      const outerWhere = `WHERE jsonb_typeof("recent_attempts") = 'array'`;
+      expect(migrationBackfill.split(outerWhere)).toHaveLength(2);
+      expect(character.id).toMatch(/^[\w-]+$/);
+      const backfill = migrationBackfill.replace(
+        outerWhere,
+        `WHERE "character_id" = '${character.id}'\n\tAND jsonb_typeof("recent_attempts") = 'array'`,
+      );
+      expect(backfill).not.toBe(migrationBackfill);
       const lowYields = async () =>
         (
           await db

@@ -70,23 +70,27 @@ duration multiplier and **charged effect** through the equipment-definition
 boundary (see "Inventory and equipment"). A charged effect is one of two closed
 identities: `speed` — the one global Power Cell speed multiplier, applied to the
 tool's duration under the same whole-tick rounding — or `extra_yield` — ore
-added to each successful charged attempt. Never both.
+added to each charged attempt that produces primary ore. Never both.
 
-| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged success |
+| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged ore |
 | --- | --- | --- | --- | --- | --- |
-| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary 1–2 |
-| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: ordinary roll +1 — 2–3 |
+| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary: Ferrite and Galvanite 1–2, Oil Shale 2–4 (low yield 1) |
+| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: +1 on any attempt that yields ore — Ferrite and Galvanite success 2–3 (a dead miss stays empty), Oil Shale success 3–5, **low yield 2** |
 
 A charged Salvage Cutter is faster attempts (better Mining XP per hour); a
-charged Loadsteel Cutter is more ore per successful attempt (better ore and
-Power Cell efficiency). A charged attempt consumes one charge whether it
+charged Loadsteel Cutter is more ore per attempt that yields ore (better ore and
+Power Cell efficiency). At Mining 5 with unrestricted capacity a charged
+Loadsteel averages about 28.06 Oil Shale over ten attempts (22.09 before #342's
+low-yield bonus), while a charged Salvage Cutter stays faster per unit of time. A charged attempt consumes one charge whether it
 succeeds or fails, and one Cell still funds ten charged attempts. Neither tool's
-charge changes success chance or the XP an attempt pays. The Loadsteel Cutter's
-extra ore comes after the source's ordinary successful yield has resolved under
-the existing roll and fit rules (1 or 2, falling back to the minimum at a full
-stack or mass boundary), and is added only if that extra unit fits too — no
-room for the bonus keeps the ordinary result rather than falling back any
-further. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
+charge changes success chance or the XP an attempt pays (a charged low yield is
+still exactly 20 XP). The Loadsteel Cutter's extra ore is an **optional bonus,
+never a minimum**: it is added to the attempt's ordinarily resolved ore (a
+success's rolled yield, or a low yield's one) and retained as far as capacity
+allows, down to the ordinary amount. A source whose miss awards no ore (The Jag,
+Deep Jag) gives a charge nothing to add to, so a charged dead miss stays empty.
+No room for the bonus keeps the ordinary result, and an attempt is never
+refused or shortened because only its bonus does not fit. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
 the extra ore. Below its Mining 5 requirement a Loadsteel Cutter can neither be
 equipped nor used: Mining treats it as no usable tool.
 
@@ -143,12 +147,14 @@ resolution all apply unchanged.
   ticks (60 seconds)** before the equipped tool's and Power Cell's modifiers.
 - **Full success** (roll under the chance): uniformly **2, 3 or 4** Oil Shale
   from **one** integer draw, plus **100** base Mining XP. A charged Loadsteel
-  Cutter adds its +1 to a *true success only*, and only as capacity allows.
+  Cutter adds its +1 (3–5), only as capacity allows.
 - **Low yield** (roll at or above the chance): exactly **1** Oil Shale and **20**
   Mining XP — not zero ore and zero XP. It is still an unsuccessful attempt (it
   counts under "low yield" in the run, never "successful"). It never rolls a
-  Secondary Find and never takes the charged bonus; a charged attempt still
-  consumes its charge.
+  Secondary Find. A charged Loadsteel Cutter adds its +1 here too (a charged low
+  yield is **2** shale when that fits, otherwise the ordinary 1), the XP stays
+  exactly 20, and the attempt consumes exactly one charge. Both capacity modes
+  apply to the bonus the same way: it is retained only if it fits.
 - **Secondary finds** (true successes only, one mutually exclusive roll of 100):
   **Uncut Sapphire 1/20** (the existing item and its intrinsic +30 XP, **no**
   public announcement from this mine; Deep Jag's own announcement is unchanged),
@@ -226,8 +232,9 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
   find is **never rolled and then discarded**: on a hit with tight capacity the
   find and the minimum ore are kept, and only the optional ore above the minimum
   (and a charged tool's extra ore) is reduced.
-- **Charged tools.** A charged Loadsteel Cutter's +1 is *primary ore only*; it
-  never duplicates a find. A future cutter may modify Secondary Find Chance or
+- **Charged tools.** A charged Loadsteel Cutter's +1 is *primary ore only*, on
+  any attempt that yields ore; it never duplicates a find, and a low yield rolls
+  none. A future cutter may modify Secondary Find Chance or
   yield explicitly, but that is not coupled to the primary-yield bonus.
 - **Run history.** A run's totals stay item-keyed ("Ferrite Shale gained",
   "Uncut Topaz found") with one combined Mining XP total.

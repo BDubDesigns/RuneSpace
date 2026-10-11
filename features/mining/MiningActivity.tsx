@@ -469,7 +469,10 @@ export function MiningActivity({ characterName }: { characterName: string }) {
             ? ` · ${durationMultiplierLabel(cutter.baseDurationMultiplierBps)} attempt time, charged or not`
             : ""}
           {cutter.chargedEffect.kind === "extra_yield"
-            ? ` · charged successes yield ${source.chargedYieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+            ? source.chargedLowYieldQuantity === null
+              ? ` · charged successes yield ${source.chargedYieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+              : // A source that pays a low yield names both charged outcomes (#342).
+                ` · charged: full success ${source.chargedYieldMinimum}–${source.chargedYieldMaximum}, low yield ${source.chargedLowYieldQuantity} ${source.itemName}`
             : ""}
         </p>
       ) : null}

@@ -249,10 +249,12 @@ describe("a low-yield roll", () => {
     expect(total(outcome, OIL)).toBe(1);
   });
 
-  it("never rolls a secondary find or a quantity, and never takes the charged bonus", () => {
+  it("never rolls a secondary find or a quantity, even with a charge to spend", () => {
     const { outcome, nextInteger } = mine({ tool: loadsteel, cutterCharge: 2 }, missedRoll());
     expect(nextInteger).not.toHaveBeenCalled();
-    expect(outcome.attempts[0]).toMatchObject({ quantityAwarded: 1, boosted: true });
+    // The charged Loadsteel bonus is covered under "a charged Loadsteel Cutter".
+    expect(outcome.attempts[0]).toMatchObject({ quantityAwarded: 2, boosted: true });
+    expect(outcome.attempts[0]!.secondaryFinds).toEqual([]);
     expect(outcome.remainingCutterCharge).toBe(1);
   });
 
@@ -501,5 +503,222 @@ describe("the two new locations", () => {
       LOCATION_IDS.theJag,
       LOCATION_IDS.holoHollow,
     ]);
+  });
+});
+
+describe("a charged Loadsteel Cutter's bonus ore on any attempt that yields ore", () => {
+  const NEEDS_LOW_YIELD = 9_999;
+  const NO_FIND = 99;
+  const SAPPHIRE_ROLL = 0;
+  const SLAB_ROLL = 5;
+  const galvanite = balance.mining.sources.galvanite as MiningSourceBalance;
+  const lowYield = () => ({ basisPoints: [NEEDS_LOW_YIELD] });
+  const charged = (cutterCharge = 3) => ({ tool: loadsteel, cutterCharge });
+
+  it("gives a charged low yield 2 Oil Shale, still exactly 20 XP and exactly one charge", () => {
+    const { outcome, nextInteger } = mine(charged(), lowYield());
+    expect(outcome.attempts[0]).toMatchObject({
+      success: false,
+      lowYield: true,
+      boosted: true,
+      chargeConsumed: true,
+      quantityAwarded: 2,
+      xpAwarded: 20,
+      secondaryFinds: [],
+      remainingCharge: 2,
+    });
+    expect(outcome.awardedXp).toBe(20);
+    expect(outcome.remainingCutterCharge).toBe(2);
+    expect(total(outcome, OIL)).toBe(2);
+    // A low yield never draws a yield or rolls the secondary table.
+    expect(nextInteger).not.toHaveBeenCalled();
+  });
+
+  it("leaves every other tool and charge state exactly as it was", () => {
+    // Loadsteel, uncharged: low yield 1. Salvage, charged or not: low yield 1.
+    expect(mine(charged(0), lowYield()).outcome.attempts[0]).toMatchObject({
+      boosted: false,
+      quantityAwarded: 1,
+      xpAwarded: 20,
+    });
+    for (const cutterCharge of [0, 3]) {
+      const { outcome } = mine({ tool: salvage, cutterCharge }, lowYield(), 100);
+      expect(outcome.attempts[0]).toMatchObject({
+        lowYield: true,
+        quantityAwarded: 1,
+        xpAwarded: 20,
+      });
+    }
+    // Charged Salvage is faster (50 ticks), never richer.
+    expect(
+      mine({ tool: salvage, cutterCharge: 3 }, lowYield(), 50).outcome.attempts[0],
+    ).toMatchObject({ boosted: true, durationTicks: 50, quantityAwarded: 1 });
+  });
+
+  it("gives a charged full success 3 to 5 and the other tools their ordinary 2 to 4", () => {
+    const quantities = (snapshot: Partial<MiningSnapshot>) =>
+      [0, 1, 2].map(
+        (draw) =>
+          mine(snapshot, { integers: [draw, NO_FIND] }).outcome.attempts[0]!.quantityAwarded,
+      );
+    expect(quantities(charged())).toEqual([3, 4, 5]);
+    expect(quantities(charged(0))).toEqual([2, 3, 4]);
+    expect(quantities({ tool: salvage, cutterCharge: 3 })).toEqual([2, 3, 4]);
+    expect(quantities({ tool: salvage, cutterCharge: 0 })).toEqual([2, 3, 4]);
+  });
+
+  it("does not change what a charge costs, the chance, the duration or the XP", () => {
+    expect(miningSuccessChanceBps(5, oil)).toBe(4_030);
+    expect(miningAttemptDurationTicks(balance, oil, loadsteel, true)).toBe(80);
+    const { outcome } = mine(charged(), { integers: [0, SAPPHIRE_ROLL] });
+    // Sapphire on a charged success: ordinary 100 + 30, never a bigger number.
+    expect(outcome.awardedXp).toBe(130);
+    expect(outcome.attempts[0]!.secondaryFinds).toEqual([{ itemId: SAPPHIRE, quantity: 1 }]);
+    expect(outcome.remainingCutterCharge).toBe(2);
+  });
+
+  it("consumes the last charge on a low yield and then pays the ordinary one", () => {
+    // Two attempts in the window: the last-charge low yield (2), then uncharged (1).
+    const { outcome } = mine(charged(1), { basisPoints: [NEEDS_LOW_YIELD, NEEDS_LOW_YIELD] }, 160);
+    expect(outcome.attempts.map((attempt) => [attempt.boosted, attempt.quantityAwarded])).toEqual([
+      [true, 2],
+      [false, 1],
+    ]);
+    expect(outcome.attempts.map((attempt) => attempt.xpAwarded)).toEqual([20, 20]);
+    expect(outcome.remainingCutterCharge).toBe(0);
+  });
+
+  it("keeps Ferrite Shale and Galvanite's dead misses empty even when charged", () => {
+    for (const source of [jag, galvanite]) {
+      const { outcome } = mine(
+        { tool: loadsteel, cutterCharge: 3, miningLevel: 5 },
+        { basisPoints: [9_999] },
+        source.attemptDurationTicks,
+        source,
+      );
+      expect(outcome.attempts[0]).toMatchObject({
+        lowYield: false,
+        boosted: true,
+        chargeConsumed: true,
+        quantityAwarded: 0,
+        xpAwarded: 0,
+      });
+      expect(outcome.createdStacks).toEqual([]);
+      expect(outcome.awardedXp).toBe(0);
+      // The charge is spent but buys nothing.
+      expect(outcome.remainingCutterCharge).toBe(2);
+    }
+  });
+
+  describe("capacity: the bonus is optional, never a minimum", () => {
+    const prioritized = { prioritizePrimaryResources: true };
+    const oilStack = (quantity: number) => ({ id: "oil", itemId: OIL, quantity });
+
+    it("On: keeps the ordinary one shale and its 20 XP when only the bonus does not fit", () => {
+      // The one slot is a shale stack at 4 of 5: room for exactly one more.
+      const { outcome } = mine(
+        { ...charged(), ...prioritized, existingStacks: [oilStack(4)], slotsAvailable: 0 },
+        lowYield(),
+      );
+      expect(outcome.attempts[0]).toMatchObject({
+        lowYield: true,
+        quantityAwarded: 1,
+        xpAwarded: 20,
+      });
+      expect(outcome.stackUpdates).toEqual([{ id: "oil", quantity: 5 }]);
+    });
+
+    it("On: mass for one shale keeps one, mass for two keeps the charged two", () => {
+      const withMass = (massAvailableGrams: number) =>
+        mine({ ...charged(), ...prioritized, massAvailableGrams }, lowYield()).outcome;
+      expect(withMass(600).attempts[0]!.quantityAwarded).toBe(1);
+      expect(withMass(1_199).attempts[0]!.quantityAwarded).toBe(1);
+      expect(withMass(1_200).attempts[0]!.quantityAwarded).toBe(2);
+    });
+
+    it("On: never refuses or shortens an attempt for want of the bonus", () => {
+      const { outcome } = mine(
+        { ...charged(), ...prioritized, slotsAvailable: 1, massAvailableGrams: 600 },
+        lowYield(),
+      );
+      // The attempt itself ran and kept its ordinary one shale and 20 XP. The only
+      // stop is the NEXT attempt's preflight, now that nothing at all is left.
+      expect(outcome.attempts).toHaveLength(1);
+      expect(outcome.attempts[0]).toMatchObject({ quantityAwarded: 1, xpAwarded: 20 });
+      expect(outcome.consumedTicks).toBe(80);
+      expect(outcome.awardedXp).toBe(20);
+      expect(total(outcome, OIL)).toBe(1);
+      expect(outcome.stopReason).toBe("carried_mass_capacity_reached");
+    });
+
+    it("On: a charged success keeps primary first, and a find only after it", () => {
+      // 4 + 1 charged = 5 desired, one slot: five fit, so the Slab has no room.
+      const full = mine(
+        { ...charged(), ...prioritized, slotsAvailable: 1 },
+        { integers: [2, SLAB_ROLL] },
+      ).outcome;
+      expect(full.attempts[0]).toMatchObject({
+        quantityAwarded: 5,
+        secondaryFinds: [],
+        xpAwarded: 100,
+      });
+      // Mass for three: three shale are kept, still a full success with 100 XP.
+      const tight = mine(
+        { ...charged(), ...prioritized, slotsAvailable: 1, massAvailableGrams: 1_800 },
+        { integers: [2, SLAB_ROLL] },
+      ).outcome;
+      expect(tight.attempts[0]).toMatchObject({
+        success: true,
+        quantityAwarded: 3,
+        xpAwarded: 100,
+      });
+    });
+
+    it("Off: the preflight already guarantees two shale, so the charged low yield is two", () => {
+      const { outcome } = mine({ ...charged(), slotsAvailable: 2 }, lowYield());
+      expect(outcome.attempts[0]!.quantityAwarded).toBe(2);
+    });
+
+    it("Off: keeps the find reservation, so the bonus ore can end the run but never lose a find", () => {
+      // Room for exactly two shale and the Slab. The charged low yield takes the
+      // two shale; the next attempt's preflight then refuses before any roll.
+      const { outcome, nextInteger } = mine(
+        { ...charged(), slotsAvailable: 2, massAvailableGrams: 1_200 + 12_000 },
+        { basisPoints: [NEEDS_LOW_YIELD, 0], integers: [0, SLAB_ROLL] },
+        160,
+      );
+      expect(outcome.attempts).toHaveLength(1);
+      expect(outcome.attempts[0]).toMatchObject({ lowYield: true, quantityAwarded: 2 });
+      expect(outcome.stopReason).toBe("carried_mass_capacity_reached");
+      expect(outcome.awardedXp).toBe(20);
+      expect(nextInteger).not.toHaveBeenCalled();
+    });
+
+    it("never creates, drops or duplicates ore across a mixed charged window", () => {
+      for (const prioritizePrimaryResources of [false, true]) {
+        const { outcome } = mine(
+          {
+            ...charged(10),
+            prioritizePrimaryResources,
+            slotsAvailable: 3,
+            massAvailableGrams: 9_000,
+          },
+          {
+            basisPoints: Array.from({ length: 20 }, (_, index) =>
+              index % 3 === 0 ? 0 : NEEDS_LOW_YIELD,
+            ),
+            integers: Array.from({ length: 40 }, (_, index) => (index % 2 === 0 ? 1 : 99)),
+          },
+          80 * 20,
+        );
+        const awarded = outcome.attempts.reduce((sum, attempt) => sum + attempt.quantityAwarded, 0);
+        expect(total(outcome, OIL)).toBe(awarded);
+        expect(outcome.createdStacks.length).toBeLessThanOrEqual(3);
+        expect(total(outcome, OIL) * 600).toBeLessThanOrEqual(9_000);
+        expect(outcome.awardedXp).toBe(
+          outcome.attempts.reduce((sum, attempt) => sum + attempt.xpAwarded, 0),
+        );
+      }
+    });
   });
 });

@@ -253,8 +253,9 @@ export type MiningResolvedAttempt = {
   success: boolean;
   /**
    * A roll that missed the success chance at a source that authors a low yield
-   * (#342): exactly that quantity and XP, never a find. Always false for a
-   * source with none, whose miss awards nothing.
+   * (#342): that ore (plus a charged Loadsteel Cutter's optional extra) and
+   * exactly its XP, never a find. Always false for a source with none, whose miss
+   * awards nothing.
    */
   lowYield: boolean;
   rolledBasisPoints: number;
@@ -313,15 +314,33 @@ export function boostedMiningAttemptDurationTicks(
 }
 
 /**
- * The ore a charged tool adds to a successful attempt's ordinarily resolved
- * yield (#233): the Loadsteel Cutter's one, and nothing for a tool whose
- * charge buys speed or for an uncharged attempt.
+ * The ore a charged tool adds to an attempt's ordinarily resolved yield (#233):
+ * the Loadsteel Cutter's one, and nothing for a tool whose charge buys speed or
+ * for an uncharged attempt.
+ *
+ * It applies to any attempt that produces primary ore: a full success and, at a
+ * source that authors one, a low yield (#342). It never creates ore from an
+ * attempt that produces none, so a dead miss at The Jag or Deep Jag stays empty.
+ * It is always an optional bonus, retained only as capacity allows.
  */
 export function miningChargedExtraYield(
   tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
   charged: boolean,
 ): number {
   return charged && tool?.chargedEffect.kind === "extra_yield" ? tool.chargedEffect.units : 0;
+}
+
+/**
+ * What a charged low yield awards at a source that authors one, as players read
+ * it (#342): the source's low-yield ore plus the tool's charged extra ore. Null
+ * for a source whose miss awards nothing, which a charge cannot change.
+ */
+export function miningChargedLowYieldQuantity(
+  source: Pick<MiningSourceBalance, "lowYield">,
+  tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
+  charged: boolean,
+): number | null {
+  return source.lowYield ? source.lowYield.quantity + miningChargedExtraYield(tool, charged) : null;
 }
 
 /**
@@ -557,15 +576,24 @@ export function resolveMining<Id>(input: {
       failures += 1;
       if (boosted) remainingCutterCharge -= 1;
       // A source that authors a low yield pays it for a missed roll (#342): its
-      // exact ore and XP, no Secondary Find roll, and no charged-tool bonus. The
-      // preflight above proved at least the source's minimum fits, which is never
-      // less than this.
+      // ore and exact XP, and never a Secondary Find roll. A charged Loadsteel
+      // Cutter's extra ore is an optional bonus on top of the ordinary low yield:
+      // retained as far as it fits, but never at the cost of the ordinary ore,
+      // which the preflight above proved fits (the source's full minimum, or one
+      // ore when prioritizing, is never less than the low yield). A source with no
+      // low yield awards no ore, so a charge has nothing to add to.
       const lowYield = award.lowYield;
+      let lowYieldQuantity = 0;
       if (lowYield) {
-        const placed = planEntries([stackBundleEntry(award, lowYield.quantity)]);
-        if (!placed.ok)
+        const primary = largestFittingPrimary(
+          lowYield.quantity + miningChargedExtraYield(tool, boosted),
+          lowYield.quantity,
+          undefined,
+        );
+        if (!primary)
           throw new Error("Mining preflight admitted an attempt whose low yield cannot be kept");
-        applyPlan(placed.plans[0]!, award, lowYield.quantity);
+        lowYieldQuantity = primary.quantity;
+        applyPlan(primary.plan.plans[0]!, award, lowYieldQuantity);
       }
       resolvedAttempts.push({
         success: false,
@@ -573,7 +601,7 @@ export function resolveMining<Id>(input: {
         rolledBasisPoints,
         thresholdBasisPoints,
         itemId: source.itemId,
-        quantityAwarded: lowYield?.quantity ?? 0,
+        quantityAwarded: lowYieldQuantity,
         secondaryFinds: [],
         xpAwarded: lowYield?.xp ?? 0,
         boosted,

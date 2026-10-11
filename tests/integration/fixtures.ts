@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { SLOT_MIN } from "@/db/rune-space";
@@ -185,6 +185,23 @@ export async function withChatRetentionWindow<T>(db: Db, run: () => Promise<T>):
   } finally {
     await release();
   }
+}
+
+/**
+ * The System announcement rows (a Mining find) the named characters produced.
+ *
+ * A System row belongs to no account or character, so a user's cleanup never
+ * reaches it — but suites share one database and run concurrently, so counting
+ * or deleting every non-player row would read or destroy another suite's rows.
+ * An announcement's body begins with the finder's character name, which
+ * fixtures make unique per test user, so a suite scopes every read and its own
+ * cleanup to the names of ITS characters through this one predicate.
+ */
+export function systemAnnouncementsBy(rune: Rune, characterNames: readonly string[]): SQL {
+  const bodies = characterNames.map(
+    (name) => sql`starts_with(${rune.chatMessages.body}, ${`${name} `})`,
+  );
+  return and(ne(rune.chatMessages.kind, "player"), or(...bodies)) ?? sql`false`;
 }
 
 /**

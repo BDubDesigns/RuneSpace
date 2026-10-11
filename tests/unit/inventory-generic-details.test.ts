@@ -443,7 +443,7 @@ describe("InventoryDetailsStats — real UI regression (issue #119)", () => {
     expect(html).toContain('data-stat="mining-time"');
     expect(html).toContain("0.8×, charged or not");
     expect(html).toContain('data-stat="charged-yield"');
-    expect(html).toContain("+1 ore per success");
+    expect(html).toContain("+1 ore on any attempt that yields ore");
   });
 
   it("renders every container's slot contribution from the same boundary (#233)", () => {
