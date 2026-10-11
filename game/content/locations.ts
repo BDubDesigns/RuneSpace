@@ -33,6 +33,10 @@ import {
  * - Deep Jag (#209): the collapsed lower workings southwest of The Jag. The
  *   first location whose player-facing state changes durably — see its
  *   `stateVariants` and `game/domain/location-state`.
+ * - South Access Track (#342): a travel-only road south of the Crash Site. No
+ *   activity, shop, NPC or workstation; it exists to put two walking legs between
+ *   the ship and the mine.
+ * - The South Cut (#342): Skatboll's Oil Shale mine, Mining 5.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -53,6 +57,7 @@ const locationDefinitions = [
       LOCATION_IDS.emergencyPowerAnnex,
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.holoHollow,
+      LOCATION_IDS.southAccessTrack,
     ],
     // The Crash Site's three repairs: the Cargo Hold, the Landing Gear (#322) and the
     // Propulsion System (#330). Listing each is what lets Mission guidance walk a
@@ -353,6 +358,60 @@ const locationDefinitions = [
       },
     },
   },
+  {
+    // A traversal-only road (#342): it hosts nothing, on purpose. Two ordinary
+    // 24-second walking legs separate the Crash Site's Cargo Hold from the mine,
+    // and eligible walking Scavenging applies on both of them as everywhere else.
+    id: LOCATION_IDS.southAccessTrack,
+    displayName: "South Access Track",
+    description:
+      "A muddy, rutted service road running south out of the Crash Site past sagging poles, old pipe runs and broken fence. Nothing is made or sold here; it only goes somewhere.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theSouthCut],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "south_access_track" as const,
+      layout: "south_access_track" as const,
+      localMap: { axial: { q: 0, r: 2 }, label: "South Access Track" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#342): approved art
+        // is never upscaled merely to match the older 1920x480 convention.
+        asset: "/location-scenes/south-access-track.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Muddy rutted service road curving away between a pipe run on concrete supports and a wire fence, utility poles and a distant open-cut mine under an overcast sky",
+        focal: { x: 50, y: 55 } as const,
+      },
+    },
+  },
+  {
+    // Skatboll's Oil Shale mine (#342): a close, reinforced entrance cut into
+    // black laminated shale, not an open quarry. The Mining 5 gate is the
+    // source's own, enforced by the server when a run starts.
+    id: LOCATION_IDS.theSouthCut,
+    displayName: "The South Cut",
+    description:
+      "A battered steel-framed entrance cut straight into black, thinly layered oil shale, its lamps burning on wet ground. Cutting here takes Mining 5.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [LOCATION_IDS.southAccessTrack],
+    availableActionIds: [ACTION_IDS.oilShaleMining],
+    mapStatus: "Mining",
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_south_cut" as const,
+      layout: "the_south_cut" as const,
+      localMap: { axial: { q: 0, r: 3 }, label: "The South Cut" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#342).
+        asset: "/location-scenes/the-south-cut.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A rusted steel-framed mine entrance cut into black layered oil shale, warm lamps lighting a wet rutted track into the tunnel, machinery and a conveyor gantry to either side",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocationDefinitionInput[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
@@ -390,4 +449,6 @@ export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.holoHollow,
   LOCATION_IDS.ruskRecovery,
   LOCATION_IDS.deepJag,
+  LOCATION_IDS.southAccessTrack,
+  LOCATION_IDS.theSouthCut,
 ];

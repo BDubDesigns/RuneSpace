@@ -139,7 +139,10 @@ import {
 } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
-import { loadAutoDiscardSlag } from "@/server/character-preferences";
+import {
+  loadAutoDiscardSlag,
+  loadPrioritizePrimaryResources,
+} from "@/server/character-preferences";
 import { loadUnpinnedMissionIds } from "@/server/mission-pins";
 import {
   createRefiningResolver,
@@ -527,6 +530,10 @@ export type MiningSourceProjection = {
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
+  /** The Mining level that opens this source (#342); 1 for every source before Oil Shale. */
+  requiredMiningLevel: number;
+  /** What a missed roll still earns, or null when it earns nothing (#342). */
+  lowYield: { quantity: number; xp: number } | null;
   /** A charged success's yield with the equipped tool: its ordinary range plus any extra ore (#233). */
   chargedYieldMinimum: number;
   chargedYieldMaximum: number;
@@ -946,6 +953,13 @@ export type PlayGameplayState = {
    */
   autoDiscardSlag: boolean;
   /**
+   * The character-wide Prioritize primary resources preference (#342). One value
+   * every Mining source reads and the Mining toggle writes. Off protects
+   * Secondary Finds; On keeps primary ore first and forfeits a find that has no
+   * room.
+   */
+  prioritizePrimaryResources: boolean;
+  /**
    * The Missions this character has unpinned (#325). Absence means pinned, so
    * this lists only explicit overrides. A presentation preference that decides
    * which active Missions Current Missions shows, and nothing else: `missions`
@@ -1036,6 +1050,12 @@ export type PlayGameplayState = {
     | "unknown_route"
     | "route_locked"
     | "insufficient_credits";
+  /**
+   * Why a Start Mining command was refused for a reason of the source itself
+   * (#342): the character's Mining level does not open it. Where Mining is not
+   * offered at all is `travelError`'s `mining_unavailable_here`, as before.
+   */
+  miningError?: "mining_level_required";
   /** Set when a Start Refining command was refused outside the Processing Yard. */
   /**
    * Why a Refining start was refused. `refining_recipe_locked` is the
@@ -1932,7 +1952,7 @@ export async function stateFromTransaction(
   refiningError?: PlayGameplayState["refiningError"],
   weldingError?: PlayGameplayState["weldingError"],
   practiceError?: PlayGameplayState["practiceError"],
-  stationErrors?: Pick<PlayGameplayState, "fabricationError" | "tinkeringError">,
+  stationErrors?: Pick<PlayGameplayState, "fabricationError" | "tinkeringError" | "miningError">,
 ): Promise<PlayGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadPlaySnapshot(transaction, characterId);
@@ -2378,6 +2398,7 @@ export async function stateFromTransaction(
       ? { fabricationError: stationErrors.fabricationError }
       : {}),
     ...(stationErrors?.tinkeringError ? { tinkeringError: stationErrors.tinkeringError } : {}),
+    ...(stationErrors?.miningError ? { miningError: stationErrors.miningError } : {}),
     miningSource: locationMiningSource
       ? {
           actionId: locationMiningSource.actionId,
@@ -2405,6 +2426,8 @@ export async function stateFromTransaction(
           successXp: locationMiningSource.successXp,
           yieldMinimum: locationMiningSource.yieldMinimum,
           yieldMaximum: locationMiningSource.yieldMaximum,
+          requiredMiningLevel: locationMiningSource.requiredMiningLevel,
+          lowYield: locationMiningSource.lowYield,
           ...(() => {
             const charged = miningYieldRange(locationMiningSource, equippedTool?.definition, true);
             return { chargedYieldMinimum: charged.minimum, chargedYieldMaximum: charged.maximum };
@@ -2551,6 +2574,7 @@ export async function stateFromTransaction(
     repairs,
     practice,
     autoDiscardSlag: await loadAutoDiscardSlag(transaction, characterId),
+    prioritizePrimaryResources: await loadPrioritizePrimaryResources(transaction, characterId),
     unpinnedMissionIds: await loadUnpinnedMissionIds(transaction, characterId),
     workOrders,
     practiceError,

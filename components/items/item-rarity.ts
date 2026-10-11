@@ -13,4 +13,11 @@ export const ITEM_RARITY_STYLE = {
     accent: "var(--rs-item-rare-accent)",
     stackTrack: "var(--rs-item-rare-stack-track)",
   },
+  // Ultra Rare (#342) takes its own accent; the continuous shimmer that goes with
+  // it is applied by the shared visual through `data-item-rarity`, never baked
+  // into an item's artwork.
+  ultra_rare: {
+    accent: "var(--rs-item-ultra-rare-accent)",
+    stackTrack: "var(--rs-item-ultra-rare-stack-track)",
+  },
 } as const satisfies Record<ItemRarity, { accent: string; stackTrack: string }>;

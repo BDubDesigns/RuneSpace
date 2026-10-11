@@ -207,6 +207,16 @@ export const AutoDiscardSlagPreferenceRequestSchema = z.object({
 });
 
 /**
+ * The character-wide Prioritize primary resources preference (#342) that every
+ * Mining source reads. The value is a boolean and nothing else; the server
+ * stores it on the owned character the request resolves to.
+ */
+export const PrioritizePrimaryResourcesPreferenceRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  prioritizePrimaryResources: z.boolean(),
+});
+
+/**
  * Fabrication (#232). Starting names the character, one authored recipe by its
  * stable action ID, and the run selection; everything the recipe costs,
  * makes, takes, and pays is resolved server-side.

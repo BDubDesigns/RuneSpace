@@ -118,15 +118,27 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Pins Quiet the Highlights Update as the newest", () => {
+  it("publishes the Oil Shale at The South Cut Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("pins-quiet-the-highlights");
+    expect(latest.slug).toBe("oil-shale-at-the-south-cut");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
-      Date.parse(getPublicUpdate("thrust-issues")!.publishedAt),
+      Date.parse(getPublicUpdate("pins-quiet-the-highlights")!.publishedAt),
     );
     expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
-    expect(JSON.stringify(latest)).toContain("Pin it again from the Mission Log");
+    expect(JSON.stringify(latest)).toContain("Prioritize primary resources");
+    // It uses the approved South Cut scene as its hero, at that file's real size.
+    expect(latest.hero).toMatchObject({
+      src: "/location-scenes/the-south-cut.webp",
+      width: 1536,
+      height: 384,
+    });
+  });
+
+  it("keeps the Pins Quiet the Highlights Update published beneath it (#335)", () => {
+    expect(JSON.stringify(getPublicUpdate("pins-quiet-the-highlights"))).toContain(
+      "Pin it again from the Mission Log",
+    );
   });
 
   it("publishes the Thrust Issues Update, linking its Wiki pages", () => {

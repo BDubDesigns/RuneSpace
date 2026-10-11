@@ -49,6 +49,8 @@ export const ITEM_CATEGORIES: readonly {
 const itemCategoryByItemId = {
   [ITEM_IDS.ferriteShale]: "ores-and-gemstones",
   [ITEM_IDS.galvanite]: "ores-and-gemstones",
+  [ITEM_IDS.oilShale]: "ores-and-gemstones",
+  [ITEM_IDS.motherlodeSlab]: "ores-and-gemstones",
   [ITEM_IDS.uncutQuartz]: "ores-and-gemstones",
   [ITEM_IDS.uncutTopaz]: "ores-and-gemstones",
   [ITEM_IDS.uncutSapphire]: "ores-and-gemstones",

@@ -129,6 +129,16 @@ same lighting, same delivered dimensions, differing only in the cleared rubble
 and the installed brace. Each carries its own `alt`, because what a screen
 reader should hear genuinely differs between the two states.
 
+## Skatboll's southern road (issue #342)
+
+The South Access Track and The South Cut are ordinary single-scene locations with
+native 1536×384 4:1 lossy WebP scenes (`south-access-track.webp`, `the-south-cut.webp`;
+the approved masters are kept, unaltered, in `assets/location-scenes/` — they were
+delivered JPEG-encoded, so they carry a `.jpg` extension). The Track's scene is
+activity-free on purpose; The South Cut's is a close, reinforced entrance cut into
+black laminated oil shale, not an open quarry, and the map identifier matches it.
+Scenes carry no baked ship, people, text or UI.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's

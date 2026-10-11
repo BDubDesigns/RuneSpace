@@ -11,6 +11,8 @@ export const MAP_IDENTIFIER_ASSET_BY_KEY = {
   holo_hollow: "/map-icons/holo-hollow.webp",
   rusk_recovery: "/map-icons/rusk-recovery.webp",
   deep_jag: "/map-icons/deep-jag.webp",
+  south_access_track: "/map-icons/south-access-track.webp",
+  the_south_cut: "/map-icons/the-south-cut.webp",
 } as const satisfies Record<MapIconKey, string>;
 
 /**

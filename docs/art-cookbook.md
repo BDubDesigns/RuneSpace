@@ -391,6 +391,15 @@ Likewise, a technically transparent asset with a visible pink halo is not done.
 The finished identifier should communicate the location itself. The UI owns
 labels and status.
 
+**Direct-alpha sources.** The South Access Track and The South Cut identifiers
+(#342) were approved as grayscale RGBA masters generated with transparency in one
+pass, so they have no pink key to remove. The pipeline still applies its QA, not a
+shortcut around it: alpha below 4 is cleared, near-opaque alpha (>= 240) is snapped
+to fully opaque, the subject is trimmed on its alpha bounds, scaled down to a 512 px
+long edge, grayscaled after cleanup, exported lossless, and inspected on both dark
+and light backgrounds for halos, mattes and holes, then in the real map. A
+direct-alpha source that fails that inspection goes back to the hot-pink workflow.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.
@@ -529,6 +538,14 @@ Current production conventions:
   (#330) are 1536x384 lossy WebP derivatives in `public/location-scenes/`
   (`crash-site-crashed.webp`, `crash-site-repaired.webp`); their unaltered
   masters are kept in `assets/location-scenes/`
+- the Oil Shale Mining slice's approved art (#342): the South Access Track and
+  The South Cut 1536x384 scenes (`public/location-scenes/south-access-track.webp`,
+  `the-south-cut.webp`, lossy WebP q85; the delivered masters were JPEG-encoded and
+  are kept unaltered as `assets/location-scenes/*-master.jpg`), their two map
+  identifiers (see below) and the Oil Shale and Motherlode Slab item derivatives
+  (640x640 canvas, 576 px long edge, lossless WebP, masters in `assets/item-art/`).
+  The Motherlode Slab's art carries **no baked sparkle**: Ultra Rare shimmer is a UI
+  treatment (`docs/design-system.md`, "Item rarity")
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

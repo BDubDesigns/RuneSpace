@@ -22,6 +22,8 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "holo_hollow",
         "rusk_recovery",
         "deep_jag",
+        "south_access_track",
+        "the_south_cut",
       ].sort(),
     );
   });

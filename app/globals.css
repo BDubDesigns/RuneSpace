@@ -142,6 +142,14 @@
   /* The RARE FIND System line in General reads in the same rare accent. */
   --rs-rare-find-accent: var(--rs-item-rare-accent);
   --rs-rare-find-surface: var(--rs-accent-arcane-subtle);
+  /* Ultra Rare (#342): its own warm accent on the tile border, stack indicator
+     and the ULTRA RARE FIND System line. The continuous shimmer is a separate,
+     reusable overlay (.rs-item-shimmer) so it is never baked into item art. */
+  --rs-item-ultra-rare-accent: #ff9f4a;
+  --rs-item-ultra-rare-stack-track: rgb(255 159 74 / 0.18);
+  --rs-item-ultra-rare-sparkle: #fff1c9;
+  --rs-ultra-rare-find-accent: var(--rs-item-ultra-rare-accent);
+  --rs-ultra-rare-find-surface: rgb(255 159 74 / 0.1);
   --rs-chat-mention-other: var(--rs-accent-secondary);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a
@@ -771,6 +779,107 @@ body {
   }
   50% {
     scale: 1.15;
+  }
+}
+
+/* Rarity shimmer (#342): a slow, continuous glint for Ultra Rare and above,
+   painted over an item tile's artwork zone by the shared item visuals. It is a
+   UI treatment, never part of an item's artwork: a thin diagonal sheen drifts
+   across the art every few seconds while three small sparkles twinkle on
+   staggered, unequal cycles so the tile never pulses in unison. Both layers are
+   clipped to the tile, sit under the nameplate, and ignore pointer input.
+   `--rs-shimmer-strength` is the one dial a higher rarity can raise later. */
+.rs-item-shimmer {
+  --rs-shimmer-strength: 1;
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.rs-item-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgb(255 214 140 / calc(0.32 * var(--rs-shimmer-strength))) 50%,
+    transparent 58%
+  );
+  transform: translateX(-60%);
+  animation: rs-item-shimmer-sweep 5.5s ease-in-out infinite;
+}
+
+.rs-item-shimmer__spark {
+  position: absolute;
+  width: 0.85rem;
+  height: 0.85rem;
+  background:
+    linear-gradient(var(--rs-item-ultra-rare-sparkle), var(--rs-item-ultra-rare-sparkle)) center /
+      100% 1.5px no-repeat,
+    linear-gradient(var(--rs-item-ultra-rare-sparkle), var(--rs-item-ultra-rare-sparkle)) center /
+      1.5px 100% no-repeat;
+  filter: drop-shadow(0 0 3px var(--rs-item-ultra-rare-accent));
+  opacity: 0;
+  animation: rs-item-shimmer-twinkle 4.2s ease-in-out infinite;
+}
+
+.rs-item-shimmer__spark:nth-child(1) {
+  top: 22%;
+  left: 24%;
+}
+
+.rs-item-shimmer__spark:nth-child(2) {
+  top: 44%;
+  left: 68%;
+  animation-duration: 5.3s;
+  animation-delay: 1.4s;
+}
+
+.rs-item-shimmer__spark:nth-child(3) {
+  top: 66%;
+  left: 38%;
+  animation-duration: 6.1s;
+  animation-delay: 2.9s;
+}
+
+@keyframes rs-item-shimmer-sweep {
+  0%,
+  45% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(60%);
+  }
+}
+
+@keyframes rs-item-shimmer-twinkle {
+  0%,
+  55%,
+  100% {
+    opacity: 0;
+    scale: 0.5;
+  }
+  28% {
+    opacity: calc(0.95 * var(--rs-shimmer-strength));
+    scale: 1;
+  }
+}
+
+/* Reduced motion keeps the item noticeably special without any movement: the
+   sweep is dropped and the sparkles rest softly lit. */
+@media (prefers-reduced-motion: reduce) {
+  .rs-item-shimmer::before {
+    animation: none;
+    display: none;
+  }
+
+  .rs-item-shimmer__spark {
+    animation: none;
+    opacity: 0.7;
+    scale: 0.9;
   }
 }
 

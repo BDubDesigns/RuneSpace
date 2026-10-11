@@ -17,6 +17,14 @@ served to clients.
 - The whole `assets` directory is excluded from the Docker build context via
   `.dockerignore`; the Dockerfile asserts it is absent after `COPY . .`.
 
+- `south-access-track.png` and `the-south-cut.png` are the owner-approved
+  1536×1024 grayscale RGBA identifiers for the Oil Shale Mining slice (#342),
+  supplied with genuine transparency and no hot-pink key. They were still put
+  through the cookbook's QA: alpha below 4 cleared, near-opaque alpha snapped
+  to 255, trimmed to the alpha bounds, scaled to a 512 px long edge, grayscale,
+  lossless WebP, and inspected on dark and light backgrounds. Nothing was
+  regenerated or recoloured.
+
 The other four identifiers keep no master here: their pre-key colour sources
 live in working-art storage rather than the repository, which
 `docs/art-cookbook.md` explicitly allows.

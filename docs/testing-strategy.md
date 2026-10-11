@@ -81,7 +81,8 @@ small number of critical mobile player journeys.
   commission (`curly-must-stash`, #292), and Wade's landing-gear job
   (`wheel-be-right-back`, #322), Wade's propulsion job and the restored
   ship (`thrust-issues`, #330), and Mission pinning with the Mission Log
-  (`mission-pinning`, #325). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`mission-pinning`, #325), and Skatboll Oil Shale Mining's map, scene, gate,
+  setting and Ultra Rare shimmer (`oil-shale-mining`, #342). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

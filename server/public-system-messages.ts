@@ -1,11 +1,13 @@
 import { chatMessages, type ChatMessage } from "@/db/rune-space";
+import type { ItemRarity } from "@/game/content/item-presentation";
 import type { SystemChatMessageView } from "@/game/schemas/chat";
 import { afterCharacterCommandCommits, type DatabaseTransaction } from "@/server/action-resolution";
 import { publishRealtimeEvent } from "@/server/realtime";
 
 /**
  * Public System messages (#308): automatic lines RuneSpace itself posts to the
- * General timeline, today only a Mining RARE FIND announcement.
+ * General timeline, today only a Mining RARE FIND or ULTRA RARE FIND
+ * announcement.
  *
  * They are rows in the one durable `chat_messages` timeline, so history, paging,
  * retention, and live delivery are the ordinary chat paths. What makes them
@@ -18,6 +20,7 @@ import { publishRealtimeEvent } from "@/server/realtime";
 
 /** A System row as the wire carries it. */
 export function toSystemView(row: ChatMessage): SystemChatMessageView {
+  const treatment = row.kind === "ultra_rare_find" ? "ultra_rare_find" : "rare_find";
   return {
     redacted: false,
     system: true,
@@ -25,7 +28,7 @@ export function toSystemView(row: ChatMessage): SystemChatMessageView {
     seq: row.seq,
     channel: "general",
     promoted: false,
-    treatment: "rare_find",
+    treatment,
     body: row.body,
     sentAt: row.createdAt.toISOString(),
   };
@@ -41,19 +44,26 @@ export function rareFindAnnouncementBody(input: {
 }
 
 /**
- * Record one RARE FIND announcement inside the caller's transaction, so it
+ * Record one RARE FIND (or, for an Ultra Rare item, ULTRA RARE FIND) announcement inside the caller's transaction, so it
  * commits together with the item, the XP, and the run history it announces — or
  * not at all. Live delivery is queued for after that commit; a rollback drops
  * it, and a missed delivery is recovered by the ordinary history read.
  */
 export async function recordRareFindAnnouncement(
   transaction: DatabaseTransaction,
-  input: { characterName: string; itemName: string; locationName: string; now: Date },
+  input: {
+    characterName: string;
+    itemName: string;
+    locationName: string;
+    /** The item's authored rarity picks the line's kind and so its label. */
+    rarity: ItemRarity;
+    now: Date;
+  },
 ): Promise<SystemChatMessageView> {
   const [row] = await transaction
     .insert(chatMessages)
     .values({
-      kind: "rare_find",
+      kind: input.rarity === "ultra_rare" ? "ultra_rare_find" : "rare_find",
       channel: "general",
       body: rareFindAnnouncementBody(input),
       createdAt: input.now,

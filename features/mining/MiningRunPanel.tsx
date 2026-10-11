@@ -61,7 +61,9 @@ export function MiningRunPanel({
       stats={[
         { label: "attempts", value: run.attempts },
         { label: "successful", value: run.successes },
-        { label: "failed", value: run.failures },
+        // A source that pays a low yield for a missed roll (#342) has no "failed"
+        // attempts to count: its misses are low yields.
+        { label: source.lowYield ? "low yield" : "failed", value: run.failures },
         ...gainedRows,
         {
           id: "xp",
@@ -101,7 +103,8 @@ function MiningAttemptRow({
   return (
     <article className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm">
       <p className="font-display uppercase tracking-wide">
-        Attempt {attempt.sequence} - {attempt.success ? "Success" : "Failed"}
+        Attempt {attempt.sequence} -{" "}
+        {attempt.success ? "Success" : attempt.lowYield ? "Low yield" : "Failed"}
       </p>
       <p className="text-[color:var(--rs-text-secondary)]">
         Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
@@ -115,7 +118,7 @@ function MiningAttemptRow({
       <p className="text-xs text-[color:var(--rs-text-muted)]">
         Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
       </p>
-      {attempt.success ? (
+      {attempt.success || attempt.lowYield ? (
         <p>
           {attempt.quantityAwarded} {itemName(attempt.itemId)}
           {attempt.secondaryFinds.map((find) => (

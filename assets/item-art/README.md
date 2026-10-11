@@ -24,6 +24,13 @@ clients.
   the Wheel Assembly: alpha noise below 4 cleared, trimmed to its content, scaled
   to a 576 px long edge, centred on a 640×640 transparent canvas and saved as
   lossless WebP. Nothing was regenerated, recomposed or recoloured.
+- `oil-shale.png` and `motherlode-slab.png` are the approved 1254×1254
+  transparent renders of Oil Shale and the Motherlode Slab (#342). The committed
+  derivatives follow the same convention as the Wheel Assembly: alpha noise
+  below 4 cleared, near-opaque alpha snapped to 255, trimmed to content, scaled
+  to a 576 px long edge, centred on a 640×640 transparent canvas and saved as
+  lossless WebP. The art contains no baked sparkle: the Ultra Rare shimmer is
+  applied by the UI. Nothing was regenerated, recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

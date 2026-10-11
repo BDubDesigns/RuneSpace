@@ -121,6 +121,7 @@ describe("Ferrite Shale Mining resolution", () => {
     expect(success.attempts).toEqual([
       {
         success: true,
+        lowYield: false,
         rolledBasisPoints: 3499,
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
@@ -136,6 +137,7 @@ describe("Ferrite Shale Mining resolution", () => {
     expect(failure.attempts).toEqual([
       {
         success: false,
+        lowYield: false,
         rolledBasisPoints: 3500,
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
@@ -160,6 +162,7 @@ describe("Ferrite Shale Mining resolution", () => {
     expect(outcome.attempts).toEqual([
       {
         success: true,
+        lowYield: false,
         rolledBasisPoints: 0,
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
@@ -173,6 +176,7 @@ describe("Ferrite Shale Mining resolution", () => {
       },
       {
         success: false,
+        lowYield: false,
         rolledBasisPoints: 3500,
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,
@@ -186,6 +190,7 @@ describe("Ferrite Shale Mining resolution", () => {
       },
       {
         success: true,
+        lowYield: false,
         rolledBasisPoints: 0,
         thresholdBasisPoints: 3500,
         itemId: ITEM_IDS.ferriteShale,

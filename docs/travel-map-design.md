@@ -5,10 +5,17 @@ Owns the dedicated, query-backed `LocalMapPanel` treatment only. The current
 location scene and same-location population/profile flow belong to Location
 (see `docs/architecture.md` and `docs/location-scenes.md`); Journey owns the
 in-transit presentation. Full current-location scene artwork is #78.
-Eight locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
+Ten locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
 Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), The Jag
 (`the_jag`), Holo Hollow (`holo_hollow`), Rusk Recovery (`rusk_recovery`), and Deep Jag
-(`deep_jag`, #209, southwest of The Jag at axial `q=-3, r=4` and adjacent only to it). The panel's job is fast readable navigation and
+(`deep_jag`, #209, southwest of The Jag at axial `q=-3, r=4` and adjacent only to it),
+plus the South Access Track (`south_access_track`, axial `q=0, r=2`) and The South Cut
+(`the_south_cut`, axial `q=0, r=3`) of #342: a travel-only road south of the Crash Site
+and the Oil Shale mine behind it, chained Crash Site ↔ Track ↔ Cut with two ordinary
+24-second walking legs and no direct Crash Site ↔ Cut edge. The Track shows no status
+plate; The Cut shows `Mining`. Both identifiers are approved grayscale transparent
+lossless WebP (`public/map-icons/south-access-track.webp`, `the-south-cut.webp`; masters
+in `assets/map-icons/`). The panel's job is fast readable navigation and
 gameplay-state communication on a phone; hexes are **not** miniature scene paintings.
 
 Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
@@ -242,10 +249,14 @@ affordance model with nothing added: native `overflow: auto` on
 `left` / `right` / `top` / `bottom` from real measured scroll metrics. There is
 no zoom, no grab-drag engine, and no minimap.
 
-The viewport is bounded (`max-h-[72dvh]`) so the map cannot push the rest of the
+The viewport is bounded (`max-h-[76dvh]`) so the map cannot push the rest of the
 page off a phone, and deliberately not shorter than that: a nested scroller
 small enough to trap ordinary vertical page scrolling would be worse than a tall
-map. Verified at 390×844 and at desktop width with no horizontal page overflow.
+map. The South Access Track and The South Cut (#342) lengthened the map to about
+611 px (606.97 px canvas plus the viewport's 4 px padding) — a few pixels more than
+the former 72dvh cap allowed on a 390×844 phone, which would have put a vertical
+scroller and a bottom arrow on a map that is otherwise whole — so the cap is
+76dvh. Verified at 390×844 and at desktop width with no horizontal page overflow.
 
 ## The selected-destination panel (issue #240)
 

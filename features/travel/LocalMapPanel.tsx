@@ -703,14 +703,16 @@ export function LocalMapPanel({
           `dvh`-relative rather than a fixed pixel figure so it scales with the
           screen instead of guessing at one: on a 390x844 phone the whole map
           fits inside it and there is no cramped nested vertical scroller to
-          fight with the page, and on a short desktop window the cap engages and
+          fight with the page (the South Access Track and The South Cut, #342,
+          took the map to ~611 px, which is why the cap is 76dvh rather than the
+          72dvh that fit the shorter map), and on a short desktop window the cap engages and
           the existing four-direction affordances start telling the truth about
           a second axis. No zoom, no custom drag engine — the browser's own
           scrolling, exactly as before. */}
       <div className="relative -mx-1">
         <div
           ref={localMapViewportRef}
-          className="max-h-[72dvh] overflow-auto px-1 pb-1"
+          className="max-h-[76dvh] overflow-auto px-1 pb-1"
           data-map-scroll-viewport
           onClick={clearSelectionOnEmptyMap}
         >

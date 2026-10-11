@@ -45,6 +45,8 @@ const balanceSchema = z.object({
         successXp: z.literal(15),
         yieldMinimum: z.literal(1),
         yieldMaximum: z.literal(2),
+        requiredMiningLevel: z.literal(1),
+        lowYield: z.null(),
         secondaryFinds: z.tuple([
           z.object({
             itemId: z.literal(ITEM_IDS.uncutQuartz),
@@ -75,6 +77,8 @@ const balanceSchema = z.object({
         successXp: z.literal(25),
         yieldMinimum: z.literal(1),
         yieldMaximum: z.literal(2),
+        requiredMiningLevel: z.literal(1),
+        lowYield: z.null(),
         secondaryFinds: z.tuple([
           z.object({
             itemId: z.literal(ITEM_IDS.uncutTopaz),
@@ -84,6 +88,44 @@ const balanceSchema = z.object({
           z.object({
             itemId: z.literal(ITEM_IDS.uncutSapphire),
             oneIn: z.literal(55),
+            announce: z.literal(true),
+          }),
+        ]),
+      }),
+      /**
+       * Skatboll's Oil Shale at The South Cut (#342). The first source with a
+       * personal Mining level gate, a three-way full-success yield and a
+       * low-yield outcome instead of a dead miss.
+       *
+       * The success curve is anchored at Mining 1 like every other source and
+       * only the ACCESS gate is level 5, so Mining 5 is 40.30% (35% + 4 of 49
+       * steps of the 65-point climb to a guaranteed Mining 50), not 35%.
+       * `yieldMinimum`/`yieldMaximum` are the full-success range, drawn
+       * uniformly over 2, 3 and 4. `lowYield` is what a roll that misses the
+       * success chance still earns: exactly that many ore and that much XP, and
+       * never a Secondary Find.
+       */
+      oilShale: z.object({
+        actionId: z.literal(ACTION_IDS.oilShaleMining),
+        itemId: z.literal(ITEM_IDS.oilShale),
+        attemptDurationTicks: z.literal(100),
+        successAtLevelOneBps: z.literal(3_500),
+        guaranteedSuccessLevel: z.literal(50),
+        successRangeBps: z.literal(6_500),
+        successXp: z.literal(100),
+        yieldMinimum: z.literal(2),
+        yieldMaximum: z.literal(4),
+        requiredMiningLevel: z.literal(5),
+        lowYield: z.object({ quantity: z.literal(1), xp: z.literal(20) }),
+        secondaryFinds: z.tuple([
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutSapphire),
+            oneIn: z.literal(20),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.motherlodeSlab),
+            oneIn: z.literal(100),
             announce: z.literal(true),
           }),
         ]),
@@ -907,6 +949,23 @@ const balanceSchema = z.object({
       stackLimit: z.literal(2),
       secondaryFindMiningXp: z.literal(30),
     }),
+    /**
+     * Skatboll Oil Shale (#342): 600 g a piece, five to a stack, so a full
+     * stack is 3 kg and the slot count is the real limit. The Motherlode Slab is
+     * one unbroken 12 kg specimen: it never stacks, and it owns its +150 Mining
+     * XP exactly as every other find owns its own.
+     */
+    oilShale: z.object({
+      itemId: z.literal(ITEM_IDS.oilShale),
+      massGrams: z.literal(600),
+      stackLimit: z.literal(5),
+    }),
+    motherlodeSlab: z.object({
+      itemId: z.literal(ITEM_IDS.motherlodeSlab),
+      massGrams: z.literal(12_000),
+      stackLimit: z.literal(1),
+      secondaryFindMiningXp: z.literal(150),
+    }),
   }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
@@ -963,6 +1022,8 @@ const defaults = balanceSchema.parse({
         successXp: 15,
         yieldMinimum: 1,
         yieldMaximum: 2,
+        requiredMiningLevel: 1,
+        lowYield: null,
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutQuartz, oneIn: 40, announce: false },
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 60, announce: true },
@@ -978,9 +1039,28 @@ const defaults = balanceSchema.parse({
         successXp: 25,
         yieldMinimum: 1,
         yieldMaximum: 2,
+        requiredMiningLevel: 1,
+        lowYield: null,
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 35, announce: false },
           { itemId: ITEM_IDS.uncutSapphire, oneIn: 55, announce: true },
+        ],
+      },
+      oilShale: {
+        actionId: ACTION_IDS.oilShaleMining,
+        itemId: ITEM_IDS.oilShale,
+        attemptDurationTicks: 100,
+        successAtLevelOneBps: 3_500,
+        guaranteedSuccessLevel: 50,
+        successRangeBps: 6_500,
+        successXp: 100,
+        yieldMinimum: 2,
+        yieldMaximum: 4,
+        requiredMiningLevel: 5,
+        lowYield: { quantity: 1, xp: 20 },
+        secondaryFinds: [
+          { itemId: ITEM_IDS.uncutSapphire, oneIn: 20, announce: false },
+          { itemId: ITEM_IDS.motherlodeSlab, oneIn: 100, announce: true },
         ],
       },
     },
@@ -1445,6 +1525,13 @@ const defaults = balanceSchema.parse({
       massGrams: 100,
       stackLimit: 2,
       secondaryFindMiningXp: 30,
+    },
+    oilShale: { itemId: ITEM_IDS.oilShale, massGrams: 600, stackLimit: 5 },
+    motherlodeSlab: {
+      itemId: ITEM_IDS.motherlodeSlab,
+      massGrams: 12_000,
+      stackLimit: 1,
+      secondaryFindMiningXp: 150,
     },
   },
   carrying: {

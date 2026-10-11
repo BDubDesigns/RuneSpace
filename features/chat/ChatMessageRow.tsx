@@ -145,11 +145,24 @@ export function ChatMessageRow({
 }
 
 /**
- * An automatic System line in General (#308), today a Mining RARE FIND. It is
- * plainly RuneSpace's own output: named "System", carrying the restrained
- * RARE FIND treatment, with no sender to open and so no Whisper, Report, or
- * Block, and it can mention no one.
+ * An automatic System line in General (#308), a Mining RARE FIND or, for an
+ * Ultra Rare item (#342), ULTRA RARE FIND. It is plainly RuneSpace's own output:
+ * named "System", carrying the restrained rarity treatment, with no sender to
+ * open and so no Whisper, Report, or Block, and it can mention no one.
  */
+const SYSTEM_LINE_TREATMENTS = {
+  rare_find: {
+    label: "RARE FIND",
+    accent: "var(--rs-rare-find-accent)",
+    surface: "var(--rs-rare-find-surface)",
+  },
+  ultra_rare_find: {
+    label: "ULTRA RARE FIND",
+    accent: "var(--rs-ultra-rare-find-accent)",
+    surface: "var(--rs-ultra-rare-find-surface)",
+  },
+} as const;
+
 export function SystemChatMessageRow({
   id,
   body,
@@ -159,13 +172,15 @@ export function SystemChatMessageRow({
   id: string;
   body: string;
   sentAt: string;
-  treatment: "rare_find";
+  treatment: keyof typeof SYSTEM_LINE_TREATMENTS;
 }) {
+  const style = SYSTEM_LINE_TREATMENTS[treatment];
   return (
     <li
-      className="border-l-4 border-l-[color:var(--rs-rare-find-accent)] bg-[color:var(--rs-rare-find-surface)] px-3 py-2"
+      className="border-l-4 px-3 py-2"
       data-chat-message={id}
       data-chat-system={treatment}
+      style={{ borderLeftColor: style.accent, backgroundColor: style.surface }}
     >
       <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-[color:var(--rs-text-muted)]">
         <span
@@ -175,10 +190,11 @@ export function SystemChatMessageRow({
           System
         </span>
         <span
-          className="font-display uppercase tracking-[0.12em] text-[color:var(--rs-rare-find-accent)]"
+          className="font-display uppercase tracking-[0.12em]"
           data-rare-find-label=""
+          style={{ color: style.accent }}
         >
-          RARE FIND
+          {style.label}
         </span>
         <time dateTime={sentAt}>{formatTime(sentAt)}</time>
       </p>

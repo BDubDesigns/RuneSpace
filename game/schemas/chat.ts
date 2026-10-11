@@ -104,7 +104,8 @@ export const SystemChatMessageViewSchema = z.object({
   seq: z.number().int().positive(),
   channel: z.literal("general"),
   promoted: z.literal(false),
-  treatment: z.literal("rare_find"),
+  /** `ultra_rare_find` is the louder line for an Ultra Rare item (#342). */
+  treatment: z.enum(["rare_find", "ultra_rare_find"]),
   body: z.string().min(1),
   sentAt: z.string().datetime(),
 });

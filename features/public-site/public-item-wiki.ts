@@ -8,6 +8,7 @@ import {
 } from "@/game/content/item-categories";
 import {
   getItemPresentation,
+  ITEM_RARITY_LABELS,
   itemQuantityLabel,
   resolveItemPresentation,
 } from "@/game/content/item-presentation";
@@ -78,7 +79,8 @@ export type WikiItemPage = {
   summary: string;
   /** Present only when the item authors one. */
   description?: string;
-  rare: boolean;
+  /** The authored rarity's label ("Rare", "Ultra Rare"), present only for a rare item. */
+  rarityLabel?: string;
   properties: readonly { label: string; value: string }[];
   obtain: readonly WikiItemLine[];
   oneTime: readonly WikiItemLine[];
@@ -424,7 +426,8 @@ function propertyRows(itemId: string, reference: ItemReference, powerCellSpeedMu
       value: `Adds ${equipment.slotCapacity} inventory slots while equipped`,
     });
   }
-  if (getItemPresentation(itemId)?.rarity === "rare") rows.push({ label: "Rarity", value: "Rare" });
+  const rarity = getItemPresentation(itemId)?.rarity;
+  if (rarity) rows.push({ label: "Rarity", value: ITEM_RARITY_LABELS[rarity] });
   return rows;
 }
 
@@ -483,7 +486,9 @@ export function buildWikiItemPage(
     ...(getItemPresentation(itemId)?.description
       ? { description: getItemPresentation(itemId)!.description! }
       : {}),
-    rare: getItemPresentation(itemId)?.rarity === "rare",
+    ...(getItemPresentation(itemId)?.rarity
+      ? { rarityLabel: ITEM_RARITY_LABELS[getItemPresentation(itemId)!.rarity!] }
+      : {}),
     properties: propertyRows(
       itemId,
       reference,

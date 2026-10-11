@@ -349,11 +349,13 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
 
 ### Public System messages (Issue #308)
 
-General also carries automatic **System** lines — today only a Mining RARE FIND
-announcement (`docs/gameplay-foundations.md`, "Secondary Finds"). They are a
+General also carries automatic **System** lines — today a Mining RARE FIND or,
+for an Ultra Rare item (#342), ULTRA RARE FIND announcement
+(`docs/gameplay-foundations.md`, "Secondary Finds"). They are a
 first-class kind of row in the one durable timeline, not a fake player.
 
-- **Persistence:** `chat_messages.kind` is `player` or `rare_find`. A System row
+- **Persistence:** `chat_messages.kind` is `player`, `rare_find` or
+  `ultra_rare_find` (the announced item's authored rarity picks which). A System row
   has *no* sender account, character, or name, and a check constraint makes that
   a database fact (the three sender columns are null exactly when `kind` is not
   `player`; System rows are `general` only). No System account or character is
@@ -801,4 +803,4 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 
 ## Current status
 
-RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold, Landing Gear and Propulsion System repair at Crash Site, character-owned site stashes at four activity sites (#284), Inventory/Equipment, locations and Power Cells/Power Annex, the Holo Hollow settlement with Local Places, character-scoped Credits, and merchant Trade at both a Local Place (Bix) and a World Location (Wade at Rusk Recovery), repeatable Practice Welding with its Clean Pass opportunities, Work Orders, Deep Jag, Fabrication through level 8 with Manual Override and Tinkering at Rusk Recovery's Fabrication Station (#232, #233), two Mining tools and three containers resolved through one equipment-definition boundary (#233), NPC conversations, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / Wheel Be Right Back / A Cut Above, plus Out of the Weather, Cutting Costs and Curly Must-Stash). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.
+RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold, Landing Gear and Propulsion System repair at Crash Site, character-owned site stashes at four activity sites (#284), Inventory/Equipment, locations and Power Cells/Power Annex, the Holo Hollow settlement with Local Places, character-scoped Credits, and merchant Trade at both a Local Place (Bix) and a World Location (Wade at Rusk Recovery), repeatable Practice Welding with its Clean Pass opportunities, Work Orders, Deep Jag, the Oil Shale mine at The South Cut behind a travel-only South Access Track (#342), Fabrication through level 8 with Manual Override and Tinkering at Rusk Recovery's Fabrication Station (#232, #233), two Mining tools and three containers resolved through one equipment-definition boundary (#233), NPC conversations, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / Wheel Be Right Back / A Cut Above, plus Out of the Weather, Cutting Costs and Curly Must-Stash). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.
