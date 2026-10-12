@@ -101,6 +101,9 @@ boundary.** This file is the repository's normative agent-behavior contract;
 
 Grep for these before re-deriving them from scratch.
 
+- **Items and recipes:** [authoring checklist](docs/item-recipe-authoring.md) maps
+  required registrations, conditional work, derived references, and tests.
+
 - **Dialogue content has a shadow copy in QC Studio.** `game/content/dialogue.ts`
   defines the authoritative `DialogueBeat` types and every authored beat.
   `tools/qc-studio/` keeps a parallel mirror for its authoring/preview tool:
