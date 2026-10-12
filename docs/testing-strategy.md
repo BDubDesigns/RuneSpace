@@ -91,7 +91,8 @@ small number of critical mobile player journeys.
   (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
   setting and Ultra Rare shimmer (`oil-shale-mining`, #342), and fuel manufacturing's
   Empty and Full Small Fuel Canister recipes, art and failure shape
-  (`fuel-manufacturing`, #343). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`fuel-manufacturing`, #343), and panel scroll hints plus the Play page preview
+  arrows (`scroll-affordances`, #345). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

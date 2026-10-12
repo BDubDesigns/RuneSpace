@@ -20,6 +20,7 @@ import { acknowledgeNewsAction } from "@/server/actions";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
+import { PlayPageScrollHints } from "./PlayPageScrollHints";
 import { PlayProvider, usePlay } from "./PlayContext";
 import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
 import { PlayUtilityWorkspace } from "./PlayUtilityWorkspace";
@@ -313,6 +314,8 @@ function PlayWorkspace({
               />
               <PlayerTradeSurface />
             </GameShell>
+            {/* Preview experiment (#345): remove with PlayPageScrollHints.tsx. */}
+            <PlayPageScrollHints />
           </PlayerTradeProvider>
         </ChatProvider>
       </SocialProvider>

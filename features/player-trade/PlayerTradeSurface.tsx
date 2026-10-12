@@ -5,6 +5,7 @@ import { CreditsAmount, CreditsIcon } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
+import { ScrollAffordanceFrame } from "@/components/ui/ScrollAffordances";
 import { usePlay } from "@/features/play/PlayContext";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import type { TradeExchangeLines, TradeSessionView } from "@/game/schemas/player-trade";
@@ -96,7 +97,10 @@ function TradeSessionSurface({ session }: { session: TradeSessionView }) {
         data-trade-surface=""
         data-trade-version={session.offerVersion}
       >
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pb-3">
+        <ScrollAffordanceFrame
+          className="flex min-h-0 flex-1 flex-col"
+          scrollerClassName="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pb-3"
+        >
           <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
             <p className="text-xs text-[color:var(--rs-text-secondary)]">Trading with</p>
             <p
@@ -143,7 +147,7 @@ function TradeSessionSurface({ session }: { session: TradeSessionView }) {
               />
             </div>
           )}
-        </div>
+        </ScrollAffordanceFrame>
         <footer
           aria-label="Trade actions"
           className="flex flex-wrap gap-2 border-t border-[color:var(--rs-border-structural)] pt-3"
@@ -686,7 +690,10 @@ function TradeEndedSurface({ ended }: { ended: EndedTradeNotice }) {
       title={copy.title}
     >
       <div className="mt-3 flex min-h-0 flex-1 flex-col" data-trade-ended={ended.outcome}>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pb-3">
+        <ScrollAffordanceFrame
+          className="flex min-h-0 flex-1 flex-col"
+          scrollerClassName="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pb-3"
+        >
           <div className={NAME_CLASS}>
             <Feedback tone={ended.outcome === "completed" ? "success" : "muted"}>
               {copy.text(ended.counterpartName)}
@@ -702,7 +709,7 @@ function TradeEndedSurface({ ended }: { ended: EndedTradeNotice }) {
               />
             </div>
           ) : null}
-        </div>
+        </ScrollAffordanceFrame>
         <footer className="flex gap-2 border-t border-[color:var(--rs-border-structural)] pt-3">
           <ActionButton className="flex-1 sm:flex-none" onClick={dismissEnded}>
             Done
