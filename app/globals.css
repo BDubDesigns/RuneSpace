@@ -180,19 +180,15 @@
   /* Local-map scroll affordances (issue #92). Keep the mining/amber accent as
      the single source of truth while deriving the fill, border, and static
      halo used by the viewport edge markers. */
-  --rs-map-scroll-affordance-fill: color-mix(in srgb, var(--rs-accent-mining) 82%, transparent);
-  --rs-map-scroll-affordance-border: color-mix(
+  --rs-scroll-affordance-fill: color-mix(in srgb, var(--rs-accent-mining) 82%, transparent);
+  --rs-scroll-affordance-border: color-mix(
     in srgb,
     var(--rs-accent-mining) 52%,
     var(--rs-surface-page)
   );
-  --rs-map-scroll-affordance-glow: color-mix(in srgb, var(--rs-accent-mining) 90%, transparent);
-  --rs-map-scroll-affordance-glow-outer: color-mix(
-    in srgb,
-    var(--rs-accent-mining) 56%,
-    transparent
-  );
-  --rs-map-scroll-affordance-pulse-duration: 2.25s;
+  --rs-scroll-affordance-glow: color-mix(in srgb, var(--rs-accent-mining) 90%, transparent);
+  --rs-scroll-affordance-glow-outer: color-mix(in srgb, var(--rs-accent-mining) 56%, transparent);
+  --rs-scroll-affordance-pulse-duration: 2.25s;
   --rs-duration-fast: 120ms;
   --rs-duration-standard: 180ms;
   --rs-control-height: 2.75rem;
@@ -649,12 +645,27 @@ body {
 }
 
 /* The layer is a sibling of the native scroll container so its markers stay
-   anchored to the visible viewport while the map canvas moves underneath. */
-.rs-map-scroll-affordance-layer {
+   anchored to the visible viewport while the map canvas moves underneath. The
+   panel scroll hints (#345) reuse it unchanged: a sibling of the scroller inside
+   a relative frame the size of the scroller's visible box. */
+.rs-scroll-affordance-layer {
   position: absolute;
   z-index: 20;
   inset: 0;
   pointer-events: none;
+}
+
+/* The Play page's preview hints (#345) are anchored to the visible mobile
+   viewport instead of a scroller. The layer spans the usable viewport — below
+   the top safe area and above the fixed bottom navigation with breathing room,
+   so the bottom arrow never meets the navigation — and its horizontal extent is
+   set inline to the primary column. Below the floating Chat launcher and the
+   navigation, above page content. */
+.rs-scroll-affordance-layer--viewport {
+  position: fixed;
+  z-index: 15;
+  inset: calc(env(safe-area-inset-top) + var(--rs-space-1)) auto
+    calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2)) auto;
 }
 
 /* One canonical arrow for all four edges (#240). Every direction is the same
@@ -664,60 +675,58 @@ body {
    (`rotate`); it never scales. The inner arrow owns the breathing `scale`, so
    the pulse grows from the arrow's own center in every direction instead of
    compounding with the wrapper's translation. */
-.rs-map-scroll-affordance {
-  --rs-map-scroll-arrow-length: 1.5rem;
-  --rs-map-scroll-arrow-span: 3rem;
-  --rs-map-scroll-arrow-inset: 0.25rem;
-  --rs-map-scroll-arrow-anchor: calc(
-    var(--rs-map-scroll-arrow-inset) + var(--rs-map-scroll-arrow-length) / 2
-  );
+.rs-scroll-affordance {
+  --rs-scroll-arrow-length: 1.5rem;
+  --rs-scroll-arrow-span: 3rem;
+  --rs-scroll-arrow-inset: 0.25rem;
+  --rs-scroll-arrow-anchor: calc(var(--rs-scroll-arrow-inset) + var(--rs-scroll-arrow-length) / 2);
   position: absolute;
   display: block;
-  width: var(--rs-map-scroll-arrow-length);
-  height: var(--rs-map-scroll-arrow-span);
+  width: var(--rs-scroll-arrow-length);
+  height: var(--rs-scroll-arrow-span);
   translate: -50% -50%;
 }
 
-.rs-map-scroll-affordance__arrow {
+.rs-scroll-affordance__arrow {
   position: absolute;
   inset: 0;
   display: block;
-  background: var(--rs-map-scroll-affordance-border);
+  background: var(--rs-scroll-affordance-border);
   clip-path: polygon(0 50%, 100% 0, 100% 100%);
-  filter: drop-shadow(0 0 0.3rem var(--rs-map-scroll-affordance-glow))
-    drop-shadow(0 0 0.75rem var(--rs-map-scroll-affordance-glow-outer));
+  filter: drop-shadow(0 0 0.3rem var(--rs-scroll-affordance-glow))
+    drop-shadow(0 0 0.75rem var(--rs-scroll-affordance-glow-outer));
   transform-origin: center;
-  animation: rs-map-scroll-affordance-breathe var(--rs-map-scroll-affordance-pulse-duration)
-    ease-in-out infinite;
+  animation: rs-scroll-affordance-breathe var(--rs-scroll-affordance-pulse-duration) ease-in-out
+    infinite;
 }
 
-.rs-map-scroll-affordance__arrow::after {
+.rs-scroll-affordance__arrow::after {
   position: absolute;
   inset: 0.125rem;
   content: "";
-  background: var(--rs-map-scroll-affordance-fill);
+  background: var(--rs-scroll-affordance-fill);
   clip-path: inherit;
 }
 
-.rs-map-scroll-affordance--left {
+.rs-scroll-affordance--left {
   top: 50%;
-  left: var(--rs-map-scroll-arrow-anchor);
+  left: var(--rs-scroll-arrow-anchor);
 }
 
-.rs-map-scroll-affordance--right {
+.rs-scroll-affordance--right {
   top: 50%;
-  left: calc(100% - var(--rs-map-scroll-arrow-anchor));
+  left: calc(100% - var(--rs-scroll-arrow-anchor));
   rotate: 180deg;
 }
 
-.rs-map-scroll-affordance--top {
-  top: var(--rs-map-scroll-arrow-anchor);
+.rs-scroll-affordance--top {
+  top: var(--rs-scroll-arrow-anchor);
   left: 50%;
   rotate: 90deg;
 }
 
-.rs-map-scroll-affordance--bottom {
-  top: calc(100% - var(--rs-map-scroll-arrow-anchor));
+.rs-scroll-affordance--bottom {
+  top: calc(100% - var(--rs-scroll-arrow-anchor));
   left: 50%;
   rotate: 270deg;
 }
@@ -725,34 +734,34 @@ body {
 /* An accepted Mission's guided hex lies beyond this edge (#240): the same
    arrow re-derives its fill, border, and halo from the shared Mission tokens —
    active green, turn-in blue — exactly as the hex ring does. */
-.rs-map-scroll-affordance[data-map-scroll-mission="active"] {
-  --rs-map-scroll-affordance-fill: color-mix(
+.rs-scroll-affordance[data-map-scroll-mission="active"] {
+  --rs-scroll-affordance-fill: color-mix(
     in srgb,
     var(--rs-mission-guidance-color) 82%,
     transparent
   );
-  --rs-map-scroll-affordance-border: color-mix(
+  --rs-scroll-affordance-border: color-mix(
     in srgb,
     var(--rs-mission-guidance-color) 52%,
     var(--rs-surface-page)
   );
-  --rs-map-scroll-affordance-glow: var(--rs-mission-guidance-color);
-  --rs-map-scroll-affordance-glow-outer: var(--rs-mission-guidance-glow);
+  --rs-scroll-affordance-glow: var(--rs-mission-guidance-color);
+  --rs-scroll-affordance-glow-outer: var(--rs-mission-guidance-glow);
 }
 
-.rs-map-scroll-affordance[data-map-scroll-mission="turn_in"] {
-  --rs-map-scroll-affordance-fill: color-mix(
+.rs-scroll-affordance[data-map-scroll-mission="turn_in"] {
+  --rs-scroll-affordance-fill: color-mix(
     in srgb,
     var(--rs-mission-available-color) 82%,
     transparent
   );
-  --rs-map-scroll-affordance-border: color-mix(
+  --rs-scroll-affordance-border: color-mix(
     in srgb,
     var(--rs-mission-available-color) 52%,
     var(--rs-surface-page)
   );
-  --rs-map-scroll-affordance-glow: var(--rs-mission-available-color);
-  --rs-map-scroll-affordance-glow-outer: var(--rs-mission-available-glow);
+  --rs-scroll-affordance-glow: var(--rs-mission-available-color);
+  --rs-scroll-affordance-glow-outer: var(--rs-mission-available-glow);
 }
 
 /* The selected-destination panel (#240) sticks just above the fixed bottom
@@ -772,7 +781,7 @@ body {
   }
 }
 
-@keyframes rs-map-scroll-affordance-breathe {
+@keyframes rs-scroll-affordance-breathe {
   0%,
   100% {
     scale: 1;
@@ -1026,7 +1035,7 @@ body {
   .rs-overlay-panel,
   .rs-overlay-backdrop-exit,
   .rs-overlay-panel-exit,
-  .rs-map-scroll-affordance__arrow,
+  .rs-scroll-affordance__arrow,
   .rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay,
   .rs-dialogue-cursor {
     animation: none;

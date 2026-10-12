@@ -293,13 +293,16 @@ document scroll, and no map pan or nudge when it opens.
 
 ## Edge arrows: one geometry, Mission cues (issue #240)
 
-All four edge arrows are one canonical shape. `.rs-map-scroll-affordance` is a wrapper that owns
-only placement — centered on its anchor with `translate: -50% -50%`, `--rs-map-scroll-arrow-inset`
+All four edge arrows are one canonical shape. `.rs-scroll-affordance` is a wrapper that owns
+only placement — centered on its anchor with `translate: -50% -50%`, `--rs-scroll-arrow-inset`
 from its edge — and direction, via `rotate` (`0` / `180deg` / `90deg` / `270deg` for left / right /
-top / bottom). The inner `.rs-map-scroll-affordance__arrow` (`data-map-scroll-arrow`) is the same
+top / bottom). The inner `.rs-scroll-affordance__arrow` (`data-map-scroll-arrow`) is the same
 `1.5rem × 3rem` left-pointing clip, border, and fill in every direction and owns the breathing
 `scale`, so the pulse grows from the arrow's own center with no drift; there are no per-direction
-sizes. Reduced motion removes the breath from the inner arrow exactly as before.
+sizes. Reduced motion removes the breath from the inner arrow exactly as before. The shape, tokens
+(`--rs-scroll-affordance-*`) and placement classes are shared with the panel scroll hints
+(`docs/design-system.md`, "Scroll hints"); only the map's four-direction layer, one-pixel rule
+and Mission cues are map-specific.
 
 When an accepted Mission's guided World Location lies beyond an edge, that edge's arrow carries
 `data-map-scroll-mission="active" | "turn_in"` and re-derives its fill, border, and halo tokens from

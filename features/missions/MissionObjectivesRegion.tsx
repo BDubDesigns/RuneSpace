@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { ScrollAffordanceFrame } from "@/components/ui/ScrollAffordances";
 import type { PlayGameplayState } from "@/server/play";
 import { MissionGuidanceStrips } from "./MissionGuidanceStrips";
 import { pinnedGuidanceMissions } from "./mission-pins";
@@ -48,14 +49,16 @@ export function MissionObjectivesRegion({ state }: { state: PlayGameplayState })
         </button>
       ) : null}
       {showStrips ? (
-        <div
+        <ScrollAffordanceFrame
           // The padding (and its matching negative margin) keeps the strips' exterior
-          // glow inside the scrolling box instead of clipping it at the edge.
-          className="relative -m-1 max-h-[min(24dvh,12rem)] overflow-y-auto overscroll-contain p-1"
+          // glow inside the scrolling box instead of clipping it at the edge. The
+          // scroll hints (#345) appear only when the capped list truly overflows.
+          className="-m-1"
           id="objectives-region-body"
+          scrollerClassName="max-h-[min(24dvh,12rem)] overflow-y-auto overscroll-contain p-1"
         >
           <MissionGuidanceStrips state={state} />
-        </div>
+        </ScrollAffordanceFrame>
       ) : null}
     </div>
   );

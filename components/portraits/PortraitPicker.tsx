@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { SelectablePortraitOption } from "@/game/domain/character-portrait";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ScrollAffordanceFrame } from "@/components/ui/ScrollAffordances";
 import { CharacterPortrait } from "./CharacterPortrait";
 
 const WIDE_QUERY = "(min-width: 64rem)"; // matches the Tailwind `lg` breakpoint
@@ -142,67 +143,66 @@ export function PortraitPicker({
     <div className="lg:flex lg:items-start lg:gap-6" data-portrait-chooser>
       {/* Portrait grid (browsing state). Hidden on narrow layouts while a
           portrait is being reviewed; always visible on wide layouts. */}
-      <div className={`${reviewOpen ? "hidden" : ""} lg:block lg:w-80 lg:shrink-0`}>
-        <div
-          aria-label={label}
-          className="grid grid-cols-3 gap-2 lg:max-h-[30rem] lg:overflow-y-auto lg:pr-1"
-          ref={gridRef}
-          role="group"
-        >
-          {options.map((option) => {
-            const selected = option.portraitId === selectedPortraitId;
-            const current = option.portraitId === currentPortraitId;
-            return (
-              <button
-                aria-label={`${option.displayName} portrait${
-                  selected ? ", selected" : ""
-                }${current ? ", current" : ""}`}
-                aria-pressed={selected}
-                className={`rs-focus relative flex flex-col items-stretch gap-1.5 border p-1.5 text-left outline-none motion-safe:transition-colors ${
-                  selected
-                    ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
-                    : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] hover:border-[color:var(--rs-border-structural)]"
-                }`}
-                data-portrait-option
-                data-portrait-id={option.portraitId}
-                {...(selected ? { "data-portrait-selected": "true" } : {})}
-                {...(current ? { "data-portrait-current": "true" } : {})}
-                key={option.portraitId}
-                onClick={() => activate(option.portraitId)}
-                type="button"
-              >
-                <CharacterPortrait
-                  bordered={false}
-                  className="aspect-square w-full"
-                  presentation={{
-                    kind: "selected",
-                    displayName: option.displayName,
-                    derivativePath: option.derivativePath,
-                    derivativeWidth: option.derivativeWidth,
-                    derivativeHeight: option.derivativeHeight,
-                    accessibleDescription: option.accessibleDescription,
-                  }}
-                  sizes="(min-width: 64rem) 96px, 33vw"
-                />
-                <span className="truncate text-center text-xs font-medium text-[color:var(--rs-text-primary)]">
-                  {option.displayName}
+      <ScrollAffordanceFrame
+        aria-label={label}
+        className={`${reviewOpen ? "hidden" : ""} lg:block lg:w-80 lg:shrink-0`}
+        role="group"
+        scrollerClassName="grid grid-cols-3 gap-2 lg:max-h-[30rem] lg:overflow-y-auto lg:pr-1"
+        scrollerRef={gridRef}
+      >
+        {options.map((option) => {
+          const selected = option.portraitId === selectedPortraitId;
+          const current = option.portraitId === currentPortraitId;
+          return (
+            <button
+              aria-label={`${option.displayName} portrait${
+                selected ? ", selected" : ""
+              }${current ? ", current" : ""}`}
+              aria-pressed={selected}
+              className={`rs-focus relative flex flex-col items-stretch gap-1.5 border p-1.5 text-left outline-none motion-safe:transition-colors ${
+                selected
+                  ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
+                  : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] hover:border-[color:var(--rs-border-structural)]"
+              }`}
+              data-portrait-option
+              data-portrait-id={option.portraitId}
+              {...(selected ? { "data-portrait-selected": "true" } : {})}
+              {...(current ? { "data-portrait-current": "true" } : {})}
+              key={option.portraitId}
+              onClick={() => activate(option.portraitId)}
+              type="button"
+            >
+              <CharacterPortrait
+                bordered={false}
+                className="aspect-square w-full"
+                presentation={{
+                  kind: "selected",
+                  displayName: option.displayName,
+                  derivativePath: option.derivativePath,
+                  derivativeWidth: option.derivativeWidth,
+                  derivativeHeight: option.derivativeHeight,
+                  accessibleDescription: option.accessibleDescription,
+                }}
+                sizes="(min-width: 64rem) 96px, 33vw"
+              />
+              <span className="truncate text-center text-xs font-medium text-[color:var(--rs-text-primary)]">
+                {option.displayName}
+              </span>
+              {selected ? (
+                <>
+                  <SelectedCheck />
+                  <span className="sr-only">Selected</span>
+                </>
+              ) : null}
+              {current ? (
+                <span className="absolute bottom-5 left-1 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-1 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)]">
+                  Current
                 </span>
-                {selected ? (
-                  <>
-                    <SelectedCheck />
-                    <span className="sr-only">Selected</span>
-                  </>
-                ) : null}
-                {current ? (
-                  <span className="absolute bottom-5 left-1 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-1 py-0.5 text-[9px] font-bold uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)]">
-                    Current
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </ScrollAffordanceFrame>
 
       {/* Preview / review region. Always visible on wide layouts; on narrow
           layouts it is the in-page review state reached from the grid. */}

@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { createPortal } from "react-dom";
 import { ActionButton } from "./ActionButton";
 import { SectionHeader } from "./SectionHeader";
+import { ScrollAffordanceOverlay, useScrollAffordances } from "./ScrollAffordances";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const FOCUSABLE_SELECTOR =
@@ -24,6 +33,31 @@ const EXIT_FALLBACK_MS = 400;
  * back out of it, or the two traps would bounce focus between them.
  */
 const openDrawers: object[] = [];
+const openDrawerListeners = new Set<() => void>();
+
+function notifyOpenDrawers() {
+  for (const listener of [...openDrawerListeners]) listener();
+}
+
+function subscribeToOpenDrawers(onChange: () => void): () => void {
+  openDrawerListeners.add(onChange);
+  return () => {
+    openDrawerListeners.delete(onChange);
+  };
+}
+
+/**
+ * Whether any modal Drawer is mounted (open or fading out). A page-level
+ * feature that reads the document's scroll position uses it to stand down while
+ * a Drawer is foregrounded, since the Drawer locks the page behind it.
+ */
+export function useModalDrawerOpen(): boolean {
+  return useSyncExternalStore(
+    subscribeToOpenDrawers,
+    () => openDrawers.length > 0,
+    () => false,
+  );
+}
 
 /**
  * Shared modal overlay used by Inventory, Equipment, and the character
@@ -72,13 +106,19 @@ export function Drawer({
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exiting, setExiting] = useState(false);
   const stackEntry = useRef<object>({});
+  // The panel is its own scroll viewport (#345): hidden content above and below
+  // is hinted by arrows on a layer that is a sibling of the panel, so they stay
+  // on its visible edges while the content scrolls under them.
+  const scrollAffordances = useScrollAffordances(panel);
 
   useEffect(() => {
     const entry = stackEntry.current;
     openDrawers.push(entry);
+    notifyOpenDrawers();
     return () => {
       const index = openDrawers.indexOf(entry);
       if (index !== -1) openDrawers.splice(index, 1);
+      notifyOpenDrawers();
     };
   }, []);
 
@@ -244,6 +284,20 @@ export function Drawer({
   const backdropAnim = exiting ? "rs-overlay-backdrop-exit" : "rs-overlay-backdrop";
   const panelAnim = exiting ? "rs-overlay-panel-exit" : "rs-overlay-panel";
 
+  // Width belongs to the frame, height and scrolling to the panel: the frame is
+  // exactly the panel's box (the panel fills it), which is what the hint layer
+  // is positioned against.
+  const frameSize =
+    size === "full"
+      ? "sm:w-[min(60rem,calc(100vw-2rem))] sm:max-w-5xl"
+      : size === "wide"
+        ? "sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
+        : "max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]";
+  const panelSize =
+    size === "full"
+      ? "flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] flex-col sm:h-[min(calc(100dvh-2rem),52rem)]"
+      : "max-h-[min(78dvh,42rem)]";
+
   return createPortal(
     <div
       ref={backdrop}
@@ -251,39 +305,36 @@ export function Drawer({
       onClick={onBackdropClick}
       role="presentation"
     >
-      <section
-        aria-label={label}
-        aria-modal="true"
-        className={`${panelAnim} w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
-          size === "full"
-            ? "flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] flex-col sm:h-[min(calc(100dvh-2rem),52rem)] sm:w-[min(60rem,calc(100vw-2rem))] sm:max-w-5xl"
-            : size === "wide"
-              ? "max-h-[min(78dvh,42rem)] sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
-              : "max-h-[min(78dvh,42rem)] max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
-        }`}
-        onAnimationEnd={onPanelAnimationEnd}
-        ref={panel}
-        role="dialog"
-        tabIndex={-1}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <SectionHeader eyebrow={eyebrow} level={2}>
-            {title}
-          </SectionHeader>
-          {dismissible ? (
-            <ActionButton
-              ref={closeButton}
-              aria-label={`Close ${label.toLowerCase()}`}
-              className="shrink-0 px-3"
-              intent="secondary"
-              onClick={close}
-            >
-              Close
-            </ActionButton>
-          ) : null}
-        </div>
-        {children}
-      </section>
+      <div className={`relative w-full ${frameSize}`}>
+        <section
+          aria-label={label}
+          aria-modal="true"
+          className={`${panelAnim} w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${panelSize}`}
+          onAnimationEnd={onPanelAnimationEnd}
+          ref={panel}
+          role="dialog"
+          tabIndex={-1}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <SectionHeader eyebrow={eyebrow} level={2}>
+              {title}
+            </SectionHeader>
+            {dismissible ? (
+              <ActionButton
+                ref={closeButton}
+                aria-label={`Close ${label.toLowerCase()}`}
+                className="shrink-0 px-3"
+                intent="secondary"
+                onClick={close}
+              >
+                Close
+              </ActionButton>
+            ) : null}
+          </div>
+          {children}
+        </section>
+        <ScrollAffordanceOverlay affordances={scrollAffordances} className={panelAnim} />
+      </div>
     </div>,
     document.body,
   );

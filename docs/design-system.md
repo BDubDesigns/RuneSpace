@@ -444,6 +444,63 @@ duration). If a future overlay needs motion beyond a fade, keep it off any
 element that contains absolutely-positioned item tiles, or restructure those
 tiles first.
 
+## Scroll hints (Issue #345)
+
+A bounded panel that scrolls on its own says so with the local map's amber arrow
+(`.rs-scroll-affordance`, `docs/travel-map-design.md`): a down-pointing triangle
+at the bottom edge while content continues below, an up-pointing one at the top
+edge while content is scrolled out above, both in the middle, neither when the
+content fits. There is one arrow — the same `1.5rem × 3rem` clip, amber fill and
+border, restrained halo and gentle breathing as the map's, drawn from the
+`--rs-scroll-affordance-*` tokens — and no second chevron, image or color.
+
+- **The rule** is `getVerticalScrollAffordances` in `components/ui/scroll-affordances.ts`:
+  native `scrollTop`, `clientHeight` and `scrollHeight` with an 8px near-edge
+  tolerance, so a subpixel position never flickers an arrow and one gives way as
+  soon as the player is essentially at that edge. It measures real overflow, never
+  the possibility of scrolling. The map keeps its own one-pixel rule.
+- **The hook** is `useScrollAffordances(ref)` in `components/ui/ScrollAffordances.tsx`.
+  It re-measures on mount, native scroll, window and visual-viewport resize, a size
+  change of the scroller or any of its children (tab switches, async content,
+  collapses, a hidden ancestor becoming visible) and when children are added or
+  removed. Each scroller keeps its own measurement.
+- **Placement** keeps the arrows on the *visible* scroll viewport, not on the moving
+  content: the layer is a sibling of the scroller inside a `relative` frame the size of
+  the scroller's visible box, so it can never scroll away, add height or intercept
+  input. A scroller inside a layout (`ScrollAffordanceFrame`: the trade body above its
+  fixed footer, the desktop Current Missions list, the portrait chooser's grid) gets
+  that frame from the component. A panel that *is* the scroller wraps itself: the modal
+  `Drawer`'s frame carries the width classes and the panel fills it (the panel keeps
+  its height, scrolling, animation, focus trap and scroll lock, and the layer fades
+  with it), and a docked `UtilitySurface` sits in a flex frame beside its hint layer.
+- **Decorative only.** The layer is `aria-hidden`, holds nothing focusable and has
+  `pointer-events: none`, so native touch, wheel, trackpad and keyboard scrolling,
+  focus scrolling and inertia are untouched. It reserves no height, adds no
+  scrollbar, scrolls nothing and is not a button. `prefers-reduced-motion: reduce`
+  removes the breathing; the arrow stays visible and truthful.
+- **Where it applies:** every modal `Drawer` and docked `UtilitySurface` (Inventory,
+  Equipment, Character, Missions, Chat), the player-trade body (active and ended),
+  the capped desktop Current Missions list and the desktop portrait grid.
+- **Chat and Whispers are excluded.** Their logs auto-scroll to the latest message,
+  page in older messages and preserve a reading position by watching the same
+  scroll metrics; an arrow that appears and clears as messages land, or that implies
+  "jump to older/newer", would compete with that anchoring and with the message UI
+  itself. Chat's own Drawer or dock panel still gets the hint where *it* overflows.
+
+### Play page preview experiment
+
+`PlayPageScrollHints` (`features/play/PlayPageScrollHints.tsx`) is an
+owner-approved **preview experiment**, not a settled global-page design. On the
+phone/tablet composition's main Location screen the document itself scrolls, so
+the Activity under the location scene is not always obviously reachable. The same
+arrow is anchored to the visible viewport (fixed, above the bottom navigation with
+a space-2 gap and below the top safe area, aligned with the `<main>` column) and
+derives its direction from the actual document scroller. It does not appear on
+Map or Journey, at the docked desktop width, on public pages or while a modal
+Drawer is foregrounded (the Drawer locks the page behind it), and it is plain
+amber: mission edge cues stay a map-only behavior. It is isolated to remove:
+delete that file and its one line in `features/play/PlayScreen.tsx`.
+
 ## Mission guidance on beveled controls
 
 `ActionButton` always carries `.rs-bevel`, whose clip-path clips anything

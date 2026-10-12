@@ -78,6 +78,7 @@ export const FOCUSED_PHASES = [
   "thrust-issues",
   "oil-shale-mining",
   "fuel-manufacturing",
+  "scroll-affordances",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

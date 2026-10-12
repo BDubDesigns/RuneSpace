@@ -471,20 +471,16 @@ function LocalMapScrollAffordanceLayer({
   missionCues: LocalMapMissionEdgeCues;
 }) {
   return (
-    <div
-      aria-hidden="true"
-      className="rs-map-scroll-affordance-layer"
-      data-map-scroll-affordance-layer
-    >
+    <div aria-hidden="true" className="rs-scroll-affordance-layer" data-map-scroll-affordance-layer>
       {LOCAL_MAP_SCROLL_DIRECTIONS.map((direction) =>
         affordances[direction] ? (
           <span
             key={direction}
-            className={`rs-map-scroll-affordance rs-map-scroll-affordance--${direction}`}
+            className={`rs-scroll-affordance rs-scroll-affordance--${direction}`}
             data-map-scroll-affordance={direction}
             data-map-scroll-mission={missionCues[direction]}
           >
-            <span className="rs-map-scroll-affordance__arrow" data-map-scroll-arrow />
+            <span className="rs-scroll-affordance__arrow" data-map-scroll-arrow />
           </span>
         ) : null,
       )}
