@@ -333,7 +333,10 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   Whispers share.
 - **Retention:** each send deletes at most a bounded batch of rows older than
   90 days (`SKIP LOCKED`, so concurrent sends never contend), and reads never
-  return expired rows even before they are pruned. No scheduler is needed.
+  return expired rows even before they are pruned. The batch is chosen once in
+  a `MATERIALIZED` CTE that the `DELETE` joins (#352): a locking
+  `IN (SELECT … LIMIT … FOR UPDATE SKIP LOCKED)` can be re-run per row by a
+  nested-loop plan and delete past its limit. No scheduler is needed.
 - **Guardrail:** `server/chat-guardrail.ts` refuses a message containing a
   listed severe slur before persistence or delivery. It matches whole folded
   tokens only, keeps the list as SHA-256 digests, and records nothing about the

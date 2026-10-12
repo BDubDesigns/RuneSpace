@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, lt, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { chatRetentionCutoff } from "@/game/domain/chat";
 import type { ChatMessageView, ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
@@ -550,6 +550,254 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
         .where(inArray(rune.chatMessages.id, [...expiredIds, kept!.id]));
       expect(remaining.map((entry) => entry.id)).toEqual([kept!.id]);
     });
+  });
+
+  /**
+   * Issue #352: one prune never deletes more than its limit. The old
+   * `DELETE … WHERE id IN (SELECT … LIMIT n FOR UPDATE SKIP LOCKED)` could be
+   * planned as a nested-loop semi join that re-ran the locking subquery per
+   * candidate row; after the first delete the rescan skipped that row and
+   * returned the next, so `limit` 1 deleted several (observed once on `main`
+   * CI: `expected 2 to be 1`). These tests run the production prune under both
+   * the planner's default plan and that forced re-scan shape, on real
+   * PostgreSQL, inside the #278 retention-window lock.
+   */
+  describe("issue #352 bounded retention prune", () => {
+    // Discourage every join/aggregate strategy but a nested loop, so the
+    // locking subquery of the old statement is rescanned once per outer row.
+    const NESTED_LOOP_ONLY = [
+      "enable_hashagg",
+      "enable_hashjoin",
+      "enable_mergejoin",
+      "enable_material",
+      "enable_sort",
+    ];
+    type Plan = "default" | "nested-loop";
+    const HOUR_MS = 60 * 60_000;
+    /** An age past the 90-day cutoff by `ms`; under 2 days keeps it inside real retention. */
+    const expiredBy = (ms: number) => 90 * DAY_MS + ms;
+
+    async function pruneUnder(plan: Plan, now: Date, limit: number): Promise<number> {
+      return db.transaction(async (tx) => {
+        if (plan === "nested-loop") {
+          for (const setting of NESTED_LOOP_ONLY)
+            await tx.execute(sql`select set_config(${setting}, 'off', true)`);
+        }
+        return chat.pruneExpiredChatMessages(tx, now, limit);
+      });
+    }
+
+    /**
+     * Seeds one general-channel row per age (ms before `now`), oldest `seq`
+     * first, and returns them in `seq` order. Callers keep every row inside
+     * *real* retention (the clock below runs ahead) so no ordinary send prunes
+     * them.
+     */
+    async function seed(
+      character: { id: string; playerAccountId: string; displayName: string },
+      now: Date,
+      ages: number[],
+    ) {
+      const rows: { id: string; seq: number }[] = [];
+      for (const [index, ageMs] of ages.entries()) {
+        // Expired on the test's clock only; real-time-expired rows would be
+        // pruned by any send in a parallel file (#278).
+        expect(now.getTime() - ageMs).toBeGreaterThan(chatRetentionCutoff(Date.now()));
+        const [row] = await db
+          .insert(rune.chatMessages)
+          .values({
+            channel: "general",
+            senderPlayerAccountId: character.playerAccountId,
+            senderCharacterId: character.id,
+            senderCharacterName: character.displayName,
+            body: `retention row ${index}`,
+            createdAt: new Date(now.getTime() - ageMs),
+          })
+          .returning({ id: rune.chatMessages.id, seq: rune.chatMessages.seq });
+        rows.push(row!);
+      }
+      return rows;
+    }
+
+    /** Which of `ids` still exist. */
+    async function surviving(ids: string[]): Promise<string[]> {
+      const rows = await db
+        .select({ id: rune.chatMessages.id, seq: rune.chatMessages.seq })
+        .from(rune.chatMessages)
+        .where(inArray(rune.chatMessages.id, ids))
+        .orderBy(rune.chatMessages.seq);
+      return rows.map((row) => row.id);
+    }
+
+    /**
+     * Runs `run` with the test clock two days ahead, after clearing rows other
+     * files left expired on that clock (their afterEach cleanup runs outside the
+     * retention lock). Nothing can seed the boundary again while the lock is
+     * held, so the first rows `seq` order meets are this test's own.
+     */
+    async function withCleanBoundary(run: (now: Date) => Promise<void>) {
+      await withChatRetentionWindow(db, async () => {
+        const now = new Date(Date.now() + 2 * DAY_MS);
+        while ((await chat.pruneExpiredChatMessages(db, now)) > 0) {
+          // keep draining until nothing expired is left on this clock
+        }
+        await run(now);
+      });
+    }
+
+    it("is exercised by a statement shape that really re-scans its subquery", async () => {
+      await withCleanBoundary(async (now) => {
+        // Control for the tests below: if the planner no longer picks this
+        // shape for the pre-#352 statement, they would stop proving anything.
+        const cutoff = new Date(chatRetentionCutoff(now.getTime()));
+        const legacy = db
+          .select({ id: rune.chatMessages.id })
+          .from(rune.chatMessages)
+          .where(lt(rune.chatMessages.createdAt, cutoff))
+          .orderBy(rune.chatMessages.seq)
+          .limit(1)
+          .for("update", { skipLocked: true });
+        const plan = await db.transaction(async (tx) => {
+          for (const setting of NESTED_LOOP_ONLY)
+            await tx.execute(sql`select set_config(${setting}, 'off', true)`);
+          const result = await tx.execute<{ "QUERY PLAN": string }>(
+            sql`explain delete from ${rune.chatMessages} where ${rune.chatMessages.id} in (${legacy})`,
+          );
+          return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
+        });
+        expect(plan).toContain("Nested Loop Semi Join");
+        expect(plan).toContain("Subquery Scan");
+      });
+    });
+
+    it.each<Plan>(["default", "nested-loop"])(
+      "deletes at most the limit, oldest first, and never the boundary row (%s plan)",
+      async (plan) => {
+        await withCleanBoundary(async (now) => {
+          const { character } = await player();
+          const cutoff = chatRetentionCutoff(now.getTime());
+          // Five expired rows, then one exactly at the cutoff (strictly `>`
+          // 90 days is expired, so it is kept) and one well inside retention.
+          const [a, b, c, d, e, boundary, fresh] = await seed(character, now, [
+            expiredBy(5 * HOUR_MS),
+            expiredBy(4 * HOUR_MS),
+            expiredBy(3 * HOUR_MS),
+            expiredBy(2),
+            expiredBy(1),
+            now.getTime() - cutoff,
+            10 * DAY_MS,
+          ]);
+          const ids = [a!, b!, c!, d!, e!, boundary!, fresh!].map((row) => row.id);
+
+          expect(await pruneUnder(plan, now, 1)).toBe(1);
+          expect(await surviving(ids)).toEqual(ids.slice(1));
+          expect(await pruneUnder(plan, now, 1)).toBe(1);
+          expect(await surviving(ids)).toEqual(ids.slice(2));
+          // Other batch sizes are capped too, and a limit above the backlog
+          // removes only what is left.
+          expect(await pruneUnder(plan, now, 2)).toBe(2);
+          expect(await surviving(ids)).toEqual(ids.slice(4));
+          expect(await pruneUnder(plan, now, 500)).toBe(1);
+          // Only the boundary row and the fresh row survive, and nothing is left to do.
+          expect(await surviving(ids)).toEqual([boundary!.id, fresh!.id]);
+          expect(await pruneUnder(plan, now, 500)).toBe(0);
+          expect(await surviving(ids)).toEqual([boundary!.id, fresh!.id]);
+        });
+      },
+    );
+
+    it.each<Plan>(["default", "nested-loop"])(
+      "skips rows another transaction holds and deletes the next oldest (%s plan)",
+      async (plan) => {
+        await withCleanBoundary(async (now) => {
+          const { character } = await player();
+          const [a, b, c] = await seed(character, now, [
+            expiredBy(3 * HOUR_MS),
+            expiredBy(2 * HOUR_MS),
+            expiredBy(HOUR_MS),
+          ]);
+          const ids = [a!, b!, c!].map((row) => row.id);
+
+          let release!: () => void;
+          const released = new Promise<void>((resolve) => (release = resolve));
+          let locked!: () => void;
+          const holding = new Promise<void>((resolve) => (locked = resolve));
+          // A concurrent transaction holds the oldest row's lock, as an
+          // in-flight prune or delete would.
+          const holder = db.transaction(async (tx) => {
+            await tx.execute(
+              sql`select id from ${rune.chatMessages} where id = ${a!.id} for update`,
+            );
+            locked();
+            await released;
+          });
+          await holding;
+          try {
+            // Not blocked by the held row, and not replaced by a second one.
+            expect(await pruneUnder(plan, now, 1)).toBe(1);
+            expect(await surviving(ids)).toEqual([a!.id, c!.id]);
+            // Every remaining eligible row is now locked by someone else: 0, no wait.
+            await db.transaction(async (tx) => {
+              await tx.execute(
+                sql`select id from ${rune.chatMessages} where id = ${c!.id} for update`,
+              );
+              // The prune runs on its own connection, so it sees this lock as held.
+              expect(await pruneUnder(plan, now, 5)).toBe(0);
+            });
+          } finally {
+            release();
+            await holder;
+          }
+          // Once released, the skipped row is eligible again and still oldest.
+          expect(await pruneUnder(plan, now, 1)).toBe(1);
+          expect(await surviving(ids)).toEqual([c!.id]);
+          expect(await pruneUnder(plan, now, 1)).toBe(1);
+          expect(await surviving(ids)).toEqual([]);
+        });
+      },
+    );
+
+    it.each<Plan>(["default", "nested-loop"])(
+      "lets two concurrent prunes take disjoint batches without waiting or double-deleting (%s plan)",
+      async (plan) => {
+        await withCleanBoundary(async (now) => {
+          const { character } = await player();
+          const rows = await seed(character, now, [
+            expiredBy(6 * HOUR_MS),
+            expiredBy(5 * HOUR_MS),
+            expiredBy(4 * HOUR_MS),
+            expiredBy(3 * HOUR_MS),
+            expiredBy(2 * HOUR_MS),
+            expiredBy(HOUR_MS),
+          ]);
+          const ids = rows.map((row) => row.id);
+
+          let release!: () => void;
+          const released = new Promise<void>((resolve) => (release = resolve));
+          // First caller prunes and stays open, so its three deleted rows stay
+          // locked while the second caller runs: SKIP LOCKED means the second
+          // takes the next three instead of waiting on, or re-deleting, them.
+          let firstDeleted!: (count: number) => void;
+          const firstResult = new Promise<number>((resolve) => (firstDeleted = resolve));
+          const first = db.transaction(async (tx) => {
+            for (const setting of plan === "nested-loop" ? NESTED_LOOP_ONLY : [])
+              await tx.execute(sql`select set_config(${setting}, 'off', true)`);
+            firstDeleted(await chat.pruneExpiredChatMessages(tx, now, 3));
+            await released;
+          });
+          let second: number;
+          try {
+            expect(await firstResult).toBe(3);
+            second = await pruneUnder(plan, now, 3);
+          } finally {
+            release();
+            await first;
+          }
+          expect(second).toBe(3);
+          expect(await surviving(ids)).toEqual([]);
+        });
+      },
+    );
   });
 
   it("serves the history route with the viewer's budget and ad status", async () => {
