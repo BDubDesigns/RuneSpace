@@ -167,6 +167,8 @@ suite("issue #274 recipe-unlock System notices (real PostgreSQL)", () => {
         ACTION_IDS.ferriteShaleSlagRefining,
         ACTION_IDS.galvaniteSlagRefining,
         ACTION_IDS.galvaferriteRefining,
+        // Refining 8 also opens the fuel recipe (#343).
+        ACTION_IDS.fullSmallFuelCanisterRefining,
       ],
     });
   });

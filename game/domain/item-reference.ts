@@ -22,6 +22,7 @@ import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { REPAIR_TARGETS, type RepairTargetDefinition } from "@/game/content/repair-targets";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
 import { isItemTransferable } from "@/game/domain/player-trade";
+import { partitionFailureAwards } from "@/game/domain/refining";
 import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import type { FixedClaimSource } from "@/game/domain/item-sources";
@@ -89,9 +90,19 @@ export type ItemReferenceRecipe =
       outputQuantity: number;
       /** Always succeeds: the recipe rolls nothing and has no failure. */
       deterministic: boolean;
-      /** What an unsuccessful attempt hands back, for a recipe that can fail. */
+      /**
+       * What an unsuccessful attempt hands back, for a recipe that can fail.
+       * `outputs` is what a failure MAKES (Slag); `returned` is the part of its
+       * fixed outputs that is one of the recipe's own inputs coming back (#343),
+       * omitted when there is none. Whether an award is made or returned is
+       * derived from the recipe's inputs, never from an item ID.
+       */
       failure?:
-        | { kind: "fixed_outputs"; outputs: readonly ItemReferenceInput[] }
+        | {
+            kind: "fixed_outputs";
+            outputs: readonly ItemReferenceInput[];
+            returned?: readonly ItemReferenceInput[];
+          }
         | { kind: "one_input_returned" };
     };
 
@@ -329,7 +340,16 @@ export function publicRecipes(registries: ItemReferenceRegistries): readonly Ite
           ? {
               failure: {
                 kind: "fixed_outputs" as const,
-                outputs: inputsOf(recipe.failure.outputs),
+                ...(() => {
+                  const { returned, produced } = partitionFailureAwards<ItemReferenceInput>(
+                    recipe.inputs.map((input) => input.itemId),
+                    recipe.failure.outputs,
+                  );
+                  return {
+                    outputs: inputsOf(produced),
+                    ...(returned.length > 0 ? { returned: inputsOf(returned) } : {}),
+                  };
+                })(),
               },
             }
           : recipe.failure.kind === "one_input_returned"

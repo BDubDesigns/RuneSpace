@@ -252,6 +252,44 @@ const balanceSchema = z.object({
         outputQuantity: z.literal(2),
         failure: z.object({ kind: z.literal("none") }),
       }),
+      /**
+       * Fuel manufacturing (#343): 10 Oil Shale + 1 Empty Small Fuel Canister ->
+       * 1 Full Small Fuel Canister at Refining 8, on the Galvanic Stock /
+       * Galvaferrite curve (35% at Refining 1, guaranteed at 30; 50.68% at 8 —
+       * the level-8 unlock does not reset the interpolation).
+       *
+       * A failure is an ordinary `fixed_outputs` branch whose outputs are two
+       * RETURNED inputs, never Slag: exactly 5 of the 10 Oil Shale and the
+       * Empty Small Fuel Canister come back, and the other 5 shale are lost.
+       * Neither returned item is a byproduct, so Auto-discard Slag can never
+       * discard them and their room gates the attempt like a success output.
+       */
+      smallFuelCanister: z.object({
+        actionId: z.literal(ACTION_IDS.fullSmallFuelCanisterRefining),
+        outputItemId: z.literal(ITEM_IDS.fullSmallFuelCanister),
+        minimumLevel: z.literal(8),
+        attemptDurationTicks: z.literal(60),
+        successAtLevelOneBps: z.literal(3_500),
+        guaranteedSuccessLevel: z.literal(30),
+        successRangeBps: z.literal(6_500),
+        successXp: z.literal(100),
+        failureXp: z.literal(20),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.oilShale), quantity: z.literal(10) }),
+          z.object({ itemId: z.literal(ITEM_IDS.emptySmallFuelCanister), quantity: z.literal(1) }),
+        ]),
+        outputQuantity: z.literal(1),
+        failure: z.object({
+          kind: z.literal("fixed_outputs"),
+          outputs: z.tuple([
+            z.object({ itemId: z.literal(ITEM_IDS.oilShale), quantity: z.literal(5) }),
+            z.object({
+              itemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
+              quantity: z.literal(1),
+            }),
+          ]),
+        }),
+      }),
     }),
   }),
   /**
@@ -632,6 +670,24 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
         ]),
       }),
+      /**
+       * Fuel packaging (#343): 1 Galvanic Stock -> 1 Empty Small Fuel Canister at
+       * Fabrication 8. The station supplies the valve and fittings, so nothing
+       * else is an input, and one Stock is one canister, not two. Its 30 ticks
+       * and 75 base XP deliberately match the Power Cell recipe. It is a direct
+       * packaging recipe and not a Tinkering target.
+       */
+      emptySmallFuelCanister: z.object({
+        actionId: z.literal(ACTION_IDS.emptySmallFuelCanisterFabrication),
+        outputItemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(8),
+        durationTicks: z.literal(30),
+        baseXp: z.literal(75),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+        ]),
+      }),
     }),
     /**
      * Manual Override (#232): the optional per-workpiece push-your-luck layer.
@@ -966,6 +1022,27 @@ const balanceSchema = z.object({
       stackLimit: z.literal(1),
       secondaryFindMiningXp: z.literal(150),
     }),
+    /**
+     * Fuel manufacturing (#343). The empty shell is exactly the 800 g Galvanic
+     * Stock it is fabricated from and stacks five deep. The full canister is
+     * 6,000 g — its shell plus 5.2 kg of fuel — and stacks two deep, so a pair
+     * is a real carrying decision. The 800 g that 10 Oil Shale (6,000 g) plus
+     * the shell (800 g) lose on success is process waste, not an inventory item.
+     *
+     * `fuelUnits` is the content the full canister carries for a later
+     * refueling slice; nothing consumes it yet.
+     */
+    emptySmallFuelCanister: z.object({
+      itemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
+      massGrams: z.literal(800),
+      stackLimit: z.literal(5),
+    }),
+    fullSmallFuelCanister: z.object({
+      itemId: z.literal(ITEM_IDS.fullSmallFuelCanister),
+      massGrams: z.literal(6_000),
+      stackLimit: z.literal(2),
+      fuelUnits: z.literal(50),
+    }),
   }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
@@ -1132,6 +1209,29 @@ const defaults = balanceSchema.parse({
         inputs: [{ itemId: ITEM_IDS.galvanite, quantity: 2 }],
         outputQuantity: 2,
         failure: { kind: "none" },
+      },
+      smallFuelCanister: {
+        actionId: ACTION_IDS.fullSmallFuelCanisterRefining,
+        outputItemId: ITEM_IDS.fullSmallFuelCanister,
+        minimumLevel: 8,
+        attemptDurationTicks: 60,
+        successAtLevelOneBps: 3_500,
+        guaranteedSuccessLevel: 30,
+        successRangeBps: 6_500,
+        successXp: 100,
+        failureXp: 20,
+        inputs: [
+          { itemId: ITEM_IDS.oilShale, quantity: 10 },
+          { itemId: ITEM_IDS.emptySmallFuelCanister, quantity: 1 },
+        ],
+        outputQuantity: 1,
+        failure: {
+          kind: "fixed_outputs",
+          outputs: [
+            { itemId: ITEM_IDS.oilShale, quantity: 5 },
+            { itemId: ITEM_IDS.emptySmallFuelCanister, quantity: 1 },
+          ],
+        },
       },
     },
   },
@@ -1375,6 +1475,15 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
         ],
       },
+      emptySmallFuelCanister: {
+        actionId: ACTION_IDS.emptySmallFuelCanisterFabrication,
+        outputItemId: ITEM_IDS.emptySmallFuelCanister,
+        outputQuantity: 1,
+        minimumLevel: 8,
+        durationTicks: 30,
+        baseXp: 75,
+        inputs: [{ itemId: ITEM_IDS.galvanicStock, quantity: 1 }],
+      },
     },
     manualOverride: {
       loadMinimum: 1,
@@ -1532,6 +1641,17 @@ const defaults = balanceSchema.parse({
       massGrams: 12_000,
       stackLimit: 1,
       secondaryFindMiningXp: 150,
+    },
+    emptySmallFuelCanister: {
+      itemId: ITEM_IDS.emptySmallFuelCanister,
+      massGrams: 800,
+      stackLimit: 5,
+    },
+    fullSmallFuelCanister: {
+      itemId: ITEM_IDS.fullSmallFuelCanister,
+      massGrams: 6_000,
+      stackLimit: 2,
+      fuelUnits: 50,
     },
   },
   carrying: {

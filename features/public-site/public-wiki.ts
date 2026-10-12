@@ -235,9 +235,9 @@ const authoredWikiArticles = [
         heading: "Refining at the Abandoned Processing Yard",
         paragraphs: [
           "Refining is only available at the Abandoned Processing Yard. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
-          "A failed attempt says so: any Slag it makes, or any input a failed Galvaferrite pour hands back, is shown as what the failure left, not as something you refined.",
+          "A failed attempt says so: any Slag it makes, or any input a failed Galvaferrite pour or fuel attempt hands back, is shown as what the failure left, not as something you refined.",
           "The Slag a failed Refined Ferrite or Galvanic Stock attempt makes is a bonus, never a requirement. You do not need room for it to start or keep refining; the attempt still finishes, spends its ore and pays its Refining XP. Slag is kept for as long as you have room, and whatever will not fit is thrown out. Turn Auto-discard Slag on and every bit of it is thrown out instead. It is the same setting as the Practice Welding bench's, so changing it in one place changes it in the other, and it stays until you change it. The result and history say when Slag was discarded, so it is never counted as something you are carrying.",
-          "Auto-discard Slag only covers Slag from a failure. A pour that makes Slag on purpose still puts it in your Inventory and needs room for it, and a failed Galvaferrite pour always gives back the input it returns. The product you are actually refining still needs room too, and Slag you keep can use up that room.",
+          "Auto-discard Slag only covers Slag from a failure. A pour that makes Slag on purpose still puts it in your Inventory and needs room for it, and a failed Galvaferrite pour or fuel attempt always gives back what it returns. The product you are actually refining still needs room too, and Slag you keep can use up that room.",
         ],
         list: [
           "Refined Ferrite — two Ferrite Shale, a little over four seconds. A failure still produces one Slag, which isn't wasted: the Cargo Hold repair needs both.",
@@ -245,6 +245,20 @@ const authoredWikiArticles = [
           "Galvaferrite — one Refined Ferrite and one Galvanic Stock, about seven seconds. Needs Refining 8. A failed alloy hands back one of the two inputs and loses the other.",
           "Slag from Ferrite Shale — two Ferrite Shale into one Slag, a little under four seconds. Needs Refining 5. It never fails, and it pays the same small Refining XP a failed Refined Ferrite attempt does.",
           "Slag from Galvanite — two Galvanite into two Slag, a little under five seconds. Needs Refining 5. It never fails, and it pays what a failed Galvanic Stock pour does.",
+          "Full Small Fuel Canister — ten Oil Shale and one Empty Small Fuel Canister, 36 seconds. Needs Refining 8. See Fuel canisters, below.",
+        ],
+      },
+      {
+        heading: "Fuel canisters",
+        paragraphs: [
+          [
+            "The Abandoned Processing Yard can turn Oil Shale into fuel, but only into a canister. An Empty Small Fuel Canister is made from one Galvanic Stock at the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            " (Fabrication 8). Refining then takes ten Oil Shale and one Empty canister for 36 seconds. It needs Refining 8, and owning the ingredients does not get around that.",
+          ],
+          "The chance of success follows the same climb as Galvanic Stock and Galvaferrite: 35% at Refining 1, rising to certain at Refining 30. Reaching Refining 8 does not reset it, so at Refining 8 it is 50.68%. The attempt takes the full 36 seconds whether it succeeds or not.",
+          "A success gives one Full Small Fuel Canister, holding 50 Fuel Units, and 100 Refining experience. A failure is not total: it pays 20 Refining experience and gives back five of the ten Oil Shale and the same Empty canister, so you can try again without making another. The other five Oil Shale are lost. A failed fuel attempt never makes Slag, and Auto-discard Slag never touches what comes back.",
+          "A Full canister weighs 6kg and stacks two to a slot; an Empty one weighs 800g and stacks five. Both are ordinary items: you can carry, stash and trade them, and they work the same for someone who never refined or fabricated anything. Nothing in the game uses Fuel Units yet, and no one buys canisters yet.",
         ],
       },
       {
@@ -263,7 +277,7 @@ const authoredWikiArticles = [
           "Refining needs its inputs on hand; stock up before heading to the Processing Yard.",
           "Galvanite is heavy — 400g a piece against shale's 100g — so a full trip out of Deep Jag is a much shorter one.",
           "Leave a spare slot while you mine, so a rare find always has somewhere to go — or turn on Prioritize primary resources if you would rather keep mining and accept losing a find that has no room.",
-          "Oil Shale is 600g a piece, and a Motherlode Slab is 12kg: check your carrying weight before a long run at The South Cut.",
+          "Oil Shale is 600g a piece, and a Motherlode Slab is 12kg: check your carrying weight before a long run at The South Cut. A fuel attempt takes ten Oil Shale, and a Full canister is 6kg.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
         ],
       },
@@ -919,6 +933,11 @@ const authoredWikiArticles = [
             "Freight Harness (Fabrication 8) — 4 Galvaferrite and 2 Mounting Brackets. 36 seconds, 270 Fabrication XP. An advanced container that adds six ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
             " slots in either container attachment, at a hefty 9 kg.",
+          ],
+          [
+            "Empty Small Fuel Canister (Fabrication 8) — 1 Galvanic Stock. 18 seconds, 75 Fabrication XP. One Stock makes one canister, never two. It weighs 800g and stacks five to a slot, and it is the shell the Processing Yard's Refining fills with fuel (see ",
+            { text: "Fuel canisters", articleSlug: "mining-and-refining" },
+            "). It cannot be taken apart again in Tinkering.",
           ],
         ],
       },

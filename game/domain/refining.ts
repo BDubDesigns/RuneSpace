@@ -113,6 +113,26 @@ export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: Refini
 }
 
 /**
+ * Split a failure's awards into what it handed BACK and what it MADE (#343).
+ *
+ * An award is returned when its item is one of the inputs the attempt took;
+ * anything else was produced. This is the one home of that rule: the attempt
+ * copy applies it to the attempt's own consumed inputs, the public item
+ * reference to the recipe's authored inputs. It never looks at an item ID, so a
+ * future failure shape that does both at once reads correctly.
+ */
+export function partitionFailureAwards<Award extends { itemId: string }>(
+  inputItemIds: Iterable<string>,
+  awards: readonly Award[],
+): { returned: Award[]; produced: Award[] } {
+  const inputs = new Set(inputItemIds);
+  return {
+    returned: awards.filter((award) => inputs.has(award.itemId)),
+    produced: awards.filter((award) => !inputs.has(award.itemId)),
+  };
+}
+
+/**
  * The success chance for one recipe at one Refining level, on the shared
  * whole-basis-point interpolation model. A deterministic recipe always
  * succeeds; it authors no curve at all.

@@ -350,8 +350,9 @@ test("Fabrication 5 and 8: recipes by level, the x2 Cell batch, and advanced Tin
   await station.locator('[data-station-mode-select="recipes"]').click();
   await expect(
     station.locator("[data-fabrication-recipes-catalog]").locator("[data-recipes-catalog-entry]"),
-  ).toHaveCount(11);
-  // Fabrication 8 adds the Drive Mount (#330) to the Freight Harness.
+  ).toHaveCount(12);
+  // Fabrication 8 adds the Drive Mount (#330) to the Freight Harness, and the
+  // Empty Small Fuel Canister (#343).
   // The Recipes view is what is on screen now.
   await expectArtwork(
     station

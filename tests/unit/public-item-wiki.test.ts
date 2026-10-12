@@ -98,7 +98,15 @@ describe("Wiki item catalog", () => {
         "Uncut Topaz",
       ],
       ["Galvaferrite", "Galvanic Stock", "Refined Ferrite", "Scrap Metal", "Slag"],
-      ["Drive Mount", "Galvanic Wire Spool", "Mounting Bracket", "Power Cell", "Wheel Assembly"],
+      [
+        "Drive Mount",
+        "Empty Small Fuel Canister",
+        "Full Small Fuel Canister",
+        "Galvanic Wire Spool",
+        "Mounting Bracket",
+        "Power Cell",
+        "Wheel Assembly",
+      ],
       ["Freight Harness", "Loadsteel Cutter", "MYKEA SCHLEPPRAUM-8", "Salvage Cutter", "Scrap Box"],
     ]);
   });

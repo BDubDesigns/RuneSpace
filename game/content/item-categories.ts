@@ -64,6 +64,8 @@ const itemCategoryByItemId = {
   [ITEM_IDS.wheelAssembly]: "components-and-supplies",
   [ITEM_IDS.driveMount]: "components-and-supplies",
   [ITEM_IDS.powerCell]: "components-and-supplies",
+  [ITEM_IDS.emptySmallFuelCanister]: "components-and-supplies",
+  [ITEM_IDS.fullSmallFuelCanister]: "components-and-supplies",
   [ITEM_IDS.salvageCutter]: "tools-and-containers",
   [ITEM_IDS.loadsteelCutter]: "tools-and-containers",
   [ITEM_IDS.scrapBox]: "tools-and-containers",
