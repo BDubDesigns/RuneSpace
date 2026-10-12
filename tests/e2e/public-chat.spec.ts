@@ -492,6 +492,11 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     const general = log(dialog, "General");
     const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
     const olderButton = dialog.getByRole("button", { name: "Load older messages" });
+    // History is still loading when Chat first opens, and `count()` does not
+    // wait: wait for either the line or the way to older pages before reading
+    // it. Both are on screen when the line is on page 1 and older history
+    // exists, so the union takes `.first()`.
+    await expect(line.or(olderButton).first()).toBeVisible();
     // General is game-wide, so concurrent rows may push this announcement
     // beyond page 1 before Chat opens. If it is not on the latest page, find it
     // with the ordinary cursor-based Load older messages flow.
