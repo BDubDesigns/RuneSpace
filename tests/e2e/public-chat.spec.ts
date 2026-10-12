@@ -545,8 +545,10 @@ test("an ULTRA RARE FIND System line is the same senderless line with its own la
     const line = general.locator('[data-chat-system="ultra_rare_find"]', { hasText: tag });
     const olderButton = dialog.getByRole("button", { name: "Load older messages" });
     // History is still loading when Chat first opens: wait for either the line
-    // or the way to older pages before deciding which one to do.
-    await expect(line.or(olderButton)).toBeVisible();
+    // or the way to older pages before deciding which one to do. Both are on
+    // screen when the line is on page 1 and older history exists, so the union
+    // takes `.first()`; a strict `toBeVisible()` rejects a two-element match.
+    await expect(line.or(olderButton).first()).toBeVisible();
     while ((await line.count()) === 0) {
       await expect(olderButton).toBeVisible();
       const loaded = page.waitForResponse(
