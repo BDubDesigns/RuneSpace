@@ -473,6 +473,35 @@ eachWidth(
   historyJourney,
 );
 
+/**
+ * Brings a tagged General line into the DOM. General is game-wide, so concurrent
+ * rows may push a just-inserted System announcement beyond page 1 before Chat
+ * opens; if it is not on the latest page, it is found with the ordinary
+ * cursor-based Load older messages flow.
+ *
+ * `count()` never waits, so it is only read after a wait that cannot be stale.
+ * History is still loading when Chat first opens, and the older button is
+ * disabled while a page loads and re-enabled in the same commit that renders
+ * it. So the wait is for the line or an *enabled* button: the line can be on
+ * page 1 beside the button (two matches, hence `.first()`), and a count read
+ * mid-load would otherwise send the loop to click a button the final page
+ * removes.
+ */
+async function revealGeneralLine(page: Page, dialog: Locator, line: Locator) {
+  const olderReady = dialog.getByRole("button", { name: "Load older messages", disabled: false });
+  await expect(line.or(olderReady).first()).toBeVisible();
+  while ((await line.count()) === 0) {
+    const loaded = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/chat" &&
+        new URL(response.url()).searchParams.has("before"),
+    );
+    await olderReady.click();
+    await loaded;
+    await expect(line.or(olderReady).first()).toBeVisible();
+  }
+}
+
 test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free of player actions", async ({
   page,
   context,
@@ -491,25 +520,7 @@ test("a RARE FIND System line is RuneSpace's own: marked, senderless, and free o
     const dialog = await openChat(page, player.character.id);
     const general = log(dialog, "General");
     const line = general.locator('[data-chat-system="rare_find"]', { hasText: tag });
-    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
-    // History is still loading when Chat first opens, and `count()` does not
-    // wait: wait for either the line or the way to older pages before reading
-    // it. Both are on screen when the line is on page 1 and older history
-    // exists, so the union takes `.first()`.
-    await expect(line.or(olderButton).first()).toBeVisible();
-    // General is game-wide, so concurrent rows may push this announcement
-    // beyond page 1 before Chat opens. If it is not on the latest page, find it
-    // with the ordinary cursor-based Load older messages flow.
-    while ((await line.count()) === 0) {
-      await expect(olderButton).toBeVisible();
-      const loaded = page.waitForResponse(
-        (response) =>
-          new URL(response.url()).pathname === "/api/chat" &&
-          new URL(response.url()).searchParams.has("before"),
-      );
-      await olderButton.click();
-      await loaded;
-    }
+    await revealGeneralLine(page, dialog, line);
     await expect(line).toBeVisible();
     await expect(line).toContainText("System");
     await expect(line).toContainText("RARE FIND");
@@ -548,22 +559,7 @@ test("an ULTRA RARE FIND System line is the same senderless line with its own la
     const dialog = await openChat(page, player.character.id);
     const general = log(dialog, "General");
     const line = general.locator('[data-chat-system="ultra_rare_find"]', { hasText: tag });
-    const olderButton = dialog.getByRole("button", { name: "Load older messages" });
-    // History is still loading when Chat first opens: wait for either the line
-    // or the way to older pages before deciding which one to do. Both are on
-    // screen when the line is on page 1 and older history exists, so the union
-    // takes `.first()`; a strict `toBeVisible()` rejects a two-element match.
-    await expect(line.or(olderButton).first()).toBeVisible();
-    while ((await line.count()) === 0) {
-      await expect(olderButton).toBeVisible();
-      const loaded = page.waitForResponse(
-        (response) =>
-          new URL(response.url()).pathname === "/api/chat" &&
-          new URL(response.url()).searchParams.has("before"),
-      );
-      await olderButton.click();
-      await loaded;
-    }
+    await revealGeneralLine(page, dialog, line);
     await expect(line).toBeVisible();
     await expect(line).toContainText("System");
     await expect(line).toContainText("ULTRA RARE FIND");
