@@ -86,7 +86,8 @@ small number of critical mobile player journeys.
   character-owned site stashes (`site-stash`, #284), and Curly's paid HH B&B
   commission (`curly-must-stash`, #292), and Wade's landing-gear job
   (`wheel-be-right-back`, #322), Wade's propulsion job and the restored
-  ship (`thrust-issues`, #330), and Mission pinning with the Mission Log
+  ship (`thrust-issues`, #330), the Crash Site's layered scene geometry at phone,
+  intermediate and desktop widths and in dialogue (`crash-site-scene`, #351), and Mission pinning with the Mission Log
   (`mission-pinning`, #325), the dialogue-stepping helper's own harness
   (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
   setting and Ultra Rare shimmer (`oil-shale-mining`, #342), and fuel manufacturing's

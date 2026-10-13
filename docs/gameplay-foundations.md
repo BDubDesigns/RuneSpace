@@ -613,18 +613,19 @@ exactly one more registry entry and one more panel at the Crash Site.
 
 ### The Crash Site's two scenes (issue #330)
 
-The Crash Site shows the approved **Rivet Utility Shuttle** in two matched 1536 ×
-384 scenes: `public/location-scenes/crash-site-crashed.webp` (the heavily damaged
-wreck, which replaced the legacy Crash Site art) and
-`crash-site-repaired.webp`, with the unaltered masters retained under
-`assets/location-scenes/`. The crashed scene is the location's base scene and
-the whole of the ship's presentation through the Cargo Hold and Landing Gear
-repairs — there are no intermediate ship-art states. The repaired scene is the
-single state variant above, so a character who finishes the Propulsion System
-sees it the moment the last Welding section lands and another character at the
-same site still sees their own wreck. Crash Site conversation backdrops follow
-the same repair (`crashSiteExterior` resolves to `crashSiteExteriorRepaired`),
-through the existing `repaired` background rule.
+The Crash Site shows the approved **Rivet Utility Shuttle** as one empty
+environmental background (`crash-site-empty.webp`) with a state-selected
+transparent ship overlay (#351; `docs/location-scenes.md`, "Layered scenes"). The
+crashed overlay (`rivet-crashed.webp`, with its local wreckage) is the location's
+base scene and the whole of the ship's presentation through the Cargo Hold and
+Landing Gear repairs — there are no intermediate ship-art states. The repaired
+overlay (`rivet-repaired.webp`) is the single state variant above, so a character
+who finishes the Propulsion System sees it the moment the last Welding section
+lands and another character at the same site still sees their own wreck. Crash
+Site conversation backdrops follow the same repair (`crashSiteExterior` resolves
+to `crashSiteExteriorRepaired`), through the existing `repaired` background rule,
+and compose the same layers. The original 1536 × 384 baked panoramas (#330) are
+retained for the published Update hero.
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and

@@ -13,7 +13,43 @@ export const LocationDormantActivitySchema = z.object({
   status: z.string(),
 });
 
-/** The committed 4:1 artwork one presentation shows. */
+const ScenePercent = z.number().min(0).max(100);
+
+/**
+ * A transparent layer composed over a scene's opaque background (#351).
+ *
+ * Placement is authored in the **background's own source space** — percent of its
+ * canvas — never in pixels or per breakpoint. The renderer lays the background and
+ * every overlay out on one shared stage that takes a single cover/crop transform, so
+ * an overlay cannot drift from the spot it was placed on at any viewport. Only
+ * `width` is authored: the overlay's height follows its own intrinsic aspect ratio,
+ * so a ship is never stretched.
+ *
+ * The overlay is decorative. The scene's own `alt` describes the whole composition,
+ * so a screen reader hears one description of the place, not the background and then
+ * a second image.
+ */
+export const SceneOverlaySchema = z
+  .object({
+    asset: z.string().regex(/^\/location-scenes\/.+\.(webp|png)$/),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    placement: z
+      .object({
+        left: ScenePercent,
+        top: ScenePercent,
+        width: z.number().positive().max(100),
+      })
+      .strict(),
+  })
+  .strict();
+
+/**
+ * The committed 4:1 artwork one presentation shows.
+ *
+ * `overlay`, when authored, is one transparent layer composed over `asset` (#351).
+ * Omitting it is a first-class state — the bare background — not a missing asset.
+ */
 export const LocationSceneSchema = z
   .object({
     asset: z.string().regex(/^\/location-scenes\/.+\.(webp|png)$/),
@@ -27,6 +63,7 @@ export const LocationSceneSchema = z
       })
       .strict()
       .optional(),
+    overlay: SceneOverlaySchema.optional(),
   })
   .strict();
 

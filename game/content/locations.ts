@@ -45,6 +45,40 @@ import {
  */
 export const CRASH_SITE_SHIP_RESTORED_VARIANT_ID = "crash_site_ship_restored";
 
+/**
+ * The Crash Site is one approved empty environment plus a state-selected
+ * transparent Rivet overlay (#351). The background and its framing are authored
+ * once; each ship state adds only its own layer, so the ground, camera and chrome
+ * never change between states and nothing flashes or goes blank.
+ *
+ * Placement is percent of the 2508x627 background canvas (the delivered 1536x384
+ * file is the same canvas), measured from the owner's composite preview and tuned
+ * by visual QA at 390px, the 890x252 desktop viewport and an intermediate width.
+ * Both ships share a landing mark: same left edge and the same ground contact
+ * line, so crashed -> repaired changes only the ship. `scripts/prepare-crash-site-art.mjs`
+ * derives these from the one reference box on each untrimmed master.
+ */
+const CRASH_SITE_BACKGROUND = {
+  asset: "/location-scenes/crash-site-empty.webp" as const,
+  width: 1536,
+  height: 384,
+  focal: { x: 50, y: 50 } as const,
+};
+
+const CRASHED_RIVET_OVERLAY = {
+  asset: "/location-scenes/rivet-crashed.webp" as const,
+  width: 1249,
+  height: 584,
+  placement: { left: 34.134, top: 33.115, width: 31.866 },
+};
+
+const REPAIRED_RIVET_OVERLAY = {
+  asset: "/location-scenes/rivet-repaired.webp" as const,
+  width: 1307,
+  height: 612,
+  placement: { left: 34.289, top: 28.103, width: 31.423 },
+};
+
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
@@ -79,13 +113,9 @@ const locationDefinitions = [
         description:
           "Your ship stands repaired on its landing gear in the mud and scrap, its propulsion restored.",
         scene: {
-          // The approved matched pair to the crashed scene: same camera, framing
-          // and lighting, delivered at its native 1536x384 4:1 resolution.
-          asset: "/location-scenes/crash-site-repaired.webp" as const,
-          width: 1536,
-          height: 384,
+          ...CRASH_SITE_BACKGROUND,
           alt: "The repaired Rivet Utility Shuttle standing on its landing gear on wet ground, hull panels patched and whole, a mesa and a spired outpost behind it",
-          focal: { x: 50, y: 50 } as const,
+          overlay: REPAIRED_RIVET_OVERLAY,
         },
       },
     ],
@@ -95,13 +125,9 @@ const locationDefinitions = [
       layout: "crash_site" as const,
       localMap: { axial: { q: 0, r: 1 }, label: "Crash Site" },
       scene: {
-        // The approved heavily damaged Rivet Utility Shuttle (#330), replacing the
-        // legacy wreck; delivered at its native 1536x384 4:1 resolution.
-        asset: "/location-scenes/crash-site-crashed.webp" as const,
-        width: 1536,
-        height: 384,
+        ...CRASH_SITE_BACKGROUND,
         alt: "The crashed Rivet Utility Shuttle slumped in the mud, hull panels torn open to its drive, a mesa and a spired outpost behind it",
-        focal: { x: 50, y: 50 } as const,
+        overlay: CRASHED_RIVET_OVERLAY,
       },
     },
   },

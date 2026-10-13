@@ -30,8 +30,12 @@ describe("location scene registry (issue #78)", () => {
   });
 
   it("authoritative current location selects the correct scene (no filename guessing)", () => {
+    // The Crash Site is one empty background plus a state-selected ship overlay (#351).
     expect(getLocation(LOCATION_IDS.crashSite)?.presentation.scene.asset).toBe(
-      "/location-scenes/crash-site-crashed.webp",
+      "/location-scenes/crash-site-empty.webp",
+    );
+    expect(getLocation(LOCATION_IDS.crashSite)?.presentation.scene.overlay?.asset).toBe(
+      "/location-scenes/rivet-crashed.webp",
     );
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.presentation.scene.asset).toBe(
       "/location-scenes/processing-yard.webp",
@@ -50,7 +54,7 @@ describe("location scene registry (issue #78)", () => {
     const destination = LOCATION_IDS.abandonedProcessingYard;
     // Correct: scene for origin is shown (truthful while traveling)
     expect(resolveLocationScene(getLocation, origin)?.asset).toBe(
-      "/location-scenes/crash-site-crashed.webp",
+      "/location-scenes/crash-site-empty.webp",
     );
     // The helper does not conflate destination with current during transit;
     // callers must pass currentLocationId, never destination.
@@ -123,8 +127,23 @@ describe("location scene registry (issue #78)", () => {
     const header = readFileSync("features/location-scene/LocationSceneHeader.tsx", "utf8");
     expect(header).toMatch(/\n\s+priority\n/);
     expect(header).not.toContain("priority={false}");
-    // Exactly one scene image exists in the header, so exactly one preload is added.
-    expect(header.match(/<Image\b/g) ?? []).toHaveLength(1);
+    // The header composes its scene through SceneComposition (#351) and asks for the
+    // priority preload; it renders no image of its own.
+    expect(header).toContain("<SceneComposition");
+    expect(header).not.toMatch(/<Image\b/);
+    expect(header).toMatch(/\n\s+priority\n/);
+
+    // Exactly one image in the composition is preloaded: the background. The overlay
+    // is eager but never `priority`, so no second preload competes for LCP.
+    const composition = readFileSync("features/location-scene/SceneComposition.tsx", "utf8");
+    const images = composition.match(/<Image\b[\s\S]*?\/>/g) ?? [];
+    expect(images).toHaveLength(2);
+    const [background, overlay] = images;
+    expect(background).toContain("priority={priority}");
+    expect(background).toContain('data-scene-layer="background"');
+    expect(overlay).toContain('data-scene-layer="overlay"');
+    expect(overlay).toContain('loading="eager"');
+    expect(overlay).not.toMatch(/\bpriority\b\s*(=|\n|\/>)/);
 
     // The Local Place directory renders several below-the-fold thumbnails; they
     // must not become eager downloads competing with the hero.

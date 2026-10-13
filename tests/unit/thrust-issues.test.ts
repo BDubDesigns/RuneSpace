@@ -354,7 +354,8 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
 
   it("is the approved crashed Rivet until Propulsion completes, whatever else is done", () => {
     const base = crashSite.presentation.scene;
-    expect(base.asset).toBe("/location-scenes/crash-site-crashed.webp");
+    expect(base.asset).toBe("/location-scenes/crash-site-empty.webp");
+    expect(base.overlay?.asset).toBe("/location-scenes/rivet-crashed.webp");
     for (const completed of [
       [],
       [REPAIR_TARGET_IDS.cargoHold],
@@ -375,7 +376,8 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
   it("becomes the approved repaired Rivet the moment Propulsion completes", () => {
     const resolved = resolveLocationState(crashSite, facts([REPAIR_TARGET_IDS.propulsionSystem]));
     expect(resolved.variantId).toBe("crash_site_ship_restored");
-    expect(resolved.scene.asset).toBe("/location-scenes/crash-site-repaired.webp");
+    expect(resolved.scene.asset).toBe("/location-scenes/crash-site-empty.webp");
+    expect(resolved.scene.overlay?.asset).toBe("/location-scenes/rivet-repaired.webp");
     expect(resolved.description).toMatch(/repaired/);
     // Presentation only: the same actions, and no travel or map state of its own.
     expect(resolved.availableActionIds).toEqual(crashSite.availableActionIds);
@@ -386,25 +388,41 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
   it("derives from each character's own facts, so one character's repair is not another's", () => {
     const a = resolveLocationState(crashSite, facts([REPAIR_TARGET_IDS.propulsionSystem]));
     const b = resolveLocationState(crashSite, facts([]));
-    expect(a.scene.asset).toBe("/location-scenes/crash-site-repaired.webp");
-    expect(b.scene.asset).toBe("/location-scenes/crash-site-crashed.webp");
+    expect(a.scene.overlay?.asset).toBe("/location-scenes/rivet-repaired.webp");
+    expect(b.scene.overlay?.asset).toBe("/location-scenes/rivet-crashed.webp");
+    // Only the ship layer changes: the background is the very same file.
+    expect(a.scene.asset).toBe(b.scene.asset);
   });
 
-  it("ships exactly the two approved scenes at their delivered 1536 x 384", () => {
-    for (const [asset, scene] of [
-      ["public/location-scenes/crash-site-crashed.webp", crashSite.presentation.scene],
-      ["public/location-scenes/crash-site-repaired.webp", crashSite.stateVariants[0]!.scene!],
-    ] as const) {
-      expect(existsSync(asset)).toBe(true);
-      expect(readImageHeader(asset)).toMatchObject({ width: 1536, height: 384 });
-      expect(scene).toMatchObject({ width: 1536, height: 384 });
-      expect(`public${scene.asset}`).toBe(asset);
-    }
+  it("ships one empty background and two alpha ship overlays, with every master retained", () => {
     expect(crashSite.stateVariants).toHaveLength(1);
-    // The legacy wreck is replaced, and the approved masters are retained.
+    const background = crashSite.presentation.scene;
+    expect(`public${background.asset}`).toBe("public/location-scenes/crash-site-empty.webp");
+    expect(readImageHeader(`public${background.asset}`)).toMatchObject({
+      width: 1536,
+      height: 384,
+      container: "VP8 ",
+    });
+    for (const scene of [background, crashSite.stateVariants[0]!.scene!]) {
+      const overlay = scene.overlay!;
+      const header = readImageHeader(`public${overlay.asset}`);
+      expect(header).toMatchObject({ width: overlay.width, height: overlay.height });
+      expect(header.hasAlpha, `${overlay.asset} must keep its alpha channel`).toBe(true);
+    }
+    for (const master of [
+      "crash-site-empty-overcast-master.png",
+      "rivet-crashed-transparent-master.png",
+      "rivet-repaired-transparent-master.png",
+    ]) {
+      expect(existsSync(`assets/location-scenes/${master}`)).toBe(true);
+    }
+    // The previous baked scenes are historical: the published Update hero still
+    // points at the repaired one, so neither file nor master is removed (#351).
+    for (const baked of ["crash-site-crashed", "crash-site-repaired"]) {
+      expect(existsSync(`public/location-scenes/${baked}.webp`)).toBe(true);
+      expect(existsSync(`assets/location-scenes/${baked}.png`)).toBe(true);
+    }
     expect(existsSync("public/location-scenes/crash-site.webp")).toBe(false);
-    expect(existsSync("assets/location-scenes/crash-site-crashed.png")).toBe(true);
-    expect(existsSync("assets/location-scenes/crash-site-repaired.png")).toBe(true);
   });
 
   it("writes distinct alt text for each ship state", () => {
@@ -418,9 +436,11 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
   it("shows the same ship in a Crash Site conversation, from the same repair", () => {
     const crashed = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
     const repaired = CONVERSATION_BACKGROUND_IDS.crashSiteExteriorRepaired;
-    expect(getConversationBackground(crashed)?.asset).toBe(crashSite.presentation.scene.asset);
-    expect(getConversationBackground(repaired)?.asset).toBe(
-      crashSite.stateVariants[0]!.scene!.asset,
+    // Each conversation backdrop is composed from the location's own scene for that
+    // state, so the wreck/repaired ship in dialogue is the ship at its landing mark.
+    expect(getConversationBackground(crashed)?.composition).toBe(crashSite.presentation.scene);
+    expect(getConversationBackground(repaired)?.composition).toBe(
+      crashSite.stateVariants[0]!.scene,
     );
     expect(resolveConversationBackgroundId(crashed, new Set())).toBe(crashed);
     expect(resolveConversationBackgroundId(crashed, new Set([REPAIR_TARGET_IDS.landingGear]))).toBe(

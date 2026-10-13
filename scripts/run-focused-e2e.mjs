@@ -76,6 +76,7 @@ export const FOCUSED_PHASES = [
   "wheel-be-right-back",
   "mission-pinning",
   "thrust-issues",
+  "crash-site-scene",
   "oil-shale-mining",
   "fuel-manufacturing",
   "scroll-affordances",

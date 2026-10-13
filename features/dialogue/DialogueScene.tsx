@@ -8,6 +8,7 @@ import {
   resolveDialogueSpeaker,
 } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
+import { SceneComposition } from "@/features/location-scene/SceneComposition";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { VisualTile } from "@/components/items/VisualTile";
 import { CREDITS_CHIP_SRC, CreditsAmount } from "@/components/ui/CreditsAmount";
@@ -79,14 +80,27 @@ export function DialogueScene({
         data-dialogue-subject={beat.kind}
         data-dialogue-background={beat.backgroundId}
       >
-        <Image
-          src={background.asset}
-          alt={background.alt}
-          fill
-          sizes="(max-width: 640px) 100vw, 56rem"
-          className="object-cover"
-          priority
-        />
+        {background.composition ? (
+          // A layered scene (#351) is composed on the same stage the Location header
+          // uses, so the ship in a conversation is the ship at its landing mark.
+          <SceneComposition
+            scene={background.composition}
+            sizes="(max-width: 640px) 100vw, 56rem"
+            // A 15:8 frame at its widest (56rem) is ~478px tall, so a 4:1 stage is
+            // at most ~1912px wide.
+            stageWidthHint={1912}
+            priority
+          />
+        ) : (
+          <Image
+            src={background.asset}
+            alt={background.alt}
+            fill
+            sizes="(max-width: 640px) 100vw, 56rem"
+            className="object-cover"
+            priority
+          />
+        )}
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
         {sceneLocation ? (
           <p
