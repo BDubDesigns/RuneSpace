@@ -278,7 +278,12 @@ Hermes host.
   cooldown (including a concurrent race), refused ads spending nothing,
   guardrail refusals persisting and delivering nothing, publish-after-commit,
   stable seq pagination across identical timestamps, and bounded 90-day
-  retention.
+  retention (#352): a prune never deletes more than its limit, oldest first,
+  skipping rows another transaction holds and taking disjoint batches from
+  concurrent callers, each proved under the default plan and one forced to
+  re-scan a semi-joined subquery (`set_config('enable_hashagg', 'off', true)`
+  and friends, local to the test's transaction), with a control that the
+  pre-#352 statement really takes that shape.
 - `tests/e2e/public-chat.spec.ts` proves at phone and desktop widths: switching
   channels in place, own/long messages without horizontal overflow, the
   promoted ad's treatment and its one record in both feeds, the 280-character

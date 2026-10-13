@@ -266,24 +266,35 @@ const MENTION_TOO_MANY = `A message can mention up to ${CHAT_POLICY.maxMentions}
  * Delete messages past ordinary retention, oldest first, at most `limit` per
  * call. `SKIP LOCKED` lets concurrent sends prune disjoint rows instead of
  * waiting on — or deadlocking with — each other.
+ *
+ * The batch is chosen once, in a `MATERIALIZED` CTE (#352). Written as
+ * `DELETE … WHERE id IN (SELECT … LIMIT … FOR UPDATE SKIP LOCKED)`, PostgreSQL
+ * may plan the semi-join as a nested loop that re-runs the locking subquery
+ * for each candidate row; once the first row is deleted, the rescan skips it
+ * and yields the next one, so one call deletes far more than `limit`. A CTE is
+ * executed at most once however the outer plan joins it, so the delete can
+ * never touch more rows than the batch holds.
  */
 export async function pruneExpiredChatMessages(
-  executor: Pick<Transaction, "delete" | "select">,
+  executor: Pick<Transaction, "execute" | "select">,
   now: Date,
   limit: number = CHAT_RETENTION_PRUNE_BATCH,
 ): Promise<number> {
-  const expired = executor
+  const expiredBatch = executor
     .select({ id: chatMessages.id })
     .from(chatMessages)
     .where(lt(chatMessages.createdAt, new Date(chatRetentionCutoff(now.getTime()))))
     .orderBy(chatMessages.seq)
     .limit(limit)
     .for("update", { skipLocked: true });
-  const deleted = await executor
-    .delete(chatMessages)
-    .where(inArray(chatMessages.id, expired))
-    .returning({ id: chatMessages.id });
-  return deleted.length;
+  const deleted = await executor.execute<{ id: string }>(sql`
+    with expired_ids as materialized (${expiredBatch})
+    delete from ${chatMessages}
+    using expired_ids
+    where ${chatMessages.id} = expired_ids.id
+    returning ${chatMessages.id}
+  `);
+  return deleted.rows.length;
 }
 
 /**
