@@ -10,7 +10,8 @@ QA belong to `docs/art-cookbook.md`.
 
 - Component: `features/location-scene/LocationSceneHeader.tsx` (shared, single responsive viewport: mobile shallow cinematic strip, desktop taller reveal)
 - Registry SSOT: `game/content/locations.ts` (`LOCATIONS`, `presentation.scene`)
-- Schema: `game/schemas/locations.ts` (`presentation.scene: { asset, width, height, alt, focal? }`)
+- Schema: `game/schemas/locations.ts` (`presentation.scene: { asset, width, height, alt, focal?, overlay? }`)
+- Compositor: `features/location-scene/SceneComposition.tsx` (the one stage that lays out a scene's background and optional transparent overlay; used by the Location header and by layered conversation backgrounds)
 - Assets: `public/location-scenes/*.webp` — committed local WebP, no CDN, no runtime transform
 - Consumer: `features/location-scene/LocationSurface.tsx` (stationary Location composition; integrated into its `Panel tone="raised"`; header lives inside the panel's top edge so the scene feels built into RuneSpace, not inserted as a photo)
 
@@ -39,6 +40,7 @@ presentation: {
 - The contract is the **4:1 aspect ratio**, not a fixed pixel size. Approved art
   is recorded at the resolution it was actually delivered at and is never
   upscaled to match an older entry (Holo Hollow's 1536×384 set, issue #159).
+- `overlay` is optional (#351): one transparent layer composed over `asset`. See "Layered scenes" below.
 - `alt` is concise, useful, distinct per location — decorative wrappers are elsewhere.
 - `focal` is optional `{x,y}` in percent (0–100), defaulting to center-top-ish when absent. It drives `object-position` so the shared viewport keeps the subject readable without shipping a second crop. New locations add one entry; no per-location CSS branches.
 - Resolver helper: `resolveLocationScene(getLocation, id)` returns `scene | undefined` (unknown id → `undefined`, never a broken path).
@@ -54,13 +56,13 @@ Derived from the three supplied source images via repository-local optimization 
 | DeWhat? Emergency Power Annex | `img_b54f385f2859.png` (bunker capsule / cyan arcane light) | 2508×627 (2.1 MB PNG) | `power-annex.webp` | 1920×480 | ~95,352 |
 | **Total** |  |  |  |  | **~348 kB** (lossy WebP q80, ~95% saving vs 6.9 MB source PNGs) |
 
-The Crash Site's legacy scene above was replaced by Thrust Issues (#330) with the
-approved crashed **Rivet Utility Shuttle** (`crash-site-crashed.webp`, 1536×384,
-the location's base scene) and its matched repaired counterpart
-(`crash-site-repaired.webp`, the location's one state variant, shown only after
-that character's Propulsion System repair completes). Both are WebP derivatives
-of retained masters in `assets/location-scenes/`; there are no intermediate ship
-states. `game/content/locations.ts` is authoritative for the current paths.
+The Crash Site's legacy scene above was replaced by Thrust Issues (#330) with two
+baked panoramas of the **Rivet Utility Shuttle** (`crash-site-crashed.webp` and
+`crash-site-repaired.webp`, 1536×384), and those were in turn replaced by the
+layered scene in "Layered scenes" below (#351). The two baked WebPs and their
+masters are kept, unreferenced by the game, because a published Update's hero
+still points at the repaired one (`docs/public-updates.md`); do not delete them.
+`game/content/locations.ts` is authoritative for the current paths.
 
 This table records the original issue #78 set. Later scenes (The Long
 Scramble, The Jag, Holo Hollow, and Holo Hollow's Local Places) are recorded in
@@ -138,6 +140,76 @@ delivered JPEG-encoded, so they carry a `.jpg` extension). The Track's scene is
 activity-free on purpose; The South Cut's is a close, reinforced entrance cut into
 black laminated oil shale, not an open quarry, and the map identifier matches it.
 Scenes carry no baked ship, people, text or UI.
+
+## Layered scenes: one background, a state-selected overlay (issue #351)
+
+The Crash Site is the first scene made of **one opaque empty background plus one
+transparent overlay**, instead of a baked panorama per state. The ground, framing,
+chrome and clouds are authored once; only the ship layer changes, so nothing
+flashes or goes blank between states.
+
+| Layer | Delivered file | Dimensions | Notes |
+|---|---|---|---|
+| Background (always) | `crash-site-empty.webp` | 1536×384, opaque, lossy q80 | Approved darker/overcast empty Crash Site: mesas, facility on the right, open muddy centre, **no ship and no detached debris**. |
+| Crashed Rivet | `rivet-crashed.webp` | 1249×584, alpha, lossy q85 / alpha 100 | Torn hull and its local detached wreckage. **Debris exists only on this overlay.** |
+| Repaired Rivet | `rivet-repaired.webp` | 1307×612, alpha | The existing approved repaired transparent master, reused as supplied. |
+
+The three unaltered masters are kept in `assets/location-scenes/`
+(`crash-site-empty-overcast-master.png`, `rivet-crashed-transparent-master.png`,
+`rivet-repaired-transparent-master.png`). `scripts/prepare-crash-site-art.mjs`
+derives the three files from them (see `docs/art-cookbook.md`).
+
+States resolve through the existing state-variant seam, unchanged: the base scene
+is the crashed Rivet, and `CRASH_SITE_SHIP_RESTORED_VARIANT_ID` (required:
+`REPAIR_TARGET_IDS.propulsionSystem` complete, per character) swaps in the repaired
+Rivet. There is no second flag, and it is not gated on Wade's turn-in.
+
+**No-ship is a supported state, not a reachable one.** A scene with no `overlay`
+is the bare empty background, and the compositor renders it from the same elements.
+Nothing in the game selects it yet: whether the ship has left is the later flight
+slice's authoritative parked-ship location, never inferred from Propulsion repair or
+Wade's Mission. `tests/unit/scene-composition.test.ts` and `tests/e2e/crash-site-scene.spec.ts`
+prove it renders without inventing a departed state.
+
+### Placement is scene-relative metadata
+
+`overlay.placement` is `{ left, top, width }` in **percent of the background's own
+canvas**; the overlay's height follows its intrinsic aspect, so a ship is never
+stretched. There are no pixel offsets and no mobile/desktop split. To place another
+parked ship at another site, author the overlay and its placement — no CSS.
+
+### One stage, one transform
+
+`SceneComposition` puts the background and the overlay in a single stage element
+that reproduces `object-fit: cover` + `object-position: focal` with container query
+units (`width: max(100cqw, 100cqh × aspect)`, offset by the focal fraction). Both
+layers are cropped, scaled and offset together, so the ship cannot drift from its
+landing mark at 390px, at the 890×252 desktop viewport, or in between, and a
+transparent contact shadow stays on the ground it was cast on. The viewport (the
+header's `h-[126px] sm:h-[168px] lg:h-[252px]` box, or a dialogue's 15:8 frame)
+remains the caller's; there is no JavaScript measurement, so server-rendered
+markup is already correct. Every location renders through the same stage; a scene
+without an overlay is simply the background.
+
+- **Performance / LCP.** The background keeps `priority` and is the one preload.
+  The overlay is `loading="eager"` but never `priority`, and its `sizes` reflects
+  the ship's real rendered width, so it neither competes for LCP nor downloads the
+  full stage width.
+- **Accessibility.** The scene's `alt` describes the whole composition (ship state
+  included) and rides on the background; the overlay is `alt=""` and
+  `aria-hidden`, so the place is announced once. Each state authors its own `alt`
+  that names what is there; none says "empty location".
+
+### Conversations
+
+Wade's Crash Site conversation backdrops (`crashSiteExterior` →
+`crashSiteExteriorRepaired`, the existing `repaired` rule) carry
+`composition: <the location's scene for that state>`, and `DialogueScene` renders
+that composition through the same `SceneComposition` stage inside its 15:8 frame.
+There is no second composite file and no second placement to drift. A background
+with no `composition` renders exactly as before. QC Studio renders through the real
+`DialogueScene`, so its preview shows the ship; its background list still carries
+`asset` (the base layer) and `alt`.
 
 ## Transit truthfulness
 
@@ -237,6 +309,9 @@ the buildings read as if they occupy nearly the same spot. A later approved art
 polish pass should give each building a more distinct setting while preserving
 the approved building identities (see `docs/art-cookbook.md`). Do not
 regenerate or replace these assets outside that pass.
+
+The Local Place scenes (#159, #172) and every other World Location are unchanged:
+none authors an overlay.
 
 ## Explicit non-goals (not in this slice)
 

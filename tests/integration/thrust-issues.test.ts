@@ -551,8 +551,8 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         weldingProgress: 15,
         complete: false,
       });
-      expect(midway.locationStates[LOCATION_IDS.crashSite]?.scene.asset).toBe(
-        "/location-scenes/crash-site-crashed.webp",
+      expect(midway.locationStates[LOCATION_IDS.crashSite]?.scene.overlay?.asset).toBe(
+        "/location-scenes/rivet-crashed.webp",
       );
       expect(midway.locationStates[LOCATION_IDS.crashSite]?.variantId).toBeUndefined();
 
@@ -567,7 +567,10 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
       expect(finished.activeAction).toBeUndefined();
       expect(finished.locationStates[LOCATION_IDS.crashSite]).toMatchObject({
         variantId: "crash_site_ship_restored",
-        scene: { asset: "/location-scenes/crash-site-repaired.webp" },
+        scene: {
+          asset: "/location-scenes/crash-site-empty.webp",
+          overlay: { asset: "/location-scenes/rivet-repaired.webp" },
+        },
       });
       // 16 x 50 base Welding XP; Clean Pass is the only thing that may add to it,
       // and the deterministic roll here awards the plain base.
@@ -628,10 +631,16 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         ]!;
       expect(await sceneOf(a)).toMatchObject({
         variantId: "crash_site_ship_restored",
-        scene: { asset: "/location-scenes/crash-site-repaired.webp" },
+        scene: {
+          asset: "/location-scenes/crash-site-empty.webp",
+          overlay: { asset: "/location-scenes/rivet-repaired.webp" },
+        },
       });
       expect(await sceneOf(b)).toMatchObject({
-        scene: { asset: "/location-scenes/crash-site-crashed.webp" },
+        scene: {
+          asset: "/location-scenes/crash-site-empty.webp",
+          overlay: { asset: "/location-scenes/rivet-crashed.webp" },
+        },
       });
       expect((await sceneOf(b)).variantId).toBeUndefined();
       expect(
@@ -652,8 +661,8 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         });
       }
       const state = await stateAt(userId, characterId);
-      expect(state.locationStates[LOCATION_IDS.crashSite]?.scene.asset).toBe(
-        "/location-scenes/crash-site-crashed.webp",
+      expect(state.locationStates[LOCATION_IDS.crashSite]?.scene.overlay?.asset).toBe(
+        "/location-scenes/rivet-crashed.webp",
       );
       expect(state.repairs[REPAIR_TARGET_IDS.landingGear]?.complete).toBe(true);
       expect(state.repairs[REPAIR_TARGET_IDS.propulsionSystem]?.complete).toBe(false);

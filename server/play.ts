@@ -725,6 +725,12 @@ export type LocationStateProjection = {
     height: number;
     alt: string;
     focal?: { x: number; y: number };
+    overlay?: {
+      asset: string;
+      width: number;
+      height: number;
+      placement: { left: number; top: number; width: number };
+    };
   };
 };
 

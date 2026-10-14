@@ -40,6 +40,9 @@ const propulsion = balance.repairTargets.propulsion;
 const SYSTEM = `[data-ship-system="${REPAIR_TARGET_IDS.propulsionSystem}"]`;
 const PANEL = `[data-repair-work-panel="${REPAIR_TARGET_IDS.propulsionSystem}"]`;
 const SCENE = `[data-location-scene="${LOCATION_IDS.crashSite}"]`;
+// The scene is a layered composition (#351): the alt on the background image
+// describes the whole picture, and the ship overlay is decorative.
+const BACKGROUND = 'img[data-scene-layer="background"]';
 const REPORT_STATUS = "Propulsion restored. Report to Wade.";
 const FLIGHT_READY_STATUS = "Propulsion restored. Ship flight-ready.";
 
@@ -195,7 +198,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await page.reload();
   const scene = page.locator(SCENE);
   await expect(scene).toBeVisible();
-  await expect(scene.locator("img")).toHaveAttribute("alt", /crashed Rivet Utility Shuttle/);
+  await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /crashed Rivet Utility Shuttle/);
   const system = page.locator(SYSTEM);
   await expect(system).toBeVisible();
   await expect(system).toHaveAttribute("data-ship-system-state", "offline");
@@ -278,7 +281,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await expect(panel.locator("[data-repair-stop-welding]")).toBeVisible();
 
   // Still the wreck while the weld is under way.
-  await expect(scene.locator("img")).toHaveAttribute("alt", /crashed Rivet Utility Shuttle/);
+  await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /crashed Rivet Utility Shuttle/);
 
   // Fast-forward all sixteen sections the way the other journeys do.
   const weldingBefore = await weldingXp(characterId);
@@ -295,7 +298,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
 
   // The last section restores the ship at once, before any report: the approved
   // repaired scene, its own status, and no controls at all.
-  await expect(scene.locator("img")).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
+  await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   await expect(page.locator("[data-location-description]")).toContainText("propulsion restored");
   await expect(system).toHaveAttribute("data-ship-system-state", "complete");
   await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(REPORT_STATUS);
@@ -309,7 +312,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   // Durable across another reload, in the generic repair row.
   await page.reload();
   await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(REPORT_STATUS);
-  await expect(scene.locator("img")).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
+  await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   const [row] = await db
     .select({ completedAt: characterRepairTargets.completedAt })
     .from(characterRepairTargets)
@@ -371,7 +374,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(
     FLIGHT_READY_STATUS,
   );
-  await expect(scene.locator("img")).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
+  await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   const cargo = page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`);
   await expect(cargo).toHaveAttribute("data-ship-system-state", "complete");
   await expect(cargo.locator('[data-ship-system-status="complete"]')).toHaveText(
@@ -388,7 +391,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   ]) {
     await page.setViewportSize(viewport);
     await expect(scene).toBeVisible();
-    await expect(scene.locator("img")).toBeVisible();
+    await expect(scene.locator(BACKGROUND)).toBeVisible();
     await expect(system).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

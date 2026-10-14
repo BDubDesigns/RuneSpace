@@ -6,6 +6,7 @@ import {
   type LocationId,
   type RepairTargetId,
 } from "@/game/config/foundations";
+import type { LocationDefinition } from "@/game/schemas/locations";
 import { CRASH_SITE_SHIP_RESTORED_VARIANT_ID, getLocation } from "./locations";
 
 export type ConversationBackgroundDefinition = {
@@ -13,6 +14,13 @@ export type ConversationBackgroundDefinition = {
   locationId: LocationId;
   asset: string;
   alt: string;
+  /**
+   * A layered scene this background is composed from (#351). When present the
+   * conversation renders the same stage the Location header does, so a ship stays
+   * on its landing mark; `asset` and `alt` remain the base layer and the
+   * composition's description.
+   */
+  composition?: LocationDefinition["presentation"]["scene"];
   /**
    * The matching background this one becomes once a repair is finished (#292).
    *
@@ -63,6 +71,7 @@ export const CONVERSATION_BACKGROUNDS = [
     locationId: LOCATION_IDS.crashSite,
     asset: crashSiteScene.asset,
     alt: crashSiteScene.alt,
+    composition: crashSiteScene,
     // The same before/after rule as Curly's room: the ship in a conversation is
     // the ship as this character has left it (#330).
     repaired: {
@@ -75,6 +84,7 @@ export const CONVERSATION_BACKGROUNDS = [
     locationId: LOCATION_IDS.crashSite,
     asset: crashSiteRepairedScene.asset,
     alt: crashSiteRepairedScene.alt,
+    composition: crashSiteRepairedScene,
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.theJagExterior,

@@ -400,6 +400,38 @@ long edge, grayscaled after cleanup, exported lossless, and inspected on both da
 and light backgrounds for halos, mattes and holes, then in the real map. A
 direct-alpha source that fails that inspection goes back to the hot-pink workflow.
 
+## Transparent overlay layers (issue #351)
+
+A parked ship, or any object that must change while its place does not, is a
+transparent overlay composed over an opaque empty background. The empty background
+must contain none of the object and none of its debris; every piece of debris,
+shadow and scorch belongs to the overlay that owns that state. Do not mistake a
+baked panorama for a transparent master.
+
+Overlays arrive as direct-alpha RGBA masters and follow the direct-alpha recipe
+above, minus the grayscale step: alpha below 4 is cleared, near-opaque alpha
+(>= 240) is snapped fully opaque, the subject is trimmed on its alpha bounds, and it
+is scaled **down** (never up) and exported as lossy WebP with
+`alphaQuality: 100` so soft contact shadows survive. Environment backgrounds stay
+opaque 4:1 lossy WebP. `scripts/prepare-crash-site-art.mjs` is the repository's
+reproducible record of this (`sharp`, resolved through Next.js's own dependency): it
+writes the three Crash Site derivatives and prints each overlay's scene-relative
+placement so the authored metadata in `game/content/locations.ts` can be checked.
+Each ship is measured from one reference box on its **untrimmed** master canvas, so
+trimming never moves it.
+
+Visual QA for an overlay: inspect it on dark, light and mid-grey backgrounds for
+black or white mattes, edge halos, holes and a solid rectangle; confirm the
+contact shadow is soft and sits on the ground; confirm no debris persists in any
+other state; then check the placed composition in the real app at 390px, at the
+desktop 890x252 scene viewport and at an intermediate width, and in a dialogue
+frame. `tests/e2e/crash-site-scene.spec.ts` measures the crop and the ship's
+position rather than trusting the 4:1 canvas.
+
+Known property of the approved crashed master: its drive ring reaches the right edge
+of its 1672 px canvas. It was approved as delivered and is not regenerated here;
+placement keeps that edge well inside the scene.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.
@@ -534,10 +566,16 @@ Current production conventions:
   derivatives are `public/npc-art/curly-*.png` (one shared 1086x1448 canvas,
   the neutral master scaled down to match, never up) and
   `public/location-scenes/curly-room-{before,after}.webp` (a 15:8 centre crop)
-- the Crash Site's approved crashed and repaired Rivet Utility Shuttle scenes
-  (#330) are 1536x384 lossy WebP derivatives in `public/location-scenes/`
-  (`crash-site-crashed.webp`, `crash-site-repaired.webp`); their unaltered
-  masters are kept in `assets/location-scenes/`
+- the Crash Site's layered scene (#351): one approved empty overcast background
+  (`crash-site-empty.webp`, 1536x384 opaque lossy WebP q80, from a 2508x627
+  master) plus two transparent Rivet overlays (`rivet-crashed.webp`,
+  `rivet-repaired.webp`), all in `public/location-scenes/`, with the three
+  unaltered masters in `assets/location-scenes/`
+  (`crash-site-empty-overcast-master.png`, `rivet-crashed-transparent-master.png`,
+  `rivet-repaired-transparent-master.png`). The earlier baked crashed and repaired
+  panoramas (#330, `crash-site-crashed.webp`, `crash-site-repaired.webp`) are no
+  longer shown in the game but stay committed: a published Update hero references
+  the repaired one. See "Transparent overlay layers" below
 - the Oil Shale Mining slice's approved art (#342): the South Access Track and
   The South Cut 1536x384 scenes (`public/location-scenes/south-access-track.webp`,
   `the-south-cut.webp`, lossy WebP q85; the delivered masters were JPEG-encoded and

@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import type { LocationDefinition } from "@/game/schemas/locations";
+import { SceneComposition } from "./SceneComposition";
 
 /**
  * The scene chrome needs only an identity, a title, and scene metadata. Both a
@@ -30,8 +30,6 @@ export function LocationSceneHeader({
   const scene = location.presentation.scene;
   // Defensive: schema guarantees scene, but keep truthful if registry is stale.
   if (!scene) return null;
-  const focalX = scene.focal?.x ?? 50;
-  const focalY = scene.focal?.y ?? 45;
 
   return (
     <div
@@ -46,19 +44,19 @@ export function LocationSceneHeader({
           ~890px (GameShell max-w-7xl with 20rem aside) — desktop must be
           proportionally taller so it reveals more top/bottom, not just crops it. */}
       <div className="rs-location-scene-viewport relative h-[126px] w-full overflow-hidden sm:h-[168px] lg:h-[252px]">
-        <Image
-          src={scene.asset}
-          alt={scene.alt}
-          width={scene.width}
-          height={scene.height}
+        {/* One stage carries the background and any overlay through the same
+            cover/crop (#351); the viewport stays this header's own. The desktop
+            stage is at most ~1008px wide (252px tall at 4:1). */}
+        <SceneComposition
+          scene={scene}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 92vw, 890px"
-          className="h-full w-full object-cover"
-          style={{ objectPosition: `${focalX}% ${focalY}%` }}
+          stageWidthHint={1008}
           // Issue #117: the current surface renders exactly one scene, it is
           // above the fold, and it measured as the LCP element. Without
           // `priority` Next authors it `loading="lazy"` with no preload, so the
           // browser only discovers it after layout. Local Place directory
-          // thumbnails further down the page stay lazy.
+          // thumbnails further down the page stay lazy. Only the background is
+          // preloaded; an overlay never is.
           priority
         />
         {/* Subtle dark blend + top/bottom scrim so plates feel mounted, and scene

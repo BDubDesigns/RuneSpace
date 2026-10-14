@@ -13,6 +13,8 @@ export type ImageHeader = {
   height: number;
   /** `"png"`, or the WebP bitstream chunk: `"VP8 "` lossy, `"VP8L"` lossless. */
   container: string;
+  /** Whether a WebP declares an alpha channel (extended-format header flag). */
+  hasAlpha?: boolean;
 };
 
 export function readImageHeader(path: string): ImageHeader {
@@ -29,6 +31,7 @@ export function readImageHeader(path: string): ImageHeader {
         width: buffer.readUIntLE(24, 3) + 1,
         height: buffer.readUIntLE(27, 3) + 1,
         container: findWebpBitstream(buffer),
+        hasAlpha: (buffer[20]! & 0x10) !== 0,
       };
     }
     if (first === "VP8 ") {

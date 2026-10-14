@@ -29,9 +29,10 @@ describe("issue #102 authored NPC and mission boundaries", () => {
   });
 
   it("keeps conversation backgrounds independently replaceable", () => {
-    expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.crashSiteExterior)?.asset).toBe(
-      "/location-scenes/crash-site-crashed.webp",
-    );
+    // The Crash Site's backdrop is its empty environment plus a ship overlay (#351).
+    const crashSite = getConversationBackground(CONVERSATION_BACKGROUND_IDS.crashSiteExterior);
+    expect(crashSite?.asset).toBe("/location-scenes/crash-site-empty.webp");
+    expect(crashSite?.composition?.overlay?.asset).toBe("/location-scenes/rivet-crashed.webp");
     expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.theJagExterior)?.asset).toBe(
       "/location-scenes/the-jag.png",
     );
