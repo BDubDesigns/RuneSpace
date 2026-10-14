@@ -1026,6 +1026,9 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-mobile-claimed.png");
   await page.getByRole("button", { name: "Back to Location" }).click();
+  // router.replace is asynchronous: the Map URL must be gone before opening
+  // Inventory and reloading, or we may reload ?surface=map instead of Location.
+  await expect(page).toHaveURL((url) => !url.searchParams.has("surface"));
 
   await page.getByRole("button", { name: /Inventory/ }).click();
   const claimedCell = page.getByLabel("5 Power Cell", { exact: true });
