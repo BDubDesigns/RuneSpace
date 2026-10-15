@@ -177,7 +177,8 @@ describe("issue #357 Holo Hollow Landing", () => {
 
 describe("dialogue backdrop place labels", () => {
   it("uses the specific Local Place for every interior, and the World Location otherwise", () => {
-    for (const background of CONVERSATION_BACKGROUNDS) {
+    for (const entry of CONVERSATION_BACKGROUNDS) {
+      const background = getConversationBackground(entry.id)!;
       const place = background.localPlaceId
         ? getLocalPlaceInLocation(background.locationId, background.localPlaceId)
         : undefined;
