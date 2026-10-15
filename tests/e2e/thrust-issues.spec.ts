@@ -354,13 +354,12 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   expect(await weldingXp(characterId)).toBe(xpBeforeReport);
   await expect(page.locator("[data-mission-strip]")).toHaveCount(0);
 
-  // Exactly once: Wade's follow-up, no report and no new job, and no flight prompt.
+  // Exactly once: the report is gone and cannot be made again. With the story
+  // caught up Wade's hub now offers Move Along (#358), by hand, and nothing else.
   await page.reload();
   const after = await openNpcConversation(page, "Wade Rusk");
-  await after.getByRole("button", { name: /Thrust Issues/ }).click();
-  await expect(after.locator("[data-dialogue-text]")).toContainText(
-    "Still looks like hell. But it's a ship.",
-  );
+  await expect(after.getByRole("button", { name: /Thrust Issues/ })).toHaveCount(0);
+  await expect(after.getByRole("button", { name: /Move Along/ })).toContainText("Available");
   await expect(after.getByRole("button", { name: "REPORT REPAIR" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   expect(await weldingXp(characterId)).toBe(xpBeforeReport);
