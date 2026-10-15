@@ -18,7 +18,8 @@ describe("RuneSpace QC Studio adapter", () => {
   });
 
   it("labels local conversation backgrounds by their actual Local Places", () => {
-    const label = (id: string) => runespaceDialogueAdapter.backgrounds.find((bg) => bg.id === id)?.label;
+    const label = (id: string) =>
+      runespaceDialogueAdapter.backgrounds.find((bg) => bg.id === id)?.label;
     expect(label("last_leg_trading_interior")).toBe("Last Leg Trading");
     expect(label("hh_bnb_interior")).toBe("HH B&B");
     expect(label("crash_site_exterior")).toBe("Crash Site");

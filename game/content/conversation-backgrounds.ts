@@ -195,7 +195,9 @@ export function getConversationBackgroundPlaceName(backgroundId: string): string
   if (background.localPlaceId) {
     const place = getLocalPlaceInLocation(background.locationId, background.localPlaceId);
     if (!place) {
-      throw new Error(`Dialogue background "${background.id}" references a Local Place outside its World Location.`);
+      throw new Error(
+        `Dialogue background "${background.id}" references a Local Place outside its World Location.`,
+      );
     }
     return place.displayName;
   }

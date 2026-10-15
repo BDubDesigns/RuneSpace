@@ -186,7 +186,9 @@ describe("dialogue backdrop place labels", () => {
       const expected = place?.displayName ?? getLocation(background.locationId)?.displayName;
       expect(getConversationBackgroundPlaceName(background.id)).toBe(expected);
     }
-    expect(getConversationBackgroundPlaceName("last_leg_trading_interior")).toBe("Last Leg Trading");
+    expect(getConversationBackgroundPlaceName("last_leg_trading_interior")).toBe(
+      "Last Leg Trading",
+    );
     expect(getConversationBackgroundPlaceName("curly_room_after")).toBe("HH B&B");
     expect(getConversationBackgroundPlaceName("crash_site_exterior")).toBe("Crash Site");
   });
