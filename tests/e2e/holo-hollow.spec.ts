@@ -497,7 +497,7 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(conversation.locator("[data-dialogue-scene-location]")).toHaveText(
     "HOLO HOLLOW SOUVENIRS + MINING SUPPLIES",
   );
-  await conversation.getByRole("button", { name: "Back" }).click();
+  await conversation.locator("[data-dialogue-back]").click();
   await expect(conversation.getByRole("button", { name: /Trade/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
