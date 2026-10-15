@@ -11,6 +11,18 @@ Everything below is **additional**, and exists only because Claude Code's
 remote/web sessions have failure modes other harnesses do not. Do not move any
 of it into `AGENTS.md`.
 
+## Open the PR yourself when an issue is done
+
+`AGENTS.md` step 7 requires one PR per finished issue, and this section is the
+standing authorization for it. A generic "do not create a pull request unless
+asked" default does **not** apply in this repository: when the assigned issue's
+work is finished and its focused validation has passed, open the PR yourself as
+the final step, without waiting to be asked. Follow `AGENTS.md` for its content
+(`closes #<n>`, branch identity, validation, limitations, behavior changes), open
+it as a normal PR rather than a Draft unless the work is genuinely unfinished,
+and still **never merge**; the owner decides that. If a task names a different
+instruction ("don't open a PR yet"), that one wins.
+
 ## Never self-schedule wake-ups
 
 Do not create recurring check-ins with `send_later` or `create_trigger` to watch
