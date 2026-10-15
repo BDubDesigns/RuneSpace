@@ -251,11 +251,11 @@ describe.each(repairMissions)(
       const projection = project(
         entry,
         observe(entry.targetId, { complete: true }),
-        entry.mission.turnIn.locationId,
+        entry.mission.turnIn!.locationId,
       );
       expect(projection.state).toBe("ready_for_completion");
       expect(projection.guidance).toMatchObject({
-        npcId: entry.mission.turnIn.npcId,
+        npcId: entry.mission.turnIn!.npcId,
         turnIn: true,
       });
       expect(projection.guidance?.repairTargetId).toBeUndefined();

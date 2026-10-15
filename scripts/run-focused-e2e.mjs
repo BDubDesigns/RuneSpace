@@ -80,6 +80,7 @@ export const FOCUSED_PHASES = [
   "oil-shale-mining",
   "fuel-manufacturing",
   "last-leg-trading",
+  "ship-first-flight",
   "scroll-affordances",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and

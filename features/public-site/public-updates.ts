@@ -9,6 +9,45 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #358 — the Rivet's first flight.
+    slug: "the-rivet-takes-off",
+    title: "The Rivet Takes Off",
+    publishedAt: "2026-10-15T14:30:00-07:00",
+    summary:
+      "Your repaired ship can fly. Take Move Along from Wade, load the tank, and launch from the Crash Site to Holo Hollow Landing: 10 Fuel Units, 15 seconds, and no way back.",
+    body: [
+      [
+        "Once Wade Rusk has heard the drive report for ",
+        { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
+        ", he has one more job for you, and it is the one the whole repair was for: fly the ship. ",
+        { text: "Move Along", articleSlug: "mission-move-along" },
+        " asks you to take your Rivet Utility Shuttle from the Crash Site to Holo Hollow Landing. You take the job from Wade at Rusk Recovery yourself; it does not start on its own, and the ship will not make its first flight until you have.",
+      ],
+      "Your ship now has its own panel. Wherever the ship actually is, Board Ship opens the Cargo Hold, the fuel tank and the flight controls in one place. The tank holds 300 Fuel Units and every ship starts empty. Load it with a Full Small Fuel Canister from either your Inventory or your Cargo Hold; each one adds 50 Fuel Units, and if the tank cannot hold all 50 the game tells you exactly how much would be wasted before you confirm.",
+      "The first flight costs 10 Fuel Units and takes 15 seconds. Launching moves your ship, with its Cargo Hold, from the Crash Site to Holo Hollow Landing for good, and the Crash Site is left as empty ground. You cannot cancel a flight and nothing refunds the fuel. While it lasts you cannot walk or work, but you can still look through your Inventory, Equipment and Missions, and if you close the game it still lands. Touchdown completes Move Along, which pays nothing, and the game shows a Flight complete notice that waits for you until you dismiss it, even on another device.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Move Along, Wade Rusk's first-flight Mission, offered at Rusk Recovery after Thrust Issues.",
+          "A Ship panel at your ship, with Board Ship opening the Cargo Hold, fuel tank and flight controls.",
+          "Refueling with Full Small Fuel Canisters, from Inventory or from the Cargo Hold, up to a 300 Fuel Unit tank.",
+          "The first flight: Crash Site to Holo Hollow Landing, 10 Fuel Units and 15 seconds, with a live countdown you can minimize.",
+          "A Flight complete notice that stays until you dismiss it.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Cargo Hold is part of your ship: it can be opened only where your ship is, and it moves with the ship when it flies.",
+          "Once your ship has flown, the Crash Site shows empty ground and Holo Hollow Landing shows your Rivet on the pad.",
+          "Wade's Thrust Issues offer now ends on a different parting line.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #357 — Holo Hollow Landing and Last Leg Trading.
     slug: "holo-hollow-landing",
     title: "Holo Hollow Landing",

@@ -1,5 +1,5 @@
 import { eq, isNotNull, and } from "drizzle-orm";
-import { characterMissions, characterRepairTargets } from "@/db/rune-space";
+import { characterMissions, characterRepairTargets, characterShips } from "@/db/rune-space";
 import {
   resolveLocationStateById,
   type LocationStateFacts,
@@ -20,7 +20,7 @@ export async function loadLocationStateFacts(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<LocationStateFacts> {
-  const [missionRows, repairRows] = await Promise.all([
+  const [missionRows, repairRows, shipRows] = await Promise.all([
     transaction
       .select({ missionId: characterMissions.missionId })
       .from(characterMissions)
@@ -39,10 +39,16 @@ export async function loadLocationStateFacts(
           isNotNull(characterRepairTargets.completedAt),
         ),
       ),
+    transaction
+      .select({ berthLocationId: characterShips.berthLocationId })
+      .from(characterShips)
+      .where(eq(characterShips.characterId, characterId)),
   ]);
   return {
     acceptedMissionIds: new Set(missionRows.map((row) => row.missionId)),
     completedRepairTargetIds: new Set(repairRows.map((row) => row.targetId)),
+    // No row is an untouched ship still at the Crash Site (#358).
+    ...(shipRows[0] ? { shipBerthLocationId: shipRows[0].berthLocationId } : {}),
   };
 }
 

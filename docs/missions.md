@@ -45,7 +45,8 @@ type MissionDefinition = {
   continuationMissionId?: MissionId;     // zero-or-one authored continuation, see §3.1
   offers: readonly MissionOffer[];       // ≥1, or [] for a linked continuation-only mission
   requirements: readonly MissionRequirement[]; // ordered live-state checks
-  turnIn: MissionTurnIn;                 // authoritative completion interaction
+  turnIn?: MissionTurnIn;                // authoritative completion interaction; absent exactly when autoCompletion is authored
+  autoCompletion?: MissionAutoCompletion; // completed by a gameplay outcome instead, see §7.1
   reward?: MissionReward;                // at most one, see §8
   dialogue: MissionDialogue;             // semantic dialogue mapping
   reactiveFacts?: readonly MissionReactiveFact[]; // narrow Mission-local story facts, see §9.3
@@ -59,7 +60,8 @@ type MissionDefinition = {
 - **`continuationMissionId`** — zero-or-one explicitly authored automatic continuation (§3.1).
 - **`offers[]`** — one or more authored offer routes (§4), except a continuation-only mission may use an empty array only when another authored mission points to it with `continuationMissionId`. An unlinked offerless definition fails validation.
 - **`requirements[]`** — ordered requirements (§5) evaluated against live authoritative state on every projection.
-- **`turnIn`** — `npcId` + `locationId` + `requiresStationary: true` + objective copy + `dialogueId` (§7). Mission location semantics are authored here and **never** derived from an NPC's `homeLocationId`.
+- **`turnIn`** — `npcId` + `locationId` + `requiresStationary: true` + objective copy + `dialogueId` (§7). Mission location semantics are authored here and **never** derived from an NPC's `homeLocationId`. Absent only for a Mission that authors `autoCompletion` (§7.1); validation requires exactly one of the two.
+- **`autoCompletion`** — the narrow, non-NPC completion capability (#358): the named gameplay outcome stamps the Mission complete in its own transaction (§7.1).
 - **`reward`** — at most one narrow reward, and optional: a mission whose real outcome is world/social state authors none (§8).
 - **`dialogue`** — semantic mappings (§9). Every lifecycle moment the Mission can reach is either authored or declared in `dialogue.omitted` (§9.4).
 
@@ -136,6 +138,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
 | `carried_unique_item` (#232) | `itemId`, `turnIn: "show" \| "consume_one"`, `objective` | `consume_one`: at least one instance of the unique `itemId` is carried and **unequipped**, so a hand-in can never take the tool in the player's hand; it hands one over at turn-in, least value first (an uncharged instance before a charged one, then the newest). `show` (#233) takes nothing, so an **equipped** instance counts too. Cargo Hold contents never count for either. No provenance: any instance satisfies it (`uniqueItemRequirementHolds`) |
 | `repair_target_complete` | `targetId`, `objective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop. Phase copy and guidance are generated from the target's own recipe — see §5.1 |
+| `ship_flight` (#358) | `routeId`, `objective` | **never satisfied by observation.** Nothing a player can arrange stands in for the flight, so this requirement is always unmet while the Mission is open and the Mission's `autoCompletion` completes it in the landing transaction (§7.1). Validation requires a matching `autoCompletion` on the same route, so the Mission could otherwise never finish |
 | `npc_conversation` | `npcId`, `locationId`, `dialogueId`, `progressKey`, `objective`, `actionLabel?` | the durable marker for that authored key is set, which only the generic `acknowledgeMissionConversation` command does (§12.3). Trade, arrival, or reading prose never satisfy it |
 
 **Ordering owns the objective.** The first unmet requirement in authored order becomes the current semantic objective / guidance step. `requirements` order is gameplay — changing it changes the player's progression and guidance.
@@ -199,6 +202,45 @@ Key rules:
 - **`turnIn.locationId` is an independent eligibility constraint.** It is checked separately from the requirement list — in `deriveMissionState` for projection and again in `completeMissionForDefinition` for server authority.
 - **`requiresStationary` is independent.** `activeActionId !== undefined` refuses the turn-in regardless of requirements.
 - **Authors must not duplicate the turn-in location as an `at_location` requirement merely to make eligibility correct.** `at_location` requirements exist for objective progression when the mission actually requires that location *state* (e.g. Walk It Off's "Travel to The Jag" progression, Cut Your Teeth's "Return to The Jag" step). The turn-in constraint itself does not need a duplicated requirement to stay correct.
+
+### 7.1 Automatic completion (#358)
+
+Move Along is the first Mission completed by a gameplay outcome — the Rivet's
+landing — rather than a conversation. This is a deliberately narrow capability,
+not an event bus and not "every satisfied requirement completes itself".
+
+```ts
+type MissionAutoCompletion = { kind: "ship_flight"; routeId: ShipRouteId };
+```
+
+- **One closed kind.** The flight's landing (`commitShipArrival` in
+  `server/ship-state.ts`) stamps `completed_at` on each Mission whose
+  `autoCompletion` names that exact route, if and only if the character has
+  accepted it and it is not already complete. The stamp is the same exactly-once
+  guard a turn-in uses (`completed_at IS NULL`), inside the same transaction that
+  relocates the character, ship and Cargo Hold, so a retry or a concurrent read
+  can never complete it twice. The stamp's timestamp is the flight's scheduled
+  arrival instant.
+- **No turn-in, no completion scene, no reward.** Registry validation rejects an
+  automatic Mission that also authors a `turnIn`, a `reward`, or any turn-in
+  lifecycle dialogue (`dialogue` must be empty), and requires the matching
+  `ship_flight` requirement. `completeMission` refuses a forged hand-in for such a
+  Mission. Offer acceptance, the offer NPC's active reminder
+  (`MissionOffer.activeDialogueId`) and ordinary post-completion dialogue
+  (`completedNpcDialogue`) work as for any Mission.
+- **What does not complete it:** walking to the destination, the launch click, a
+  countdown reaching zero on the client, and a failed or refused flight. Projection
+  keeps the Mission `active` (never `ready_for_completion`) until the landing.
+- **Acceptance is explicit and gates the flight.** Move Along is offered after
+  Thrust Issues is completed, accepted by hand through the ordinary conversation
+  hub, and never chained. The route authors `requiredAcceptedMissionId`, so the
+  first Crash Site launch is refused until it is accepted; once complete it gates
+  nothing.
+- **The player is told durably.** The landing writes a `ship_arrival_notice`
+  (`docs/gameplay-foundations.md`, "The arrival notice"); the Mission Log shows
+  the normal completed card.
+
+NPC turn-in Missions are unchanged.
 
 ## 8. Rewards and acceptance effects
 
@@ -1089,3 +1131,13 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Turn-in:** Wade at **Rusk Recovery**, `actionLabel: "REPORT REPAIR"`. **Reward: none.** The 16 sections already paid 800 ordinary Welding XP, and the report adds no XP, Credits or item, which is why the Mission authors no `reward` and its completion presentation has no reward beat.
 - **Two facts, not one.** Finishing the repair is the *physical* fact: the Crash Site immediately shows the approved repaired ship and the Propulsion System reads "Propulsion restored. Report to Wade." Turning in to Wade is the separate *narrative* fact, after which the status reads "Propulsion restored. Ship flight-ready." Neither is duplicated into a stored flag. Neither opens a flight control, route, fuel or reserve; first flight, the next world and fuel are separate follow-on slices that can read these two existing facts.
 - **Dialogue:** the locked offer, active reminder and completion lines, verbatim, in Wade's own expressions (neutral, concerned, neutral, scowl for the offer; neutral then scowl for the completion). Three beats the design did not define are authored in his register from what the repair itself already says — a busy beat, a one-line turn-in opening ("Mounts seated. Frame welded. Good.") and a one-line follow-up that restates only the locked verdict, so it never goes stale and promises no flight or fuel. The deferred fuel warning and first-flight prompt are deliberately absent.
+
+
+### Move Along — the first flight, accepted by hand and completed by the landing (#358)
+
+- **Acceptance:** `prerequisiteMissionId: thrustIssues` and nothing else. One offer route, **Wade at Rusk Recovery**, `actionLabel: "TAKE HER TO THE PAD"`, with `activeDialogueId` for his reminder. It is **not** Thrust Issues' continuation: Thrust Issues is reported, and the player later accepts this by hand through the ordinary conversation hub.
+- **Requirement and completion:** one `ship_flight` requirement on `crash_site_to_holo_hollow_landing` — "Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (10 FU)." — and `autoCompletion` on the same route (§7.1). Only the flight's authoritative landing completes it: walking to the Landing, the Launch click, a countdown reaching zero, and a failed flight do not.
+- **No turn-in, no reward, no completion scene.** No XP, Credits, item or free fuel, and no report back to Wade. The landing shows a compact "Flight complete — Arrived at Holo Hollow Landing" / "Mission Complete: Move Along" notice (a durable, dismissible receipt, not a toast) and the Mission Log carries the normal completed card.
+- **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until it is accepted, even with the ship repaired and fuel loaded; the Ship panel says "Talk to Wade at Rusk Recovery to accept Move Along." Once the Mission is complete this gates nothing.
+- **Dialogue (locked copy, verbatim):** a five-beat offer ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."
+- **Reset.** Resetting a chain from an operator console clears the Mission records (Move Along follows Thrust Issues in the reset scope) but not the ship row: where the ship is berthed is physical state, not Mission state.

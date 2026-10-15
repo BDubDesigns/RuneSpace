@@ -75,11 +75,12 @@ export const LocationSceneSchema = z
  * available actions, and whether an authored walking edge is currently usable
  * — from facts the game already owns.
  *
- * `requires` deliberately references only two kinds of authoritative fact:
- * a Mission the character has accepted, and a repair target they have
- * completed. It is NOT a condition scripting language, and it is not a place to
- * grow one: a third kind of fact should be justified by a second real consumer,
- * the same rule the rest of this codebase follows.
+ * `requires` deliberately references only three kinds of authoritative fact:
+ * a Mission the character has accepted, a repair target they have completed,
+ * and whether their ship is actually berthed at this very location (#358). The
+ * third earned its place with two real consumers — the Crash Site shows no ship
+ * once it has left, and Holo Hollow Landing shows it once it has arrived. It is
+ * NOT a condition scripting language, and it is not a place to grow one.
  *
  * Every field is optional and overrides the location's own unconditional value,
  * so an existing location with no variants behaves exactly as before.
@@ -91,11 +92,19 @@ export const LocationStateVariantSchema = z
       .object({
         acceptedMissionId: ContentId.optional(),
         completedRepairTargetId: ContentId.optional(),
+        /**
+         * `here`: the character's ship is berthed at this location. `elsewhere`:
+         * it is berthed somewhere else. Read from the ship's own authoritative
+         * berth, never from where the character happens to be standing.
+         */
+        shipBerth: z.enum(["here", "elsewhere"]).optional(),
       })
       .strict()
       .refine(
         (requires) =>
-          requires.acceptedMissionId != null || requires.completedRepairTargetId != null,
+          requires.acceptedMissionId != null ||
+          requires.completedRepairTargetId != null ||
+          requires.shipBerth != null,
         { message: "A location state variant must require at least one authoritative fact" },
       ),
     description: z.string().optional(),

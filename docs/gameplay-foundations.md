@@ -575,16 +575,18 @@ completion — `completedStatus` ("Propulsion restored. Report to Wade.") until
 Thrust Issues is turned in, then the target's `reportedStatus` ("Propulsion
 restored. Ship flight-ready."), through `completedRepairStatus`
 (`game/domain/repair-targets`). Both are per character, because both facts are.
-Restoring the ship opens **no** flight control, Launch or Board Ship action,
-destination, fuel or reserve: first flight, the next world and the fuel economy
-are separate later slices that can consume the repair completion and the
-Mission turn-in.
+Restoring the ship opens **no** flight control by itself. The first flight
+(#358, "The Rivet Utility Shuttle and its first flight" below) consumes the
+repair completion and the Mission turn-in as facts; it adds no flag to either.
 
-### Ship systems: one presentation at the Crash Site (issue #322)
+### Ship systems: one presentation, now inside the Ship panel (issue #322)
 
 The Cargo Hold, the Landing Gear and the Propulsion System (#330) are
 **visible physical systems of the crashed ship**, and they share one
-presentation and state model, `features/ship/ShipSystemPanel.tsx`: *visible
+presentation and state model, `features/ship/ShipSystemPanel.tsx`. Since #358
+the three are sections (`ShipSystemSection`) of the **single Ship panel**
+(`features/ship/ShipPanel.tsx`) rather than three stacked cards; the standalone
+`ShipSystemPanel` shares the same content and state hook. *Visible
 damaged system → Mission authorizes the repair → the standard repair
 presentation → completed system*. Progression changes whether a system is
 actionable, never whether the player can see that the ship has it.
@@ -610,6 +612,94 @@ presentation retired its bespoke material, Welding and Reward cards and its
 separate commit-confirmation step; the install control now names the exact
 amounts it takes, as every other repair does. The Propulsion System (#330) was
 exactly one more registry entry and one more panel at the Crash Site.
+
+### The Rivet Utility Shuttle and its first flight (issue #358)
+
+Each character owns one Rivet Utility Shuttle. It is not a separate object: it
+is the ship already repaired through the repair rows, plus the little that
+nothing else could record — where it is berthed, how much fuel is in the tank,
+and the one flight that may be under way. That is one row, `character_ships`
+(`db/rune-space.ts`): `berth_location_id`, `fuel_units` (CHECK 0–300) and an
+all-or-nothing set of flight columns (route, origin, destination, start and
+arrival instants). **No row means an untouched ship at the Crash Site with an
+empty tank**, so no character is backfilled; the row is created the first time
+the tank is filled or the ship launches. The berth moves only when a flight's
+landing commits — never when the character walks, so walking to Holo Hollow
+Landing neither moves the ship nor completes a Mission.
+
+**Numbers** (`game/config/balance.ts`, `ship`): 300 FU tank, starting at 0; the
+one route, `crash_site_to_holo_hollow_landing` (`game/content/ship-routes.ts`),
+costs 10 FU and takes 25 ticks (15 real seconds). The route is one-way: there is
+no flight back to the Crash Site and no interplanetary route. A Full Small Fuel
+Canister's 50 FU is the item's own `fuelUnits` (#343).
+
+**Refueling** (`refuelShip`, `server/ship-commands.ts`) has exactly two source
+actions: Load from Inventory and Load from Cargo Hold. Each consumes exactly one
+Full Small Fuel Canister (never returning an empty shell) and adds 50 FU, or
+less when the tank is nearly full, in which case the player must first confirm
+the exact gain and waste (`confirmedGainFuelUnits`). The server decides
+everything under the character lock: the character must be idle at the ship's
+actual berth, propulsion must be restored, the chosen source must hold a
+canister, and `expectedFuelUnits` (the tank the player saw) is a stale-view
+guard so a retried or racing tap is refused, never loaded twice. `planRefuel`
+(`game/domain/ship.ts`) is the one pure rule; the UI restates it only to decide
+which button needs a confirmation.
+
+**Launch** (`launchShip`) validates, in one transaction, an authored route that
+departs from the ship's actual berth, a character who is at that berth and
+idle, the route's required repairs (all three ship systems), a completed Thrust
+Issues, an **accepted** Move Along, and at least 10 FU (`planLaunch`). It then
+deducts the fuel once, records immutable start and arrival instants on the ship
+row, and inserts an `active_actions` row for `ship_flight`. There is no cancel,
+abort, refund or second launch, and an operator force-idle fails closed rather
+than orphan the flight (`server/play-interrupt.ts`). Move Along gates only the
+route that completes it (`requiredAcceptedMissionId`): once it is complete it
+gates nothing.
+
+**In flight** the character is in one authoritative state. A default-deny gate
+in the shared owned-character boundaries (`server/action-resolution.ts`,
+`allowDuringFlight`) refuses every player command — walking, activities,
+trading, Inventory and Equipment changes, cargo, Missions — except the Play read
+and presentation-only dismissals, so Inventory, Equipment and Missions stay
+browseable but nothing mutates. `tests/unit/ship-flight-gate.test.ts` keeps that
+opt-out list exact. The client shows a live countdown from the server's recorded
+instants (`FlightPanel`), which can be minimized and reopened; a client clock
+reaching zero only shows "touchdown pending" and unlocks nothing.
+
+**Landing** is lazy, like every timed action: the next authenticated read or
+command resolves an overdue flight through `createShipFlightResolver`
+(`server/ship-state.ts`), registered in the Play resolver, with no per-character
+timer. It compares the recorded arrival instant to the resolution window, so
+the generic offline-work cap cannot delay it — a character returning three
+hours after a 15-second flight lands immediately. In one transaction the
+resolver moves the character and the ship (and with it the attached Cargo Hold,
+whose access is simply "the character is where the ship is berthed" —
+`server/cargo-hold.ts`), stamps Move Along complete, clears the flight, and
+writes the arrival receipt. It charges nothing at arrival and is idempotent under
+simultaneous reads and retries. Inconsistent state throws and rolls everything
+back.
+
+**Move Along** is the first Mission completed by a gameplay outcome rather than
+a conversation (`docs/missions.md`, "Automatic completion").
+
+**The arrival notice** is `ship_arrival_notices`: a durable, once-per-arrival
+presentation receipt written in the landing transaction (unique per character,
+route and scheduled arrival instant) and projected until dismissed. Dismissal
+(`acknowledgeShipArrival`) is idempotent, presentation only, allowed during a
+trade or flight, and changes neither the arrival nor the Mission. It is not a
+notification inbox.
+
+**Scenes** read the ship's own berth, not the character's position
+(`LocationStateFacts.shipBerthLocationId`, `requires.shipBerth` on a location
+state variant): the Crash Site shows the crashed ship, the repaired ship, then
+the empty background once the ship has flown; Holo Hollow Landing shows the same
+canonical repaired overlay on its empty 4:1 pano only while the ship is berthed
+there. No new art.
+
+**The Ship panel** (`features/ship/ShipPanel.tsx`) is the one presence at the
+ship's actual berth: the three systems with their repair work, the Cargo Hold's
+storage once repaired, and — once Propulsion is restored — a Board Ship control
+for fuel and flight. It renders nowhere else.
 
 ### The Crash Site's two scenes (issue #330)
 
@@ -1150,7 +1240,8 @@ none of those is an inventory item.
 
 Two recipes on the existing engines turn Skatboll's Oil Shale into fuel the
 player can carry. Neither is a new system: each is one authored entry, and there
-is no ship tank, refueling, Fuel Unit spending, flight, price or freight pad.
+is no price or freight pad here; the ship's tank, refueling and flight arrived
+in #358.
 
 - **Empty Small Fuel Canister** — Fabrication 8 at the existing Rusk Recovery
   station: 1 Galvanic Stock → 1 canister, 30 ticks, 75 base XP (deliberately the
@@ -1164,8 +1255,8 @@ is no ship tank, refueling, Fuel Unit spending, flight, price or freight pad.
   chance is the Galvanic Stock / Galvaferrite curve unchanged — 3,500 bps at
   Refining 1 to a guaranteed 10,000 at 30, so the level-8 unlock sits at 5,068
   bps (50.68%) rather than restarting the climb. The Full canister is 6,000 g,
-  stacks to 2 and carries `fuelUnits: 50` on its item definition for a later
-  refueling slice; nothing reads that value yet.
+  stacks to 2 and carries `fuelUnits: 50` on its item definition, which the
+  Rivet's tank loads from (#358).
 
 A failure is a `fixed_outputs` branch of two *returned inputs*: exactly 5 of the
 10 Oil Shale and the same shell come back, the other 5 shale are lost, and
@@ -1658,7 +1749,9 @@ of war, fuel, hauling, and transportation upgrades build.
 - **Holo Hollow Landing** (`holo_hollow_landing`, `{q:1,r:1}`, issue #357):
   Skatboll's landing pad, an ordinary World Location rather than a separate
   planet, open to anyone on foot from the start. It hosts no activity, no ship
-  state and no merchant of its own; its one Local Place is **Last Leg Trading**.
+  state of its own and no merchant of its own; its one Local Place is **Last
+  Leg Trading**. Once a character's Rivet flies there (#358) the pad shows that
+  ship and the Ship panel is available there.
   Walking edges, all the standard 24 seconds and bidirectional: **Crash Site**,
   **Abandoned Processing Yard** and **South Access Track**. There is no link to
   The South Cut and no ship moves when a character walks here.

@@ -155,7 +155,6 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   const system = page.locator(GEAR_SYSTEM);
   await expect(system).toBeVisible();
   await expect(system).toHaveAttribute("data-ship-system-state", "offline");
-  await expect(system.getByRole("heading")).toContainText("Ship");
   await expect(system.getByRole("heading")).toContainText("Landing Gear");
   await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
     "The landing gear is damaged and cannot be repaired yet.",

@@ -22,6 +22,7 @@ import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
 import { PlayPageScrollHints } from "./PlayPageScrollHints";
 import { PlayProvider, usePlay } from "./PlayContext";
+import { isPlayInTransit } from "@/features/ship/flight";
 import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
 import { PlayUtilityWorkspace } from "./PlayUtilityWorkspace";
 import { PlayViewSwitch } from "./PlayViewSwitch";
@@ -295,7 +296,7 @@ function PlayWorkspace({
                   mapControl={
                     desktop === false ? undefined : (
                       <PlayViewSwitch
-                        inTransit={Boolean(state.travelState)}
+                        inTransit={isPlayInTransit(state)}
                         mapActive={mapActive}
                         onMapExit={onMapExit}
                       />

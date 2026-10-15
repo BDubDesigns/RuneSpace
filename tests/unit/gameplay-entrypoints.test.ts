@@ -101,7 +101,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 82 production player actions", () => {
+  it("enumerates exactly the 85 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -114,13 +114,14 @@ describe("player server actions (server/actions.ts)", () => {
     // adds seven site stash commands: stack and item deposit and withdrawal,
     // and container install, swap, and remove. #312 adds Turn Back from a
     // Journey. #325 adds Mission pinning. #342 adds the Prioritize primary
-    // resources preference.
-    expect(bodies.size).toBe(82);
+    // resources preference. #358 adds the Rivet's refuel, launch, and landing
+    // notice acknowledgment.
+    expect(bodies.size).toBe(85);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(78);
+    expect(gameplay).toHaveLength(81);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }

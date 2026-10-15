@@ -68,6 +68,33 @@ export const ScavengeRevealAcknowledgmentRequestSchema = z.object({
   revealId: z.string().uuid(),
 });
 
+/**
+ * Loading the Rivet's tank (#358). The browser names only which of the two
+ * sources to draw from and what it was looking at: `expectedFuelUnits` is a
+ * stale-view guard (a retried or racing tap sees a different tank and is refused,
+ * never loaded twice), and `confirmedGainFuelUnits` is the exact gain the player
+ * accepted for a partial load. Neither is an authority — the server recomputes
+ * the tank, the canister, the gain and the waste itself.
+ */
+export const RefuelShipRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  source: z.enum(["inventory", "cargo_hold"]),
+  expectedFuelUnits: z.number().int().min(0).max(300),
+  confirmedGainFuelUnits: z.number().int().min(1).max(300).optional(),
+});
+
+/** A launch names the authored route and nothing else (#358). */
+export const LaunchShipRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  routeId: ContentId,
+});
+
+/** Dismissal of one landing receipt is presentation-only and idempotent (#358). */
+export const AcknowledgeShipArrivalRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  noticeId: z.string().uuid(),
+});
+
 /** The Power Annex command supplies only the owned character identity. */
 export const ClaimPowerCellsRequestSchema = z.object({
   characterId: z.string().uuid(),

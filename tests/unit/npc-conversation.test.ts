@@ -584,7 +584,7 @@ describe("issue #164 replayable social topics", () => {
     const topicDialogueIds = new Set(CONVERSATION_TOPICS.map((topic) => topic.dialogueId));
     for (const definition of [WALK_IT_OFF, CUT_YOUR_TEETH, WASTE_NOT, HOLD_IT_TOGETHER]) {
       const missionOwned = [
-        definition.turnIn.dialogueId,
+        definition.turnIn!.dialogueId,
         ...definition.offers.flatMap((offer) => [
           offer.dialogueId,
           offer.acceptedContinuation?.dialogueId,

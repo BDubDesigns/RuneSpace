@@ -4,6 +4,9 @@ import { useEffect, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
+import { FlightPanel } from "@/features/ship/FlightPanel";
+import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
+import { isShipInFlight } from "@/features/ship/flight";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
@@ -47,6 +50,7 @@ export function PlayConsole({
   const { acquireCommand, acceptState, releaseCommand, setRefreshCallback, state } = usePlay();
   const desktop = useDesktopWorkspace();
   const inTransit = Boolean(state.travelState);
+  const inFlight = isShipInFlight(state);
   const [, startTransition] = useTransition();
 
   function applyReconciliation(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
@@ -97,12 +101,16 @@ export function PlayConsole({
         />
       ) : null}
       <ScavengeSuppressedNotice />
+      {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
+      <ShipArrivalNotice />
       {surface === "map" ? (
         // The return control is the desktop main-column header's while docked
         // (#286), so the panel does not carry a second one beside it.
         <LocalMapPanel onBack={desktop ? undefined : onMapExit} onTravelStarted={onMapExit} />
       ) : inTransit ? (
         <JourneyPanel />
+      ) : inFlight ? (
+        <FlightPanel />
       ) : (
         <>
           {/* The grammar, in order (#193): the place, then the one thing you

@@ -183,7 +183,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
     conversation.getByRole("img", { name: "Wade Rusk, concerned expression" }),
   ).toBeVisible();
   await playToText(conversation, /You'll need two Drive Mounts\. Galvaferrite work\./);
-  await playToText(conversation, /get your beater ship off my front lawn\./);
+  await playToText(conversation, /I'm done holding your hand\./);
   await expect(
     conversation.getByRole("img", { name: "Wade Rusk, scowl expression" }),
   ).toBeVisible();
@@ -202,7 +202,6 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   const system = page.locator(SYSTEM);
   await expect(system).toBeVisible();
   await expect(system).toHaveAttribute("data-ship-system-state", "offline");
-  await expect(system.getByRole("heading")).toContainText("Ship");
   await expect(system.getByRole("heading")).toContainText("Propulsion System");
   await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
     "The propulsion system is damaged and cannot be repaired yet.",

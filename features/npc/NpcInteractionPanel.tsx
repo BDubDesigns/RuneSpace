@@ -23,6 +23,7 @@ import {
   presentConversationEntries,
 } from "@/features/missions/mission-pins";
 import { usePlay } from "@/features/play/PlayContext";
+import { isPlayInTransit } from "@/features/ship/flight";
 
 /** Everything one resident's Local Contact row presents (#231). */
 export type ResidentContact = {
@@ -119,7 +120,7 @@ export function NpcInteractionPanel({
       ? getMerchant(activePlace.merchantId)
       : undefined
     : getLocationMerchant(locationId);
-  const stationary = !state.activeAction && !state.travelState;
+  const stationary = !state.activeAction && !isPlayInTransit(state);
   const guidanceTargets = derivePinnedGuidanceTargets(state);
   const departed =
     conversationNpcId && !residents.some((npc) => npc.id === conversationNpcId)

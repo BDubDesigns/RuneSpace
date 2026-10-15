@@ -8,7 +8,7 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
-import { ACTION_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { planExactStackAddition, type StackState } from "@/game/domain/inventory";
 import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
@@ -26,6 +26,7 @@ import {
   type PlayGameplayState,
 } from "@/server/play";
 import { loadRepairAccess } from "@/server/repair-access";
+import { loadShipBerthLocationId } from "@/server/ship-state";
 import { loadRepairTargetRow, repairStateFromRow } from "@/server/welding";
 
 export type CargoHoldStackTransferRequest = {
@@ -39,7 +40,7 @@ export type CargoHoldUniqueTransferRequest = {
 };
 
 export type CargoHoldRefusalReason =
-  | "not_at_crash_site"
+  | "not_at_ship"
   | "in_transit"
   | "repair_incomplete"
   | "stack_changed"
@@ -104,11 +105,16 @@ async function accessRefusal(
     .from(characters)
     .where(eq(characters.id, characterId))
     .limit(1);
-  if (charactersAtLocation[0]?.currentLocationId !== LOCATION_IDS.crashSite) {
+  // The Hold is attached to the ship (#358), so it is reachable only where the
+  // ship actually is: the Crash Site until a flight lands, then wherever it
+  // berthed. Walking to a ship's old berth, or to where it has not yet landed,
+  // never opens it.
+  const berthLocationId = await loadShipBerthLocationId(transaction, characterId);
+  if (charactersAtLocation[0]?.currentLocationId !== berthLocationId) {
     return {
       status: "refused",
-      reason: "not_at_crash_site",
-      message: "Cargo Hold access is only available while stationary at Crash Site.",
+      reason: "not_at_ship",
+      message: "Cargo Hold access is only available while stationary at your ship.",
     };
   }
   const repairRow = await loadRepairTargetRow(

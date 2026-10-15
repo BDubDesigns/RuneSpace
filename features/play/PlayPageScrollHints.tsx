@@ -11,6 +11,7 @@ import {
   type VerticalScrollAffordances,
 } from "@/components/ui/scroll-affordances";
 import { usePlay } from "./PlayContext";
+import { isPlayInTransit } from "@/features/ship/flight";
 import { useDesktopWorkspace } from "./workspace-presentation";
 
 /**
@@ -112,7 +113,7 @@ export function PlayPageScrollHints() {
   const mapActive = useSearchParams().get("surface") === "map";
   const { state } = usePlay();
   const modalOpen = useModalDrawerOpen();
-  const inTransit = Boolean(state.travelState);
+  const inTransit = isPlayInTransit(state);
   const enabled = desktop === false && !mapActive && !inTransit && !modalOpen;
   const { affordances, left, width } = usePageScrollAffordances(enabled);
 

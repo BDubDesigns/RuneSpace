@@ -316,6 +316,13 @@
       "when": 1791688559945,
       "tag": "0044_oil_shale_mining",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792099803742,
+      "tag": "0045_rivet_ship_first_flight",
+      "breakpoints": true
     }
   ]
 }

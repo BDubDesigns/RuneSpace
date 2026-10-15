@@ -158,8 +158,8 @@ describe("Tansy hands off; Wade owns the Mission", () => {
     expect(TEN_THOUSAND_HOURS.offers.some((offer) => offer.npcId === NPC_IDS.tansyRusk)).toBe(
       false,
     );
-    expect(TEN_THOUSAND_HOURS.turnIn.npcId).toBe(NPC_IDS.wadeRusk);
-    expect(TEN_THOUSAND_HOURS.turnIn.locationId).toBe(LOCATION_IDS.ruskRecovery);
+    expect(TEN_THOUSAND_HOURS.turnIn!.npcId).toBe(NPC_IDS.wadeRusk);
+    expect(TEN_THOUSAND_HOURS.turnIn!.locationId).toBe(LOCATION_IDS.ruskRecovery);
   });
 
   it("is never auto-accepted", () => {
@@ -250,7 +250,7 @@ describe("the objective is real Practice welds", () => {
 
     const done = project(accepted(), { welds: 3 });
     expect(done.state).toBe("ready_for_completion");
-    expect(done.currentObjective).toBe(TEN_THOUSAND_HOURS.turnIn.objective);
+    expect(done.currentObjective).toBe(TEN_THOUSAND_HOURS.turnIn!.objective);
     expect(done.stage?.turnInAvailable).toBe(true);
   });
 

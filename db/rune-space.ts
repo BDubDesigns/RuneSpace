@@ -51,6 +51,13 @@ export const SLOT_MAX = 3;
  */
 export const STARTING_CREDITS = 10;
 
+/**
+ * The Rivet's tank capacity in Fuel Units, written into the ship table's CHECK.
+ * The authoritative value is `ship.tankCapacityFuelUnits` in game/config/balance;
+ * a unit test asserts the two never drift apart.
+ */
+export const SHIP_TANK_CAPACITY_FUEL_UNITS = 300;
+
 export const playerAccounts = pgTable(
   "player_accounts",
   {
@@ -430,6 +437,98 @@ export const characterScavengeReveals = pgTable(
       table.characterId,
       table.claimedAt,
     ),
+  ],
+);
+
+/**
+ * A character's one Rivet Utility Shuttle (#358).
+ *
+ * The ship is derived wherever it already has an authoritative home: whether it
+ * is repaired comes from the repair rows, and the Cargo Hold's contents stay on
+ * the character's own Cargo rows (the Hold is "attached" because its access is
+ * decided by where this row says the ship is berthed). What this row adds is
+ * only what nothing else could record: where the ship is parked, how much fuel
+ * is in the tank, and the one flight that may be under way.
+ *
+ * A character with no row has an untouched ship at the Crash Site with an empty
+ * tank, so a new route or character needs no backfill. The row is created the
+ * first time the tank is filled or the ship launches.
+ *
+ * `berth_location_id` is the ship's actual physical berth. It moves only when
+ * a flight's arrival commits, never when the character walks. The in-flight
+ * columns are either all NULL (parked) or all set (airborne): the route,
+ * origin, destination and the immutable start and arrival instants are
+ * recorded once at launch, and the arrival is resolved lazily from them like
+ * every other timed action. Fuel is deducted at launch and never at arrival.
+ */
+export const characterShips = pgTable(
+  "character_ships",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    berthLocationId: text("berth_location_id").notNull().default("crash_site"),
+    // Mirrors `ship.tankCapacityFuelUnits` in game/config/balance, as
+    // `STARTING_CREDITS` mirrors the Credits balance: this layer imports no game
+    // content, and a unit test keeps the two from drifting apart.
+    fuelUnits: integer("fuel_units").notNull().default(0),
+    flightRouteId: text("flight_route_id"),
+    flightOriginLocationId: text("flight_origin_location_id"),
+    flightDestinationLocationId: text("flight_destination_location_id"),
+    flightStartedAt: timestamp("flight_started_at", { withTimezone: true }),
+    flightArrivesAt: timestamp("flight_arrives_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_ships_fuel_in_tank",
+      sql`${table.fuelUnits} >= 0 AND ${table.fuelUnits} <= ${sql.raw(String(SHIP_TANK_CAPACITY_FUEL_UNITS))}`,
+    ),
+    // A flight is all-or-nothing: a half-recorded flight could neither be
+    // resolved nor refused, so the database refuses to store one.
+    check(
+      "character_ships_flight_all_or_nothing",
+      sql`(${table.flightRouteId} IS NULL AND ${table.flightOriginLocationId} IS NULL AND ${table.flightDestinationLocationId} IS NULL AND ${table.flightStartedAt} IS NULL AND ${table.flightArrivesAt} IS NULL) OR (${table.flightRouteId} IS NOT NULL AND ${table.flightOriginLocationId} IS NOT NULL AND ${table.flightDestinationLocationId} IS NOT NULL AND ${table.flightStartedAt} IS NOT NULL AND ${table.flightArrivesAt} IS NOT NULL AND ${table.flightArrivesAt} > ${table.flightStartedAt} AND ${table.flightOriginLocationId} <> ${table.flightDestinationLocationId})`,
+    ),
+  ],
+);
+
+/**
+ * The durable once-per-arrival presentation receipt for a Rivet flight (#358).
+ *
+ * Written in the same transaction that commits a landing, so a landing and its
+ * receipt cannot disagree. It exists only so the player is shown "Flight
+ * complete" even after closing the browser, losing the connection, or opening
+ * another device; `acknowledged_at` records that they dismissed it. It is
+ * presentation only: the arrival and any Mission it completed are authoritative
+ * independently of this row, and acknowledging it changes nothing else. It is
+ * deliberately not a notification inbox. `arrived_at` is the flight's own
+ * scheduled arrival instant, so a retried resolution cannot mint a second one.
+ */
+export const shipArrivalNotices = pgTable(
+  "ship_arrival_notices",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    routeId: text("route_id").notNull(),
+    destinationLocationId: text("destination_location_id").notNull(),
+    // The Mission this landing completed, set only when it genuinely did.
+    completedMissionId: text("completed_mission_id"),
+    arrivedAt: timestamp("arrived_at", { withTimezone: true }).notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("ship_arrival_notices_character_route_arrival_unique").on(
+      table.characterId,
+      table.routeId,
+      table.arrivedAt,
+    ),
+    index("ship_arrival_notices_character_id_idx").on(table.characterId),
   ],
 );
 
@@ -2286,6 +2385,8 @@ export type EquippedItem = typeof equippedItems.$inferSelect;
 export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
+export type CharacterShip = typeof characterShips.$inferSelect;
+export type ShipArrivalNotice = typeof shipArrivalNotices.$inferSelect;
 export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;

@@ -64,9 +64,11 @@ const BOUNDARY_REFRESH_GRACE_MS = 150;
 function boundaryKeyForState(state: PlayGameplayState): string | undefined {
   return state.travelState
     ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
-    : state.activeAction
-      ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
-      : undefined;
+    : state.ship.flight
+      ? `flight:${state.ship.flight.routeId}:${state.ship.flight.arrivesAt}`
+      : state.activeAction
+        ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
+        : undefined;
 }
 
 /**
@@ -232,7 +234,10 @@ export function PlayProvider({
   // must survive a request that arrives just before the server's whole-tick
   // deadline and returns the same authoritative timestamp.
   const boundaryKey = boundaryKeyForState(state);
-  const boundaryAt = state.travelState?.arrivesAt ?? state.activeAction?.nextAttemptAt;
+  const boundaryAt =
+    state.travelState?.arrivesAt ??
+    state.ship.flight?.arrivesAt ??
+    state.activeAction?.nextAttemptAt;
 
   useEffect(() => {
     if (!boundaryKey || !boundaryAt) return;
