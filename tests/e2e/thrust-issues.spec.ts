@@ -323,12 +323,12 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
     );
   expect(row?.completedAt).not.toBeNull();
 
-  // No flight control exists, here or anywhere else on the page.
+  // Restoring the ship launches nothing by itself (#358 adds the Ship panel's
+  // Board Ship control, but no route is flown, shown or enabled until the player
+  // boards): no Launch control and no Stillreach exist anywhere on the page.
   const noFlight = async () => {
-    await expect(
-      page.getByRole("button", { name: /flight controls|launch|board ship/i }),
-    ).toHaveCount(0);
-    await expect(page.getByText(/Flight Controls|Board Ship|Stillreach/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
+    await expect(page.getByText(/Stillreach/)).toHaveCount(0);
   };
   await noFlight();
 
