@@ -184,7 +184,7 @@ export const NPCS: readonly NpcDefinition[] = [
     // relocation. His four approved expressions map the shared vocabulary to his
     // own art.
     id: NPC_IDS.tollKade,
-    displayName: "Toll Kade",
+    displayName: "Tolliver “Toll” Kade",
     role: "Last Leg Trading hauler & merchant",
     homeLocationId: LOCATION_IDS.holoHollowLanding,
     localPlaceId: LOCAL_PLACE_IDS.lastLegTrading,

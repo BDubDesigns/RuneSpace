@@ -257,6 +257,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "holo_hollow" as const,
       layout: "holo_hollow" as const,
+      localPlacesEyebrow: "Around town",
       localMap: { axial: { q: -1, r: 1 }, label: "Holo Hollow" },
       scene: {
         // Delivered at its native 1536x384 4:1 resolution (#159): approved art
@@ -472,6 +473,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "holo_hollow_landing" as const,
       layout: "holo_hollow_landing" as const,
+      localPlacesEyebrow: "Around the pad",
       localMap: { axial: { q: 1, r: 1 }, label: "Holo Hollow Landing" },
       scene: {
         // Delivered at its native 1536x384 4:1 resolution (#357): an empty pad,

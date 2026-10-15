@@ -348,6 +348,7 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // The town presents its places rather than a production activity.
   const directory = page.locator("[data-local-place-directory]");
   await expect(directory).toBeVisible();
+  await expect(directory).toContainText("Around town");
   await expect(directory.locator("[data-local-place]")).toHaveCount(4);
   // A fresh character's unaccepted Walk It Off advertises no place in town.
   await expect(directory.locator("[data-mission-guidance]")).toHaveCount(0);

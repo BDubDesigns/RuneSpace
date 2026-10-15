@@ -109,6 +109,13 @@ describe("issue #357 Holo Hollow Landing", () => {
     expect(edges).toHaveLength(3);
   });
 
+  it("authors a context-specific heading for both Local Place hubs", () => {
+    expect(getLocation(landing)?.presentation.localPlacesEyebrow).toBe("Around the pad");
+    expect(getLocation(LOCATION_IDS.holoHollow)?.presentation.localPlacesEyebrow).toBe(
+      "Around town",
+    );
+  });
+
   it("has Last Leg Trading as its one open Local Place and hosts no merchant of its own", () => {
     const places = getLocalPlacesForLocation(landing);
     expect(places.map((place) => place.id)).toEqual([LOCAL_PLACE_IDS.lastLegTrading]);
@@ -164,6 +171,7 @@ describe("issue #357 Toll Kade", () => {
   const toll = getNpc(NPC_IDS.tollKade)!;
 
   it("stands inside Last Leg Trading, not on the pad, with four separate portraits", () => {
+    expect(toll.displayName).toBe("Tolliver “Toll” Kade");
     expect(toll.homeLocationId).toBe(landing);
     expect(toll.localPlaceId).toBe(LOCAL_PLACE_IDS.lastLegTrading);
     expect(getResidentNpcs({ locationId: landing }).map((npc) => npc.id)).toEqual([]);

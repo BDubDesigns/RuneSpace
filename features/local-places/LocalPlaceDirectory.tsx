@@ -9,6 +9,7 @@ import { MissionActionLink } from "@/components/ui/MissionActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
+import { getLocation } from "@/game/content/locations";
 import {
   deriveLocalPlaceAccess,
   deriveLocalPlaceSurface,
@@ -38,6 +39,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   const { state } = usePlay();
   const places = getLocalPlacesForLocation(locationId);
   if (places.length === 0) return null;
+  const placesEyebrow = getLocation(locationId)?.presentation.localPlacesEyebrow ?? "Around here";
   // A place whose door opens on Mission completion reads that authoritative
   // state here, so the world visibly changes as soon as the Mission is done.
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
@@ -51,7 +53,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
 
   return (
     <div data-local-place-directory>
-      <SectionHeader eyebrow="Around town" level={2}>
+      <SectionHeader eyebrow={placesEyebrow} level={2}>
         Places
       </SectionHeader>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">

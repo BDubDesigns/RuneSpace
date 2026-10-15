@@ -173,6 +173,8 @@ export const LocationDefinitionSchema = z
         "the_south_cut",
         "holo_hollow_landing",
       ]),
+      /** Local Place directory heading for this World Location, when it has venues. */
+      localPlacesEyebrow: z.string().trim().min(1).optional(),
       localMap: z
         .object({
           axial: z.object({ q: z.number().int(), r: z.number().int() }).strict(),

@@ -479,7 +479,7 @@ const authoredWikiArticles = [
         heading: "Trading with Toll at Last Leg Trading",
         paragraphs: [
           [
-            "Toll Kade works the counter at Last Leg Trading, a freight and fuel shop on ",
+            "Tolliver “Toll” Kade works the counter at Last Leg Trading, a freight and fuel shop on ",
             { text: "Holo Hollow Landing", articleSlug: "travel-and-scavenging" },
             ". Open the Landing from the Map, step into the shop, and you can talk to him straight away: his Skatboll, Stillreach and Fuel topics are there from the start and can be read again any time. Talking and trading are separate, and reading a topic changes nothing about your trade.",
           ],

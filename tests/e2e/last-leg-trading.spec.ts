@@ -46,10 +46,14 @@ for (const viewport of [
     await openTestCharacter(page, testCharacter.id);
 
     // The pad itself has no resident and no ship; its one Local Place is the shop.
+    await expect(page.locator("[data-local-place-directory]")).toContainText("Around the pad");
     await expect(page.locator('[data-npc-interaction="toll_kade"]')).toHaveCount(0);
     await enterTheShop(page);
 
-    const conversation = await openNpcConversation(page, "Toll Kade");
+    await expect(page.locator('[data-npc-interaction="toll_kade"]')).toContainText(
+      "Tolliver “Toll” Kade",
+    );
+    const conversation = await openNpcConversation(page, "Tolliver “Toll” Kade");
     for (const topic of ["Skatboll", "Stillreach", "Fuel"]) {
       await expect(conversation.getByRole("button", { name: new RegExp(topic) })).toBeVisible();
     }
@@ -80,7 +84,7 @@ test("keeps the counter shut, and says why, until Thrust Issues is reported", as
   await enterTheShop(page);
 
   await page.locator('[data-npc-action="trade"]').click();
-  const counter = page.getByRole("dialog", { name: "Trade with Toll Kade" });
+  const counter = page.getByRole("dialog", { name: "Trade with Tolliver “Toll” Kade" });
   await expect(counter).toContainText(
     "Trading unlocks after you report the completed Thrust Issues repair to Wade at Rusk Recovery.",
   );
