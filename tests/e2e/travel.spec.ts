@@ -99,6 +99,8 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
     // Visible from the start as a future-world tease, behind The Jag (#209).
     "Deep Jag",
     "Holo Hollow",
+    // Skatboll's landing pad joins the map as a sixth neighbor of the Crash Site (#357).
+    "Holo Hollow Landing",
     "Long Scramble",
     "Power Annex",
     "Processing Yard",
@@ -126,13 +128,14 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
-// Ten hexes from the Crash Site: it is "You are here", the Processing Yard,
-// Power Annex, Long Scramble, Holo Hollow and the South Access Track (#342) are
-// all directly reachable, and The Jag, Rusk Recovery (#190), Deep Jag (#209) and
+// Eleven hexes from the Crash Site: it is "You are here", the Processing Yard,
+// Power Annex, Long Scramble, Holo Hollow, the South Access Track (#342) and Holo
+// Hollow Landing (#357) are all directly reachable, and The Jag, Rusk Recovery (#190), Deep Jag (#209) and
 // The South Cut (#342) are visible behind the Scramble, behind Holo Hollow,
 // behind The Jag, and behind the Track respectively.
 const STATIONARY_STATE_LABELS = [
   "You are here",
+  "Reachable",
   "Reachable",
   "Reachable",
   "Reachable",
@@ -150,6 +153,7 @@ const SELECTED_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Reachable",
+  "Reachable",
   "Visible",
   "Visible",
   "Visible",
@@ -158,6 +162,7 @@ const SELECTED_STATE_LABELS = [
 const IN_TRANSIT_STATE_LABELS = [
   "Origin",
   "Destination",
+  "Reachable",
   "Reachable",
   "Reachable",
   "Reachable",

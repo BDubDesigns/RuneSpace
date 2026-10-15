@@ -1,4 +1,4 @@
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, NPC_IDS } from "@/game/config/foundations";
 import { resolveArticleArt } from "@/game/content/article-art";
 import { PublicUpdateSchema } from "@/game/schemas/public-updates";
 import { COMMUNITY_RULES_SLUG, SAFETY_PRIVACY_SLUG } from "./policy-links";
@@ -8,6 +8,45 @@ import type { PublicUpdate } from "@/game/schemas/public-updates";
 export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
+  {
+    // Issue #357 — Holo Hollow Landing and Last Leg Trading.
+    slug: "holo-hollow-landing",
+    title: "Holo Hollow Landing",
+    publishedAt: "2026-10-14T20:00:00-07:00",
+    summary:
+      "Skatboll's landing pad is open on foot, with Last Leg Trading and Toll Kade at its edge. Talk to Toll now; buy and sell fuel canisters once you have reported Thrust Issues.",
+    hero: {
+      src: "/location-scenes/holo-hollow-landing.webp",
+      alt: "An empty industrial landing pad with a weathered H.H. painted inside a worn white circle, edge lights glowing, two low service sheds and fuel tanks behind it, and cold mountains under a heavy overcast sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "npc", npcId: NPC_IDS.tollKade }, side: "right" },
+      [
+        "Holo Hollow Landing is a new place on the map, east of the Crash Site: Skatboll's landing pad, a worn industrial apron with a weathered H.H. across it and lamps along its edge. You can walk there from the Crash Site, the Abandoned Processing Yard or the South Access Track, each a normal 24-second walk. It is open from the start, before your ship is repaired and before you have taken any job, and walking there moves nothing but you. See ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        " for how it connects.",
+      ],
+      "At the edge of the pad is Last Leg Trading, a freight and fuel shop, and behind its counter is Toll Kade, a working hauler with opinions about shipping labels. His Skatboll, Stillreach and Fuel topics are there as soon as you walk in, and you can read them as often as you like.",
+      [
+        "Trading opens later. Toll will buy and sell once you have reported the completed Thrust Issues repair to Wade at Rusk Recovery. He sells Full Small Fuel Canisters at 225 Credits and Empty ones at 40, buys them back at 160 and 25, and buys Oil Shale at 6 Credits a piece. He sells each character up to five Full and five Empty canisters a day. See ",
+        { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+        " for the details.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Holo Hollow Landing, a walkable landing pad at the far side of the Crash Site, the Abandoned Processing Yard and the South Access Track.",
+          "Last Leg Trading and Toll Kade, with three topics you can read any time: Skatboll, Stillreach and Fuel.",
+          "Fuel canister trading with Toll after you report Thrust Issues: Full canisters at 225 Credits (160 back), Empty canisters at 40 (25 back), and Oil Shale bought at 6.",
+          "A limit of five Full and five Empty canisters a day per character, reset at midnight Pacific time.",
+        ],
+      },
+    ],
+  },
   {
     // Issue #343 — Fuel manufacturing.
     slug: "fuel-canisters",

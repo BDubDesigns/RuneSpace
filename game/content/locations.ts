@@ -37,6 +37,9 @@ import {
  *   activity, shop, NPC or workstation; it exists to put two walking legs between
  *   the ship and the mine.
  * - The South Cut (#342): Skatboll's Oil Shale mine, Mining 5.
+ * - Holo Hollow Landing (#357): Skatboll's walkable landing pad, an ordinary
+ *   World Location at (1,1) with three walking edges. Its one Local Place is
+ *   Last Leg Trading. It hosts no ship: the pad is shown empty.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -92,6 +95,7 @@ const locationDefinitions = [
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.holoHollow,
       LOCATION_IDS.southAccessTrack,
+      LOCATION_IDS.holoHollowLanding,
     ],
     // The Crash Site's three repairs: the Cargo Hold, the Landing Gear (#322) and the
     // Propulsion System (#330). Listing each is what lets Mission guidance walk a
@@ -137,7 +141,11 @@ const locationDefinitions = [
     description:
       "Rusted conveyors and a refurbished hopper stand ready — Ferrite Shale can be refined here into Refined Ferrite and Slag.",
     region: "holo_hollow" as const,
-    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
+    adjacentLocationIds: [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.emergencyPowerAnnex,
+      LOCATION_IDS.holoHollowLanding,
+    ],
     availableActionIds: [ACTION_IDS.refining],
     mapStatus: "Refining",
     dormantActivities: [],
@@ -394,7 +402,11 @@ const locationDefinitions = [
     description:
       "A muddy, rutted service road running south out of the Crash Site past sagging poles, old pipe runs and broken fence. Nothing is made or sold here; it only goes somewhere.",
     region: "holo_hollow" as const,
-    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theSouthCut],
+    adjacentLocationIds: [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.theSouthCut,
+      LOCATION_IDS.holoHollowLanding,
+    ],
     availableActionIds: [],
     dormantActivities: [],
     presentation: {
@@ -439,6 +451,39 @@ const locationDefinitions = [
       },
     },
   },
+  {
+    // Skatboll's landing pad (#357): a physical, walkable World Location open to
+    // anyone on foot from the start, before the ship is repaired and before any
+    // Mission. It owns no activity and no ship state; the one thing here is its
+    // Local Place, Last Leg Trading. Three ordinary walking edges and no link to
+    // The South Cut, so reaching the mine still takes the South Access Track.
+    id: LOCATION_IDS.holoHollowLanding,
+    displayName: "Holo Hollow Landing",
+    description:
+      "A worn industrial landing pad on Skatboll with a weathered H.H. painted across it, lit by edge lamps and fenced with crumbling barriers. Last Leg Trading keeps a counter on the far side.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.abandonedProcessingYard,
+      LOCATION_IDS.southAccessTrack,
+    ],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "holo_hollow_landing" as const,
+      layout: "holo_hollow_landing" as const,
+      localMap: { axial: { q: 1, r: 1 }, label: "Holo Hollow Landing" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#357): an empty pad,
+        // so a parked ship can later be a separate overlay (docs/location-scenes).
+        asset: "/location-scenes/holo-hollow-landing.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "An empty industrial landing pad with a weathered H.H. painted inside a worn white circle, edge lights glowing, two low service sheds and fuel tanks behind it, and cold mountains under a heavy overcast sky",
+        focal: { x: 50, y: 62 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocationDefinitionInput[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
@@ -478,4 +523,5 @@ export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.deepJag,
   LOCATION_IDS.southAccessTrack,
   LOCATION_IDS.theSouthCut,
+  LOCATION_IDS.holoHollowLanding,
 ];

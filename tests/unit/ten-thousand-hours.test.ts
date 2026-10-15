@@ -214,10 +214,25 @@ describe("acceptance is the whole onboarding", () => {
     expect(wadeShop.authorizingMissionId).toBe(MISSION_IDS.tenThousandHours);
 
     const beforeAcceptance = deriveAcceptedMissionIds([project(undefined)]);
-    expect(isMerchantOpen(wadeShop, beforeAcceptance)).toBe(false);
-    expect(isMerchantOpen(wadeShop, deriveAcceptedMissionIds([project(accepted())]))).toBe(true);
+    expect(
+      isMerchantOpen(wadeShop, {
+        acceptedMissionIds: beforeAcceptance,
+        completedMissionIds: new Set(),
+      }),
+    ).toBe(false);
+    expect(
+      isMerchantOpen(wadeShop, {
+        acceptedMissionIds: deriveAcceptedMissionIds([project(accepted())]),
+        completedMissionIds: new Set(),
+      }),
+    ).toBe(true);
     // And it stays open once the Mission is finished.
-    expect(isMerchantOpen(wadeShop, deriveAcceptedMissionIds([project(completed())]))).toBe(true);
+    expect(
+      isMerchantOpen(wadeShop, {
+        acceptedMissionIds: deriveAcceptedMissionIds([project(completed())]),
+        completedMissionIds: new Set(),
+      }),
+    ).toBe(true);
   });
 });
 

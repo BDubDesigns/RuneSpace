@@ -131,8 +131,10 @@ describe("canonical article art", () => {
     expect(index).toContain("How to get it");
     expect(index).toContain("Pin it");
     expect(index).toContain("Oil Shale at The South Cut");
+    expect(index).toContain("Fuel Canisters");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Fuel Canisters");
+      expect(markup).toContain("Holo Hollow Landing");
+      expect(markup).not.toContain("toll-kade-neutral.png");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("empty-small-fuel-canister.webp");
       expect(markup).not.toContain("full-small-fuel-canister.webp");

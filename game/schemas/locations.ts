@@ -158,6 +158,7 @@ export const LocationDefinitionSchema = z
         "deep_jag",
         "south_access_track",
         "the_south_cut",
+        "holo_hollow_landing",
       ]),
       layout: z.enum([
         "crash_site",
@@ -170,6 +171,7 @@ export const LocationDefinitionSchema = z
         "deep_jag",
         "south_access_track",
         "the_south_cut",
+        "holo_hollow_landing",
       ]),
       localMap: z
         .object({

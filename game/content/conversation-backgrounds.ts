@@ -141,6 +141,15 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/curly-room-after.webp",
     alt: "The same lamplit guest room with a MYKEA storage container mounted on a welded frame above the bed, the luggage around it a little tidier",
   },
+  {
+    // Last Leg Trading's counter (#357): approved interior art with no person
+    // baked in, so Toll is always the separate portrait over it. The 4:1
+    // exterior is the Local Place's own scene and is not reused here.
+    id: CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior,
+    locationId: LOCATION_IDS.holoHollowLanding,
+    asset: "/location-scenes/last-leg-trading-interior.webp",
+    alt: "A fuel, freight and salvage trading counter under a lit Last Leg Trading sign, shelves and crates to the left, red and white fuel canisters to the right, wet floor reflecting warm overhead lights",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

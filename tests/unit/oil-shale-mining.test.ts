@@ -472,9 +472,12 @@ describe("the two new locations", () => {
     expect(getLocation(LOCATION_IDS.theSouthCut)?.adjacentLocationIds).toEqual([
       LOCATION_IDS.southAccessTrack,
     ]);
+    // The Track also reaches Holo Hollow Landing (#357); The South Cut still
+    // reaches nothing but the Track.
     expect(getLocation(LOCATION_IDS.southAccessTrack)?.adjacentLocationIds).toEqual([
       LOCATION_IDS.crashSite,
       LOCATION_IDS.theSouthCut,
+      LOCATION_IDS.holoHollowLanding,
     ]);
   });
 
@@ -497,6 +500,7 @@ describe("the two new locations", () => {
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.holoHollow,
       LOCATION_IDS.southAccessTrack,
+      LOCATION_IDS.holoHollowLanding,
     ]);
     expect(getLocation(LOCATION_IDS.theLongScramble)?.adjacentLocationIds).toEqual([
       LOCATION_IDS.crashSite,

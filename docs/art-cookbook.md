@@ -593,6 +593,18 @@ Current production conventions:
   square, never stretched. The silver cylinder family is told apart by physical
   hardware (the Full one's red cap and red side locking bar), never by a baked
   label, so it still reads at the 80 px inventory size
+- Holo Hollow Landing and Last Leg Trading (#357): the empty Landing panorama
+  (`holo-hollow-landing.webp`, 1536x384 lossy WebP q80, from the approved
+  1536x384 master), the Last Leg Trading exterior (2508x627) and interior (1717x916)
+  WebPs, and Toll Kade's four transparent 400x500 portraits (`toll-kade-{neutral,
+  friendly,thoughtful,skeptical}.png`, the thoughtful pose letterboxed horizontally
+  only because its master is taller and narrower). The scenes and portraits were
+  delivered as approved production derivatives and are committed as delivered; all
+  masters are kept unaltered in `assets/location-scenes/` and
+  `assets/npc-art/toll-kade/`. The H.H. map identifier
+  (`assets/map-icons/holo-hollow-landing.png`, 1254x1254 direct-alpha) went through
+  the direct-alpha recipe in `scripts/prepare-holo-hollow-landing-art.mjs` to a
+  512x428 grayscale lossless WebP
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

@@ -89,6 +89,8 @@ const npcIds = {
   rennCalder: asContentId("renn_calder"),
   // An offworld guest at HH B&B (#292), a second contact there beside Mara.
   curly: asContentId("curly"),
+  // Last Leg Trading's resident at Holo Hollow Landing (#357).
+  tollKade: asContentId("toll_kade"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -315,6 +317,10 @@ const dialogueIds = {
   // Curly's replayable topics (#292).
   curlySeeingTheWorldsTopic: asContentId("curly_topic_seeing_the_worlds"),
   curlyBackHomeTopic: asContentId("curly_topic_back_home"),
+  // Toll Kade's replayable topics at Last Leg Trading (#357).
+  tollSkatbollTopic: asContentId("toll_kade_topic_skatboll"),
+  tollStillreachTopic: asContentId("toll_kade_topic_stillreach"),
+  tollFuelTopic: asContentId("toll_kade_topic_fuel"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -338,6 +344,9 @@ const conversationTopicIds = {
   maraBix: asContentId("mara_kells_bix"),
   curlySeeingTheWorlds: asContentId("curly_seeing_the_worlds"),
   curlyBackHome: asContentId("curly_back_home"),
+  tollSkatboll: asContentId("toll_kade_skatboll"),
+  tollStillreach: asContentId("toll_kade_stillreach"),
+  tollFuel: asContentId("toll_kade_fuel"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -353,6 +362,11 @@ const expressionIds = {
   // Added for Mara's approved expression set (#170): composed and matter-of-fact
   // rather than wary (guarded) or displeased (scowl).
   firm: asContentId("firm"),
+  // Toll Kade's approved expression set (#357): a friendly, practical working
+  // hauler who reads as warm, thinking something through, or dryly unconvinced.
+  friendly: asContentId("friendly"),
+  thoughtful: asContentId("thoughtful"),
+  skeptical: asContentId("skeptical"),
 } as const satisfies Record<string, ContentId>;
 
 const conversationBackgroundIds = {
@@ -373,6 +387,8 @@ const conversationBackgroundIds = {
   // The Crash Site seen from a conversation once the ship's propulsion is repaired
   // (#330): the crashed scene resolves to this one from that repair's completion.
   crashSiteExteriorRepaired: asContentId("crash_site_exterior_repaired"),
+  // Last Leg Trading's shop interior at Holo Hollow Landing (#357).
+  lastLegTradingInterior: asContentId("last_leg_trading_interior"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -479,6 +495,9 @@ export const LOCATION_IDS = {
   // the Mining-5 mine behind it.
   southAccessTrack: asContentId("south_access_track"),
   theSouthCut: asContentId("the_south_cut"),
+  // Skatboll's walkable landing pad (#357): an ordinary World Location, not a
+  // separate planet. Its Local Place is Last Leg Trading.
+  holoHollowLanding: asContentId("holo_hollow_landing"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -493,6 +512,8 @@ export const LOCAL_PLACE_IDS = {
   holoHollowAssistanceCenter: asContentId("holo_hollow_assistance_center"),
   hhBnb: asContentId("hh_bnb"),
   holoHollowCrewStop: asContentId("holo_hollow_crew_stop"),
+  // Holo Hollow Landing's first Local Place (#357).
+  lastLegTrading: asContentId("last_leg_trading"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */
@@ -501,6 +522,10 @@ export const MERCHANT_IDS = {
   // Wade sells practice stock out of his own yard (#190) — a World Location
   // merchant, not a Local Place one.
   wadeRusk: asContentId("wade_rusk_yard"),
+  // The Last Leg Trading business (#357), not this one counter. A future
+  // affiliated outlet names the same merchant so both share one set of per-
+  // character daily allowances, which the ledger keys on this ID.
+  lastLegTrading: asContentId("last_leg_trading"),
 } as const satisfies Record<string, ContentId>;
 
 /**

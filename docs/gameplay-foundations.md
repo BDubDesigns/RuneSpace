@@ -1489,6 +1489,41 @@ at all and the heading names it, so Wade's counter never opens an empty Sell
 tab. This is read from content, never from which merchant it is, and it is not a
 reason to author a price merely to fill a tab.
 
+### Completed-Mission merchant unlock and Last Leg Trading (issue #357)
+
+A merchant authors at most one unlock. `authorizingMissionId` (above) opens it on
+**acceptance**; `requiredCompletedMissionId` opens it on **completion** — the
+Mission accepted, finished and turned in, read from the same completed-Mission
+record Local Place access and NPC relocation read. It authors its own
+`lockedMessage`, the schema rejects a merchant that authors both unlocks or
+only half of this one, and there is no second unlock flag. `isMerchantOpen`
+takes both the accepted and the completed sets, and the `tradeWithMerchant`
+command revalidates the completed record under the character lock before
+quoting **either** direction, refusing with `merchant_locked`, so a hidden button
+is never the gate. Wade's and Bix's behaviour is unchanged. The Trade control
+for a completed-Mission merchant stays visible while locked and shows the
+authored message instead of the counter (an accepted-Mission merchant still
+presents no Trade at all until it is met).
+
+**Last Leg Trading** (`MERCHANT_IDS.lastLegTrading`, fronted by Toll Kade, hosted
+by the Local Place of the same name at Holo Hollow Landing) requires a completed
+`thrust_issues` — not an accepted one, not a repaired-but-unreported ship, not
+another character's completion — and not Move Along or any flight. First-pass
+balance, all read from the merchant registry:
+
+| Item | Player buys | Player sells | Daily limit (per character, Pacific day) |
+| --- | --- | --- | --- |
+| Full Small Fuel Canister | 225 Cr | 160 Cr | 5 |
+| Empty Small Fuel Canister | 40 Cr | 25 Cr | 5 |
+| Oil Shale | not sold | 6 Cr | none |
+
+The two canister limits are separate lines in the ordinary merchant daily
+ledger (#230): selling back never restores an allowance, and another character
+has their own. The ledger keys on the **merchant ID**, which names the Last
+Leg Trading *business*, so the later affiliated Stillreach outlet is meant to
+reference the same merchant and share these allowances. That outlet, its
+terminal, a multi-merchant stock platform, rotation and new stock are not built.
+
 ## Local Places (issue #159)
 
 A Local Place is a place inside one parent World Location — a shop, a municipal
@@ -1619,6 +1654,14 @@ of war, fuel, hauling, and transportation upgrades build.
   the beginning of the game; it hosts Practice Welding and, once its Mission is
   accepted, Wade's own merchant counter. One static scene before and after
   progression — no locked/unlocked scene swap.
+
+- **Holo Hollow Landing** (`holo_hollow_landing`, `{q:1,r:1}`, issue #357):
+  Skatboll's landing pad, an ordinary World Location rather than a separate
+  planet, open to anyone on foot from the start. It hosts no activity, no ship
+  state and no merchant of its own; its one Local Place is **Last Leg Trading**.
+  Walking edges, all the standard 24 seconds and bidirectional: **Crash Site**,
+  **Abandoned Processing Yard** and **South Access Track**. There is no link to
+  The South Cut and no ship moves when a character walks here.
 
 Adjacency after issue #83 (bidirectional, no second graph): Crash Site ↔
 Processing Yard, Crash Site ↔ Power Annex, Processing Yard ↔ Power Annex,

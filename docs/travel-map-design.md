@@ -5,7 +5,7 @@ Owns the dedicated, query-backed `LocalMapPanel` treatment only. The current
 location scene and same-location population/profile flow belong to Location
 (see `docs/architecture.md` and `docs/location-scenes.md`); Journey owns the
 in-transit presentation. Full current-location scene artwork is #78.
-Ten locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
+Eleven locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
 Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), The Jag
 (`the_jag`), Holo Hollow (`holo_hollow`), Rusk Recovery (`rusk_recovery`), and Deep Jag
 (`deep_jag`, #209, southwest of The Jag at axial `q=-3, r=4` and adjacent only to it),
@@ -13,7 +13,11 @@ plus the South Access Track (`south_access_track`, axial `q=0, r=2`) and The Sou
 (`the_south_cut`, axial `q=0, r=3`) of #342: a travel-only road south of the Crash Site
 and the Oil Shale mine behind it, chained Crash Site ↔ Track ↔ Cut with two ordinary
 24-second walking legs and no direct Crash Site ↔ Cut edge. The Track shows no status
-plate; The Cut shows `Mining`. Both identifiers are approved grayscale transparent
+plate; The Cut shows `Mining`. Holo Hollow Landing (`holo_hollow_landing`, axial
+`q=1, r=1`, #357) is the eleventh: a sixth neighbor of the Crash Site, also joined
+to the Abandoned Processing Yard and the South Access Track by ordinary
+24-second walks and not to The Cut; its identifier is the approved H.H. pad
+art prepared by `scripts/prepare-holo-hollow-landing-art.mjs`. Both identifiers are approved grayscale transparent
 lossless WebP (`public/map-icons/south-access-track.webp`, `the-south-cut.webp`; masters
 in `assets/map-icons/`). The panel's job is fast readable navigation and
 gameplay-state communication on a phone; hexes are **not** miniature scene paintings.

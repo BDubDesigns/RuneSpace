@@ -118,6 +118,29 @@ const localPlaceDefinitions = [
       },
     },
   },
+  {
+    // Holo Hollow Landing's first Local Place (#357). Open to every walker from
+    // the start: it carries no access rule, and its Trade counter is gated
+    // separately on the merchant, so Talk is available long before Trade.
+    id: LOCAL_PLACE_IDS.lastLegTrading,
+    parentLocationId: LOCATION_IDS.holoHollowLanding,
+    displayName: "Last Leg Trading",
+    description:
+      "A freight-and-fuel counter under a long awning at the edge of the pad: canisters racked beside crates, salvage on the shelves, and the lights always on.",
+    access: { kind: "open" as const },
+    merchantId: MERCHANT_IDS.lastLegTrading,
+    presentation: {
+      scene: {
+        // Delivered at its native 2508x627 4:1 resolution (#357); approved art is
+        // never resampled merely to match the 1536x384 convention.
+        asset: "/location-scenes/last-leg-trading-exterior.webp" as const,
+        width: 2508,
+        height: 627,
+        alt: "A freight and fuel trading post under a lit Last Leg Trading sign, canisters and crates stacked along its front, a fenced rocky edge to the left and the empty landing pad to the right",
+        focal: { x: 50, y: 40 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocalPlaceDefinition[];
 
 export const LOCAL_PLACES: readonly LocalPlaceDefinition[] = localPlaceDefinitions.map((place) =>

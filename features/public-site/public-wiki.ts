@@ -85,14 +85,14 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has ten connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
+          "Holo Hollow currently has eleven connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
         heading: "The local map",
         list: [
-          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, The Long Scramble, the South Access Track, and the town of Holo Hollow.",
-          "Abandoned Processing Yard — connects to Crash Site and the Power Annex.",
+          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, The Long Scramble, the South Access Track, Holo Hollow Landing, and the town of Holo Hollow.",
+          "Abandoned Processing Yard — connects to Crash Site, the Power Annex and Holo Hollow Landing.",
           "DeWhat? Emergency Power Annex — connects to Crash Site, the Abandoned Processing Yard, and the town of Holo Hollow.",
           "The Long Scramble — connects to Crash Site, The Jag, and the town of Holo Hollow. It has no work of its own; it's just the way through.",
           "The Jag — connects to The Long Scramble and, below it, Deep Jag. There's no direct route between Crash Site and The Jag.",
@@ -111,8 +111,13 @@ const authoredWikiArticles = [
             { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
             ". After that it is an ordinary walk, and the map reads MINING.",
           ],
-          "South Access Track — a muddy service road running south out of the Crash Site. It connects to Crash Site and The South Cut, has no work, shop or workstation of its own, and is just the way through.",
+          "South Access Track — a muddy service road running south out of the Crash Site. It connects to Crash Site, The South Cut and Holo Hollow Landing, has no work, shop or workstation of its own, and is just the way through.",
           "The South Cut — an Oil Shale mine cut into black layered shale, at the far end of the South Access Track. It only connects to the Track, so reaching it from the Crash Site is two ordinary walks, about 48 seconds each way. Mining Oil Shale here needs Mining 5.",
+          [
+            "Holo Hollow Landing — Skatboll's landing pad, a worn industrial apron with a weathered H.H. painted across it, east of the Crash Site. It is an ordinary place on foot, open from the start: it connects to Crash Site, the Abandoned Processing Yard and the South Access Track, each a normal 24-second walk, and does not connect to The South Cut. Walking there moves nothing but you. Last Leg Trading is here; see ",
+            { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+            ".",
+          ],
         ],
       },
       {
@@ -258,7 +263,7 @@ const authoredWikiArticles = [
           ],
           "The chance of success follows the same climb as Galvanic Stock and Galvaferrite: 35% at Refining 1, rising to certain at Refining 30. Reaching Refining 8 does not reset it, so at Refining 8 it is 50.68%. The attempt takes the full 36 seconds whether it succeeds or not.",
           "A success gives one Full Small Fuel Canister, holding 50 Fuel Units, and 100 Refining experience. A failure is not total: it pays 20 Refining experience and gives back five of the ten Oil Shale and the same Empty canister, so you can try again without making another. The other five Oil Shale are lost. A failed fuel attempt never makes Slag, and Auto-discard Slag never touches what comes back.",
-          "A Full canister weighs 6kg and stacks two to a slot; an Empty one weighs 800g and stacks five. Both are ordinary items: you can carry, stash and trade them, and they work the same for someone who never refined or fabricated anything. Nothing in the game uses Fuel Units yet, and no one buys canisters yet.",
+          "A Full canister weighs 6kg and stacks two to a slot; an Empty one weighs 800g and stacks five. Both are ordinary items: you can carry, stash and trade them, and they work the same for someone who never refined or fabricated anything. Nothing in the game uses Fuel Units yet. Toll Kade at Last Leg Trading buys and sells canisters once you have reported Thrust Issues to Wade; see Credits & Trading.",
         ],
       },
       {
@@ -402,7 +407,7 @@ const authoredWikiArticles = [
     title: "Credits & Trading",
     category: "gear-and-credits",
     summary:
-      "Your character's Credits, buying and selling at Bix Weller's shop, Wade's scrap counter at Rusk Recovery, and trading with other players.",
+      "Your character's Credits, buying and selling at Bix Weller's shop, Wade's scrap counter at Rusk Recovery, Toll Kade's fuel counter at Holo Hollow Landing, and trading with other players.",
     sections: [
       {
         paragraphs: [
@@ -468,6 +473,23 @@ const authoredWikiArticles = [
           ],
           "He sells each character at most 12 Scrap Metal a day, counted and reset exactly like Bix's Power Cells: the counter shows what's left today, it starts again at midnight Pacific time, and selling scrap back doesn't add to it. Scrap stacks up to three to an inventory slot.",
           "He buys spare Scrap Metal back at 1 Credit a piece, and structural material at the same prices Bix pays where they both buy the same thing: Refined Ferrite at 10 Credits, Galvanic Stock at 18, and Galvaferrite at 45. He still leaves Slag to Bix.",
+        ],
+      },
+      {
+        heading: "Trading with Toll at Last Leg Trading",
+        paragraphs: [
+          [
+            "Toll Kade works the counter at Last Leg Trading, a freight and fuel shop on ",
+            { text: "Holo Hollow Landing", articleSlug: "travel-and-scavenging" },
+            ". Open the Landing from the Map, step into the shop, and you can talk to him straight away: his Skatboll, Stillreach and Fuel topics are there from the start and can be read again any time. Talking and trading are separate, and reading a topic changes nothing about your trade.",
+          ],
+          [
+            "Trading opens only after you have reported the completed Thrust Issues repair to Wade at Rusk Recovery (see ",
+            { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
+            "). Repairing the ship is not enough; the report is what counts. It is each character's own, so another character on your account has to do it for themselves, and until then the counter stays shut for both buying and selling. It does not wait for the ship to have flown.",
+          ],
+          "Toll sells Full Small Fuel Canisters at 225 Credits and Empty Small Fuel Canisters at 40 Credits. He buys a Full one back at 160, an Empty one at 25, and Oil Shale at 6 Credits a piece. He does not sell Oil Shale.",
+          "He sells each character at most 5 Full and 5 Empty canisters a day, counted separately and reset at midnight Pacific time. Selling a canister back to him does not give you more for the day. A purchase has to fit your Credits and your Inventory, or nothing is bought and nothing is charged.",
         ],
       },
     ],

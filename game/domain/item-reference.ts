@@ -134,6 +134,8 @@ export type ItemReferenceSource =
       dailyLimit?: number;
       /** The Mission whose acceptance opens the merchant, when one does. */
       opensWithMissionId?: string;
+      /** The Mission whose completion opens the merchant's trade, when one does (#357). */
+      opensAfterCompletedMissionId?: string;
       /** The Mission whose completion opens the shop's Local Place, when one does. */
       placeOpensWithMissionId?: string;
     }
@@ -496,6 +498,9 @@ export function buildItemReference(
       ...(line.dailySellLimit !== undefined ? { dailyLimit: line.dailySellLimit } : {}),
       ...(merchant.authorizingMissionId !== undefined
         ? { opensWithMissionId: merchant.authorizingMissionId }
+        : {}),
+      ...(merchant.requiredCompletedMissionId !== undefined
+        ? { opensAfterCompletedMissionId: merchant.requiredCompletedMissionId }
         : {}),
       ...(place?.access.kind === "locked_until_mission_completed"
         ? { placeOpensWithMissionId: place.access.missionId }
