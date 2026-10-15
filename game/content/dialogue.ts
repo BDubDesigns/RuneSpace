@@ -122,6 +122,7 @@ const bixShop = CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior;
 const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior;
 const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
 const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
+const lastLegShop = CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior;
 // Curly's room before and after his mount is installed (#292). The unfinished
 // room resolves to the finished one from the mount's own completion, so a beat
 // authored against it always shows the room as it currently is.
@@ -175,6 +176,17 @@ function wadeCommsFromYard(expressionId: ExpressionId, text: string): DialogueBe
     expressionId,
     backgroundId: ruskYard,
     presentationMode: "comms",
+    text,
+  };
+}
+
+function tollLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.tollKade,
+    expressionId,
+    backgroundId: lastLegShop,
+    presentationMode: "local",
     text,
   };
 }
@@ -2530,6 +2542,68 @@ const dialogue = {
       ),
       curlyFinished(EXPRESSION_IDS.concerned, "He keeps asking when I'm coming home, though."),
       curlyFinished(EXPRESSION_IDS.neutral, "Honestly? I think I'd rather stay a little longer."),
+    ],
+  },
+  // Toll Kade's three replayable topics (#357). The copy and its expression cues
+  // are owner-approved and locked verbatim in the issue: nothing here paraphrases
+  // them, and none of them carries a Mission, a Trade action or a price. Fuel
+  // quantities are Toll's own spoken words rather than values read from content.
+  [DIALOGUE_IDS.tollSkatbollTopic]: {
+    id: DIALOGUE_IDS.tollSkatbollTopic,
+    npcId: NPC_IDS.tollKade,
+    beats: [
+      tollLocal(
+        EXPRESSION_IDS.neutral,
+        "Skatboll's the planet. Holo Hollow's the town. You'd be amazed how often those get swapped on a shipping label.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.friendly,
+        "This Landing isn't much to look at, but the lights work and there's room to unload. I'll take that over fancy any day.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.skeptical,
+        "A fancy landing pad doesn't help much if the fuel isn't there when you need it.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tollStillreachTopic]: {
+    id: DIALOGUE_IDS.tollStillreachTopic,
+    npcId: NPC_IDS.tollKade,
+    beats: [
+      tollLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Stillreach is a long enough haul that you want to count your fuel both ways. Getting there is only half the job.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.neutral,
+        "I've got a Last Leg Trading terminal at the station there. Same business. Automated counter.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.friendly,
+        "Efficient little thing. Takes payments, hands out supplies, and has never laughed at one of my jokes. Professional jealousy.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tollFuelTopic]: {
+    id: DIALOGUE_IDS.tollFuelTopic,
+    npcId: NPC_IDS.tollKade,
+    beats: [
+      tollLocal(
+        EXPRESSION_IDS.neutral,
+        "A full Small Fuel Canister holds fifty fuel units. One load, and the canister's gone. That's the arrangement.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Check your tank first. Less than fifty units of room, and some of that fuel goes to waste.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.friendly,
+        "You can make fuel yourself or buy it from me. Either way, I'd keep enough to get home.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.skeptical,
+        "A full cargo hold's nice. A ship that can move it is nicer.",
+      ),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;

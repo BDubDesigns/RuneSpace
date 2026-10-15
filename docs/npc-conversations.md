@@ -294,6 +294,9 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Renn Calder | Life here | always |
 | Curly | Seeing the Worlds | always |
 | Curly | Back Home | after **Curly Must-Stash** is completed |
+| Toll Kade | Skatboll | always |
+| Toll Kade | Stillreach | always |
+| Toll Kade | Fuel | always |
 
 Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,
@@ -304,6 +307,17 @@ Renn has no merchant function. He is no longer social-only: #172 gave him
 His three topics remain ordinary replayable conversation and still carry no
 Mission command — the Mission is resolved by Mission content, not by the topic
 hub, exactly as for every other NPC.
+
+Toll Kade (#357) works inside the Last Leg Trading Local Place at Holo Hollow
+Landing, so his three topics are listed for anyone standing in that shop, on
+foot, before Trade unlocks and before any Mission; none records that it was read
+and none carries a Mission or Trade action. Their text and expression
+assignments (neutral, friendly, thoughtful, skeptical) are owner-approved and
+authored verbatim in `game/content/dialogue.ts` against the shop's own 15:8
+interior background, with his four portraits kept separate from it. His **Trade**
+action is a separate control that reads the merchant's completed-Thrust-Issues
+unlock (`docs/gameplay-foundations.md`) and, while locked, says so instead of
+opening a counter.
 
 Curly's **Seeing the Worlds** needs no gate for the same reason (#292): he shares
 Mara's place, so it is there whether or not his Mission is on offer yet.
@@ -369,3 +383,14 @@ author the Mission's offers, turn-in, dialogue mapping, `activeNpcDialogue`, and
 If a new conversation seems to need a mission-ID branch in React, a bespoke
 accept/complete path, prose parsing, or a per-NPC conversation adapter, stop and
 inspect whether this model is being bypassed.
+
+### Dialogue scene location labels (issue #357 follow-up)
+
+The dialogue background identifies the place shown, not merely the World Location
+of the character. For an interior, author its `localPlaceId` alongside its parent
+`locationId` in `game/content/conversation-backgrounds.ts`. Both the actual
+`DialogueScene` plate and the QC Studio background selector derive the label
+from that Local Place registry entry. Outdoor/exterior backdrops continue to
+show the World Location. The scene plate is single-line and ellipsizes when the
+full name is too long; the full location name remains accessible in its text
+and title attribute.

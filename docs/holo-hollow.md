@@ -615,6 +615,22 @@ The board's settled rules, its client-eligibility rules, and the first authored
 pool of eight level-5 jobs now live in `docs/work-orders.md`. That document is
 content and product rules only; Work Orders remain unimplemented.
 
+## Holo Hollow Landing and Last Leg Trading (shipped in #357)
+
+Not part of the town: **Holo Hollow Landing** is Skatboll's landing pad, an
+ordinary World Location east of the Crash Site at axial (1,1). It is walkable
+from the start, before the ship is repaired and before any Mission, and it hosts
+no ship, activity or merchant itself. Its one Local Place is **Last Leg Trading**,
+a freight-and-fuel counter run by **Tolliver "Toll" Kade**, a friendly, practical
+working hauler. Toll stands inside the store and offers three replayable Talk
+topics (Skatboll, Stillreach, Fuel) from the first visit. He is also the
+merchant for Full and Empty Small Fuel Canisters and for buying Oil Shale; that
+counter opens only after this character has reported the completed Thrust
+Issues repair to Wade. Mechanics: `docs/gameplay-foundations.md`; art:
+`docs/location-scenes.md`. The Stillreach terminal Toll mentions is
+**not built**: when it is, it belongs to the same Last Leg Trading merchant so
+both share one set of per-character daily allowances.
+
 ## Contracts and economic progression
 
 Later contracts should generally **buy outcomes**, while Missions may require

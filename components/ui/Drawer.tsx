@@ -316,9 +316,11 @@ export function Drawer({
           tabIndex={-1}
         >
           <div className="flex items-start justify-between gap-3">
-            <SectionHeader eyebrow={eyebrow} level={2}>
-              {title}
-            </SectionHeader>
+            <div className="min-w-0 flex-1">
+              <SectionHeader eyebrow={eyebrow} headingClassName="truncate" level={2}>
+                {title}
+              </SectionHeader>
+            </div>
             {dismissible ? (
               <ActionButton
                 ref={closeButton}

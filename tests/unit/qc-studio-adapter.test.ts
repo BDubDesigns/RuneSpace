@@ -17,6 +17,14 @@ describe("RuneSpace QC Studio adapter", () => {
     }
   });
 
+  it("labels local conversation backgrounds by their actual Local Places", () => {
+    const label = (id: string) =>
+      runespaceDialogueAdapter.backgrounds.find((bg) => bg.id === id)?.label;
+    expect(label("last_leg_trading_interior")).toBe("Last Leg Trading");
+    expect(label("hh_bnb_interior")).toBe("HH B&B");
+    expect(label("crash_site_exterior")).toBe("Crash Site");
+  });
+
   it("only exposes expressions authored for each RuneSpace NPC", () => {
     // An NPC whose conversation content is not authored yet legitimately has no
     // expression art; every NPC who actually speaks must have some.

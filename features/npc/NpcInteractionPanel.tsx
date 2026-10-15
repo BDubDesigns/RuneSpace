@@ -29,6 +29,13 @@ export type ResidentContact = {
   npc: NpcDefinition;
   entries: readonly NpcConversationEntry[];
   merchant?: MerchantDefinition;
+  /**
+   * The counter exists but is not open to this character yet (#357): the Trade
+   * control stays visible and says why, instead of hiding. Only a merchant that
+   * authors a completed-Mission unlock is ever shown this way; Wade's accepted-
+   * Mission unlock still presents no Trade at all until it is met.
+   */
+  tradeLockedMessage?: string;
   guidance?: MissionGuidanceMeaning;
   turnInAvailable: boolean;
   /**
@@ -129,8 +136,14 @@ export function NpcInteractionPanel({
       return {
         npc,
         entries,
-        ...(venueMerchant?.npcId === npc.id && isMerchantOpen(venueMerchant, acceptedMissionIds)
+        ...(venueMerchant?.npcId === npc.id &&
+        isMerchantOpen(venueMerchant, { acceptedMissionIds, completedMissionIds })
           ? { merchant: venueMerchant }
+          : {}),
+        ...(venueMerchant?.npcId === npc.id &&
+        venueMerchant.lockedMessage !== undefined &&
+        !isMerchantOpen(venueMerchant, { acceptedMissionIds, completedMissionIds })
+          ? { tradeLockedMessage: venueMerchant.lockedMessage }
           : {}),
         // Active (green), turn-in (blue), and available (blue) are distinct
         // semantic sets; when one NPC is several targets at once the shared
@@ -147,7 +160,13 @@ export function NpcInteractionPanel({
       };
     })
     // Somebody with nothing to say and nothing to sell presents no row.
-    .filter((contact) => contact.departed || contact.entries.length > 0 || contact.merchant);
+    .filter(
+      (contact) =>
+        contact.departed ||
+        contact.entries.length > 0 ||
+        contact.merchant ||
+        contact.tradeLockedMessage,
+    );
 
   return (
     <ResidentContacts
@@ -272,7 +291,8 @@ function LocalContact({
   onConversationChange?: (npcId: string | undefined) => void;
   stationary: boolean;
 }) {
-  const { npc, entries, merchant, guidance, turnInAvailable, departed } = contact;
+  const { npc, entries, merchant, tradeLockedMessage, guidance, turnInAvailable, departed } =
+    contact;
   const [open, setOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -334,7 +354,7 @@ function LocalContact({
                   Talk
                 </MissionActionButton>
               ) : null}
-              {merchant ? (
+              {merchant || tradeLockedMessage ? (
                 <ActionButton
                   aria-haspopup="dialog"
                   aria-label={`Trade with ${npc.displayName}`}
@@ -350,7 +370,7 @@ function LocalContact({
           </div>
         </section>
       )}
-      {merchant && tradeOpen ? (
+      {(merchant || tradeLockedMessage) && tradeOpen ? (
         // Trade is its own surface rather than an inline expansion (#193): the
         // counter is ~390px tall, and unfolding it here pushed the place's own
         // activity that far down the page and put the whole shop between the
@@ -366,7 +386,13 @@ function LocalContact({
           triggerRef={tradeTriggerRef}
         >
           <div data-npc-trade>
-            <TradePanel {...(localPlaceId ? { localPlaceId } : {})} merchant={merchant} />
+            {merchant ? (
+              <TradePanel {...(localPlaceId ? { localPlaceId } : {})} merchant={merchant} />
+            ) : (
+              // The counter is closed to this character (#357). The server refuses
+              // both directions regardless; this only explains it.
+              <Feedback tone="muted">{tradeLockedMessage}</Feedback>
+            )}
           </div>
         </Drawer>
       ) : null}

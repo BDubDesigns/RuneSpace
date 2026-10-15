@@ -271,14 +271,18 @@ describe("issue #230 Scrap and Power Cell trade terms", () => {
     expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "sell")).toBe(4);
   });
 
-  it("limits each of those two lines to twelve a day, and no other line", () => {
+  it("limits each of those two lines to twelve a day, and no line but the canisters", () => {
     expect(merchantDailySellLimit(wade, ITEM_IDS.scrapMetal)).toBe(12);
     expect(merchantDailySellLimit(bix, ITEM_IDS.powerCell)).toBe(12);
     for (const merchant of MERCHANTS) {
       for (const price of merchant.prices) {
         const limited =
           (merchant.id === MERCHANT_IDS.wadeRusk && price.itemId === ITEM_IDS.scrapMetal) ||
-          (merchant.id === MERCHANT_IDS.bixWeller && price.itemId === ITEM_IDS.powerCell);
+          (merchant.id === MERCHANT_IDS.bixWeller && price.itemId === ITEM_IDS.powerCell) ||
+          // Last Leg Trading's two canister lines (#357) are limited to five.
+          (merchant.id === MERCHANT_IDS.lastLegTrading &&
+            (price.itemId === ITEM_IDS.fullSmallFuelCanister ||
+              price.itemId === ITEM_IDS.emptySmallFuelCanister));
         expect(price.dailySellLimit !== undefined).toBe(limited);
       }
     }
@@ -332,6 +336,10 @@ describe("issue #230 daily purchase allowance", () => {
       },
       [MERCHANT_IDS.wadeRusk]: {
         [ITEM_IDS.scrapMetal]: { limit: 12, purchased: 9, remaining: 3 },
+      },
+      [MERCHANT_IDS.lastLegTrading]: {
+        [ITEM_IDS.fullSmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
+        [ITEM_IDS.emptySmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
       },
     });
   });

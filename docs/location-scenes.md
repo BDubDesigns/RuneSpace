@@ -141,6 +141,19 @@ activity-free on purpose; The South Cut's is a close, reinforced entrance cut in
 black laminated oil shale, not an open quarry, and the map identifier matches it.
 Scenes carry no baked ship, people, text or UI.
 
+## Holo Hollow Landing and Last Leg Trading (issue #357)
+
+Holo Hollow Landing's scene (`holo-hollow-landing.webp`, 1536×384 opaque lossy WebP)
+is the approved **empty** pad with its weathered H.H. lettering: no ship, no
+person, no text overlay. A parked ship is a later, separate overlay, so nothing
+here reserves or fakes one. Its Local Place, Last Leg Trading, has its own distinct
+4:1 exterior (`last-leg-trading-exterior.webp`, delivered at its native 2508×627),
+and its conversation surface is the separate 15:8 interior
+(`last-leg-trading-interior.webp`, 1717×916) behind Toll's transparent 400×500
+portraits (`public/npc-art/toll-kade-*.png`), so Toll is never baked into a
+background. The approved masters are kept in `assets/`. The two flight-cinematic
+backdrops that shipped in the same art handoff are **not** used here.
+
 ## Layered scenes: one background, a state-selected overlay (issue #351)
 
 The Crash Site is the first scene made of **one opaque empty background plus one

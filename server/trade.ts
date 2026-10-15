@@ -53,6 +53,8 @@ export type TradeRefusalReason =
   | "unknown_place"
   | "place_locked"
   | "no_merchant"
+  /** The merchant's completed-Mission unlock is not met for this character (#357). */
+  | "merchant_locked"
   | "not_traded"
   | "invalid_quantity"
   | "insufficient_credits"
@@ -195,6 +197,23 @@ export async function tradeWithMerchant(
       !(await isMissionAccepted(transaction, character.id, merchant.authorizingMissionId))
     ) {
       return refuse("no_merchant", "Nobody trades here.");
+    }
+
+    // A completed-Mission unlock (#357) is revalidated here, before either
+    // direction is quoted, from this character's own completed Missions — the
+    // record a turn-in writes. It is one check for buying and selling alike, so a
+    // forged request, a repaired-but-unreported ship, or another character's
+    // completion on the same account opens nothing.
+    if (
+      merchant.requiredCompletedMissionId !== undefined &&
+      !(await loadCompletedMissionIds(transaction, character.id)).has(
+        merchant.requiredCompletedMissionId,
+      )
+    ) {
+      return refuse(
+        "merchant_locked",
+        merchant.lockedMessage ?? "This merchant is not trading with you yet.",
+      );
     }
 
     const quoted = quoteTrade({

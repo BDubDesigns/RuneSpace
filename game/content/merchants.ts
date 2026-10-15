@@ -43,6 +43,37 @@ const merchantDefinitions = [
     ],
   },
   {
+    // Last Leg Trading (#357): the business, so a future affiliated Stillreach
+    // outlet names this same merchant and shares the per-character daily
+    // allowances the ledger keys on its ID. That outlet is not built here.
+    id: MERCHANT_IDS.lastLegTrading,
+    npcId: NPC_IDS.tollKade,
+    // Open only to a character who has reported Thrust Issues to Wade (#357). The
+    // server revalidates this on every buy and sell, so it never depends on the
+    // Trade button, on any conversation, or on the ship having flown.
+    requiredCompletedMissionId: MISSION_IDS.thrustIssues,
+    lockedMessage:
+      "Trading unlocks after you report the completed Thrust Issues repair to Wade at Rusk Recovery.",
+    // First-pass balance (#357). Toll sells Full and Empty canisters up to five a
+    // character a Pacific day each, buys them back for less, and buys Oil Shale
+    // without selling it.
+    prices: [
+      {
+        itemId: ITEM_IDS.fullSmallFuelCanister,
+        buyPrice: 160,
+        sellPrice: 225,
+        dailySellLimit: 5,
+      },
+      {
+        itemId: ITEM_IDS.emptySmallFuelCanister,
+        buyPrice: 25,
+        sellPrice: 40,
+        dailySellLimit: 5,
+      },
+      { itemId: ITEM_IDS.oilShale, buyPrice: 6 },
+    ],
+  },
+  {
     id: MERCHANT_IDS.wadeRusk,
     npcId: NPC_IDS.wadeRusk,
     authorizingMissionId: MISSION_IDS.tenThousandHours,
@@ -114,14 +145,21 @@ export function getLocationMerchant(locationId: string): MerchantDefinition | un
 
 /**
  * Whether this merchant is currently open to the character, given the Missions
- * they have accepted. A merchant that authors no unlock is open to anybody.
+ * they have accepted and completed. A merchant that authors no unlock is open
+ * to anybody; one authors either an accepted Mission (Wade, #190) or a
+ * completed one (Last Leg Trading, #357).
  */
 export function isMerchantOpen(
   merchant: MerchantDefinition,
-  acceptedMissionIds: ReadonlySet<string>,
+  facts: {
+    acceptedMissionIds: ReadonlySet<string>;
+    completedMissionIds: ReadonlySet<string>;
+  },
 ): boolean {
   return (
-    merchant.authorizingMissionId === undefined ||
-    acceptedMissionIds.has(merchant.authorizingMissionId)
+    (merchant.authorizingMissionId === undefined ||
+      facts.acceptedMissionIds.has(merchant.authorizingMissionId)) &&
+    (merchant.requiredCompletedMissionId === undefined ||
+      facts.completedMissionIds.has(merchant.requiredCompletedMissionId))
   );
 }

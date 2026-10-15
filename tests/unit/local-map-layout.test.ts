@@ -65,8 +65,10 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
     // which is the only place it connects to.
     // The South Access Track and The South Cut (#342) add exactly two more: Crash
     // Site <-> South Access Track and South Access Track <-> The South Cut.
-    expect(geometry.undirectedRoutes).toHaveLength(12);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(25);
+    // Holo Hollow Landing (#357) adds exactly three more: Crash Site, Abandoned
+    // Processing Yard and South Access Track, each walkable both ways.
+    expect(geometry.undirectedRoutes).toHaveLength(15);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(31);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

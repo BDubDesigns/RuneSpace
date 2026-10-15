@@ -1,13 +1,15 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { getConversationBackground } from "@/game/content/conversation-backgrounds";
+import {
+  getConversationBackground,
+  getConversationBackgroundPlaceName,
+} from "@/game/content/conversation-backgrounds";
 import type { DialogueBeat } from "@/game/content/dialogue";
 import {
   resolveDialogueItem,
   resolveDialogueSkillXp,
   resolveDialogueSpeaker,
 } from "@/game/content/dialogue";
-import { getLocation } from "@/game/content/locations";
 import { SceneComposition } from "@/features/location-scene/SceneComposition";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { VisualTile } from "@/components/items/VisualTile";
@@ -67,7 +69,7 @@ export function DialogueScene({
   if (beat.kind === "npc" && !resolvedSpeaker) return null;
   if (beat.kind === "item" && !resolvedItem) return null;
   if (beat.kind === "skill_xp" && !resolvedSkillXp) return null;
-  const sceneLocation = getLocation(background.locationId);
+  const scenePlaceName = getConversationBackgroundPlaceName(beat.backgroundId);
   // Item, XP and Credits reveals are local-scene presentations; they have no comms variant.
   const presentationMode = beat.kind === "npc" ? beat.presentationMode : "local";
 
@@ -102,12 +104,13 @@ export function DialogueScene({
           />
         )}
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
-        {sceneLocation ? (
+        {scenePlaceName ? (
           <p
-            className="rs-dialogue-scene__plate rs-map-plate left-3 top-3 px-2 py-1 font-display text-xs uppercase tracking-[0.14em]"
+            className="rs-dialogue-scene__plate rs-map-plate left-3 top-3 truncate px-2 py-1 font-display text-xs uppercase tracking-[0.14em]"
             data-dialogue-scene-location
+            title={scenePlaceName}
           >
-            {sceneLocation.displayName.toUpperCase()}
+            {scenePlaceName.toUpperCase()}
           </p>
         ) : null}
         {presentationMode === "comms" ? (

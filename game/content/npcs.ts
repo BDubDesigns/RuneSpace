@@ -178,6 +178,24 @@ export const NPCS: readonly NpcDefinition[] = [
       [EXPRESSION_IDS.concerned]: "/npc-art/curly-concerned.png",
     },
   },
+  {
+    // Tolliver "Toll" Kade (#357) works the counter inside Last Leg Trading, not
+    // out on the pad. He is simply where he is: no first-meeting state and no
+    // relocation. His four approved expressions map the shared vocabulary to his
+    // own art.
+    id: NPC_IDS.tollKade,
+    displayName: "Tolliver “Toll” Kade",
+    role: "Last Leg Trading hauler & merchant",
+    homeLocationId: LOCATION_IDS.holoHollowLanding,
+    localPlaceId: LOCAL_PLACE_IDS.lastLegTrading,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/toll-kade-neutral.png",
+      [EXPRESSION_IDS.friendly]: "/npc-art/toll-kade-friendly.png",
+      [EXPRESSION_IDS.thoughtful]: "/npc-art/toll-kade-thoughtful.png",
+      [EXPRESSION_IDS.skeptical]: "/npc-art/toll-kade-skeptical.png",
+    },
+  },
 ] as const satisfies readonly NpcDefinition[];
 
 const npcById = new Map<string, NpcDefinition>(NPCS.map((npc) => [npc.id, npc]));

@@ -166,6 +166,30 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.curlyBackHomeTopic,
     availability: { kind: "mission_completed", missionId: MISSION_IDS.curlyMustStash },
   },
+  {
+    // Toll's three topics (#357) are ordinary and always available, on foot,
+    // before Trade unlocks and before any Mission: reading one neither advances
+    // anything nor enables a transaction, and nothing records that it was read.
+    id: CONVERSATION_TOPIC_IDS.tollSkatboll,
+    npcId: NPC_IDS.tollKade,
+    label: "Skatboll",
+    dialogueId: DIALOGUE_IDS.tollSkatbollTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.tollStillreach,
+    npcId: NPC_IDS.tollKade,
+    label: "Stillreach",
+    dialogueId: DIALOGUE_IDS.tollStillreachTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.tollFuel,
+    npcId: NPC_IDS.tollKade,
+    label: "Fuel",
+    dialogueId: DIALOGUE_IDS.tollFuelTopic,
+    availability: { kind: "always" },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(

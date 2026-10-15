@@ -158,6 +158,7 @@ export const LocationDefinitionSchema = z
         "deep_jag",
         "south_access_track",
         "the_south_cut",
+        "holo_hollow_landing",
       ]),
       layout: z.enum([
         "crash_site",
@@ -170,7 +171,10 @@ export const LocationDefinitionSchema = z
         "deep_jag",
         "south_access_track",
         "the_south_cut",
+        "holo_hollow_landing",
       ]),
+      /** Local Place directory heading for this World Location, when it has venues. */
+      localPlacesEyebrow: z.string().trim().min(1).optional(),
       localMap: z
         .object({
           axial: z.object({ q: z.number().int(), r: z.number().int() }).strict(),

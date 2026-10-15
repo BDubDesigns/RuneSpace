@@ -118,10 +118,23 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Fuel Canisters Update as the newest, announcing nothing unshipped", () => {
+  it("publishes the Holo Hollow Landing Update as the newest (#357)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("fuel-canisters");
+    expect(latest.slug).toBe("holo-hollow-landing");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("fuel-canisters")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    // Trading is announced as gated, and no flight or launch is promised.
+    expect(text).toContain("reported the completed Thrust Issues repair to Wade");
+    expect(text).not.toMatch(/launch|take ?off|flight/i);
+    expect(latest.hero?.src).toBe("/location-scenes/holo-hollow-landing.webp");
+  });
+
+  it("keeps the Fuel Canisters Update published beneath it, announcing nothing unshipped", () => {
+    const latest = getPublicUpdate("fuel-canisters")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("oil-shale-at-the-south-cut")!.publishedAt),
     );

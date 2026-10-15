@@ -104,9 +104,15 @@ describe("issue #159 Local Place registry", () => {
       LOCAL_PLACE_IDS.hhBnb,
       LOCAL_PLACE_IDS.holoHollowCrewStop,
     ]);
-    expect(places).toHaveLength(LOCAL_PLACES.length);
+    // Holo Hollow Landing's Last Leg Trading (#357) is the registry's one place
+    // outside the settlement.
+    expect(places).toHaveLength(LOCAL_PLACES.length - 1);
     for (const place of LOCAL_PLACES) {
-      expect(place.parentLocationId).toBe(LOCATION_IDS.holoHollow);
+      expect(place.parentLocationId).toBe(
+        place.id === LOCAL_PLACE_IDS.lastLegTrading
+          ? LOCATION_IDS.holoHollowLanding
+          : LOCATION_IDS.holoHollow,
+      );
       // A Local Place is never a world position: no coordinate, no adjacency.
       expect(place).not.toHaveProperty("localMap");
       expect(place).not.toHaveProperty("adjacentLocationIds");

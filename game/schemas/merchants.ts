@@ -45,9 +45,37 @@ export const MerchantDefinitionSchema = z
      * completes.
      */
     authorizingMissionId: ContentId.optional(),
+    /**
+     * The Mission whose COMPLETION (accepted, finished and turned in) opens
+     * trading with this merchant, when one does (#357).
+     *
+     * Last Leg Trading opens only for a character who has reported Thrust Issues
+     * to Wade. It reads the same completed-Mission record Local Place access and
+     * NPC relocation already read, so there is no second unlock flag and it is
+     * per character. It gates both directions, on every server command, and is
+     * independent of anything the player has read in conversation. A merchant
+     * authors this or `authorizingMissionId`, never both.
+     */
+    requiredCompletedMissionId: ContentId.optional(),
+    /** What the Trade surface tells a player while `requiredCompletedMissionId` is unmet. */
+    lockedMessage: z.string().min(1).optional(),
     prices: z.array(MerchantPriceSchema).min(1),
   })
   .strict()
+  .refine(
+    (merchant) =>
+      merchant.requiredCompletedMissionId === undefined ||
+      merchant.authorizingMissionId === undefined,
+    {
+      message: "A merchant authors an accepted-Mission unlock or a completed-Mission one, not both",
+    },
+  )
+  .refine(
+    (merchant) =>
+      (merchant.requiredCompletedMissionId === undefined) ===
+      (merchant.lockedMessage === undefined),
+    { message: "A completed-Mission unlock authors its locked message, and only it does" },
+  )
   .refine(
     (merchant) =>
       new Set(merchant.prices.map((price) => price.itemId)).size === merchant.prices.length,

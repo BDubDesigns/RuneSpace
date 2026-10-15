@@ -11,7 +11,7 @@ import {
   type FabricationRecipeBalance,
   type RolledRefiningRecipeBalance,
 } from "@/game/config/balance";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, MERCHANT_IDS } from "@/game/config/foundations";
 import { ITEM_CATEGORY_BY_ITEM_ID } from "@/game/content/item-categories";
 import { getItemPresentation, itemQuantityLabel } from "@/game/content/item-presentation";
 import { getLocation, isActionAvailableAtLocation } from "@/game/content/locations";
@@ -245,15 +245,20 @@ describe("the two canister items", () => {
     }
   });
 
-  it("is an ordinary tradable, stashable stack with no merchant price", () => {
+  it("is an ordinary tradable, stashable stack sold only by Last Leg Trading", () => {
     expect(isItemTransferable(EMPTY)).toBe(true);
     expect(isItemTransferable(FULL)).toBe(true);
     const registries = defaultItemReferenceRegistries();
     for (const itemId of [EMPTY, FULL]) {
       const sources = buildItemReference(itemId, registries)!.sources.map((source) => source.kind);
       expect(sources).toContain("player_trade");
-      // Prices are a later slice: nothing sells or buys either canister.
-      expect(sources).not.toContain("merchant");
+      // Last Leg Trading (#357) is the one merchant, and its prices live in the
+      // merchant registry rather than here.
+      expect(
+        buildItemReference(itemId, registries)!
+          .sources.filter((source) => source.kind === "merchant")
+          .map((source) => (source as { merchantId: string }).merchantId),
+      ).toEqual([MERCHANT_IDS.lastLegTrading]);
     }
   });
 });

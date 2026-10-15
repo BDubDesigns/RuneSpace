@@ -348,6 +348,7 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // The town presents its places rather than a production activity.
   const directory = page.locator("[data-local-place-directory]");
   await expect(directory).toBeVisible();
+  await expect(directory).toContainText("Around town");
   await expect(directory.locator("[data-local-place]")).toHaveCount(4);
   // A fresh character's unaccepted Walk It Off advertises no place in town.
   await expect(directory.locator("[data-mission-guidance]")).toHaveCount(0);
@@ -492,6 +493,11 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   const conversation = await openNpcConversation(page, "Bix Weller");
   const topics = conversation.locator('[data-conversation-section="topics"]').getByRole("button");
   await expect(topics).toHaveCount(3);
+  await topics.first().click();
+  await expect(conversation.locator("[data-dialogue-scene-location]")).toHaveText(
+    "HOLO HOLLOW SOUVENIRS + MINING SUPPLIES",
+  );
+  await conversation.locator("[data-dialogue-back]").click();
   await expect(conversation.getByRole("button", { name: /Trade/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 

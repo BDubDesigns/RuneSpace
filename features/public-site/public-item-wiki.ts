@@ -299,6 +299,13 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
           ".",
         );
       }
+      if (source.opensAfterCompletedMissionId) {
+        line.push(
+          " Trading opens once you have completed ",
+          missionLink(source.opensAfterCompletedMissionId),
+          ".",
+        );
+      }
       if (source.placeOpensWithMissionId) {
         line.push(
           " The place opens once you have completed ",

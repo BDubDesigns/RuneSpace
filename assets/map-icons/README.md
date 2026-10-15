@@ -25,6 +25,14 @@ served to clients.
   lossless WebP, and inspected on dark and light backgrounds. Nothing was
   regenerated or recoloured.
 
+- `holo-hollow-landing.png` is the owner-approved 1254×1254 direct-alpha H.H.
+  landing-pad identifier for Holo Hollow Landing (#357), supplied separately from
+  the art ZIP. `scripts/prepare-holo-hollow-landing-art.mjs` records its
+  derivative: alpha below 4 cleared, near-opaque alpha snapped to 255, trimmed to
+  the alpha bounds, scaled to a 512 px long edge, grayscale, lossless WebP
+  (512×428), inspected on dark and light backgrounds. Nothing was regenerated or
+  recoloured.
+
 The other four identifiers keep no master here: their pre-key colour sources
 live in working-art storage rather than the repository, which
 `docs/art-cookbook.md` explicitly allows.

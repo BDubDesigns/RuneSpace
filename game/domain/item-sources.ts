@@ -318,7 +318,7 @@ export function resolveItemSources(
   for (const merchant of registries.merchants) {
     const line = merchant.prices.find((price) => price.itemId === itemId);
     if (line?.sellPrice === undefined) continue;
-    if (!isMerchantOpen(merchant, facts.acceptedMissionIds)) continue;
+    if (!isMerchantOpen(merchant, facts)) continue;
     const place = registries.localPlaces.find((candidate) => candidate.merchantId === merchant.id);
     const location = registries.locations.find((candidate) => candidate.merchantId === merchant.id);
     const locationId = place?.parentLocationId ?? location?.id;
