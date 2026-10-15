@@ -19,10 +19,13 @@ export function SectionHeader({
   eyebrow,
   children,
   level = 1,
+  headingClassName = "",
 }: {
   eyebrow?: string;
   children: ReactNode;
   level?: 1 | 2 | 3;
+  /** Optional title treatment, e.g. ellipsis within a Drawer header. */
+  headingClassName?: string;
 }) {
   const Heading = `h${level}` as const;
   return (
@@ -32,7 +35,9 @@ export function SectionHeader({
           {eyebrow}
         </p>
       ) : null}
-      <Heading className="mt-1 font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-3xl">
+      <Heading
+        className={`mt-1 font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-3xl ${headingClassName}`.trim()}
+      >
         {children}
       </Heading>
     </header>

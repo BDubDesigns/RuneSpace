@@ -2,6 +2,7 @@ import { ContentId } from "@/game/schemas/ids";
 import {
   CONVERSATION_BACKGROUNDS,
   getConversationBackground,
+  getConversationBackgroundPlaceName,
 } from "@/game/content/conversation-backgrounds";
 import {
   DIALOGUE_SEQUENCES,
@@ -9,7 +10,6 @@ import {
   type DialogueSequence,
 } from "@/game/content/dialogue";
 import { DIALOGUE_ITEM_CATALOG } from "@/game/content/item-presentation";
-import { getLocation } from "@/game/content/locations";
 import { NPCS } from "@/game/content/npcs";
 import { SKILL_PRESENTATIONS } from "@/game/content/skill-presentation";
 import type { SkillId } from "@/game/config/foundations";
@@ -61,10 +61,9 @@ const studioNpcs: StudioNpc[] = NPCS.map((npc) => ({
 
 const studioBackgrounds: StudioConversationBackground[] = CONVERSATION_BACKGROUNDS.map(
   (background) => {
-    const location = getLocation(background.locationId);
     return {
       id: background.id,
-      label: location?.displayName ?? formatStableId(background.id),
+      label: getConversationBackgroundPlaceName(background.id) ?? formatStableId(background.id),
       asset: background.asset,
       alt: background.alt,
     };

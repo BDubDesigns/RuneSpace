@@ -1,17 +1,22 @@
 import {
   CONVERSATION_BACKGROUND_IDS,
   LOCATION_IDS,
+  LOCAL_PLACE_IDS,
   REPAIR_TARGET_IDS,
   type ConversationBackgroundId,
   type LocationId,
+  type LocalPlaceId,
   type RepairTargetId,
 } from "@/game/config/foundations";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import { CRASH_SITE_SHIP_RESTORED_VARIANT_ID, getLocation } from "./locations";
+import { getLocalPlaceInLocation } from "./local-places";
 
 export type ConversationBackgroundDefinition = {
   id: ConversationBackgroundId;
   locationId: LocationId;
+  /** The specific Local Place depicted, if this backdrop is inside one. */
+  localPlaceId?: LocalPlaceId;
   asset: string;
   alt: string;
   /**
@@ -99,18 +104,21 @@ export const CONVERSATION_BACKGROUNDS = [
   {
     id: CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior,
     locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
     asset: "/location-scenes/holo-hollow-souvenirs-interior.webp",
     alt: "Cluttered shop interior with souvenir shelves beside racked mining supplies",
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior,
     locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.holoHollowAssistanceCenter,
     asset: "/location-scenes/holo-hollow-assistance-center-interior.webp",
     alt: "Assistance center interior with a service counter, posted notices, and stacked ration crates",
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.hhBnbInterior,
     locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     asset: "/location-scenes/hh-bnb-interior.webp",
     alt: "Working inn interior with a worn bar, mismatched seating, and tourism-era fittings kept in service",
   },
@@ -128,6 +136,7 @@ export const CONVERSATION_BACKGROUNDS = [
   {
     id: CONVERSATION_BACKGROUND_IDS.curlyRoomBefore,
     locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     asset: "/location-scenes/curly-room-before.webp",
     alt: "Lamplit inn guest room crowded with trunks, suitcases, and duffels piled around the bed, a window looking out on distant spires",
     repaired: {
@@ -138,6 +147,7 @@ export const CONVERSATION_BACKGROUNDS = [
   {
     id: CONVERSATION_BACKGROUND_IDS.curlyRoomAfter,
     locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     asset: "/location-scenes/curly-room-after.webp",
     alt: "The same lamplit guest room with a MYKEA storage container mounted on a welded frame above the bed, the luggage around it a little tidier",
   },
@@ -147,6 +157,7 @@ export const CONVERSATION_BACKGROUNDS = [
     // exterior is the Local Place's own scene and is not reused here.
     id: CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior,
     locationId: LOCATION_IDS.holoHollowLanding,
+    localPlaceId: LOCAL_PLACE_IDS.lastLegTrading,
     asset: "/location-scenes/last-leg-trading-interior.webp",
     alt: "A fuel, freight and salvage trading counter under a lit Last Leg Trading sign, shelves and crates to the left, red and white fuel canisters to the right, wet floor reflecting warm overhead lights",
   },
@@ -175,4 +186,18 @@ export function resolveConversationBackgroundId(
   return repaired && completedRepairTargetIds.has(repaired.repairTargetId)
     ? repaired.backgroundId
     : backgroundId;
+}
+
+/** The actual venue pictured on a dialogue background, not merely its map hex. */
+export function getConversationBackgroundPlaceName(backgroundId: string): string | undefined {
+  const background = getConversationBackground(backgroundId);
+  if (!background) return undefined;
+  if (background.localPlaceId) {
+    const place = getLocalPlaceInLocation(background.locationId, background.localPlaceId);
+    if (!place) {
+      throw new Error(`Dialogue background "${background.id}" references a Local Place outside its World Location.`);
+    }
+    return place.displayName;
+  }
+  return getLocation(background.locationId)?.displayName;
 }

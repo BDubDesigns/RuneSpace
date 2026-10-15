@@ -12,11 +12,19 @@ import {
   MISSION_IDS,
   NPC_IDS,
 } from "@/game/config/foundations";
-import { getConversationBackground } from "@/game/content/conversation-backgrounds";
+import {
+  CONVERSATION_BACKGROUNDS,
+  getConversationBackground,
+  getConversationBackgroundPlaceName,
+} from "@/game/content/conversation-backgrounds";
 import { getNpcConversationTopics } from "@/game/content/conversation-topics";
 import { getDialogue } from "@/game/content/dialogue";
 import { LOCATIONS, areLocationsAdjacent, getLocation } from "@/game/content/locations";
-import { getLocalPlace, getLocalPlacesForLocation } from "@/game/content/local-places";
+import {
+  getLocalPlace,
+  getLocalPlaceInLocation,
+  getLocalPlacesForLocation,
+} from "@/game/content/local-places";
 import { getMerchant, isMerchantOpen } from "@/game/content/merchants";
 import { getNpc, getResidentNpcs } from "@/game/content/npcs";
 import { MerchantDefinitionSchema } from "@/game/schemas/merchants";
@@ -164,6 +172,22 @@ describe("issue #357 Holo Hollow Landing", () => {
     expect(background.alt.length).toBeGreaterThan(20);
     const { width, height } = webpSize(background.asset);
     expect(width / height).toBeCloseTo(15 / 8, 1);
+  });
+});
+
+describe("dialogue backdrop place labels", () => {
+  it("uses the specific Local Place for every interior, and the World Location otherwise", () => {
+    for (const background of CONVERSATION_BACKGROUNDS) {
+      const place = background.localPlaceId
+        ? getLocalPlaceInLocation(background.locationId, background.localPlaceId)
+        : undefined;
+      if (background.localPlaceId) expect(place).toBeDefined();
+      const expected = place?.displayName ?? getLocation(background.locationId)?.displayName;
+      expect(getConversationBackgroundPlaceName(background.id)).toBe(expected);
+    }
+    expect(getConversationBackgroundPlaceName("last_leg_trading_interior")).toBe("Last Leg Trading");
+    expect(getConversationBackgroundPlaceName("curly_room_after")).toBe("HH B&B");
+    expect(getConversationBackgroundPlaceName("crash_site_exterior")).toBe("Crash Site");
   });
 });
 

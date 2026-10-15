@@ -59,6 +59,10 @@ for (const viewport of [
     }
 
     await openConversationEntry(conversation, /Fuel/);
+    const plate = conversation.locator("[data-dialogue-scene-location]");
+    await expect(plate).toHaveText("LAST LEG TRADING");
+    await expect(plate).toHaveCSS("white-space", "nowrap");
+    await expect(plate).toHaveCSS("text-overflow", "ellipsis");
     const portrait = conversation.locator(".rs-dialogue-scene__npc");
     await playDialogueToText(conversation, /A full Small Fuel Canister holds fifty fuel units/);
     await expect(portrait).toHaveAttribute("src", /toll-kade-neutral\.png/);
@@ -71,6 +75,20 @@ for (const viewport of [
     await expect(
       conversation.locator('[data-dialogue-background="last_leg_trading_interior"]'),
     ).toBeVisible();
+
+    // Deliberately overlong heading: it must truncate, never wrap or displace Close.
+    const heading = conversation.getByRole("heading", { name: "Tolliver “Toll” Kade" });
+    await heading.evaluate((node) => {
+      node.textContent = "Tolliver “Toll” Kade the Incredibly Long-Named Freight Dispatcher";
+    });
+    await expect(heading).toHaveCSS("text-overflow", "ellipsis");
+    await expect(heading).toHaveCSS("white-space", "nowrap");
+    const close = conversation.getByRole("button", { name: /Close .*conversation/i });
+    const [headingBox, closeBox] = await Promise.all([heading.boundingBox(), close.boundingBox()]);
+    expect(headingBox).not.toBeNull();
+    expect(closeBox).not.toBeNull();
+    expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(closeBox!.x + 1);
+    expect(await heading.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
   });
 }
 

@@ -383,3 +383,14 @@ author the Mission's offers, turn-in, dialogue mapping, `activeNpcDialogue`, and
 If a new conversation seems to need a mission-ID branch in React, a bespoke
 accept/complete path, prose parsing, or a per-NPC conversation adapter, stop and
 inspect whether this model is being bypassed.
+
+### Dialogue scene location labels (issue #357 follow-up)
+
+The dialogue background identifies the place shown, not merely the World Location
+of the character. For an interior, author its `localPlaceId` alongside its parent
+`locationId` in `game/content/conversation-backgrounds.ts`. Both the actual
+`DialogueScene` plate and the QC Studio background selector derive the label
+from that Local Place registry entry. Outdoor/exterior backdrops continue to
+show the World Location. The scene plate is single-line and ellipsizes when the
+full name is too long; the full location name remains accessible in its text
+and title attribute.
