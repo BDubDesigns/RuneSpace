@@ -203,7 +203,7 @@ describe("planLaunch", () => {
   it("explains every refusal in words the Ship panel can show", () => {
     const route = getShipRoute(ROUTE)!;
     expect(launchRefusalMessage("mission_not_accepted", route)).toBe(
-      "Talk to Wade at Rusk Recovery to accept Move Along.",
+      "Report Thrust Issues to Wade at Rusk Recovery to start Move Along.",
     );
     expect(launchRefusalMessage("insufficient_fuel", route)).toBe(
       "The tank needs at least 10 FU to launch.",

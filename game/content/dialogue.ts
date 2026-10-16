@@ -2043,28 +2043,10 @@ const dialogue = {
         "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
       ),
       wadeAtYard(EXPRESSION_IDS.scowl, "But now it's a ship."),
-    ],
-  },
-  // His ordinary follow-up wherever he stands. It restates only the locked
-  // verdict, so it promises no flight, fuel or destination.
-  [DIALOGUE_IDS.wadePostThrustIssues]: {
-    id: DIALOGUE_IDS.wadePostThrustIssues,
-    npcId: NPC_IDS.wadeRusk,
-    presentsAtCurrentVenue: true,
-    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Still looks like hell. But it's a ship.")],
-  },
-  // Move Along (#358). The offer, the active reminder and the post-landing idle
-  // lines are the owner-approved locked copy, verbatim. There is no completion
-  // scene: touchdown completes the Mission with a plain presentation, not Wade.
-  [DIALOGUE_IDS.wadeMoveAlongOffer]: {
-    id: DIALOGUE_IDS.wadeMoveAlongOffer,
-    npcId: NPC_IDS.wadeRusk,
-    beats: [
-      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. Still here?"),
-      wadeAtYard(
-        EXPRESSION_IDS.scowl,
-        "Hold's fixed. Gear's fixed. Drive's fixed. Keep turning up and I'll find you something else to weld.",
-      ),
+      // Move Along's send-off (#358): reporting the drive starts it, so the story
+      // hands straight on. These are the approved Move Along offer lines that
+      // state the job, verbatim; the offer's opening and aside belong to a
+      // return visit this scene never is.
       wadeAtYard(
         EXPRESSION_IDS.neutral,
         "Holo Hollow Landing. They've got a proper pad. Take the Rivet there. Ten fuel units for the hop.",
@@ -2079,6 +2061,18 @@ const dialogue = {
       ),
     ],
   },
+  // His ordinary follow-up wherever he stands. It restates only the locked
+  // verdict, so it promises no flight, fuel or destination.
+  [DIALOGUE_IDS.wadePostThrustIssues]: {
+    id: DIALOGUE_IDS.wadePostThrustIssues,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Still looks like hell. But it's a ship.")],
+  },
+  // Move Along (#358). The active reminder and the post-landing idle lines are the
+  // owner-approved locked copy, verbatim; the send-off is the tail of Thrust
+  // Issues' completion. There is no completion scene: touchdown completes the
+  // Mission with a plain presentation, not Wade.
   [DIALOGUE_IDS.wadeMoveAlongActive]: {
     id: DIALOGUE_IDS.wadeMoveAlongActive,
     npcId: NPC_IDS.wadeRusk,

@@ -231,11 +231,14 @@ type MissionAutoCompletion = { kind: "ship_flight"; routeId: ShipRouteId };
 - **What does not complete it:** walking to the destination, the launch click, a
   countdown reaching zero on the client, and a failed or refused flight. Projection
   keeps the Mission `active` (never `ready_for_completion`) until the landing.
-- **Acceptance is explicit and gates the flight.** Move Along is offered after
-  Thrust Issues is completed, accepted by hand through the ordinary conversation
-  hub, and never chained. The route authors `requiredAcceptedMissionId`, so the
-  first Crash Site launch is refused until it is accepted; once complete it gates
-  nothing.
+- **It starts with the Thrust Issues report and gates the flight.** Move Along
+  has no offer and no accept button: Thrust Issues authors it as its
+  `continuationMissionId`, so the ordinary continuation path accepts it in the
+  same transaction as that report (existing accepted or completed records are
+  left exactly as they are). The route authors `requiredAcceptedMissionId`, so
+  the first Crash Site launch is still refused until the ordinary accepted
+  record exists; once complete it gates nothing. There is no backfill or
+  login-time repair.
 - **The player is told durably.** The landing writes a `ship_arrival_notice`
   (`docs/gameplay-foundations.md`, "The arrival notice"); the Mission Log shows
   the normal completed card.
@@ -1133,11 +1136,11 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Dialogue:** the locked offer, active reminder and completion lines, verbatim, in Wade's own expressions (neutral, concerned, neutral, scowl for the offer; neutral then scowl for the completion). Three beats the design did not define are authored in his register from what the repair itself already says — a busy beat, a one-line turn-in opening ("Mounts seated. Frame welded. Good.") and a one-line follow-up that restates only the locked verdict, so it never goes stale and promises no flight or fuel. The deferred fuel warning and first-flight prompt are deliberately absent.
 
 
-### Move Along — the first flight, accepted by hand and completed by the landing (#358)
+### Move Along — the first flight, started by the Thrust Issues report and completed by the landing (#358)
 
-- **Acceptance:** `prerequisiteMissionId: thrustIssues` and nothing else. One offer route, **Wade at Rusk Recovery**, `actionLabel: "TAKE HER TO THE PAD"`, with `activeDialogueId` for his reminder. It is **not** Thrust Issues' continuation: Thrust Issues is reported, and the player later accepts this by hand through the ordinary conversation hub.
+- **Start:** `prerequisiteMissionId: thrustIssues`, no offers (`offers: []`). Thrust Issues' `continuationMissionId` is Move Along, so reporting to Wade at Rusk Recovery accepts it in the same transaction through the normal mission acceptance path (`onConflictDoNothing`, skipped if already complete). Welding the ship alone does not start it. Wade's reminder is Move Along's `activeNpcDialogue`.
 - **Requirement and completion:** one `ship_flight` requirement on `crash_site_to_holo_hollow_landing` — "Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (10 FU)." — and `autoCompletion` on the same route (§7.1). Only the flight's authoritative landing completes it: walking to the Landing, the Launch click, a countdown reaching zero, and a failed flight do not.
 - **No turn-in, no reward, no completion scene.** No XP, Credits, item or free fuel, and no report back to Wade. The landing shows a compact "Flight complete — Arrived at Holo Hollow Landing" / "Mission Complete: Move Along" notice (a durable, dismissible receipt, not a toast) and the Mission Log carries the normal completed card.
-- **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until it is accepted, even with the ship repaired and fuel loaded; the Ship panel says "Talk to Wade at Rusk Recovery to accept Move Along." Once the Mission is complete this gates nothing.
-- **Dialogue (locked copy, verbatim):** a five-beat offer ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."
+- **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until the ordinary accepted record exists, even with the ship repaired and fuel loaded; the Ship panel says "Report Thrust Issues to Wade at Rusk Recovery to start Move Along." Once the Mission is complete this gates nothing.
+- **Dialogue (locked copy, verbatim):** the approved send-off is the last three beats of Wade's Thrust Issues completion scene ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."; there is no separate offer), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."
 - **Reset.** Resetting a chain from an operator console clears the Mission records (Move Along follows Thrust Issues in the reset scope) but not the ship row: where the ship is berthed is physical state, not Mission state.

@@ -76,24 +76,23 @@ describe("the Mission's shape", () => {
     ]);
   });
 
-  it("is gated only by Thrust Issues and is never an automatic continuation", () => {
+  it("is gated only by Thrust Issues and is Thrust Issues' authored continuation", () => {
     expect(MOVE_ALONG.prerequisiteMissionId).toBe(MISSION_IDS.thrustIssues);
     expect(MOVE_ALONG.prerequisiteSkillLevels).toBeUndefined();
-    expect(THRUST_ISSUES.continuationMissionId).toBeUndefined();
+    // Reporting the repair starts it in the same transaction (the generic
+    // continuation boundary); nothing else continues into it.
+    expect(THRUST_ISSUES.continuationMissionId).toBe(MISSION_IDS.moveAlong);
     expect(
-      MISSIONS.some((mission) => mission.continuationMissionId === MISSION_IDS.moveAlong),
-    ).toBe(false);
+      MISSIONS.filter((mission) => mission.continuationMissionId === MISSION_IDS.moveAlong).map(
+        (mission) => mission.id,
+      ),
+    ).toEqual([MISSION_IDS.thrustIssues]);
   });
 
-  it("is offered by hand by Wade at Rusk Recovery with the locked control", () => {
-    expect(MOVE_ALONG.offers).toEqual([
-      {
-        npcId: NPC_IDS.wadeRusk,
-        locationId: LOCATION_IDS.ruskRecovery,
-        dialogueId: DIALOGUE_IDS.wadeMoveAlongOffer,
-        actionLabel: "TAKE HER TO THE PAD",
-        activeDialogueId: DIALOGUE_IDS.wadeMoveAlongActive,
-      },
+  it("authors no offer and no acceptance control: it cannot be accepted by hand", () => {
+    expect(MOVE_ALONG.offers).toEqual([]);
+    expect(MOVE_ALONG.activeNpcDialogue).toEqual([
+      { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeMoveAlongActive },
     ]);
   });
 
@@ -105,9 +104,6 @@ describe("the Mission's shape", () => {
     expect(MOVE_ALONG.turnIn).toBeUndefined();
     expect(MOVE_ALONG.reward).toBeUndefined();
     expect(MOVE_ALONG.dialogue).toEqual({});
-    expect(
-      MOVE_ALONG.offers.some((offer) => "acceptEffect" in offer || "acceptedContinuation" in offer),
-    ).toBe(false);
   });
 
   it("is the only Mission that completes itself: every other one still hands in", () => {
@@ -121,7 +117,15 @@ describe("the Mission's shape", () => {
 
 describe("registry validation of the new completion", () => {
   const withOverrides = (overrides: Partial<MissionDefinition>): MissionDefinition =>
-    ({ ...MOVE_ALONG, prerequisiteMissionId: undefined, ...overrides }) as MissionDefinition;
+    ({
+      ...MOVE_ALONG,
+      prerequisiteMissionId: undefined,
+      // Validated alone, so it has no predecessor to continue it: give it an offer
+      // so only the completion rules under test can fail.
+      offers: THRUST_ISSUES.offers,
+      activeNpcDialogue: undefined,
+      ...overrides,
+    }) as MissionDefinition;
   const validate = (definition: MissionDefinition) => () =>
     validateMissionDefinitions([definition]);
 
@@ -174,24 +178,12 @@ describe("registry validation of the new completion", () => {
 });
 
 describe("projection", () => {
-  it("is not offered before Thrust Issues is complete", () => {
-    const locked = project(undefined, LOCATION_IDS.ruskRecovery, false);
-    expect(locked.prerequisiteSatisfied).toBe(false);
-    expect(
-      entries(locked).some((entry) => entry.dialogueId === DIALOGUE_IDS.wadeMoveAlongOffer),
-    ).toBe(false);
-  });
-
-  it("is offered manually once Thrust Issues is complete", () => {
-    const available = project(undefined, LOCATION_IDS.ruskRecovery);
-    expect(available.state).toBe("not_accepted");
-    expect(available.guidance?.availableNpcIds).toEqual([NPC_IDS.wadeRusk]);
-    expect(entries(available)[0]).toMatchObject({
-      kind: "mission",
-      role: "offer",
-      dialogueId: DIALOGUE_IDS.wadeMoveAlongOffer,
-      action: { kind: "accept_mission", label: "TAKE HER TO THE PAD" },
-    });
+  it("offers nothing to accept, before or after Thrust Issues", () => {
+    for (const prerequisite of [false, true]) {
+      const projection = project(undefined, LOCATION_IDS.ruskRecovery, prerequisite);
+      expect(projection.guidance).toBeUndefined();
+      expect(entries(projection).filter((entry) => entry.kind === "mission")).toEqual([]);
+    }
   });
 
   it("stays active whatever the player does, and is never ready to hand in", () => {
@@ -249,13 +241,7 @@ describe("Wade's conversation hub", () => {
   const hub = (move: MissionProjection) =>
     resolveNpcConversationWith(NPC_IDS.wadeRusk, history(move), MISSIONS, CONVERSATION_TOPICS);
 
-  it("offers it, then reminds, then shows the post-landing line only once it has landed", () => {
-    const offer = hub(project(undefined, LOCATION_IDS.ruskRecovery));
-    expect(offer.find((entry) => entry.kind === "mission")).toMatchObject({
-      role: "offer",
-      dialogueId: DIALOGUE_IDS.wadeMoveAlongOffer,
-    });
-
+  it("reminds while open, then shows the post-landing line only once it has landed", () => {
     const active = hub(project({ acceptedAt: new Date() }, LOCATION_IDS_RUSK));
     expect(active.find((entry) => entry.kind === "mission")).toMatchObject({
       role: "active",
@@ -280,16 +266,6 @@ describe("Wade's locked Move Along copy, verbatim", () => {
   const lines = (id: string) =>
     getDialogue(id)!.beats.map((beat) => ("text" in beat ? (beat.text as string) : ""));
 
-  it("offers in five beats", () => {
-    expect(lines(DIALOGUE_IDS.wadeMoveAlongOffer)).toEqual([
-      "Hm. Still here?",
-      "Hold's fixed. Gear's fixed. Drive's fixed. Keep turning up and I'll find you something else to weld.",
-      "Holo Hollow Landing. They've got a proper pad. Take the Rivet there. Ten fuel units for the hop.",
-      "You'll need fuel first. Make a Full Small Fuel Canister or buy one at Last Leg Trading. You can walk over to the Landing and back if you need to.",
-      "Fly it over. Land it. And for once, don't make me come look at it.",
-    ]);
-  });
-
   it("reminds in one beat", () => {
     expect(lines(DIALOGUE_IDS.wadeMoveAlongActive)).toEqual([
       "Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.",
@@ -303,10 +279,18 @@ describe("Wade's locked Move Along copy, verbatim", () => {
     ]);
   });
 
-  it("leaves Thrust Issues' completion lines unchanged and replaces only the false 'front lawn' jab", () => {
-    expect(lines(DIALOGUE_IDS.wadeThrustIssuesCompletion)).toEqual([
+  it("hands Thrust Issues' report straight on to Move Along, with the locked send-off", () => {
+    const completion = lines(DIALOGUE_IDS.wadeThrustIssuesCompletion);
+    // His two locked completion lines come first, unchanged.
+    expect(completion.slice(0, 2)).toEqual([
       "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
       "But now it's a ship.",
+    ]);
+    // Then the approved Move Along send-off, verbatim.
+    expect(completion.slice(2)).toEqual([
+      "Holo Hollow Landing. They've got a proper pad. Take the Rivet there. Ten fuel units for the hop.",
+      "You'll need fuel first. Make a Full Small Fuel Canister or buy one at Last Leg Trading. You can walk over to the Landing and back if you need to.",
+      "Fly it over. Land it. And for once, don't make me come look at it.",
     ]);
     const offer = lines(DIALOGUE_IDS.wadeThrustIssuesOffer);
     expect(offer.join(" ")).not.toMatch(/front lawn/i);

@@ -260,7 +260,21 @@ export function PlayProvider({
     };
 
     schedule(Math.max(100, boundaryTime - Date.now() + BOUNDARY_REFRESH_GRACE_MS));
+    // The retries above are bounded and spent in a few seconds. A player who was
+    // offline through the boundary has none left when the connection returns, so
+    // coming back online (or back to the tab) asks the server once more. Only a
+    // boundary already passed is asked about; the server still decides the outcome.
+    const reconcileIfDue = () => {
+      if (Date.now() >= boundaryTime) requestAutoRefresh(schedulerToken);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reconcileIfDue();
+    };
+    window.addEventListener("online", reconcileIfDue);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
+      window.removeEventListener("online", reconcileIfDue);
+      document.removeEventListener("visibilitychange", onVisible);
       if (timer !== undefined) window.clearTimeout(timer);
       cancelRefresh(gateModel.current, schedulerToken);
       if (boundaryGeneration.current === schedulerToken) boundaryGeneration.current += 1;

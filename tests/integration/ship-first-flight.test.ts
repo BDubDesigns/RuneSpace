@@ -259,46 +259,98 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
     at = now,
   ) => ship.refuelShip(userId, characterId, request, at);
 
-  describe("Move Along is offered after Thrust Issues and accepted by hand", () => {
-    it("refuses acceptance until Thrust Issues is complete, and never auto-chains", async () => {
+  describe("Move Along starts when Thrust Issues is reported", () => {
+    const report = (userId: string, characterId: string) =>
+      missions.completeMission(
+        userId,
+        characterId,
+        MISSION_IDS.thrustIssues,
+        NPC_IDS.wadeRusk,
+        now,
+      );
+
+    it("is not started by the repair alone, nor by being at Wade without a report", async () => {
       const { userId, characterId } = await makeCharacter({
         accept: false,
         thrustReported: false,
         location: LOCATION_IDS.ruskRecovery,
       });
-      const early = await missions.acceptMission(
+      // The Propulsion System is welded and Thrust Issues is accepted, unreported.
+      await stateAt(userId, characterId);
+      expect(await missionRow(characterId, MISSION_IDS.moveAlong)).toBeUndefined();
+      // It cannot be accepted by hand: it authors no offer.
+      const forged = await missions.acceptMission(
         userId,
         characterId,
         MISSION_IDS.moveAlong,
         NPC_IDS.wadeRusk,
         now,
       );
-      expect(early.mission.status).toBe("refused");
+      expect(forged.mission.status).toBe("refused");
       expect(await missionRow(characterId, MISSION_IDS.moveAlong)).toBeUndefined();
-      // Reporting Thrust Issues does not accept it either: Wade offers, the
-      // player takes it.
-      await db
-        .update(rune.characterMissions)
-        .set({ completedAt: now })
-        .where(
-          and(
-            eq(rune.characterMissions.characterId, characterId),
-            eq(rune.characterMissions.missionId, MISSION_IDS.thrustIssues),
-          ),
-        );
-      expect(await missionRow(characterId, MISSION_IDS.moveAlong)).toBeUndefined();
-      const accepted = await missions.acceptMission(
-        userId,
-        characterId,
-        MISSION_IDS.moveAlong,
-        NPC_IDS.wadeRusk,
-        now,
-      );
-      expect(accepted.mission.status).toBe("accepted");
-      expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).toBeNull();
     });
 
-    it("refuses a forged turn-in for Move Along: nothing hands it in", async () => {
+    it("starts in the same transaction as a successful report, once, and gates the launch", async () => {
+      const { userId, characterId } = await makeCharacter({
+        accept: false,
+        thrustReported: false,
+        location: LOCATION_IDS.ruskRecovery,
+        fuel: 50,
+      });
+      const reported = await report(userId, characterId);
+      expect(reported.mission.status).toBe("completed");
+      const started = await missionRow(characterId, MISSION_IDS.moveAlong);
+      expect(started?.acceptedAt).not.toBeNull();
+      expect(started?.completedAt).toBeNull();
+      // The report cannot be made twice, and the second attempt changes nothing.
+      const again = await report(userId, characterId);
+      expect(again.mission.status).toBe("already_completed");
+      expect(
+        (await missionRow(characterId, MISSION_IDS.moveAlong))?.acceptedAt?.toISOString(),
+      ).toBe(started?.acceptedAt?.toISOString());
+      // The launch gate reads that ordinary accepted record.
+      await db
+        .update(rune.characters)
+        .set({ currentLocationId: LOCATION_IDS.crashSite })
+        .where(eq(rune.characters.id, characterId));
+      expect((await launch(userId, characterId)).launch).toMatchObject({ status: "launched" });
+    });
+
+    it("leaves an already accepted Move Along record exactly as it was", async () => {
+      const { userId, characterId } = await makeCharacter({
+        accept: false,
+        thrustReported: false,
+        location: LOCATION_IDS.ruskRecovery,
+      });
+      const earlier = new Date("2026-10-14T00:00:00.000Z");
+      await db
+        .insert(rune.characterMissions)
+        .values({ characterId, missionId: MISSION_IDS.moveAlong, acceptedAt: earlier });
+      expect((await report(userId, characterId)).mission.status).toBe("completed");
+      const row = await missionRow(characterId, MISSION_IDS.moveAlong);
+      expect(row?.acceptedAt?.toISOString()).toBe(earlier.toISOString());
+      expect(row?.completedAt).toBeNull();
+    });
+
+    it("never reopens a completed Move Along", async () => {
+      const { userId, characterId } = await makeCharacter({
+        accept: false,
+        thrustReported: false,
+        location: LOCATION_IDS.ruskRecovery,
+      });
+      const done = new Date("2026-10-14T01:00:00.000Z");
+      await db.insert(rune.characterMissions).values({
+        characterId,
+        missionId: MISSION_IDS.moveAlong,
+        acceptedAt: done,
+        completedAt: done,
+      });
+      await report(userId, characterId);
+      const row = await missionRow(characterId, MISSION_IDS.moveAlong);
+      expect(row?.completedAt?.toISOString()).toBe(done.toISOString());
+    });
+
+    it("refuses a forged turn-in for Move Along itself: nothing hands it in", async () => {
       const { userId, characterId } = await makeCharacter({ location: LOCATION_IDS.ruskRecovery });
       const result = await missions.completeMission(
         userId,

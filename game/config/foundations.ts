@@ -295,9 +295,9 @@ const dialogueIds = {
   wadeThrustIssuesTurnIn: asContentId("wade_rusk_thrust_issues_turn_in"),
   wadeThrustIssuesCompletion: asContentId("wade_rusk_thrust_issues_completion"),
   wadePostThrustIssues: asContentId("wade_rusk_post_thrust_issues"),
-  // Move Along (#358): the offer, the active reminder, and the idle line once the
-  // Rivet has landed. There is no completion scene; touchdown completes it.
-  wadeMoveAlongOffer: asContentId("wade_rusk_move_along_offer"),
+  // Move Along (#358): the active reminder, and the idle line once the Rivet has
+  // landed. Its send-off is the tail of Thrust Issues' completion scene, and there
+  // is no completion scene of its own; touchdown completes it.
   wadeMoveAlongActive: asContentId("wade_rusk_move_along_active"),
   wadePostMoveAlong: asContentId("wade_rusk_post_move_along"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC

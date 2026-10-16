@@ -24,7 +24,7 @@ import { playDialogueToText as playToText } from "./dialogue-steps";
  * Issue #358 — the Rivet's first flight, played end to end at the canonical 390px
  * mobile width.
  *
- * Wade's Move Along offered by hand and accepted, the one Ship panel at the
+ * Reporting Thrust Issues to Wade starting Move Along by itself, the one Ship panel at the
  * berth, both refuel sources and the exact-waste confirmation, the gated and then
  * authorized Launch, the live authoritative countdown with minimize and a mid-
  * flight reload, the real landing relocating the character and ship, Move Along
@@ -100,7 +100,7 @@ async function playToAction(dialogue: import("@playwright/test").Locator, name: 
   return action;
 }
 
-test("plays Move Along: the offer, fuelling from both sources, the first flight, the landing and its durable notice", async ({
+test("plays Move Along: the automatic start, fuelling from both sources, the first flight, the landing and its durable notice", async ({
   page,
   testCharacter,
 }) => {
@@ -124,7 +124,6 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
       MISSION_IDS.breakItDown,
       MISSION_IDS.braceYourself,
       MISSION_IDS.wheelBeRightBack,
-      MISSION_IDS.thrustIssues,
     ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
   );
   for (const targetId of [
@@ -145,29 +144,41 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
 
-  // Wade offers Move Along by hand; it is not auto-accepted from Thrust Issues.
+  // Move Along is not offered or accepted by hand: reporting Thrust Issues to Wade
+  // starts it in the same transaction, and his send-off ends that scene.
+  await db.insert(characterMissions).values({
+    characterId,
+    missionId: MISSION_IDS.thrustIssues,
+    acceptedAt: now,
+    completedAt: null,
+  });
   expect(await missionRow(characterId, MISSION_IDS.moveAlong)).toBeUndefined();
+  await page.reload();
   let conversation = await openNpcConversation(page, "Wade Rusk");
-  const entry = conversation.getByRole("button", { name: /Move Along/ });
-  await expect(entry).toContainText("Available");
-  await entry.click();
-  await (await playToAction(conversation, "TAKE HER TO THE PAD")).click();
+  await conversation.getByRole("button", { name: /Thrust Issues/ }).click();
+  await (await playToAction(conversation, "REPORT REPAIR")).click();
+  await playToText(conversation, /All right\. Landing gear\. Propulsion\. Hold\./);
+  await playToText(conversation, /But now it's a ship\./);
+  await playToText(conversation, /Holo Hollow Landing\. They've got a proper pad\./);
+  await playToText(conversation, /You'll need fuel first\./);
+  await playToText(conversation, /Fly it over\. Land it\./);
   await expect
     .poll(async () => (await missionRow(characterId, MISSION_IDS.moveAlong))?.acceptedAt, {
       timeout: 30_000,
     })
     .toBeTruthy();
-  await expect(conversation.getByRole("button", { name: "TAKE HER TO THE PAD" })).toHaveCount(0);
+  expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).toBeNull();
   await page.keyboard.press("Escape");
-  // Accepted: Wade now has only his reminder, and no hand-in of any kind.
+  // Only his reminder remains, with no offer and no hand-in of any kind.
   conversation = await openNpcConversation(page, "Wade Rusk");
+  await expect(conversation.getByRole("button", { name: /Thrust Issues/ })).toHaveCount(0);
   await conversation.getByRole("button", { name: /Move Along/ }).click();
   await expect(conversation.locator("[data-dialogue-text]")).toContainText(
     /Crash Site to Holo Hollow Landing\. Ten fuel units\./,
   );
-  await expect(conversation.getByRole("button", { name: /turn in|report|complete/i })).toHaveCount(
-    0,
-  );
+  await expect(
+    conversation.getByRole("button", { name: /accept|turn in|report|complete|TAKE HER/i }),
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   // The single Ship panel at the berth: three systems, Cargo Hold usable, and a
@@ -176,12 +187,15 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
   await page.reload();
   const ship = page.locator(SHIP);
   await expect(ship).toBeVisible();
-  await expect(ship.locator("[data-ship-system]")).toHaveCount(3);
+  // Finished repairs are not sections: only the Cargo Hold remains, plus one
+  // tiny line for the other two.
+  await expect(ship.locator("[data-ship-system]")).toHaveCount(1);
+  await expect(ship.locator("[data-ship-restored-summary] [data-ship-system-line]")).toHaveCount(2);
   // One panel, three sections: no stacked cards of its own inside it.
   await expect(page.locator(SHIP)).toHaveCount(1);
   await expect(ship.locator("[data-activity-panel]")).toHaveCount(0);
   await expect(ship).toContainText("Berthed at Crash Site");
-  await expect(ship.locator('[data-ship-system-status="complete"]')).toHaveCount(3);
+  await expect(ship.locator('[data-ship-system-status="complete"]')).toHaveCount(1);
   await expect(ship.locator(BAY)).toHaveCount(0);
 
   await ship.locator(BOARD).click();
@@ -201,8 +215,14 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
   // Exactly two source actions, with their counts. Load one from each.
   const fromInventory = bay.locator('[data-ship-refuel-source="inventory"]');
   const fromCargo = bay.locator('[data-ship-refuel-source="cargo_hold"]');
-  await expect(fromInventory).toContainText("(2)");
-  await expect(fromCargo).toContainText("(1)");
+  await expect(bay.locator('[data-ship-refuel-available="inventory"]')).toHaveText(
+    "2 full canisters available in Inventory",
+  );
+  await expect(bay.locator('[data-ship-refuel-available="cargo_hold"]')).toHaveText(
+    "1 full canister available in the Cargo Hold",
+  );
+  await expect(fromInventory).toHaveText("LOAD 1 CANISTER (+50 FU)");
+  await expect(fromCargo).toHaveText("LOAD 1 CANISTER (+50 FU)");
   await fromInventory.click();
   await expect(bay.locator("[data-ship-tank]")).toContainText("50 / 300 FU");
   await expect(bay.locator("[data-ship-refuel-feedback]")).toContainText("Loaded 50 FU.");
@@ -232,6 +252,8 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
     .where(eq(characterShips.characterId, characterId));
   await page.reload();
   await ship.locator(BOARD).click();
+  await expect(bay.locator("[data-ship-refuel-partial]").first()).toContainText("30 FU");
+  await expect(fromInventory).toHaveText("LOAD 1 CANISTER (+20 FU)");
   await fromInventory.click();
   const confirm = bay.locator("[data-ship-refuel-confirm]");
   await expect(confirm).toContainText("adds 20 FU and wastes 30 FU");
@@ -328,4 +350,54 @@ test("plays Move Along: the offer, fuelling from both sources, the first flight,
     /Heard the Rivet made the Landing\./,
   );
   void NPC_IDS;
+});
+
+/**
+ * #358 review item 4 — reproduce-first. `PlayContext` retries a boundary refresh
+ * for a bounded few seconds; a player who is offline through touchdown and
+ * reconnects later, without reloading, must still see the landing confirmed by
+ * the server rather than a stuck "Touchdown pending".
+ */
+test("an offline player who reconnects after touchdown is told of the landing without a reload", async ({
+  context,
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(120_000);
+  const characterId = testCharacter.id;
+  const now = new Date();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await db.insert(characterMissions).values(
+    [MISSION_IDS.thrustIssues, MISSION_IDS.moveAlong].map((missionId) => ({
+      characterId,
+      missionId,
+      acceptedAt: now,
+      completedAt: missionId === MISSION_IDS.thrustIssues ? now : null,
+    })),
+  );
+  for (const targetId of [
+    REPAIR_TARGET_IDS.cargoHold,
+    REPAIR_TARGET_IDS.landingGear,
+    REPAIR_TARGET_IDS.propulsionSystem,
+  ]) {
+    await finishRepair(characterId, targetId);
+  }
+  await db.insert(characterShips).values({ characterId, fuelUnits: 100 });
+  await standAt(characterId, LOCATION_IDS.crashSite);
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator(SHIP).locator(BOARD).click();
+  await page.locator(SHIP).locator(LAUNCH).click();
+  await expect(page.locator("[data-flight-surface]")).toBeVisible({ timeout: 20_000 });
+  const arrivesAt = new Date((await shipRow(characterId))!.flightArrivesAt!);
+
+  // Offline through touchdown and well past the bounded retry window.
+  await context.setOffline(true);
+  await page.waitForTimeout(arrivesAt.getTime() - Date.now() + 12_000);
+  expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).toBeNull();
+  await context.setOffline(false);
+
+  // No reload: the tab must reconcile on its own.
+  await expect(page.locator(NOTICE)).toBeVisible({ timeout: 30_000 });
+  expect((await shipRow(characterId))?.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
 });

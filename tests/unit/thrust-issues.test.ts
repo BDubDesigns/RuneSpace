@@ -496,7 +496,7 @@ describe("the Mission's shape", () => {
     ]);
   });
 
-  it("is never an automatic continuation from Wheel Be Right Back or anything else", () => {
+  it("is never an automatic continuation of Wheel Be Right Back, and hands on to Move Along", () => {
     expect(WHEEL_BE_RIGHT_BACK.continuationMissionId).toBeUndefined();
     const others: readonly MissionDefinition[] = MISSIONS.filter(
       (mission) => mission.id !== THRUST_ISSUES.id,
@@ -504,8 +504,9 @@ describe("the Mission's shape", () => {
     expect(others.some((mission) => mission.continuationMissionId === THRUST_ISSUES.id)).toBe(
       false,
     );
-    // And it starts nothing: first flight is a separate slice.
-    expect(THRUST_ISSUES.continuationMissionId).toBeUndefined();
+    // Reporting it starts Move Along in the same transaction (#358), and nothing
+    // else: the repair itself starts nothing.
+    expect(THRUST_ISSUES.continuationMissionId).toBe(MISSION_IDS.moveAlong);
   });
 
   it("is offered by hand by Wade at Rusk Recovery with the locked control", () => {
@@ -585,24 +586,24 @@ describe("Wade's locked dialogue", () => {
 
   it("completes with the locked lines word for word, and no reward beat", () => {
     const beats = getDialogue(DIALOGUE_IDS.wadeThrustIssuesCompletion)!.beats;
-    expect(beats.map((beat) => beat.kind)).toEqual(["npc", "npc"]);
-    expect(beats.map((beat) => beat.text)).toEqual([
+    // Two locked lines, then Move Along's send-off (#358, `tests/unit/move-along.test.ts`).
+    expect(beats.every((beat) => beat.kind === "npc")).toBe(true);
+    expect(beats.slice(0, 2).map((beat) => beat.text)).toEqual([
       "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
       "But now it's a ship.",
     ]);
-    expect(expressions(DIALOGUE_IDS.wadeThrustIssuesCompletion)).toEqual([
+    expect(expressions(DIALOGUE_IDS.wadeThrustIssuesCompletion).slice(0, 2)).toEqual([
       EXPRESSION_IDS.neutral,
       EXPRESSION_IDS.scowl,
     ]);
   });
 
-  it("appends no fuel warning or first-flight prompt anywhere", () => {
+  it("mentions no fuel or flight before the report: only its completion hands on to Move Along", () => {
     for (const id of [
       DIALOGUE_IDS.wadeThrustIssuesOffer,
       DIALOGUE_IDS.wadeThrustIssuesRepairReminder,
       DIALOGUE_IDS.wadeThrustIssuesBusy,
       DIALOGUE_IDS.wadeThrustIssuesTurnIn,
-      DIALOGUE_IDS.wadeThrustIssuesCompletion,
       DIALOGUE_IDS.wadePostThrustIssues,
     ]) {
       expect(texts(id).join(" "), id).not.toMatch(

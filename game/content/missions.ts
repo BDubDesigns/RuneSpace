@@ -1364,6 +1364,11 @@ export const THRUST_ISSUES: MissionDefinition = {
   summary: "Repair the ship's propulsion system at the Crash Site, then report to Wade Rusk.",
   prerequisiteMissionId: MISSION_IDS.wheelBeRightBack,
   prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 8 }],
+  // Reporting the repair hands Wade's story straight on to Move Along (#358): the
+  // generic completion boundary accepts it in the same transaction, so there is
+  // no second interaction and no second trip. Propulsion being repaired starts
+  // nothing: only this turn-in does.
+  continuationMissionId: MISSION_IDS.moveAlong,
   offers: [
     {
       npcId: NPC_IDS.wadeRusk,
@@ -1403,10 +1408,13 @@ export const THRUST_ISSUES: MissionDefinition = {
 /**
  * Move Along — Wade's first-flight job (#358).
  *
- * Wade offers it by hand at Rusk Recovery once Thrust Issues is complete, and
- * it is never that Mission's continuation: the player explicitly accepts it. The
- * first Crash Site launch is blocked until it is accepted (the route authors
- * that gate), so the physical flight and the story fact cannot disagree.
+ * It starts when the player reports Thrust Issues to Wade: that Mission's
+ * `continuationMissionId` has the generic completion boundary accept it in the
+ * same transaction, so there is no separate acceptance and no second trip. The
+ * Mission therefore authors no offer. Already accepted or completed records are
+ * left exactly as they are. The first Crash Site launch is still blocked until it
+ * is accepted (the route authors that gate), so the physical flight and the story
+ * fact cannot disagree.
  *
  * The objective is the physical Rivet flight, not a location fact: walking to
  * Holo Hollow Landing, a Launch click, a countdown reaching zero, or a failed
@@ -1420,17 +1428,10 @@ export const MOVE_ALONG: MissionDefinition = {
   title: "Move Along",
   summary: "Take your repaired Rivet Utility Shuttle from the Crash Site to Holo Hollow Landing.",
   prerequisiteMissionId: MISSION_IDS.thrustIssues,
-  offers: [
-    {
-      npcId: NPC_IDS.wadeRusk,
-      locationId: LOCATION_IDS.ruskRecovery,
-      dialogueId: DIALOGUE_IDS.wadeMoveAlongOffer,
-      actionLabel: "TAKE HER TO THE PAD",
-      // His reminder while the Mission is open. It stands in for a turn-in
-      // conversation this Mission does not have.
-      activeDialogueId: DIALOGUE_IDS.wadeMoveAlongActive,
-    },
-  ],
+  offers: [],
+  // His reminder while the Mission is open. It stands in for a turn-in
+  // conversation this Mission does not have.
+  activeNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeMoveAlongActive }],
   requirements: [
     {
       kind: "ship_flight",

@@ -856,7 +856,7 @@ export const missionGuideArticles = [
           [
             "You need to have finished Thrust Issues, which means reporting the drive repair to ",
             wade,
-            ". Walk out to Rusk Recovery and choose Take Her to the Pad when you want the job. It does not start by itself, and the ship will not make its first flight until you have taken it.",
+            ". Wade's send-off ends that report, and Move Along starts on its own: there is nothing to accept. The ship will not make its first flight until it has started.",
           ],
         ],
       },
@@ -870,8 +870,8 @@ export const missionGuideArticles = [
       {
         heading: "Walkthrough",
         list: [
-          "Take the Mission from Wade at Rusk Recovery. You can walk over to the Landing and back for fuel whenever you like; walking there does not move the ship.",
-          "At the Crash Site, choose Board Ship in the Ship panel. Its tank shows how much fuel you have and has two buttons: Load From Inventory and Load From Cargo Hold. Each uses exactly one Full Small Fuel Canister and does not give an empty one back. If the tank can only take part of a canister, the game tells you exactly how much it will add and how much will be wasted, and asks you to confirm.",
+          "Report Thrust Issues to Wade at Rusk Recovery; Move Along starts with it. You can walk over to the Landing and back for fuel whenever you like; walking there does not move the ship.",
+          "At the Crash Site, choose Board Ship in the Ship panel. Its tank shows how much fuel you have and says how many full canisters are available in Inventory and in the Cargo Hold, with a Load 1 Canister button for each. Each click uses exactly one Full Small Fuel Canister and does not give an empty one back. If the tank can only take part of a canister, the game tells you exactly how much it will add and how much will be wasted, and asks you to confirm.",
           "Choose Launch. It shows the destination, the 10 Fuel Unit cost and your tank before and after, and tells you that leaving moves your ship from the Crash Site to Holo Hollow Landing for good. There is no second confirmation, and a flight cannot be cancelled.",
           "The flight takes 15 seconds. While it lasts you cannot walk, work, trade or change your gear, but you can still look at your Inventory, Equipment and Missions. You can minimize the flight and reopen it, and a reload picks up where it was.",
           "On touchdown the game shows Flight complete — Arrived at Holo Hollow Landing and Mission Complete: Move Along. You can dismiss it; until you do it will be waiting after a reload or on another device.",

@@ -147,7 +147,7 @@ export function launchRefusalMessage(
     case "mission_incomplete":
       return `Finish ${missionTitle(route?.requiredCompletedMissionIds[0])} first.`;
     case "mission_not_accepted":
-      return `Talk to Wade at Rusk Recovery to accept ${missionTitle(route?.requiredAcceptedMissionId)}.`;
+      return `Report Thrust Issues to Wade at Rusk Recovery to start ${missionTitle(route?.requiredAcceptedMissionId)}.`;
     case "insufficient_fuel": {
       const cost = route ? getShipFlightBalance(route.id).fuelCostFuelUnits : undefined;
       return cost === undefined

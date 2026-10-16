@@ -101,10 +101,11 @@ describe("ShipRefuelControls", () => {
     setState({ fuelUnits: 120, canisters: { inventory: 2, cargoHold: 3 } });
     const markup = render(() => React.createElement(ShipRefuelControls, { cargoHoldReady: true }));
     expect(markup).toContain("120 / 300 FU");
-    expect(markup).toContain("LOAD FROM INVENTORY");
-    expect(markup).toContain("LOAD FROM CARGO HOLD");
-    expect(markup).toContain("(2)");
-    expect(markup).toContain("(3)");
+    // Availability and the per-click amount are separate: one canister, +50 FU.
+    expect(markup).toContain("2 full canisters available in Inventory");
+    expect(markup).toContain("3 full canisters available in the Cargo Hold");
+    expect(markup.match(/LOAD 1 CANISTER \(\+50 FU\)/g)).toHaveLength(2);
+    expect(markup).not.toMatch(/LOAD FROM/);
     expect(markup.match(/data-ship-refuel-source=/g)).toHaveLength(2);
     // No dropdown, no bulk "fuel all".
     expect(markup).not.toMatch(/<select|fuel all|load all/i);
@@ -146,14 +147,14 @@ describe("ShipFlightControls", () => {
           ...route,
           launchRefusal: {
             reason: "mission_not_accepted",
-            message: "Talk to Wade at Rusk Recovery to accept Move Along.",
+            message: "Report Thrust Issues to Wade at Rusk Recovery to start Move Along.",
           },
         },
       ],
     });
     const markup = render(() => React.createElement(ShipFlightControls));
     expect(markup).toContain('disabled=""');
-    expect(markup).toContain("Talk to Wade at Rusk Recovery to accept Move Along.");
+    expect(markup).toContain("Report Thrust Issues to Wade at Rusk Recovery to start Move Along.");
   });
 
   it("offers no flight from a berth with no route, and nothing back to the Crash Site", () => {
@@ -296,6 +297,8 @@ describe("ShipPanel", () => {
     expect(markup).not.toContain("LAUNCH");
     // Restored systems keep their status and are not repeated as repair cards.
     expect(markup).toContain("Propulsion restored.");
-    expect(markup.match(/data-ship-system-status="complete"/g)).toHaveLength(3);
+    expect(markup.match(/data-ship-system-status="complete"/g)).toHaveLength(1);
+    expect(markup.match(/data-ship-system=/g)).toHaveLength(1);
+    expect(markup).toContain("data-ship-restored-summary");
   });
 });

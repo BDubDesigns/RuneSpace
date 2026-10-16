@@ -10,9 +10,9 @@ import { refuelShipAction } from "@/server/actions";
 
 type Confirmation = { source: RefuelSource; gained: number; wasted: number };
 
-const SOURCE_LABELS: Record<RefuelSource, { action: string; place: string }> = {
-  inventory: { action: "LOAD FROM INVENTORY", place: "Inventory" },
-  cargo_hold: { action: "LOAD FROM CARGO HOLD", place: "the Cargo Hold" },
+const SOURCE_LABELS: Record<RefuelSource, { place: string }> = {
+  inventory: { place: "Inventory" },
+  cargo_hold: { place: "the Cargo Hold" },
 };
 
 /**
@@ -135,6 +135,10 @@ export function ShipRefuelControls({ cargoHoldReady }: { cargoHoldReady: boolean
         {(["inventory", "cargo_hold"] as const).map((source) => {
           const count = counts[source];
           const empty = count < 1;
+          const plan = planFor(source);
+          // The count is what is available; the button states what one click
+          // does, so "2" can never read as "loads two canisters".
+          const gain = plan.ok ? plan.gainedFuelUnits : ship.canisterFuelUnits;
           const reason = full
             ? "The tank is full."
             : empty
@@ -144,6 +148,13 @@ export function ShipRefuelControls({ cargoHoldReady }: { cargoHoldReady: boolean
               : undefined;
           return (
             <div className="space-y-1.5" key={source}>
+              <p
+                className="text-xs uppercase tracking-[0.12em] text-[color:var(--rs-text-muted)]"
+                data-ship-refuel-available={source}
+              >
+                {count} full {count === 1 ? "canister" : "canisters"} available in{" "}
+                {SOURCE_LABELS[source].place}
+              </p>
               <ActionButton
                 className="w-full"
                 data-ship-refuel-source={source}
@@ -152,8 +163,16 @@ export function ShipRefuelControls({ cargoHoldReady }: { cargoHoldReady: boolean
                 loading={foregroundBusy && pendingSource === source}
                 onClick={() => choose(source)}
               >
-                {SOURCE_LABELS[source].action} ({count})
+                LOAD 1 CANISTER (+{gain} FU)
               </ActionButton>
+              {plan.ok && plan.wastedFuelUnits > 0 ? (
+                <p
+                  className="text-xs text-[color:var(--rs-accent-danger)]"
+                  data-ship-refuel-partial
+                >
+                  Partial fill: {plan.wastedFuelUnits} FU would be wasted.
+                </p>
+              ) : null}
               {reason ? (
                 <p
                   className="text-xs text-[color:var(--rs-text-muted)]"

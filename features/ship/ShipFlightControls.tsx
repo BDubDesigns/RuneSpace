@@ -15,7 +15,7 @@ import { launchShipAction } from "@/server/actions";
  *
  * Whether a launch would be refused, and the words that say why, are the
  * server's own verdict from the same facts the launch command re-checks, so
- * "Talk to Wade at Rusk Recovery to accept Move Along" is shown instead of a
+ * "Report Thrust Issues to Wade at Rusk Recovery to start Move Along" is shown instead of a
  * dead control. The browser contributes a route ID and nothing else.
  */
 export function ShipFlightControls() {

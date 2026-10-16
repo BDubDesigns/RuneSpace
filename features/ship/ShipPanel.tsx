@@ -9,6 +9,9 @@ import { ShipRefuelControls } from "@/features/ship/ShipRefuelControls";
 import { deriveShipSystemState, ShipSystemSection } from "@/features/ship/ShipSystemPanel";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { REPAIR_TARGET_IDS } from "@/game/config/foundations";
+import { getRepairTarget } from "@/game/content/repair-targets";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { completedRepairStatus } from "@/game/domain/repair-targets";
 
 /**
  * The one Ship panel (#358): a single presence at the ship's actual berth,
@@ -38,6 +41,24 @@ export function ShipPanel() {
     deriveShipSystemState(state.repairs[REPAIR_TARGET_IDS.cargoHold]) === "complete";
   const propulsionReady =
     deriveShipSystemState(state.repairs[REPAIR_TARGET_IDS.propulsionSystem]) === "complete";
+  const landingGearReady =
+    deriveShipSystemState(state.repairs[REPAIR_TARGET_IDS.landingGear]) === "complete";
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
+  // The finished systems, each in its authored words, as one tiny line.
+  const restoredLines = [
+    [REPAIR_TARGET_IDS.landingGear, landingGearReady],
+    [REPAIR_TARGET_IDS.propulsionSystem, propulsionReady],
+  ].flatMap(([targetId, ready]) => {
+    const definition = ready ? getRepairTarget(targetId as string) : undefined;
+    return definition
+      ? [
+          {
+            targetId: targetId as string,
+            status: completedRepairStatus(definition, completedMissionIds),
+          },
+        ]
+      : [];
+  });
 
   return (
     <ActivityPanel
@@ -60,16 +81,36 @@ export function ShipPanel() {
       >
         {({ justCompleted }) => <CargoHoldStorage justCompleted={justCompleted} />}
       </ShipSystemSection>
-      <ShipSystemSection
-        materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
-        targetId={REPAIR_TARGET_IDS.landingGear}
-        weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
-      />
-      <ShipSystemSection
-        materialsPrompt="The drive mounts and the frame reinforcement go in first. Hand over what you are carrying and bring the rest when you come back."
-        targetId={REPAIR_TARGET_IDS.propulsionSystem}
-        weldingPrompt="Mounts seated, frame braced. What is left is welding the drive back into the ship."
-      />
+      {/* A finished repair is not a section of its own: it would only be dead
+          space. A damaged or in-progress system keeps its section, its repair
+          work and its Mission guidance; a finished one shrinks to one line. */}
+      {!landingGearReady ? (
+        <ShipSystemSection
+          materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
+          targetId={REPAIR_TARGET_IDS.landingGear}
+          weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
+        />
+      ) : null}
+      {!propulsionReady ? (
+        <ShipSystemSection
+          materialsPrompt="The drive mounts and the frame reinforcement go in first. Hand over what you are carrying and bring the rest when you come back."
+          targetId={REPAIR_TARGET_IDS.propulsionSystem}
+          weldingPrompt="Mounts seated, frame braced. What is left is welding the drive back into the ship."
+        />
+      ) : null}
+      {restoredLines.length > 0 ? (
+        <p
+          className="text-xs leading-relaxed text-[color:var(--rs-text-muted)]"
+          data-ship-restored-summary
+        >
+          {restoredLines.map((line, index) => (
+            <span data-ship-system-line={line.targetId} key={line.targetId}>
+              {index > 0 ? " " : ""}
+              {line.status}
+            </span>
+          ))}
+        </p>
+      ) : null}
       {propulsionReady ? (
         <section
           className="space-y-4 border-t border-[color:var(--rs-border-structural)] pt-3"

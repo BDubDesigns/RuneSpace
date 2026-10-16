@@ -648,7 +648,7 @@ which button needs a confirmation.
 **Launch** (`launchShip`) validates, in one transaction, an authored route that
 departs from the ship's actual berth, a character who is at that berth and
 idle, the route's required repairs (all three ship systems), a completed Thrust
-Issues, an **accepted** Move Along, and at least 10 FU (`planLaunch`). It then
+Issues, an **accepted** Move Along (started by the Thrust Issues report), and at least 10 FU (`planLaunch`). It then
 deducts the fuel once, records immutable start and arrival instants on the ship
 row, and inserts an `active_actions` row for `ship_flight`. There is no cancel,
 abort, refund or second launch, and an operator force-idle fails closed rather
