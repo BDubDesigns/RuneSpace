@@ -13,6 +13,7 @@ import {
   AdminForceUnequipRequestSchema,
   AdminResetAllMissionsRequestSchema,
   AdminResetMissionChainRequestSchema,
+  AdminReturnShipRequestSchema,
   AdminSetSkillXpRequestSchema,
   AdminStopActionRequestSchema,
   AdminTeleportRequestSchema,
@@ -32,6 +33,7 @@ import {
   setSkillTotalXp,
   stopCurrentAction,
   teleportCharacter,
+  returnShipToCrashSite,
   type AdminAccessCommandResult,
   type AdminAccountAccessView,
   type AdminAddItemResult,
@@ -43,6 +45,7 @@ import {
   type AdminStackRemovalResult,
   type AdminStopResult,
   type AdminTeleportResult,
+  type AdminReturnShipResult,
 } from "@/server/admin-commands";
 import {
   loadAdminInspectorState,
@@ -87,6 +90,20 @@ export async function adminTeleportCharacter(input: unknown): Promise<AdminTelep
       request.data.characterId,
       request.data.destinationLocationId,
     );
+  } catch (error) {
+    return adminError(error);
+  }
+}
+
+export type AdminReturnShipActionResult = AdminReturnShipResult | { error: string };
+
+export async function adminReturnShipToCrashSite(
+  input: unknown,
+): Promise<AdminReturnShipActionResult> {
+  const request = AdminReturnShipRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid admin command." };
+  try {
+    return await returnShipToCrashSite(await headers(), request.data.characterId);
   } catch (error) {
     return adminError(error);
   }

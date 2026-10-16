@@ -104,6 +104,11 @@ export function formatAuditSummary(
       const interrupted = interruptedAction ? ` (interrupted "${interruptedAction}")` : "";
       return `Teleported ${from || "unknown"} → ${to || "unknown"}${interrupted}.`;
     }
+    case "return_ship_to_crash_site": {
+      const from = locationLabel(str(d.fromBerthLocationId));
+      const to = locationLabel(str(d.toBerthLocationId));
+      return `Returned the Rivet's berth ${from || "unknown"} → ${to || "unknown"}.`;
+    }
     case "removed_stack_quantity": {
       const n = num(d.removedQuantity);
       const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";

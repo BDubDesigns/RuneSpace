@@ -446,3 +446,99 @@ test("an offline player who reconnects after touchdown is told of the landing wi
   await expect(page.locator(NOTICE)).toBeVisible({ timeout: 30_000 });
   expect((await shipRow(characterId))?.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
 });
+
+/**
+ * Issue #359 — the flight cinematic over the same authoritative flight: takeoff
+ * over the departure backdrop, the local chart, touchdown over the arrival
+ * backdrop, resumed in the right phase after a mid-flight reload, honouring
+ * reduced motion, and handing over to the arrived scene and the durable notice.
+ */
+test("plays the first-flight cinematic in phase with the recorded flight", async ({
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(90_000);
+  const characterId = testCharacter.id;
+  const now = new Date();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await db.insert(characterMissions).values(
+    [MISSION_IDS.thrustIssues, MISSION_IDS.moveAlong].map((missionId) => ({
+      characterId,
+      missionId,
+      acceptedAt: now,
+      completedAt: missionId === MISSION_IDS.thrustIssues ? now : null,
+    })),
+  );
+  for (const targetId of [
+    REPAIR_TARGET_IDS.cargoHold,
+    REPAIR_TARGET_IDS.landingGear,
+    REPAIR_TARGET_IDS.propulsionSystem,
+  ]) {
+    await finishRepair(characterId, targetId);
+  }
+  await db.insert(characterShips).values({ characterId, fuelUnits: 100 });
+  await standAt(characterId, LOCATION_IDS.crashSite);
+  await openTestCharacter(page, characterId);
+  await page.locator(SHIP).locator(BOARD).click();
+  await page.locator(SHIP).locator(LAUNCH).click();
+
+  // Takeoff begins at once, over the shipless departure backdrop with the Rivet composited.
+  const cinematic = page.locator("[data-flight-cinematic]");
+  await expect(cinematic).toHaveAttribute("data-flight-phase", "takeoff");
+  await expect(cinematic.locator('img[data-scene-layer="background"]')).toHaveAttribute(
+    "src",
+    /crash-site-departure/,
+  );
+  await expect(cinematic.locator("[data-flight-ship]")).toHaveCount(1);
+  await expect(cinematic.locator("[data-flight-cinematic-caption]")).toHaveText(
+    "Takeoff · Crash Site",
+  );
+  const row = (await shipRow(characterId))!;
+  const startedAt = row.flightStartedAt!.getTime();
+  const arrivesAt = row.flightArrivesAt!.getTime();
+  // The cinematic adds nothing to the authoritative 15-second flight.
+  expect(arrivesAt - startedAt).toBe(15_000);
+
+  // The chart: the local leg between the two real places.
+  await expect(cinematic).toHaveAttribute("data-flight-phase", "travel", { timeout: 6_000 });
+  const chart = cinematic.locator("[data-flight-chart]");
+  await expect(chart).toContainText("CRASH SITE");
+  await expect(chart).toContainText("HOLO HOLLOW LANDING");
+  await expect(chart).toContainText("SKATBOLL LOCAL FLIGHT");
+  await expect(chart.locator("[data-flight-chart-marker]")).toBeVisible();
+
+  // A reload mid-chart resumes the chart; it never restarts the takeoff.
+  await page.reload();
+  await expect(page.locator("[data-flight-cinematic]")).toHaveAttribute(
+    "data-flight-phase",
+    "travel",
+  );
+
+  // Reduced motion: a static chart without the moving marker; the countdown remains.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator("[data-flight-chart-marker]")).toBeHidden();
+  await expect(page.locator("[data-flight-progress]")).toContainText(/seconds? remaining/);
+
+  // Touchdown over the arrival backdrop, the ship resting on its mark without motion.
+  await expect(page.locator("[data-flight-cinematic]")).toHaveAttribute(
+    "data-flight-phase",
+    "landing",
+    { timeout: 12_000 },
+  );
+  await expect(
+    page.locator('[data-flight-cinematic] img[data-scene-layer="background"]'),
+  ).toHaveAttribute("src", /holo-hollow-landing-arrival/);
+  expect(
+    await page
+      .locator(".rs-flight-cinematic__ship")
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("none");
+
+  // Only the server lands it: then the arrived scene and the durable notice take over.
+  await expect(page.locator(NOTICE)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-flight-cinematic]")).toHaveCount(0);
+  await expect(
+    page.locator(`[data-location-scene="${LOCATION_IDS.holoHollowLanding}"]`).locator(OVERLAY),
+  ).toHaveCount(1);
+  expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).not.toBeNull();
+});

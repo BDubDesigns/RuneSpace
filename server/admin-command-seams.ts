@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   cargoHoldItemInstances,
+  characterShips,
   characterMissions,
   characterSkillXp,
   characters,
@@ -19,7 +20,7 @@ import {
   miningLevelThresholds,
   skillLevelThresholds,
 } from "@/game/config/balance";
-import { LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { MISSIONS, getMission } from "@/game/content/missions";
 import { missionChainResetScope } from "@/game/domain/missions";
@@ -46,6 +47,8 @@ import {
   FabricationReservationError,
 } from "@/server/fabrication-reservation";
 import { invalidateMiningActionForChangedTool } from "@/server/equipment";
+import { loadShipRow } from "@/server/ship-state";
+import { INITIAL_SHIP_BERTH_LOCATION_ID } from "@/game/domain/ship";
 import { characterSkillLevel } from "@/server/skill-levels";
 import { removeCargoStack } from "@/server/cargo-hold";
 import { defaultMiningRandom } from "@/server/mining";
@@ -250,6 +253,81 @@ export async function teleportCharacterAsAdmin(
           fromLocationId,
           toLocationId: destinationLocationId,
           interruptedActionId: interruption.interruptedActionId,
+        },
+      };
+    },
+    now,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RETURN RIVET TO CRASH SITE (#359 playtest tooling)
+// ---------------------------------------------------------------------------
+
+export type AdminReturnShipOutcome =
+  | { kind: "returned"; fromBerthLocationId: string; toBerthLocationId: string }
+  | { kind: "no_change"; berthLocationId: string };
+
+export type AdminReturnShipResult = { state: PlayGameplayState; outcome: AdminReturnShipOutcome };
+
+/**
+ * Re-berth an idle, landed Rivet at the Crash Site so the owner can fly the
+ * first route again while playtesting its cinematic (#359).
+ *
+ * Only the ship's berth moves. The character stays where they are (they walk
+ * back to board), and the tank, Cargo Hold contents, repairs, Missions and
+ * earlier arrival receipts are untouched; scenes and Cargo Hold access follow
+ * the berth through their normal projections. A replay is then an ordinary
+ * launch: it spends the ordinary fuel, and Move Along, already completed, is
+ * never stamped again.
+ *
+ * The command first reconciles like any other, so a flight already due lands
+ * normally before this looks at the ship. A flight still in the air is refused
+ * untouched: re-berthing it would strand its recorded route.
+ */
+export async function returnShipToCrashSiteAsAdmin(
+  adminUserId: string,
+  characterId: string,
+  now: Date = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<AdminReturnShipResult> {
+  return runAdminCharacterCommandAs(
+    adminUserId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, { character, action, adminUserId: admin }) => {
+      await ensurePlayProvisioning(transaction, character.id);
+      const ship = await loadShipRow(transaction, character.id, { lock: true });
+      if (ship?.flightArrivesAt != null || action?.actionId === ACTION_IDS.shipFlight) {
+        throw new AdminCommandError(
+          "The Rivet is in flight. It can be returned to the Crash Site once it has landed.",
+          409,
+        );
+      }
+      const fromBerthLocationId = ship?.berthLocationId ?? INITIAL_SHIP_BERTH_LOCATION_ID;
+      // No row is an untouched ship that never left the Crash Site.
+      if (!ship || fromBerthLocationId === LOCATION_IDS.crashSite) {
+        const state = await refreshedState(transaction, character.id, now);
+        return { state, outcome: { kind: "no_change", berthLocationId: fromBerthLocationId } };
+      }
+      await transaction
+        .update(characterShips)
+        .set({ berthLocationId: LOCATION_IDS.crashSite, updatedAt: now })
+        .where(eq(characterShips.characterId, character.id));
+      await recordOperatorAudit(transaction, {
+        adminUserId: admin,
+        target: { kind: "character", characterId: character.id },
+        operation: "return_ship_to_crash_site",
+        targetIdentity: LOCATION_IDS.crashSite,
+        details: { fromBerthLocationId, toBerthLocationId: LOCATION_IDS.crashSite },
+      });
+      const state = await refreshedState(transaction, character.id, now);
+      return {
+        state,
+        outcome: {
+          kind: "returned",
+          fromBerthLocationId,
+          toBerthLocationId: LOCATION_IDS.crashSite,
         },
       };
     },

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { LocationDefinition } from "@/game/schemas/locations";
 
 export type ComposedScene = LocationDefinition["presentation"]["scene"];
@@ -22,6 +22,10 @@ export type ComposedScene = LocationDefinition["presentation"]["scene"];
  * background, so every location renders through the same elements and a ship state
  * change swaps only the overlay layer.
  *
+ * `children` are further stage-relative layers (#359: the flight cinematic's moving
+ * Rivet). They sit above the background and any overlay inside the same stage, so
+ * a layer positioned in percent of the stage is cropped and scaled with the art.
+ *
  * Accessibility: the scene's `alt` describes the whole composition and is carried
  * by the background image; the overlay is decorative (`alt=""`), so a screen reader
  * hears the place once.
@@ -31,6 +35,7 @@ export function SceneComposition({
   sizes,
   stageWidthHint,
   priority = false,
+  children,
 }: {
   scene: ComposedScene;
   /** `sizes` for the background image. */
@@ -43,6 +48,8 @@ export function SceneComposition({
   stageWidthHint: number;
   /** Preload the background only. Overlays never take a preload. */
   priority?: boolean;
+  /** Extra decorative layers placed in percent of the stage. */
+  children?: ReactNode;
 }) {
   const focalX = scene.focal?.x ?? 50;
   const focalY = scene.focal?.y ?? 45;
@@ -98,6 +105,7 @@ export function SceneComposition({
             loading="eager"
           />
         ) : null}
+        {children}
       </div>
     </div>
   );

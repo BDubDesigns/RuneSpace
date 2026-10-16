@@ -2,6 +2,7 @@ import { requireAdmin } from "@/server/admin-auth";
 import {
   stopCurrentActionAsAdmin,
   teleportCharacterAsAdmin,
+  returnShipToCrashSiteAsAdmin,
   removeCarriedStackQuantityAsAdmin,
   removeCargoStackQuantityAsAdmin,
   forceUnequipItemAsAdmin,
@@ -20,6 +21,8 @@ import {
   type AdminStopResult,
   type AdminTeleportOutcome,
   type AdminTeleportResult,
+  type AdminReturnShipOutcome,
+  type AdminReturnShipResult,
   type AdminStackRemovalOutcome,
   type AdminStackRemovalResult,
   type AdminForceUnequipOutcome,
@@ -71,6 +74,8 @@ export type {
   AdminStopResult,
   AdminTeleportOutcome,
   AdminTeleportResult,
+  AdminReturnShipOutcome,
+  AdminReturnShipResult,
   AdminStackRemovalOutcome,
   AdminStackRemovalResult,
   AdminForceUnequipOutcome,
@@ -105,6 +110,15 @@ export async function teleportCharacter(
 ): Promise<AdminTeleportResult> {
   const admin = await requireAdmin(headers);
   return teleportCharacterAsAdmin(admin.id, characterId, destinationLocationId, now);
+}
+
+export async function returnShipToCrashSite(
+  headers: Headers,
+  characterId: string,
+  now: Date = new Date(),
+): Promise<AdminReturnShipResult> {
+  const admin = await requireAdmin(headers);
+  return returnShipToCrashSiteAsAdmin(admin.id, characterId, now);
 }
 
 export async function removeCarriedStackQuantity(

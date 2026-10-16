@@ -28,6 +28,11 @@ export const AdminTeleportRequestSchema = z.object({
   destinationLocationId: z.enum(LOCATION_ID_VALUES),
 });
 
+/** RETURN RIVET TO CRASH SITE (#359) — the destination is fixed server-side. */
+export const AdminReturnShipRequestSchema = z.object({
+  characterId,
+});
+
 const stackRemovalFields = {
   characterId,
   stackId: z.string().uuid(),

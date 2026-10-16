@@ -663,7 +663,8 @@ trading, Inventory and Equipment changes, cargo, Missions — except the Play re
 and presentation-only dismissals, so Inventory, Equipment and Missions stay
 browseable but nothing mutates. `tests/unit/ship-flight-gate.test.ts` keeps that
 opt-out list exact. The client shows a live countdown from the server's recorded
-instants (`FlightPanel`), which can be minimized and reopened; a client clock
+instants (`FlightPanel`), led by the flight cinematic (#359,
+`docs/location-scenes.md`), which can be minimized and reopened; a client clock
 reaching zero only shows "touchdown pending" and unlocks nothing.
 
 **Landing** is lazy, like every timed action: the next authenticated read or

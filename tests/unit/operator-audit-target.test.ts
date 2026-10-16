@@ -41,8 +41,8 @@ describe("operator audit targets", () => {
   });
 
   it("keeps every #113 operation character-scoped and adds the four #223 operations", () => {
-    // 14 through #223, plus the seven #248 moderation operations.
-    expect(OPERATOR_OPERATIONS).toHaveLength(21);
+    // 14 through #223, the seven #248 moderation operations, and #359's ship re-berth.
+    expect(OPERATOR_OPERATIONS).toHaveLength(22);
     expect(OPERATOR_OPERATION_TARGET_KINDS).toMatchObject({
       grant_early_access: "player_account",
       revoke_early_access: "player_account",
@@ -63,6 +63,7 @@ describe("operator audit targets", () => {
       "reset_mission_chain",
       "reset_all_missions",
       "set_skill_xp",
+      "return_ship_to_crash_site",
     ]);
   });
 

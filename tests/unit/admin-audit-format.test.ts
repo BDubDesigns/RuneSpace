@@ -47,6 +47,16 @@ describe("formatAuditSummary", () => {
     ).toBe("Teleported The Jag → Crash Site.");
   });
 
+  it("formats return_ship_to_crash_site with human berth names (#359)", () => {
+    expect(
+      formatAuditSummary(
+        "return_ship_to_crash_site",
+        { fromBerthLocationId: "holo_hollow_landing", toBerthLocationId: "crash_site" },
+        "crash_site",
+      ),
+    ).toBe("Returned the Rivet's berth Holo Hollow Landing → Crash Site.");
+  });
+
   it("formats an enriched one-item removal with the item name (current rows carry itemId)", () => {
     expect(
       formatAuditSummary(

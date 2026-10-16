@@ -87,7 +87,11 @@ const CRASHED_RIVET_OVERLAY = {
   placement: { left: 34.134, top: 33.115, width: 31.866 },
 };
 
-const REPAIRED_RIVET_OVERLAY = {
+/**
+ * Exported so the first-flight cinematic (#359) composites this exact canonical
+ * repaired Rivet, never a second ship design.
+ */
+export const REPAIRED_RIVET_OVERLAY = {
   asset: "/location-scenes/rivet-repaired.webp" as const,
   width: 1307,
   height: 612,
