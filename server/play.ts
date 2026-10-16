@@ -139,6 +139,12 @@ import {
   withResolvedOwnedCharacter,
 } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
+import {
+  createShipFlightResolver,
+  loadShipRow,
+  projectShip,
+  type ShipProjection,
+} from "@/server/ship-state";
 import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
 import {
   loadAutoDiscardSlag,
@@ -204,7 +210,7 @@ import {
 } from "@/server/work-orders";
 import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
-import type { MissionProjection } from "@/game/domain/missions";
+import { deriveCompletedMissionIds, type MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot, type PlaySnapshot } from "@/server/play-state";
 import {
   createFabricationResolver,
@@ -1007,6 +1013,12 @@ export type PlayGameplayState = {
    * submits a balance of its own.
    */
   credits: number;
+  /**
+   * The character's Rivet Utility Shuttle (#358): berth, tank, the flight in
+   * the air if any, the launch verdict for each authored route, and the oldest
+   * landing receipt not yet dismissed. Every figure is server-owned.
+   */
+  ship: ShipProjection;
   /** Present only while the character is in transit (server-authoritative). */
   travelState?: {
     originLocationId: string;
@@ -1197,6 +1209,12 @@ export function createPlayResolver(
     {
       actionId: ACTION_IDS.travel,
       resolver: createTravelResolver() as PlayResolver,
+    },
+    {
+      // The Rivet in flight (#358): lazily landed on the next authenticated
+      // read or command, from the flight's own recorded arrival instant.
+      actionId: ACTION_IDS.shipFlight,
+      resolver: createShipFlightResolver() as PlayResolver,
     },
     // One Welding resolver, registered under every repair target's own action
     // ID. The resolver reads the target from that ID, so `active_actions` keeps
@@ -1980,6 +1998,7 @@ export async function stateFromTransaction(
     claimRows,
     merchantPurchaseRows,
     character,
+    shipRow,
   ] = await Promise.all([
     transaction
       .select()
@@ -2033,6 +2052,7 @@ export async function stateFromTransaction(
     characterRow
       ? Promise.resolve([characterRow])
       : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
+    loadShipRow(transaction, characterId),
   ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const refiningTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
@@ -2326,7 +2346,22 @@ export async function stateFromTransaction(
         complete: projection.complete,
       })),
     ),
+    // The ship's own berth, never the character's position (#358).
+    ...(shipRow ? { shipBerthLocationId: shipRow.berthLocationId } : {}),
   };
+  const ship = await projectShip(transaction, {
+    characterId,
+    ship: shipRow,
+    currentLocationId,
+    action,
+    completedRepairTargetIds: locationStateFacts.completedRepairTargetIds,
+    completedMissionIds: deriveCompletedMissionIds(missions),
+    acceptedMissionIds: locationStateFacts.acceptedMissionIds,
+    carriedFullCanisters: carriedByItemId[ITEM_IDS.fullSmallFuelCanister] ?? 0,
+    cargoFullCanisters: cargoStackRows
+      .filter((stack) => stack.itemId === ITEM_IDS.fullSmallFuelCanister)
+      .reduce((total, stack) => total + stack.quantity, 0),
+  });
   const locationStates: Record<string, LocationStateProjection> = {};
   for (const location of LOCATIONS) {
     const resolved = resolveLocationState(location, locationStateFacts);
@@ -2351,6 +2386,7 @@ export async function stateFromTransaction(
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
     scavengeReveals,
+    ship,
     travelState,
     powerAnnex:
       currentLocationId === LOCATION_IDS.emergencyPowerAnnex
@@ -2703,8 +2739,9 @@ export async function getPlayGameplayState(
       );
     },
     now,
-    // A read: a trade-engaged character still loads and refreshes Play (#266).
-    { allowDuringTrade: true },
+    // A read: a trade-engaged character still loads and refreshes Play (#266),
+    // and a character whose ship is in the air still sees its flight (#358).
+    { allowDuringTrade: true, allowDuringFlight: true },
   );
 }
 
@@ -3238,6 +3275,6 @@ export async function acknowledgeScavengeReveal(
       };
     },
     // Presentation only: dismissing a reveal changes no trade-relevant state (#266).
-    { allowDuringTrade: true, now },
+    { allowDuringTrade: true, allowDuringFlight: true, now },
   );
 }

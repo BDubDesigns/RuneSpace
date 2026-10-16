@@ -39,7 +39,8 @@ import {
  * - The South Cut (#342): Skatboll's Oil Shale mine, Mining 5.
  * - Holo Hollow Landing (#357): Skatboll's walkable landing pad, an ordinary
  *   World Location at (1,1) with three walking edges. Its one Local Place is
- *   Last Leg Trading. It hosts no ship: the pad is shown empty.
+ *   Last Leg Trading. The pad is empty until the character's own Rivet lands
+ *   there (#358); only then does its scene carry the ship overlay.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -47,6 +48,17 @@ import {
  * restating what it requires.
  */
 export const CRASH_SITE_SHIP_RESTORED_VARIANT_ID = "crash_site_ship_restored";
+
+/**
+ * The Crash Site once the character's ship has actually flown away (#358): the
+ * already-supported empty background with no ship overlay. Read from the ship's
+ * own berth, not from the repair that let it fly, so walking away from the
+ * Crash Site can never remove a ship that is still parked there.
+ */
+export const CRASH_SITE_SHIP_DEPARTED_VARIANT_ID = "crash_site_ship_departed";
+
+/** Holo Hollow Landing once the character's own Rivet is berthed on the pad (#358). */
+export const HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID = "holo_hollow_landing_ship_berthed";
 
 /**
  * The Crash Site is one approved empty environment plus a state-selected
@@ -82,6 +94,20 @@ const REPAIRED_RIVET_OVERLAY = {
   placement: { left: 34.289, top: 28.103, width: 31.423 },
 };
 
+/**
+ * The Rivet on Holo Hollow Landing's 1536x384 pad (#358): the same canonical
+ * transparent repaired overlay the Crash Site uses, placed on the pad's painted
+ * circle. Placement is percent of the pano; only `width` is authored and the
+ * overlay's height follows its own aspect ratio, so the ship cannot drift from
+ * its spot at any viewport or crop.
+ */
+const LANDING_RIVET_OVERLAY = {
+  asset: REPAIRED_RIVET_OVERLAY.asset,
+  width: REPAIRED_RIVET_OVERLAY.width,
+  height: REPAIRED_RIVET_OVERLAY.height,
+  placement: { left: 36.0, top: 38.2, width: 28.0 },
+};
+
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
@@ -111,6 +137,17 @@ const locationDefinitions = [
     // and there is no second flag or global art swap. Cargo Hold and Landing Gear
     // restoration change no scene: the ship is one wreck until its drive is fixed.
     stateVariants: [
+      {
+        // First, so it wins over the restored ship: once the Rivet has flown the
+        // ground it stood on is all that is left, whatever was repaired.
+        id: CRASH_SITE_SHIP_DEPARTED_VARIANT_ID,
+        requires: { shipBerth: "elsewhere" },
+        description: "Only the churned mud and scrap where your ship stood remain.",
+        scene: {
+          ...CRASH_SITE_BACKGROUND,
+          alt: "The empty Crash Site, churned mud and scrap where a ship once stood, a mesa and a spired outpost behind it",
+        },
+      },
       {
         id: CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
         requires: { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
@@ -469,6 +506,25 @@ const locationDefinitions = [
       LOCATION_IDS.southAccessTrack,
     ],
     availableActionIds: [],
+    // The pad is empty for everyone until their own Rivet lands (#358). Reading
+    // the ship's berth rather than the character's position is what keeps
+    // walking here from ever putting a ship on the pad.
+    stateVariants: [
+      {
+        id: HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID,
+        requires: { shipBerth: "here" },
+        description:
+          "A worn industrial landing pad on Skatboll with a weathered H.H. painted across it, lit by edge lamps and fenced with crumbling barriers. Your Rivet Utility Shuttle sits on the pad, and Last Leg Trading keeps a counter on the far side.",
+        scene: {
+          asset: "/location-scenes/holo-hollow-landing.webp" as const,
+          width: 1536,
+          height: 384,
+          alt: "Your repaired Rivet Utility Shuttle parked on an industrial landing pad inside a worn white circle with a weathered H.H., edge lights glowing, two low service sheds and fuel tanks behind it, and cold mountains under a heavy overcast sky",
+          focal: { x: 50, y: 62 } as const,
+          overlay: LANDING_RIVET_OVERLAY,
+        },
+      },
+    ],
     dormantActivities: [],
     presentation: {
       mapIconKey: "holo_hollow_landing" as const,

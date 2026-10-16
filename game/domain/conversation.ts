@@ -11,6 +11,7 @@ import {
   type MissionLifecycleMoment,
   type MissionRequirement,
   type MissionRequirementKind,
+  type MissionTurnIn,
 } from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
 import {
@@ -220,7 +221,9 @@ export function resolveNpcConversationWith(
             acceptedContinuation: {
               dialogueId: offer.acceptedContinuation.dialogueId,
               ...(offer.acceptedContinuation.completesMission
-                ? { action: completionAction(definition) }
+                ? definition.turnIn
+                  ? { action: completionAction(definition.turnIn) }
+                  : {}
                 : {}),
             },
           }
@@ -243,14 +246,20 @@ function activeEntry(
   definition: MissionDefinition,
   projection: NpcConversationProjection,
 ): NpcConversationEntry | undefined {
-  if (definition.turnIn.npcId === npcId) {
-    const dialogueId = turnInStageDialogueId(definition, projection.stage, projection.facts);
+  const turnInSpec = definition.turnIn;
+  if (turnInSpec?.npcId === npcId) {
+    const dialogueId = turnInStageDialogueId(
+      definition,
+      turnInSpec,
+      projection.stage,
+      projection.facts,
+    );
     if (!dialogueId) return undefined;
     // The completion command belongs to the turn-in conversation only — its
     // ordinary opening or a reactive one. A reminder or busy branch presents
     // state; it never offers a turn-in.
     const isTurnIn =
-      dialogueId === definition.turnIn.dialogueId ||
+      dialogueId === turnInSpec.dialogueId ||
       (definition.dialogue.reactive ?? []).some(
         (variant) => variant.moment === "turn_in" && variant.dialogueId === dialogueId,
       );
@@ -263,7 +272,7 @@ function activeEntry(
       dialogueId,
       missionId: definition.id,
       guidance: guidanceFor(npcId, projection),
-      ...(isTurnIn ? { action: completionAction(definition) } : {}),
+      ...(isTurnIn ? { action: completionAction(turnInSpec) } : {}),
     };
   }
 
@@ -397,10 +406,10 @@ function conversationRequirementSatisfied(
   );
 }
 
-function completionAction(definition: MissionDefinition): MissionConversationAction {
+function completionAction(turnIn: MissionTurnIn): MissionConversationAction {
   return {
     kind: "complete_mission",
-    label: definition.turnIn.actionLabel ?? DEFAULT_COMPLETE_ACTION_LABEL,
+    label: turnIn.actionLabel ?? DEFAULT_COMPLETE_ACTION_LABEL,
   };
 }
 
@@ -444,10 +453,11 @@ function reactiveVariant(
  */
 function turnInStageDialogueId(
   definition: MissionDefinition,
+  turnInSpec: MissionTurnIn,
   stage: NpcConversationProjection["stage"],
   facts?: readonly string[],
 ): DialogueId | undefined {
-  const turnIn = reactiveVariant(definition, "turn_in", facts) ?? definition.turnIn.dialogueId;
+  const turnIn = reactiveVariant(definition, "turn_in", facts) ?? turnInSpec.dialogueId;
   if (!stage) return turnIn;
   if (stage.turnInAvailable) return turnIn;
   const momentOr = (moment: MissionLifecycleMoment, dialogueId: DialogueId | undefined) => {
@@ -632,7 +642,7 @@ export function validateConversationTopics(
 
 function missionOwnedDialogueIds(definitions: readonly MissionDefinition[]): readonly string[] {
   return definitions.flatMap((definition) => [
-    definition.turnIn.dialogueId,
+    ...(definition.turnIn ? [definition.turnIn.dialogueId] : []),
     ...definition.requirements
       .filter(
         (requirement): requirement is Extract<MissionRequirement, { kind: "npc_conversation" }> =>

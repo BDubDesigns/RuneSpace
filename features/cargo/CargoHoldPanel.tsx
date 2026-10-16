@@ -50,8 +50,11 @@ export function CargoHoldPanel() {
   );
 }
 
-/** The finished Cargo Hold's storage: occupancy, open/close, and deposits and withdrawals. */
-function CargoHoldStorage({ justCompleted }: { justCompleted: boolean }) {
+/**
+ * The finished Cargo Hold's storage: occupancy, open/close, and deposits and
+ * withdrawals. The single Ship panel hosts it once the Hold is repaired (#358).
+ */
+export function CargoHoldStorage({ justCompleted = false }: { justCompleted?: boolean }) {
   const { enqueueForeground, releaseCommand, acceptState, state } = usePlay();
   const [storageOpen, setStorageOpen] = useState(false);
   // Held here, not in the surface, so the phone view survives closing and
@@ -136,7 +139,7 @@ function CargoHoldStorage({ justCompleted }: { justCompleted: boolean }) {
             CARGO HOLD RESTORED
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-            The stationary ship storage is online and ready for use at Crash Site.
+            The stationary ship storage is online and ready for use at your ship.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <p className="font-display text-sm uppercase tracking-wide">{occupancy}</p>

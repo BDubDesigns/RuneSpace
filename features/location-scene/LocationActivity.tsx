@@ -3,14 +3,13 @@
 import { LOCAL_PLACE_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
-import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
-import { ShipSystemPanel } from "@/features/ship/ShipSystemPanel";
+import { ShipPanel } from "@/features/ship/ShipPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import type { RepairProjection } from "@/server/play";
@@ -50,7 +49,7 @@ export function LocationActivity({
   localPlaceId?: string;
 }) {
   const { state } = usePlay();
-  if (state.travelState) return null;
+  if (state.travelState || state.ship.flight) return null;
 
   const locationId = state.location.currentLocationId;
   // Navigation state, validated exactly as the place surface validates it: a
@@ -77,6 +76,13 @@ export function LocationActivity({
 
   return (
     <>
+      {/* The one Ship panel (#358) belongs to wherever the ship actually is, not
+          to a fixed place: the Crash Site until a flight lands, then its new
+          berth. It carries the crashed ship's three systems and their repair
+          work (#322, #330) as sections, so the Welding work and the Mission
+          guidance that point at them are exactly where they have always been.
+          It renders nothing for a character standing anywhere else. */}
+      {locationId === state.ship.berthLocationId ? <ShipPanel /> : null}
       {primaryActivity(locationId, characterName, state)}
       {/* A site stash (#284) is a sibling of the site's own activity, never a
           replacement for it. It renders nothing until the server projects one,
@@ -113,27 +119,6 @@ function primaryActivity(
       );
     case LOCATION_IDS.abandonedProcessingYard:
       return <RefiningConsole />;
-    case LOCATION_IDS.crashSite:
-      // The crashed ship's systems (#322): every one is visible from the start as
-      // a damaged system, and a Mission only decides whether it can be repaired.
-      // They share one presentation (`ShipSystemPanel`); the Propulsion System
-      // (#330) is one more entry here. Restoring it offers no flight control, so
-      // nothing here appears or changes when it is finished except its status.
-      return (
-        <>
-          <CargoHoldPanel />
-          <ShipSystemPanel
-            materialsPrompt="The wheels go under the ship and the mounts go on the hull. Hand over what you are carrying and bring the rest when you come back."
-            targetId={REPAIR_TARGET_IDS.landingGear}
-            weldingPrompt="Wheels seated, mounts in place. What is left is welding them to the frame."
-          />
-          <ShipSystemPanel
-            materialsPrompt="The drive mounts and the frame reinforcement go in first. Hand over what you are carrying and bring the rest when you come back."
-            targetId={REPAIR_TARGET_IDS.propulsionSystem}
-            weldingPrompt="Mounts seated, frame braced. What is left is welding the drive back into the ship."
-          />
-        </>
-      );
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
     case LOCATION_IDS.ruskRecovery:

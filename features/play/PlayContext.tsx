@@ -64,9 +64,11 @@ const BOUNDARY_REFRESH_GRACE_MS = 150;
 function boundaryKeyForState(state: PlayGameplayState): string | undefined {
   return state.travelState
     ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
-    : state.activeAction
-      ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
-      : undefined;
+    : state.ship.flight
+      ? `flight:${state.ship.flight.routeId}:${state.ship.flight.arrivesAt}`
+      : state.activeAction
+        ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
+        : undefined;
 }
 
 /**
@@ -232,7 +234,10 @@ export function PlayProvider({
   // must survive a request that arrives just before the server's whole-tick
   // deadline and returns the same authoritative timestamp.
   const boundaryKey = boundaryKeyForState(state);
-  const boundaryAt = state.travelState?.arrivesAt ?? state.activeAction?.nextAttemptAt;
+  const boundaryAt =
+    state.travelState?.arrivesAt ??
+    state.ship.flight?.arrivesAt ??
+    state.activeAction?.nextAttemptAt;
 
   useEffect(() => {
     if (!boundaryKey || !boundaryAt) return;
@@ -255,7 +260,21 @@ export function PlayProvider({
     };
 
     schedule(Math.max(100, boundaryTime - Date.now() + BOUNDARY_REFRESH_GRACE_MS));
+    // The retries above are bounded and spent in a few seconds. A player who was
+    // offline through the boundary has none left when the connection returns, so
+    // coming back online (or back to the tab) asks the server once more. Only a
+    // boundary already passed is asked about; the server still decides the outcome.
+    const reconcileIfDue = () => {
+      if (Date.now() >= boundaryTime) requestAutoRefresh(schedulerToken);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reconcileIfDue();
+    };
+    window.addEventListener("online", reconcileIfDue);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
+      window.removeEventListener("online", reconcileIfDue);
+      document.removeEventListener("visibilitychange", onVisible);
       if (timer !== undefined) window.clearTimeout(timer);
       cancelRefresh(gateModel.current, schedulerToken);
       if (boundaryGeneration.current === schedulerToken) boundaryGeneration.current += 1;

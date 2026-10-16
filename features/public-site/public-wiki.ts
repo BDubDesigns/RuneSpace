@@ -114,7 +114,7 @@ const authoredWikiArticles = [
           "South Access Track — a muddy service road running south out of the Crash Site. It connects to Crash Site, The South Cut and Holo Hollow Landing, has no work, shop or workstation of its own, and is just the way through.",
           "The South Cut — an Oil Shale mine cut into black layered shale, at the far end of the South Access Track. It only connects to the Track, so reaching it from the Crash Site is two ordinary walks, about 48 seconds each way. Mining Oil Shale here needs Mining 5.",
           [
-            "Holo Hollow Landing — Skatboll's landing pad, a worn industrial apron with a weathered H.H. painted across it, east of the Crash Site. It is an ordinary place on foot, open from the start: it connects to Crash Site, the Abandoned Processing Yard and the South Access Track, each a normal 24-second walk, and does not connect to The South Cut. Walking there moves nothing but you. Last Leg Trading is here; see ",
+            "Holo Hollow Landing — Skatboll's landing pad, a worn industrial apron with a weathered H.H. painted across it, east of the Crash Site. It is an ordinary place on foot, open from the start: it connects to Crash Site, the Abandoned Processing Yard and the South Access Track, each a normal 24-second walk, and does not connect to The South Cut. Walking there moves nothing but you; your ship only lands here when you fly it (see Move Along). Last Leg Trading is here; see ",
             { text: "Credits & Trading", articleSlug: "credits-and-trading" },
             ".",
           ],
@@ -622,7 +622,7 @@ const authoredWikiArticles = [
       {
         heading: "What you get",
         paragraphs: [
-          "A repaired Cargo Hold gives you 32 slots of on-site storage at the Crash Site. You can deposit or withdraw a single item or a whole stack while you're stationary there — it's separate from what you're carrying in Inventory.",
+          "A repaired Cargo Hold gives you 32 slots of storage on your ship. You can deposit or withdraw a single item or a whole stack while you're stationary at the ship, from the Ship panel's Board Ship control — it's separate from what you're carrying in Inventory. The Hold is part of the ship: it stays at the Crash Site until your ship flies, and from then on it is wherever your ship is berthed.",
         ],
       },
       {
@@ -649,7 +649,7 @@ const authoredWikiArticles = [
             { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
             ", and its repair opens up once you have taken that job from Wade. You need Welding level 8 to take the job and to do the work. It takes 2 Drive Mounts, 1 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Wire Spool, then sixteen passes. You can buy or trade for any of the parts, and you don't need Fabrication or Refining levels to install them, but the welding is always yours.",
           ],
-          'The moment the sixteenth pass lands the ship is physically restored: the Crash Site shows it repaired, and the Propulsion System panel reads "Propulsion restored. Report to Wade." Report to him and it reads "Propulsion restored. Ship flight-ready." The sixteen passes pay their usual Welding XP and Wade adds nothing on top. The ship has no flight controls yet, so there is still nowhere to fly it.',
+          'The moment the sixteenth pass lands the ship is physically restored: the Crash Site shows it repaired, and the Propulsion System panel reads "Propulsion restored. Report to Wade." Report to him and it reads "Propulsion restored. Ship flight-ready." The sixteen passes pay their usual Welding XP and Wade adds nothing on top. A repaired ship can be fuelled and flown from the Ship panel; see Move Along for the first flight.',
           [
             "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",
             { text: "practice as much as you like", articleSlug: "practice-welding" },
@@ -1084,6 +1084,10 @@ const authoredWikiArticles = [
             { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
             " — repair the ship's drive. Take it from Wade after Wheel Be Right Back, at Welding 8.",
           ],
+          [
+            { text: "Move Along", articleSlug: "mission-move-along" },
+            " — fly your repaired ship from the Crash Site to Holo Hollow Landing. Take it from Wade after Thrust Issues.",
+          ],
         ],
       },
       {
@@ -1395,7 +1399,12 @@ const authoredWikiArticles = [
           [
             "Once you have finished that and you are a good enough welder, he has the last ship job for you: ",
             { text: "Thrust Issues", articleSlug: "mission-thrust-issues" },
-            ", fixing the drive. He is no more sentimental about the ship than he ever was. He would like it off his front lawn.",
+            ", fixing the drive. He is no more sentimental about the ship than he ever was. Once it is fixed, he says, you are on your own: he is done holding your hand.",
+          ],
+          [
+            "When the drive is fixed and you have reported it, he has one more thing for you to take on: ",
+            { text: "Move Along", articleSlug: "mission-move-along" },
+            ", flying the ship over to Holo Hollow Landing. You take it from him yourself; it does not start on its own. Once the ship has landed he has a short line about it, and then he is done.",
           ],
           [
             "Get good enough and that changes. Once you can weld at a real level, Wade puts you on his ",

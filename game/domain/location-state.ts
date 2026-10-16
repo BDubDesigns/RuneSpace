@@ -1,3 +1,4 @@
+import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation, LOCATIONS } from "@/game/content/locations";
 import type { LocationDefinition, LocationStateVariant } from "@/game/schemas/locations";
 
@@ -22,6 +23,13 @@ import type { LocationDefinition, LocationStateVariant } from "@/game/schemas/lo
 export type LocationStateFacts = {
   acceptedMissionIds: ReadonlySet<string>;
   completedRepairTargetIds: ReadonlySet<string>;
+  /**
+   * Where the character's Rivet is actually berthed (#358). Omitted means the
+   * ship has never left where every character's ship starts: the Crash Site.
+   * It moves only when a flight's landing commits, never when the character
+   * walks, so a location reads the ship's own fact rather than the character's.
+   */
+  shipBerthLocationId?: string;
 };
 
 export const NO_LOCATION_STATE_FACTS: LocationStateFacts = {
@@ -43,8 +51,16 @@ export type ResolvedLocationState = {
   scene: LocationDefinition["presentation"]["scene"];
 };
 
-function variantSatisfied(variant: LocationStateVariant, facts: LocationStateFacts): boolean {
-  const { acceptedMissionId, completedRepairTargetId } = variant.requires;
+function variantSatisfied(
+  variant: LocationStateVariant,
+  facts: LocationStateFacts,
+  locationId: string,
+): boolean {
+  const { acceptedMissionId, completedRepairTargetId, shipBerth } = variant.requires;
+  if (shipBerth != null) {
+    const berthed = (facts.shipBerthLocationId ?? LOCATION_IDS.crashSite) === locationId;
+    if (shipBerth === "here" ? !berthed : berthed) return false;
+  }
   if (acceptedMissionId != null && !facts.acceptedMissionIds.has(acceptedMissionId)) return false;
   if (
     completedRepairTargetId != null &&
@@ -63,7 +79,9 @@ export function resolveLocationState(
   location: LocationDefinition,
   facts: LocationStateFacts = NO_LOCATION_STATE_FACTS,
 ): ResolvedLocationState {
-  const variant = location.stateVariants.find((candidate) => variantSatisfied(candidate, facts));
+  const variant = location.stateVariants.find((candidate) =>
+    variantSatisfied(candidate, facts, location.id),
+  );
   return {
     locationId: location.id,
     ...(variant ? { variantId: variant.id } : {}),

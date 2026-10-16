@@ -1,9 +1,14 @@
 import type { Locator, Page } from "@playwright/test";
 import { db } from "@/db";
-import { characterRepairTargets } from "@/db/rune-space";
+import { characterRepairTargets, characterShips, characters } from "@/db/rune-space";
+import { eq } from "drizzle-orm";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
-import { getLocation } from "@/game/content/locations";
+import {
+  CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+  HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID,
+  getLocation,
+} from "@/game/content/locations";
 import {
   expect,
   openConversationEntry,
@@ -23,7 +28,14 @@ import { captureReviewScreenshot } from "./review-screenshot";
 
 const crashSite = getLocation(LOCATION_IDS.crashSite)!;
 const crashedScene = crashSite.presentation.scene;
-const repairedScene = crashSite.stateVariants[0]!.scene!;
+const repairedScene = crashSite.stateVariants.find(
+  (variant) => variant.id === CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+)!.scene!;
+const landing = getLocation(LOCATION_IDS.holoHollowLanding)!;
+const landingEmptyScene = landing.presentation.scene;
+const landingBerthedScene = landing.stateVariants.find(
+  (variant) => variant.id === HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID,
+)!.scene!;
 const SCENE = `[data-location-scene="${LOCATION_IDS.crashSite}"]`;
 const BACKGROUND = 'img[data-scene-layer="background"]';
 const OVERLAY = 'img[data-scene-layer="overlay"]';
@@ -190,29 +202,83 @@ test("Crash Site shows the repaired Rivet on the same background once Propulsion
   await checkAtEveryViewport(page, repairedScene, "repaired");
 });
 
-test("with the ship layer removed the empty background is unchanged, and nothing of the wreck remains", async ({
+/** The character's ship has flown to Holo Hollow Landing (#358): the ship row says so. */
+async function berthShipAt(characterId: string, locationId: string) {
+  await db
+    .insert(characterShips)
+    .values({ characterId, berthLocationId: locationId })
+    .onConflictDoUpdate({
+      target: characterShips.characterId,
+      set: { berthLocationId: locationId },
+    });
+}
+
+async function standAt(characterId: string, locationId: string) {
+  await db
+    .update(characters)
+    .set({ currentLocationId: locationId })
+    .where(eq(characters.id, characterId));
+}
+
+test("once the ship has flown the Crash Site is the empty background, unchanged and aligned", async ({
   page,
   testCharacter,
 }) => {
+  await finishPropulsion(testCharacter.id);
+  await berthShipAt(testCharacter.id, LOCATION_IDS.holoHollowLanding);
   await openTestCharacter(page, testCharacter.id);
   const frame = page.locator(`${SCENE} .rs-location-scene-viewport`);
   const empty = {
     ...crashedScene,
     overlay: undefined,
   } as typeof crashedScene;
+  await expect(page.locator(SCENE).locator(BACKGROUND)).toHaveAttribute("alt", /empty Crash Site/);
   for (const viewport of VIEWPORTS) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    const before = await box(frame.locator(BACKGROUND));
-    // No departed game state exists yet, so the no-ship presentation is shown by
-    // dropping the layer from the live composition: the background must not move.
-    await frame.locator(OVERLAY).evaluate((node) => node.remove());
-    const after = await box(frame.locator(BACKGROUND));
-    expect(after).toEqual(before);
+    // The very same background file and framing as the wreck stood on: only the
+    // ship layer is gone, and nothing of the wreck remains.
     await expectComposition(frame, empty, `empty @${viewport.name}`, false);
+    await expectNoOverflow(page, `empty @${viewport.name}`);
     await captureReviewScreenshot(page, `crash-site-empty-${viewport.name}.png`);
-    await page.reload();
-    await expect(frame).toBeVisible();
   }
+  await expect(page.locator("[data-ship-panel]")).toHaveCount(0);
+});
+
+test("Holo Hollow Landing is the empty pad until the Rivet berths there, then carries it aligned", async ({
+  page,
+  testCharacter,
+}) => {
+  await finishPropulsion(testCharacter.id);
+  await standAt(testCharacter.id, LOCATION_IDS.holoHollowLanding);
+  await openTestCharacter(page, testCharacter.id);
+  const landingFrame = page.locator(
+    `[data-location-scene="${LOCATION_IDS.holoHollowLanding}"] .rs-location-scene-viewport`,
+  );
+  // Walking here never moves the ship: the pad is empty and there is no Ship panel.
+  await expect(landingFrame.locator(BACKGROUND)).toHaveAttribute(
+    "alt",
+    /empty industrial landing pad/,
+  );
+  await expectComposition(landingFrame, landingEmptyScene, "landing empty @phone", false);
+  await expect(page.locator("[data-ship-panel]")).toHaveCount(0);
+
+  await berthShipAt(testCharacter.id, LOCATION_IDS.holoHollowLanding);
+  await page.reload();
+  await expect(landingFrame.locator(BACKGROUND)).toHaveAttribute(
+    "alt",
+    /repaired Rivet Utility Shuttle parked/,
+  );
+  for (const viewport of VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await expectComposition(landingFrame, landingBerthedScene, `landing berthed @${viewport.name}`);
+    await expectNoOverflow(page, `landing berthed @${viewport.name}`);
+    await captureReviewScreenshot(page, `landing-berthed-${viewport.name}.png`);
+  }
+  // The ship is here, so its panel is too.
+  await expect(page.locator("[data-ship-panel]")).toHaveAttribute(
+    "data-ship-berth",
+    LOCATION_IDS.holoHollowLanding,
+  );
 });
 
 test("a Crash Site conversation shows the same ship at its mark: crashed, then repaired", async ({

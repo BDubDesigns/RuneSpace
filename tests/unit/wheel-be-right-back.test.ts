@@ -224,9 +224,11 @@ describe("the Landing Gear repair target", () => {
 
   it("changes no ship art, flight or route state: only Propulsion swaps the scene (#330)", () => {
     const crashSite = getLocation(LOCATION_IDS.crashSite)!;
-    // The one Crash Site variant is the repaired ship, and it needs the Propulsion
-    // System's completion, so neither the Cargo Hold nor the Landing Gear moves it.
+    // The repaired ship needs the Propulsion System's completion, so neither the
+    // Cargo Hold nor the Landing Gear moves it. The only other variant is the
+    // departed ship (#358), which reads the ship's berth and no repair at all.
     expect(crashSite.stateVariants.map((variant) => variant.requires)).toEqual([
+      { shipBerth: "elsewhere" },
       { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
     ]);
     const finished = resolveLocationState(crashSite, {
@@ -357,7 +359,7 @@ describe("Wade's locked dialogue", () => {
       WHEEL_BE_RIGHT_BACK.offers[0]!.dialogueId,
       WHEEL_BE_RIGHT_BACK.dialogue.repairReminderDialogueId,
       WHEEL_BE_RIGHT_BACK.dialogue.busyDialogueId,
-      WHEEL_BE_RIGHT_BACK.turnIn.dialogueId,
+      WHEEL_BE_RIGHT_BACK.turnIn!.dialogueId,
       WHEEL_BE_RIGHT_BACK.dialogue.completionPresentationDialogueId,
       WHEEL_BE_RIGHT_BACK.completedNpcDialogue?.[0]?.dialogueId,
     ]) {

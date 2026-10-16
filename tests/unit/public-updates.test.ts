@@ -118,10 +118,24 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Holo Hollow Landing Update as the newest (#357)", () => {
+  it("publishes the Rivet first-flight Update as the newest (#358)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("holo-hollow-landing");
+    expect(latest.slug).toBe("the-rivet-takes-off");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("holo-hollow-landing")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    // It announces exactly the shipped first flight: one route, one way, no reward.
+    expect(text).toContain("10 Fuel Units");
+    expect(text).toContain("15 seconds");
+    expect(text).toContain("300 Fuel Units");
+    expect(text).not.toMatch(/stillreach|return flight|fly back to the Crash Site/i);
+  });
+
+  it("keeps the Holo Hollow Landing Update published beneath it (#357)", () => {
+    const latest = getPublicUpdate("holo-hollow-landing")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("fuel-canisters")!.publishedAt),
     );

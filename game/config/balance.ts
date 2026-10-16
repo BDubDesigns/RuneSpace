@@ -3,8 +3,10 @@ import {
   ACTION_IDS,
   ITEM_IDS,
   REPAIR_TARGET_IDS,
+  SHIP_ROUTE_IDS,
   SKILL_IDS,
   type RepairTargetId,
+  type ShipRouteId,
   type SkillId,
 } from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
@@ -836,6 +838,24 @@ const balanceSchema = z.object({
       claimGraceMs: z.literal(1_000),
     }),
   }),
+  /**
+   * The Rivet Utility Shuttle (#358). The tank holds 300 Fuel Units and every
+   * character's ship starts empty. Which routes exist is content
+   * (`game/content/ship-routes`); what each costs and how long it takes is here.
+   * A flight's duration is whole ticks, like every other timed action, so
+   * 25 ticks is the approved 15 real seconds.
+   */
+  ship: z.object({
+    actionId: z.literal(ACTION_IDS.shipFlight),
+    tankCapacityFuelUnits: z.literal(300),
+    startingFuelUnits: z.literal(0),
+    flights: z.object({
+      [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: z.object({
+        fuelCostFuelUnits: z.literal(10),
+        durationTicks: z.literal(25),
+      }),
+    }),
+  }),
   items: z.object({
     ferriteShale: z.object({
       itemId: z.literal(ITEM_IDS.ferriteShale),
@@ -1029,8 +1049,8 @@ const balanceSchema = z.object({
      * is a real carrying decision. The 800 g that 10 Oil Shale (6,000 g) plus
      * the shell (800 g) lose on success is process waste, not an inventory item.
      *
-     * `fuelUnits` is the content the full canister carries for a later
-     * refueling slice; nothing consumes it yet.
+     * `fuelUnits` is the content the full canister carries: loading one into the
+     * Rivet's tank adds this many Fuel Units (#358).
      */
     emptySmallFuelCanister: z.object({
       itemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
@@ -1556,6 +1576,17 @@ const defaults = balanceSchema.parse({
       requiredRefiningLevel: 5,
     },
   },
+  ship: {
+    actionId: ACTION_IDS.shipFlight,
+    tankCapacityFuelUnits: 300,
+    startingFuelUnits: 0,
+    flights: {
+      [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: {
+        fuelCostFuelUnits: 10,
+        durationTicks: 25,
+      },
+    },
+  },
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
@@ -1665,6 +1696,22 @@ const defaults = balanceSchema.parse({
 /** The sole effective-balance boundary until Issue #19 introduces approved overrides. */
 export function getEffectiveGameBalance(): EffectiveGameBalance {
   return defaults;
+}
+
+/** One flight route's approved cost and duration (#358). */
+export type ShipFlightBalance =
+  EffectiveGameBalance["ship"]["flights"][typeof SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding];
+
+/** The authoritative cost and duration of one authored flight route. */
+export function getShipFlightBalance(
+  routeId: ShipRouteId,
+  balance = getEffectiveGameBalance(),
+): ShipFlightBalance {
+  const flight = (balance.ship.flights as Readonly<Record<string, ShipFlightBalance | undefined>>)[
+    routeId
+  ];
+  if (!flight) throw new Error(`Ship route "${routeId}" has no approved cost and duration.`);
+  return flight;
 }
 
 /** One repair target's authoritative recipe. Never reconstruct these values. */

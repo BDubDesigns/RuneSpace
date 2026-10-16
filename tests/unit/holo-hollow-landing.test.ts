@@ -69,7 +69,11 @@ describe("issue #357 Holo Hollow Landing", () => {
     });
     expect(location.availableActionIds).toEqual([]);
     expect(location.travelable).toBe(true);
-    expect(location.stateVariants).toEqual([]);
+    // Empty for everyone until their own Rivet lands (#358): the one variant
+    // reads the ship's berth, never the character's position.
+    expect(location.stateVariants.map((variant) => variant.requires)).toEqual([
+      { shipBerth: "here" },
+    ]);
     expect(location.presentation.scene.overlay).toBeUndefined();
     expect(location.presentation.scene.width / location.presentation.scene.height).toBe(4);
     expect(existsSync(join(process.cwd(), "public/location-scenes/holo-hollow-landing.webp"))).toBe(

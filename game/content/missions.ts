@@ -7,6 +7,7 @@ import {
   MISSION_IDS,
   NPC_IDS,
   REPAIR_TARGET_IDS,
+  SHIP_ROUTE_IDS,
   SKILL_IDS,
   type ActionId,
   type DialogueId,
@@ -15,6 +16,7 @@ import {
   type MissionId,
   type NpcId,
   type RepairTargetId,
+  type ShipRouteId,
   type SkillId,
 } from "@/game/config/foundations";
 import { merchantRetailPrice } from "@/game/content/merchants";
@@ -233,6 +235,40 @@ export type MissionRequirement =
        * to a generic label when omitted.
        */
       actionLabel?: string;
+    }
+  | {
+      /**
+       * A physical Rivet flight on one authored route (#358): the first
+       * requirement that only a gameplay outcome can satisfy.
+       *
+       * Nothing observes this one. It is never "satisfied" by state a player
+       * can arrange — walking to the destination, a launch click, a timer
+       * reaching zero or a failed flight prove nothing — so it is always
+       * unmet while the Mission is open, and the Mission's `autoCompletion`
+       * completes it in the flight's own landing transaction.
+       */
+      kind: "ship_flight";
+      routeId: ShipRouteId;
+      /** Player-facing copy; no substitutions. */
+      objective: string;
+    }
+  | {
+      /**
+       * The ship's live authoritative tank covers one authored route's approved
+       * fuel cost (#358 playtest). Satisfied by the tank itself, never by a
+       * canister carried or stored: loading spends the canister, and the launch
+       * spends the fuel, so only the tank is the truth. Once the flight on this
+       * route has started, the spent fuel still counts.
+       */
+      kind: "ship_fuel";
+      routeId: ShipRouteId;
+      /**
+       * The canonical item the tank is filled from. Its Sources reference is
+       * offered only while this requirement is unmet.
+       */
+      itemId: ItemId;
+      /** Player-facing copy; `{required}` receives the route's approved cost. */
+      objective: string;
     };
 
 /** The kinds a requirement may take, used for semantic stage routing. */
@@ -376,6 +412,18 @@ export type MissionTurnIn = {
 };
 
 /**
+ * A Mission completed by a gameplay outcome rather than a conversation (#358).
+ *
+ * The first narrow non-NPC completion: the named Rivet flight's landing stamps
+ * the Mission complete inside the arrival transaction, through the same
+ * exactly-once completion stamp a turn-in uses. It is not an event bus and does
+ * not make a satisfied requirement complete anything: only a Mission that
+ * authors this, on a route that lands, completes this way. Such a Mission has
+ * no turn-in, no completion scene and no reward.
+ */
+export type MissionAutoCompletion = { kind: "ship_flight"; routeId: ShipRouteId };
+
+/**
  * A turn-in-NPC lifecycle moment that has its own authored sequence slot
  * (#324). Which moments a Mission can reach follows from its requirement kinds
  * (`missionLifecycleMoments` in `game/domain/missions.ts`); `busy` and
@@ -493,7 +541,14 @@ export type MissionDefinition = {
   offers: readonly MissionOffer[];
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
-  turnIn: MissionTurnIn;
+  /**
+   * The NPC hand-in that completes this Mission. Absent exactly when the
+   * Mission authors `autoCompletion` instead (#358): registry validation holds
+   * the two together, so every Mission has exactly one way to finish.
+   */
+  turnIn?: MissionTurnIn;
+  /** Completed by a gameplay outcome instead of a turn-in (#358). */
+  autoCompletion?: MissionAutoCompletion;
   /**
    * At most one authored completion reward. Absent when the mission's real
    * outcome is world/social state rather than a grant: Keep the Change pays its
@@ -1327,6 +1382,11 @@ export const THRUST_ISSUES: MissionDefinition = {
   summary: "Repair the ship's propulsion system at the Crash Site, then report to Wade Rusk.",
   prerequisiteMissionId: MISSION_IDS.wheelBeRightBack,
   prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 8 }],
+  // Reporting the repair hands Wade's story straight on to Move Along (#358): the
+  // generic completion boundary accepts it in the same transaction, so there is
+  // no second interaction and no second trip. Propulsion being repaired starts
+  // nothing: only this turn-in does.
+  continuationMissionId: MISSION_IDS.moveAlong,
   offers: [
     {
       npcId: NPC_IDS.wadeRusk,
@@ -1361,6 +1421,55 @@ export const THRUST_ISSUES: MissionDefinition = {
   completedNpcDialogue: [
     { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostThrustIssues },
   ],
+};
+
+/**
+ * Move Along — Wade's first-flight job (#358).
+ *
+ * It starts when the player reports Thrust Issues to Wade: that Mission's
+ * `continuationMissionId` has the generic completion boundary accept it in the
+ * same transaction, so there is no separate acceptance and no second trip. The
+ * Mission therefore authors no offer. Already accepted or completed records are
+ * left exactly as they are. The first Crash Site launch is still blocked until it
+ * is accepted (the route authors that gate), so the physical flight and the story
+ * fact cannot disagree.
+ *
+ * The objective is the physical Rivet flight, not a location fact: walking to
+ * Holo Hollow Landing, a Launch click, a countdown reaching zero, or a failed
+ * flight completes nothing. The flight's landing completes it, once, in its own
+ * transaction (`autoCompletion`). There is no turn-in, no completion scene and
+ * no reward: no item, XP or Credits, and no fuel is handed over, so Wade never
+ * hears about it from the player and only has a line for it afterwards.
+ */
+export const MOVE_ALONG: MissionDefinition = {
+  id: MISSION_IDS.moveAlong,
+  title: "Move Along",
+  summary: "Take your repaired Rivet Utility Shuttle from the Crash Site to Holo Hollow Landing.",
+  prerequisiteMissionId: MISSION_IDS.thrustIssues,
+  offers: [],
+  // His reminder while the Mission is open. It stands in for a turn-in
+  // conversation this Mission does not have.
+  activeNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeMoveAlongActive }],
+  // Two ordered objectives: the fuel is the step that needs a canister, so
+  // the Sources reference for it is what the player needs while it is unmet.
+  requirements: [
+    {
+      kind: "ship_fuel",
+      routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
+      itemId: ITEM_IDS.fullSmallFuelCanister,
+      objective: "Fuel the Rivet for the trip ({required} FU).",
+    },
+    {
+      kind: "ship_flight",
+      routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
+      objective: "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
+    },
+  ],
+  autoCompletion: { kind: "ship_flight", routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding },
+  dialogue: {},
+  // Replaces the post-Thrust Issues line only once the Rivet has really landed:
+  // the hub scans newest-first and this Mission is not complete before then.
+  completedNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostMoveAlong }],
 };
 
 /**
@@ -1559,6 +1668,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Wade's propulsion job (#330): after Wheel Be Right Back, offered by hand, at
   // Welding 8, with no Refining or Fabrication gate.
   THRUST_ISSUES,
+  // Wade's first-flight job (#358): after Thrust Issues, accepted by hand, and
+  // completed by the Rivet's own landing rather than by any conversation.
+  MOVE_ALONG,
   // Tansy's Fabrication 5 lesson (#233): after Brace Yourself, at Fabrication 5.
   A_CUT_ABOVE,
   // The optional branch sits after the main chain: it is never a prerequisite

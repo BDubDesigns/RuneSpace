@@ -28,6 +28,7 @@ const MISSION_GUIDE_SLUGS = {
   "Brace Yourself": "mission-brace-yourself",
   "Wheel Be Right Back": "mission-wheel-be-right-back",
   "Thrust Issues": "mission-thrust-issues",
+  "Move Along": "mission-move-along",
   "A Cut Above": "mission-a-cut-above",
   "Out of the Weather": "mission-out-of-the-weather",
   "Cutting Costs": "mission-cutting-costs",
@@ -348,8 +349,8 @@ describe("Mission guides (#339)", () => {
     expect(MISSIONS.map((mission) => mission.title).sort()).toEqual(
       Object.keys(MISSION_GUIDE_SLUGS).sort(),
     );
-    expect(missionGuideSlugs).toHaveLength(16);
-    expect(new Set(missionGuideSlugs).size).toBe(16);
+    expect(missionGuideSlugs).toHaveLength(17);
+    expect(new Set(missionGuideSlugs).size).toBe(17);
 
     for (const [title, slug] of Object.entries(MISSION_GUIDE_SLUGS)) {
       const guide = getWikiArticle(slug);

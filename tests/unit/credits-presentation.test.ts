@@ -251,7 +251,7 @@ describe("Mission Credits receipts resolve to a reward tile only for a confirmed
       const view = resolveMissionSuccessView({
         actionKind: "complete_mission",
         missionId: mission.id,
-        dialogueId: mission.turnIn.dialogueId,
+        dialogueId: mission.turnIn!.dialogueId,
         mission: { status: "completed", creditsPaid: amount },
       });
       expect(view).toEqual({
@@ -281,7 +281,7 @@ describe("Mission Credits receipts resolve to a reward tile only for a confirmed
   it("repeats, refusals, replays and unpaid successes never show a tile", () => {
     const base = {
       missionId: tenThousandHours.id,
-      dialogueId: tenThousandHours.turnIn.dialogueId,
+      dialogueId: tenThousandHours.turnIn!.dialogueId,
     };
     const results = [
       { actionKind: "accept_mission", mission: { status: "already_accepted" } },
@@ -338,7 +338,7 @@ describe("Curly Must-Stash payments (#292)", () => {
     const view = resolveMissionSuccessView({
       actionKind: "complete_mission",
       missionId: curly.id,
-      dialogueId: curly.turnIn.dialogueId,
+      dialogueId: curly.turnIn!.dialogueId,
       mission: { status: "completed", creditsPaid: amount },
     });
     expect(view).toEqual({

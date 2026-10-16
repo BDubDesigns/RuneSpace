@@ -153,9 +153,9 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await standAt(characterId, LOCATION_IDS.crashSite);
   await page.reload();
   const system = page.locator(GEAR_SYSTEM);
+  const restored = page.locator(`[data-ship-system-line="${REPAIR_TARGET_IDS.landingGear}"]`);
   await expect(system).toBeVisible();
   await expect(system).toHaveAttribute("data-ship-system-state", "offline");
-  await expect(system.getByRole("heading")).toContainText("Ship");
   await expect(system.getByRole("heading")).toContainText("Landing Gear");
   await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
     "The landing gear is damaged and cannot be repaired yet.",
@@ -240,15 +240,16 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   await page.reload();
 
   // Finished: the ship's own status, on the same panel, in the same wreck.
-  await expect(system).toHaveAttribute("data-ship-system-state", "complete");
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
+  // A finished repair is no section of its own (#358): it shrinks to one status line.
+  await expect(system).toHaveCount(0);
+  await expect(restored).toHaveText(STATUS);
   await expect(page.locator(GEAR_PANEL)).toHaveCount(0);
   await expect(system.getByRole("button")).toHaveCount(0);
   expect(await weldingXp(characterId)).toBe(gear.repairIncrements * balance.welding.xpPerIncrement);
 
   // Durable across another reload, in the generic repair row.
   await page.reload();
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
+  await expect(restored).toHaveText(STATUS);
   const [row] = await db
     .select({ completedAt: characterRepairTargets.completedAt })
     .from(characterRepairTargets)
@@ -297,5 +298,5 @@ test("plays Wheel Be Right Back: Wade's offer, the parts, twelve welds, and the 
   // The ship keeps its one wreck presentation and its status at the Crash Site.
   await standAt(characterId, LOCATION_IDS.crashSite);
   await page.reload();
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(STATUS);
+  await expect(restored).toHaveText(STATUS);
 });

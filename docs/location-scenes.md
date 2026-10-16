@@ -177,12 +177,23 @@ is the crashed Rivet, and `CRASH_SITE_SHIP_RESTORED_VARIANT_ID` (required:
 `REPAIR_TARGET_IDS.propulsionSystem` complete, per character) swaps in the repaired
 Rivet. There is no second flag, and it is not gated on Wade's turn-in.
 
-**No-ship is a supported state, not a reachable one.** A scene with no `overlay`
-is the bare empty background, and the compositor renders it from the same elements.
-Nothing in the game selects it yet: whether the ship has left is the later flight
-slice's authoritative parked-ship location, never inferred from Propulsion repair or
-Wade's Mission. `tests/unit/scene-composition.test.ts` and `tests/e2e/crash-site-scene.spec.ts`
-prove it renders without inventing a departed state.
+**No-ship is a reachable state since the first flight (#358).** A scene with no
+`overlay` is the bare empty background, and the compositor renders it from the same
+elements. The Crash Site selects it through `CRASH_SITE_SHIP_DEPARTED_VARIANT_ID`
+(`requires: { shipBerth: "elsewhere" }`), authored first so it wins over the
+restored ship: whether the ship has left is the ship's own authoritative berth
+(`character_ships.berth_location_id`, via `LocationStateFacts.shipBerthLocationId`),
+never inferred from the Propulsion repair or Wade's Mission, and never from where
+the character happens to be standing. Walking away from the Crash Site can never
+remove a ship that is still parked there.
+
+**A parked ship at another site.** Holo Hollow Landing's base scene is its empty
+4:1 pano (`holo-hollow-landing.webp`); its `HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID`
+(`requires: { shipBerth: "here" }`) composes the same canonical
+`rivet-repaired.webp` over it, placed on the pad's painted circle
+(`{ left: 36.0, top: 38.2, width: 28.0 }`, ground contact about 90% down the
+canvas). No bespoke duplicate art, and no mobile/desktop split. The overlay stays
+inside its canvas (`tests/unit/ship.test.ts`).
 
 ### Placement is scene-relative metadata
 

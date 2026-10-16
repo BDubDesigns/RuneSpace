@@ -1,16 +1,18 @@
 import {
   fabricationActionIds,
   getItemDefinition,
+  getShipFlightBalance,
   skillLevelThresholds,
   tinkeringActionIds,
 } from "@/game/config/balance";
-import { ACTION_IDS, type DialogueId } from "@/game/config/foundations";
+import { ACTION_IDS, type DialogueId, type ShipRouteId } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation, isActionAvailableAtLocation, LOCATIONS } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
+import { getShipRoute } from "@/game/content/ship-routes";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import type {
@@ -95,7 +97,18 @@ export type MissionObservation = {
    * projection that cannot see the level must not advertise the offer.
    */
   skillLevels?: ReadonlyMap<string, number>;
+  /**
+   * The character's ship as the Mission projection may see it (#358): the live
+   * tank, and the route of a flight already under way. Absent means no ship
+   * information, which reads as an empty tank, never as fuelled.
+   */
+  ship?: { fuelUnits: number; flightRouteId?: string };
 };
+
+/** The approved fuel cost of one authored route, from balance and never a literal. */
+function shipFuelRequired(routeId: ShipRouteId): number {
+  return getShipFlightBalance(routeId).fuelCostFuelUnits;
+}
 
 /**
  * One repair target exactly as the Mission projection is allowed to see it
@@ -347,7 +360,15 @@ function renderRequirementObjective(
   if (requirement.kind === "repair_target_complete") {
     return renderRepairObjective(requirement, observation);
   }
-  if (requirement.kind === "npc_conversation") return requirement.objective;
+  if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
+    return requirement.objective;
+  }
+  if (requirement.kind === "ship_fuel") {
+    return requirement.objective.replace(
+      "{required}",
+      String(shipFuelRequired(requirement.routeId)),
+    );
+  }
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -431,6 +452,16 @@ function requirementSatisfied(
       // The durable mission-progress row for this authored key is the only
       // evidence; the conversation itself is never replayed as proof.
       return (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= 1;
+    case "ship_fuel":
+      // Whatever the flight has already spent still counts: launching takes the
+      // fuel before the ship lands, and this must not revert in the air.
+      if (observation?.ship?.flightRouteId === requirement.routeId) return true;
+      return (observation?.ship?.fuelUnits ?? 0) >= shipFuelRequired(requirement.routeId);
+    case "ship_flight":
+      // Only the flight's own landing can satisfy this, and it does so by
+      // completing the Mission in the same transaction (#358). No observable
+      // state a player can arrange stands in for the flight.
+      return false;
   }
 }
 
@@ -492,6 +523,9 @@ export function deriveMissionState(input: {
   // its own authoritative turn-in constraint. Authors never need to
   // duplicate the turn-in location as a requirement to keep eligibility
   // correct.
+  // A Mission completed by a gameplay outcome has no turn-in to become ready
+  // for (#358): it stays active until that outcome completes it.
+  if (!input.definition.turnIn) return "active";
   const holds =
     input.stationary &&
     input.currentLocationId === input.definition.turnIn.locationId &&
@@ -512,7 +546,7 @@ function deriveCurrentObjective(
 ): string {
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   if (firstUnsatisfied) return renderRequirementObjective(firstUnsatisfied, observation);
-  return definition.turnIn.objective;
+  return definition.turnIn?.objective ?? definition.summary;
 }
 
 /**
@@ -550,6 +584,8 @@ function deriveGuidance(
   }
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   if (!firstUnsatisfied) {
+    // A Mission with no turn-in has no handoff to point at (#358).
+    if (!definition.turnIn) return undefined;
     // Every requirement holds: the Mission is in its turn-in phase, and the
     // authored handoff is the target wherever the player is and even while
     // they are busy (the turn-in is merely not performable yet).
@@ -587,6 +623,13 @@ function deriveGuidance(
     const guidance = repairTargetGuidance(firstUnsatisfied, currentLocationId, observation);
     // Nothing to point at is absence of guidance, not empty guidance.
     return Object.keys(guidance).length > 0 ? guidance : undefined;
+  }
+  if (firstUnsatisfied.kind === "ship_fuel" || firstUnsatisfied.kind === "ship_flight") {
+    // The ship departs from one authored place; away from it, that place is the
+    // target. Once there, the Ship panel is the only affordance and it needs no
+    // semantic halo of its own.
+    const origin = getShipRoute(firstUnsatisfied.routeId)?.originLocationId;
+    return origin && origin !== currentLocationId ? { locationId: origin } : undefined;
   }
   if (firstUnsatisfied.kind === "npc_conversation") {
     // The person to go and meet is the target, exactly as the turn-in NPC is
@@ -916,6 +959,25 @@ function projectRequirement(
       npcId: requirement.npcId,
     };
   }
+  if (requirement.kind === "ship_fuel") {
+    const required = shipFuelRequired(requirement.routeId);
+    const tank = observation?.ship?.fuelUnits ?? 0;
+    return {
+      kind: requirement.kind,
+      objective: renderRequirementObjective(requirement, observation),
+      satisfied,
+      progress: {
+        current: satisfied ? required : Math.min(tank, required),
+        target: required,
+      },
+      // The canister is the way to fuel the ship, so its Sources reference is
+      // offered only while the tank is still short of the trip.
+      ...(satisfied ? {} : { itemId: requirement.itemId }),
+    };
+  }
+  if (requirement.kind === "ship_flight") {
+    return { kind: requirement.kind, objective: requirement.objective, satisfied };
+  }
   const required = requiredCarriedQuantity(requirement, observation);
   const rawCarried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
   return {
@@ -1243,10 +1305,10 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
         if (
           offer.acceptedContinuation.completesMission &&
-          definition.turnIn.npcId !== offer.npcId
+          definition.turnIn?.npcId !== offer.npcId
         ) {
           throw new Error(
-            `${where} accepted continuation at NPC "${offer.npcId}" cannot present a turn-in owned by "${definition.turnIn.npcId}".`,
+            `${where} accepted continuation at NPC "${offer.npcId}" cannot present a turn-in owned by "${definition.turnIn?.npcId ?? "no one"}".`,
           );
         }
       }
@@ -1300,7 +1362,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           throw new Error(`${where} active dialogue references unknown NPC "${entry.npcId}".`);
         assertDialogue(definition.id, entry.dialogueId, "active NPC dialogue");
         assertDialogueNpc(definition.id, entry.dialogueId, entry.npcId, "active NPC dialogue");
-        if (entry.npcId === definition.turnIn.npcId) {
+        if (entry.npcId === definition.turnIn?.npcId) {
           throw new Error(
             `${where} active NPC dialogue cannot override turn-in dialogue for NPC "${entry.npcId}".`,
           );
@@ -1371,6 +1433,32 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
+      if (requirement.kind === "ship_fuel") {
+        if (!getShipRoute(requirement.routeId)) {
+          throw new Error(
+            `${where} fuel requirement references unknown ship route "${requirement.routeId}".`,
+          );
+        }
+        continue;
+      }
+      if (requirement.kind === "ship_flight") {
+        if (!getShipRoute(requirement.routeId)) {
+          throw new Error(
+            `${where} flight requirement references unknown ship route "${requirement.routeId}".`,
+          );
+        }
+        if (
+          definition.autoCompletion?.kind !== "ship_flight" ||
+          definition.autoCompletion.routeId !== requirement.routeId
+        ) {
+          // Nothing else could ever satisfy a flight requirement, so without the
+          // matching completion the Mission could never finish (#358).
+          throw new Error(
+            `${where} flight requirement on "${requirement.routeId}" needs a matching ship-flight auto-completion.`,
+          );
+        }
+        continue;
+      }
       if (requirement.kind === "npc_conversation") {
         if (!getNpc(requirement.npcId)) {
           throw new Error(
@@ -1401,7 +1489,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         // Routing at the turn-in NPC is stage-owned and an offer NPC owns its
         // own active follow-up, so a mandatory conversation at either would
         // fight an existing owner for the same hub entry.
-        if (requirement.npcId === definition.turnIn.npcId) {
+        if (requirement.npcId === definition.turnIn?.npcId) {
           throw new Error(
             `${where} conversation requirement cannot target its own turn-in NPC "${requirement.npcId}".`,
           );
@@ -1456,6 +1544,36 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           }
         }
       }
+    }
+    if (definition.autoCompletion) {
+      // The one other way to finish (#358): a gameplay outcome, never an NPC.
+      // A Mission that completes itself has nobody to hand in to and nothing to
+      // hand over, so every turn-in-shaped slot is an authoring mistake.
+      if (definition.turnIn) {
+        throw new Error(`${where} cannot author both a turn-in and an auto-completion.`);
+      }
+      if (definition.reward) {
+        throw new Error(`${where} completes automatically and cannot author a reward.`);
+      }
+      if (!getShipRoute(definition.autoCompletion.routeId)) {
+        throw new Error(
+          `${where} auto-completes on unknown ship route "${definition.autoCompletion.routeId}".`,
+        );
+      }
+      if (
+        !definition.requirements.some(
+          (requirement) =>
+            requirement.kind === "ship_flight" &&
+            requirement.routeId === definition.autoCompletion?.routeId,
+        )
+      ) {
+        throw new Error(`${where} auto-completes on a flight it does not require.`);
+      }
+      assertLifecycleCoverage(definition);
+      continue;
+    }
+    if (!definition.turnIn) {
+      throw new Error(`${where} must author a turn-in or an auto-completion.`);
     }
     if (!getNpc(definition.turnIn.npcId)) {
       throw new Error(`${where} turn-in references unknown NPC "${definition.turnIn.npcId}".`);
@@ -1593,6 +1711,9 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
   tracked_activity: "tracked_activity_reminder",
   repair_target_complete: "repair_reminder",
   npc_conversation: "conversation_reminder",
+  // The turn-in NPC never meets a Mission this requirement belongs to (#358).
+  ship_fuel: undefined,
+  ship_flight: undefined,
 };
 
 /**
@@ -1602,8 +1723,11 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
  * requirement kinds only — never from a Mission ID or prose.
  */
 export function missionLifecycleMoments(
-  definition: Pick<MissionDefinition, "requirements">,
+  definition: Pick<MissionDefinition, "requirements" | "turnIn">,
 ): readonly MissionLifecycleMoment[] {
+  // A Mission with no turn-in has no turn-in-NPC conversation to be in any
+  // moment of (#358).
+  if (!definition.turnIn) return [];
   const moments = new Set<MissionLifecycleMoment>();
   for (const requirement of definition.requirements) {
     const moment = reminderMomentFor(requirement.kind);
@@ -1647,6 +1771,13 @@ export function missionOmitsMoment(
 function assertLifecycleCoverage(definition: MissionDefinition): void {
   const where = `Mission "${definition.id}"`;
   const dialogue = definition.dialogue;
+  if (!definition.turnIn) {
+    // No turn-in NPC, so no lifecycle moment exists to author or omit (#358).
+    if (Object.keys(dialogue).length > 0) {
+      throw new Error(`${where} completes automatically and cannot author turn-in dialogue.`);
+    }
+    return;
+  }
   const turnInNpcId = definition.turnIn.npcId;
   for (const requirement of definition.requirements) {
     if (
@@ -1789,6 +1920,9 @@ function assertReactiveContent(
       throw new Error(`${where} reactive dialogue reads unknown fact "${variant.factKey}".`);
     }
     assertDialogue(definition.id, variant.dialogueId, "reactive dialogue");
+    if (!definition.turnIn) {
+      throw new Error(`${where} reactive dialogue needs a turn-in NPC to react.`);
+    }
     assertDialogueNpc(
       definition.id,
       variant.dialogueId,

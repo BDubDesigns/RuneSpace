@@ -128,6 +128,9 @@ const missionIds = {
   // Wade's propulsion job (#330): the final physical repair of the ship. Offered
   // manually after Wheel Be Right Back, at personal Welding 8.
   thrustIssues: asContentId("thrust_issues"),
+  // Wade's first-flight job (#358): fly the repaired Rivet from the Crash Site to
+  // Holo Hollow Landing. Accepted by hand, completed by the flight's own landing.
+  moveAlong: asContentId("move_along"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -292,6 +295,11 @@ const dialogueIds = {
   wadeThrustIssuesTurnIn: asContentId("wade_rusk_thrust_issues_turn_in"),
   wadeThrustIssuesCompletion: asContentId("wade_rusk_thrust_issues_completion"),
   wadePostThrustIssues: asContentId("wade_rusk_post_thrust_issues"),
+  // Move Along (#358): the active reminder, and the idle line once the Rivet has
+  // landed. Its send-off is the tail of Thrust Issues' completion scene, and there
+  // is no completion scene of its own; touchdown completes it.
+  wadeMoveAlongActive: asContentId("wade_rusk_move_along_active"),
+  wadePostMoveAlong: asContentId("wade_rusk_post_move_along"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -477,7 +485,23 @@ export const ACTION_IDS = {
   wheelAssemblyTinkering: asContentId("wheel_assembly_tinkering"),
   driveMountTinkering: asContentId("drive_mount_tinkering"),
   travel: asContentId("travel"),
+  // The Rivet Utility Shuttle in flight (#358). Like Travel it is a blocking
+  // one-active-action state; the flight's own route and timestamps are durable
+  // ship state, so `active_actions` keeps its narrow no-payload shape.
+  shipFlight: asContentId("ship_flight"),
 } as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for the Rivet Utility Shuttle's authored flight routes
+ * (#358). A route is content (`game/content/ship-routes`); its cost and duration
+ * are balance (`game/config/balance`). The first, and only, route is the
+ * Crash Site -> Holo Hollow Landing hop; there is deliberately no way back.
+ */
+export const SHIP_ROUTE_IDS = {
+  crashSiteToHoloHollowLanding: asContentId("crash_site_to_holo_hollow_landing"),
+} as const satisfies Record<string, ContentId>;
+
+export type ShipRouteId = (typeof SHIP_ROUTE_IDS)[keyof typeof SHIP_ROUTE_IDS];
 
 /** Stable identities for the approved local world (issues #40, #47, #83, #159). */
 export const LOCATION_IDS = {

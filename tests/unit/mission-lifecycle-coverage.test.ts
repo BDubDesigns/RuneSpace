@@ -55,7 +55,7 @@ function turnInEntry(
   stage: NonNullable<NpcConversationProjection["stage"]>,
 ) {
   return resolveNpcConversationWith(
-    definition.turnIn.npcId,
+    definition.turnIn!.npcId,
     [{ missionId: definition.id, state: "active", prerequisiteSatisfied: true, stage }],
     [definition],
     CONVERSATION_TOPICS,
@@ -78,6 +78,7 @@ describe("issue #324 reachable lifecycle moments", () => {
     ]);
     expect(
       missionLifecycleMoments({
+        turnIn: HOLD_IT_TOGETHER.turnIn,
         requirements: [
           { kind: "at_location", locationId: LOCATION_IDS.theJag, objective: "Go" },
           {
@@ -195,7 +196,7 @@ describe("issue #324 lifecycle coverage validation", () => {
 });
 
 describe("issue #324 resolver never silently substitutes the turn-in", () => {
-  const turnInId = HOLD_IT_TOGETHER.turnIn.dialogueId;
+  const turnInId = HOLD_IT_TOGETHER.turnIn!.dialogueId;
 
   it("presents the authored reminder and busy sequences without a turn-in command", () => {
     const definition = repairMission({});

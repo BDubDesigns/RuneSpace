@@ -19,6 +19,7 @@ import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { travelErrorMessage } from "./travel-errors";
 import { usePlay } from "@/features/play/PlayContext";
+import { isPlayInTransit } from "@/features/ship/flight";
 import type { MissionGuidanceTargets } from "@/game/domain/missions";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import {
@@ -527,7 +528,7 @@ export function LocalMapPanel({
   // Accepted Missions only: available offers never reach the map.
   const missionTargets = derivePinnedGuidanceTargets(state);
   const travel = state.travelState;
-  const inTransit = Boolean(travel);
+  const inTransit = isPlayInTransit(state);
   const workActive = Boolean(state.activeAction);
   // The map is read-only in transit, so no pending destination survives it.
   const selected = inTransit ? undefined : selectedLocationId;

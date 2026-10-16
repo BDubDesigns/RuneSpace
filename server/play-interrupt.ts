@@ -49,6 +49,8 @@ import { missOpenRepairCleanPass } from "@/server/welding";
  * - Travel:   delete the remaining active action + `characterTravelState` only;
  *             committed `characterScavengeReveals` are preserved untouched, and
  *             the character's authoritative origin row is not relocated here.
+ * - Ship flight (#358): REFUSES. A flight is one immutable record (route, fuel
+ *             spent, arrival instant) that only its own landing may clear.
  * - idle: returns `interrupted: false` (nothing to clean).
  * - unsupported/unknown action: THROWS and fails closed so a future activity's
  *   auxiliary persistence cannot be orphaned by deleting only the active row.
@@ -141,6 +143,14 @@ export async function forceIdleResolvedAction(
     // own Turn Back rule, #312).
     await clearActiveJourney(transaction, character.id);
     return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  // A Rivet in flight (#358) is deliberately uninterruptible: the flight's route,
+  // fuel spend and arrival are one immutable record, and a force-idle that deleted
+  // only the action row would strand the ship "in the air" with nothing to land
+  // it. It lands on its own recorded schedule, so an operator waits it out.
+  if (actionId === ACTION_IDS.shipFlight) {
+    throw new Error("A ship in flight cannot be interrupted; it lands on its own schedule.");
   }
 
   // Unsupported/unknown action id: FAIL CLOSED. #113 only knows how to clean

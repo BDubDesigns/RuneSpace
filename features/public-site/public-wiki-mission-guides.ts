@@ -46,6 +46,7 @@ const toBreakItDown = link("Break It Down", "mission-break-it-down");
 const toBraceYourself = link("Brace Yourself", "mission-brace-yourself");
 const toWheelBeRightBack = link("Wheel Be Right Back", "mission-wheel-be-right-back");
 const toThrustIssues = link("Thrust Issues", "mission-thrust-issues");
+const toMoveAlong = link("Move Along", "mission-move-along");
 const toACutAbove = link("A Cut Above", "mission-a-cut-above");
 const toOutOfTheWeather = link("Out of the Weather", "mission-out-of-the-weather");
 const toCuttingCosts = link("Cutting Costs", "mission-cutting-costs");
@@ -826,9 +827,69 @@ export const missionGuideArticles = [
         ],
       },
       {
-        heading: "Good to know",
+        heading: "What opens up",
         paragraphs: [
-          "The ship is repaired, but it has no flight controls yet, so there is still nowhere to fly it.",
+          [
+            "Once you have reported the repair, Wade has one more job for you: ",
+            toMoveAlong,
+            ". Until you take it, the ship cannot make its first flight.",
+          ],
+        ],
+      },
+      { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
+  {
+    slug: "mission-move-along",
+    title: "Move Along",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "Wade Rusk wants your repaired Rivet flown from the Crash Site to Holo Hollow Landing: fuel it, launch it, and land. It costs 10 Fuel Units and takes 15 seconds, and it pays nothing.",
+    sections: [
+      {
+        paragraphs: [["The first flight of your ship, after ", toThrustIssues, "."]],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "You need to have finished Thrust Issues, which means reporting the drive repair to ",
+            wade,
+            ". Wade's send-off ends that report, and Move Along starts on its own: there is nothing to accept. The ship will not make its first flight until it has started.",
+          ],
+        ],
+      },
+      {
+        heading: "What you need",
+        list: [
+          "Fuel. Every ship starts with an empty 300 Fuel Unit tank, and this flight uses 10. You can make a Full Small Fuel Canister at the Abandoned Processing Yard or buy one at Last Leg Trading in Holo Hollow Landing. Each canister adds 50 Fuel Units.",
+          "To be standing at your ship, at the Crash Site, with nothing else going on.",
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          "Report Thrust Issues to Wade at Rusk Recovery; Move Along starts with it. You can walk over to the Landing and back for fuel whenever you like; walking there does not move the ship.",
+          "At the Crash Site, choose Board Ship in the Ship panel. Its tank shows how much fuel you have and says how many full canisters are available in Inventory and in the Cargo Hold, with a Load 1 Canister button for each. Each click uses exactly one Full Small Fuel Canister and does not give an empty one back. If the tank can only take part of a canister, the game tells you exactly how much it will add and how much will be wasted, and asks you to confirm.",
+          "Choose Launch. It shows the destination, the 10 Fuel Unit cost and your tank before and after, and tells you that leaving moves your ship from the Crash Site to Holo Hollow Landing for good. There is no second confirmation, and a flight cannot be cancelled.",
+          "The flight takes 15 seconds. While it lasts you cannot walk, work, trade or change your gear, but you can still look at your Inventory, Equipment and Missions. You can minimize the flight and reopen it, and a reload picks up where it was.",
+          "On touchdown the game shows Flight complete — Arrived at Holo Hollow Landing and Mission Complete: Move Along. You can dismiss it; until you do it will be waiting after a reload or on another device.",
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "Nothing in the way of a reward: no XP, no Credits, no item and no free fuel. You do not report back to Wade.",
+          "Your ship and its Cargo Hold are now at Holo Hollow Landing, and so are you. The Crash Site shows empty ground. The ship does not fly back.",
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "If you leave the game during the flight it still lands: the next time you load your character it has arrived, however long you were away.",
+          "Walking to Holo Hollow Landing, clicking Launch or watching the countdown run out does not complete the Mission. Only the ship landing does.",
+          "The Cargo Hold goes where the ship goes, and can only be opened while you are standing at the ship.",
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },

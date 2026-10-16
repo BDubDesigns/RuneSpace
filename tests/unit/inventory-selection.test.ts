@@ -13,6 +13,7 @@ import {
 import { toggleSelection } from "@/features/shared/selectable-details";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
 import { miningToolProjection, salvageCutterProjection } from "./mining-tool-projection";
+import { EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
 
 function inventoryState(
   stacks: PlayGameplayState["inventory"]["stacks"] = [],
@@ -177,6 +178,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     scavengeSuppressed: false,
     scavengeReveals: [],
     merchantDailyPurchases: {},
+    ship: EMPTY_SHIP_PROJECTION,
   };
 }
 

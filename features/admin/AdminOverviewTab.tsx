@@ -89,7 +89,23 @@ export function AdminOverviewTab({
               {state.currentLocationId}
             </span>
           </Field>
-          <Field label="Current action">{activeActionId ?? "idle"}</Field>
+          <Field label="Current action">
+            {play.ship.flight ? "ship_flight" : (activeActionId ?? "idle")}
+          </Field>
+          <Field label="Ship berth">{locationLabel(play.ship.berthLocationId)}</Field>
+          <Field label="Ship fuel">
+            {play.ship.fuelUnits} / {play.ship.tankCapacityFuelUnits} FU
+          </Field>
+          {play.ship.flight ? (
+            <>
+              <Field label="Flight destination">
+                {locationLabel(play.ship.flight.destinationLocationId)}
+              </Field>
+              <Field label="Flight arrives">
+                <IsoTimestamp value={play.ship.flight.arrivesAt} />
+              </Field>
+            </>
+          ) : null}
           {play.travelState ? (
             <>
               <Field label="Travel origin">

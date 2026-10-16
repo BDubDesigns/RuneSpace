@@ -1103,7 +1103,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       now,
       deterministicRandom,
     );
-    expect(away.cargo).toMatchObject({ status: "refused", reason: "not_at_crash_site" });
+    expect(away.cargo).toMatchObject({ status: "refused", reason: "not_at_ship" });
 
     await db
       .update(rune.characters)

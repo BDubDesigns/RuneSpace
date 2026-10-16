@@ -12,6 +12,7 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getItemMaximumCharge,
+  getShipFlightBalance,
   skillLevelThresholds,
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
@@ -660,19 +661,29 @@ async function completeMissionForDefinition(input: {
     }
   }
 
-  if (npcId !== definition.turnIn.npcId) {
+  const turnIn = definition.turnIn;
+  if (!turnIn) {
+    // A Mission completed by a gameplay outcome (#358) has nobody to hand in to:
+    // no command may complete it, so a forged completion is simply refused.
     return stateFor({
       status: "refused",
       reason: "wrong_npc",
-      message: `${definition.title} must be completed with ${getNpc(definition.turnIn.npcId)?.displayName ?? "its turn-in contact"}.`,
+      message: `${definition.title} cannot be handed in to anyone.`,
+    });
+  }
+  if (npcId !== turnIn.npcId) {
+    return stateFor({
+      status: "refused",
+      reason: "wrong_npc",
+      message: `${definition.title} must be completed with ${getNpc(turnIn.npcId)?.displayName ?? "its turn-in contact"}.`,
     });
   }
   const locationId = await currentLocation(transaction, context.character.id);
-  if (context.action || locationId !== definition.turnIn.locationId) {
+  if (context.action || locationId !== turnIn.locationId) {
     return stateFor({
       status: "refused",
       reason: "not_stationary",
-      message: `${definition.title} can only be completed while you are stationary at ${locationName(definition.turnIn.locationId)}.`,
+      message: `${definition.title} can only be completed while you are stationary at ${locationName(turnIn.locationId)}.`,
     });
   }
 
@@ -768,6 +779,15 @@ async function completeMissionForDefinition(input: {
         });
       }
       continue;
+    }
+    if (requirement.kind === "ship_fuel" || requirement.kind === "ship_flight") {
+      // Unreachable for a Mission with a turn-in (validation forbids the pair),
+      // but neither the tank nor a flight is something a hand-in can vouch for.
+      return stateFor({
+        status: "refused",
+        reason: "wrong_npc",
+        message: `Objective not met: ${requirement.objective}.`,
+      });
     }
     if (requirement.kind === "carried_unique_item") {
       if (!uniqueItemRequirementHolds(requirement, observation)) {
@@ -1082,7 +1102,15 @@ function renderRequirementCopy(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "repair_target_complete") return requirement.objective;
-  if (requirement.kind === "npc_conversation") return requirement.objective;
+  if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
+    return requirement.objective;
+  }
+  if (requirement.kind === "ship_fuel") {
+    return requirement.objective.replace(
+      "{required}",
+      String(getShipFlightBalance(requirement.routeId).fuelCostFuelUnits),
+    );
+  }
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
     return requirement.objective.replace("{item}", itemName);

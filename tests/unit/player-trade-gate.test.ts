@@ -40,10 +40,12 @@ function optOuts(): string[] {
 }
 
 describe("accepted-trade gate", () => {
-  it("lets only the Play read and the Scavenge reveal dismissal run during a trade", () => {
+  it("lets only the Play read and the two presentation dismissals run during a trade", () => {
     expect(optOuts()).toEqual([
       "server/play.ts#acknowledgeScavengeReveal",
       "server/play.ts#getPlayGameplayState",
+      // The landing receipt's dismissal changes no Credits, Inventory or Equipment (#358).
+      "server/ship-commands.ts#acknowledgeShipArrival",
     ]);
   });
 

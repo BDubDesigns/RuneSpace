@@ -128,7 +128,7 @@ describe("Brace Yourself eligibility", () => {
 
   it("is offered and turned in by Tansy at The Jag, and rewards 250 Welding XP", () => {
     expect(braceYourself.offers[0]?.locationId).toBe(LOCATION_IDS.theJag);
-    expect(braceYourself.turnIn.locationId).toBe(LOCATION_IDS.theJag);
+    expect(braceYourself.turnIn!.locationId).toBe(LOCATION_IDS.theJag);
     expect(braceYourself.reward).toEqual({
       kind: "skill_xp",
       skillId: SKILL_IDS.welding,
@@ -216,10 +216,12 @@ describe("Deep Jag's three world states", () => {
 
   it("opens no other location's state, so the boundary stays narrow", () => {
     const stateful = LOCATIONS.filter((location) => location.stateVariants.length > 0);
-    // The Crash Site joined Deep Jag with its one repaired-ship scene (#330).
+    // The Crash Site joined Deep Jag with its repaired-ship scene (#330), and
+    // Holo Hollow Landing joined them once a ship could berth there (#358).
     expect(stateful.map((location) => location.id)).toEqual([
       LOCATION_IDS.crashSite,
       LOCATION_IDS.deepJag,
+      LOCATION_IDS.holoHollowLanding,
     ]);
   });
 });

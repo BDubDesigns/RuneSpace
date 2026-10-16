@@ -26,7 +26,11 @@ import {
 } from "@/game/content/conversation-backgrounds";
 import { getDialogue } from "@/game/content/dialogue";
 import { getItemPresentation } from "@/game/content/item-presentation";
-import { getLocation, isActionAvailableAtLocation } from "@/game/content/locations";
+import {
+  CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+  getLocation,
+  isActionAvailableAtLocation,
+} from "@/game/content/locations";
 import {
   MISSIONS,
   THRUST_ISSUES,
@@ -347,6 +351,9 @@ describe("the ship's status words come from the repairs and the Mission, nothing
 
 describe("the Crash Site scene follows the Propulsion repair, per character", () => {
   const crashSite = getLocation(LOCATION_IDS.crashSite)!;
+  const restoredVariant = crashSite.stateVariants.find(
+    (variant) => variant.id === CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+  )!;
   const facts = (completed: string[], accepted: string[] = []) => ({
     acceptedMissionIds: new Set(accepted),
     completedRepairTargetIds: new Set(completed),
@@ -395,7 +402,8 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
   });
 
   it("ships one empty background and two alpha ship overlays, with every master retained", () => {
-    expect(crashSite.stateVariants).toHaveLength(1);
+    // The repaired ship and, once the Rivet has flown, the bare background (#358).
+    expect(crashSite.stateVariants).toHaveLength(2);
     const background = crashSite.presentation.scene;
     expect(`public${background.asset}`).toBe("public/location-scenes/crash-site-empty.webp");
     expect(readImageHeader(`public${background.asset}`)).toMatchObject({
@@ -403,7 +411,7 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
       height: 384,
       container: "VP8 ",
     });
-    for (const scene of [background, crashSite.stateVariants[0]!.scene!]) {
+    for (const scene of [background, restoredVariant.scene!]) {
       const overlay = scene.overlay!;
       const header = readImageHeader(`public${overlay.asset}`);
       expect(header).toMatchObject({ width: overlay.width, height: overlay.height });
@@ -427,7 +435,7 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
 
   it("writes distinct alt text for each ship state", () => {
     const crashed = crashSite.presentation.scene.alt;
-    const repaired = crashSite.stateVariants[0]!.scene!.alt;
+    const repaired = restoredVariant.scene!.alt;
     expect(crashed).not.toBe(repaired);
     expect(crashed).toMatch(/crashed/i);
     expect(repaired).toMatch(/repaired/i);
@@ -439,9 +447,7 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
     // Each conversation backdrop is composed from the location's own scene for that
     // state, so the wreck/repaired ship in dialogue is the ship at its landing mark.
     expect(getConversationBackground(crashed)?.composition).toBe(crashSite.presentation.scene);
-    expect(getConversationBackground(repaired)?.composition).toBe(
-      crashSite.stateVariants[0]!.scene,
-    );
+    expect(getConversationBackground(repaired)?.composition).toBe(restoredVariant.scene);
     expect(resolveConversationBackgroundId(crashed, new Set())).toBe(crashed);
     expect(resolveConversationBackgroundId(crashed, new Set([REPAIR_TARGET_IDS.landingGear]))).toBe(
       crashed,
@@ -459,10 +465,11 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
       );
       expect(resolved.mapStatus).toBe(location.mapStatus);
     }
-    // Manufacturing fuel canisters (#343) is packaging, not flight: it authors
-    // no action that burns fuel, refuels a ship or moves one.
+    // Manufacturing fuel canisters (#343) is packaging: it authors no action that
+    // refuels a ship. The one flight action is the Rivet's own (#358), which
+    // `tests/unit/ship.test.ts` owns; nothing here may launch or refuel by name.
     const actions = JSON.stringify(Object.values(ACTION_IDS));
-    expect(actions).not.toMatch(/flight|launch|board_ship|refuel|fuel_tank|fuel_unit/i);
+    expect(actions).not.toMatch(/launch|board_ship|refuel|fuel_tank|fuel_unit/i);
   });
 });
 
@@ -489,7 +496,7 @@ describe("the Mission's shape", () => {
     ]);
   });
 
-  it("is never an automatic continuation from Wheel Be Right Back or anything else", () => {
+  it("is never an automatic continuation of Wheel Be Right Back, and hands on to Move Along", () => {
     expect(WHEEL_BE_RIGHT_BACK.continuationMissionId).toBeUndefined();
     const others: readonly MissionDefinition[] = MISSIONS.filter(
       (mission) => mission.id !== THRUST_ISSUES.id,
@@ -497,8 +504,9 @@ describe("the Mission's shape", () => {
     expect(others.some((mission) => mission.continuationMissionId === THRUST_ISSUES.id)).toBe(
       false,
     );
-    // And it starts nothing: first flight is a separate slice.
-    expect(THRUST_ISSUES.continuationMissionId).toBeUndefined();
+    // Reporting it starts Move Along in the same transaction (#358), and nothing
+    // else: the repair itself starts nothing.
+    expect(THRUST_ISSUES.continuationMissionId).toBe(MISSION_IDS.moveAlong);
   });
 
   it("is offered by hand by Wade at Rusk Recovery with the locked control", () => {
@@ -560,7 +568,7 @@ describe("Wade's locked dialogue", () => {
       "Hm. Landing gear's holding. Means there's one big problem left.",
       "Drive itself survived better than it had any right to. Mounts didn't. Both are shot. Frame around them took a hit, too. You try to put thrust through what's there now, best case it tears itself loose.",
       "You'll need two Drive Mounts. Galvaferrite work. One more Galvaferrite for the damaged frame. Two Mounting Brackets. One Galvanic Wire Spool for the ship-side wiring. Then you weld the whole thing back together.",
-      "Once you get that fixed, you'll finally be able to get your beater ship off my front lawn.",
+      "Fix it, and you're on your own. I'm done holding your hand.",
     ]);
     expect(expressions(DIALOGUE_IDS.wadeThrustIssuesOffer)).toEqual([
       EXPRESSION_IDS.neutral,
@@ -578,24 +586,24 @@ describe("Wade's locked dialogue", () => {
 
   it("completes with the locked lines word for word, and no reward beat", () => {
     const beats = getDialogue(DIALOGUE_IDS.wadeThrustIssuesCompletion)!.beats;
-    expect(beats.map((beat) => beat.kind)).toEqual(["npc", "npc"]);
-    expect(beats.map((beat) => beat.text)).toEqual([
+    // Two locked lines, then Move Along's send-off (#358, `tests/unit/move-along.test.ts`).
+    expect(beats.every((beat) => beat.kind === "npc")).toBe(true);
+    expect(beats.slice(0, 2).map((beat) => beat.text)).toEqual([
       "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
       "But now it's a ship.",
     ]);
-    expect(expressions(DIALOGUE_IDS.wadeThrustIssuesCompletion)).toEqual([
+    expect(expressions(DIALOGUE_IDS.wadeThrustIssuesCompletion).slice(0, 2)).toEqual([
       EXPRESSION_IDS.neutral,
       EXPRESSION_IDS.scowl,
     ]);
   });
 
-  it("appends no fuel warning or first-flight prompt anywhere", () => {
+  it("mentions no fuel or flight before the report: only its completion hands on to Move Along", () => {
     for (const id of [
       DIALOGUE_IDS.wadeThrustIssuesOffer,
       DIALOGUE_IDS.wadeThrustIssuesRepairReminder,
       DIALOGUE_IDS.wadeThrustIssuesBusy,
       DIALOGUE_IDS.wadeThrustIssuesTurnIn,
-      DIALOGUE_IDS.wadeThrustIssuesCompletion,
       DIALOGUE_IDS.wadePostThrustIssues,
     ]) {
       expect(texts(id).join(" "), id).not.toMatch(
@@ -609,7 +617,7 @@ describe("Wade's locked dialogue", () => {
       THRUST_ISSUES.offers[0]!.dialogueId,
       THRUST_ISSUES.dialogue.repairReminderDialogueId,
       THRUST_ISSUES.dialogue.busyDialogueId,
-      THRUST_ISSUES.turnIn.dialogueId,
+      THRUST_ISSUES.turnIn!.dialogueId,
       THRUST_ISSUES.dialogue.completionPresentationDialogueId,
       THRUST_ISSUES.completedNpcDialogue?.[0]?.dialogueId,
     ]) {

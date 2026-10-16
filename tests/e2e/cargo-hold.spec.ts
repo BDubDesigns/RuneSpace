@@ -127,7 +127,6 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
     }),
   ).toBeVisible();
   await expect(lockedStatus).toBeVisible();
-  await expect(cargoPanel.getByRole("heading")).toContainText("Ship");
   await expect(cargoPanel.getByRole("heading")).toContainText("Cargo Hold");
   await expect(cargoPanel).toHaveAttribute("data-ship-system-state", "offline");
   await expect(cargoPanel).toContainText(

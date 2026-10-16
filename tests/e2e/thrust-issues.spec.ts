@@ -183,7 +183,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
     conversation.getByRole("img", { name: "Wade Rusk, concerned expression" }),
   ).toBeVisible();
   await playToText(conversation, /You'll need two Drive Mounts\. Galvaferrite work\./);
-  await playToText(conversation, /get your beater ship off my front lawn\./);
+  await playToText(conversation, /I'm done holding your hand\./);
   await expect(
     conversation.getByRole("img", { name: "Wade Rusk, scowl expression" }),
   ).toBeVisible();
@@ -200,9 +200,9 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await expect(scene).toBeVisible();
   await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /crashed Rivet Utility Shuttle/);
   const system = page.locator(SYSTEM);
+  const restored = page.locator(`[data-ship-system-line="${REPAIR_TARGET_IDS.propulsionSystem}"]`);
   await expect(system).toBeVisible();
   await expect(system).toHaveAttribute("data-ship-system-state", "offline");
-  await expect(system.getByRole("heading")).toContainText("Ship");
   await expect(system.getByRole("heading")).toContainText("Propulsion System");
   await expect(system.locator('[data-ship-system-status="offline"]')).toHaveText(
     "The propulsion system is damaged and cannot be repaired yet.",
@@ -214,9 +214,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   }
   // Landing gear says only what the gear is, and the Cargo Hold is untouched.
   await expect(
-    page
-      .locator(`[data-ship-system="${REPAIR_TARGET_IDS.landingGear}"]`)
-      .locator('[data-ship-system-status="complete"]'),
+    page.locator(`[data-ship-system-line="${REPAIR_TARGET_IDS.landingGear}"]`),
   ).toHaveText("Landing gear restored.");
   await expect(page.getByText("Propulsion offline")).toHaveCount(0);
   await expect(page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`)).toBeVisible();
@@ -300,8 +298,9 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   // repaired scene, its own status, and no controls at all.
   await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   await expect(page.locator("[data-location-description]")).toContainText("propulsion restored");
-  await expect(system).toHaveAttribute("data-ship-system-state", "complete");
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(REPORT_STATUS);
+  // The finished repair shrinks to one status line instead of a section (#358).
+  await expect(system).toHaveCount(0);
+  await expect(restored).toHaveText(REPORT_STATUS);
   await expect(page.locator(PANEL)).toHaveCount(0);
   await expect(system.getByRole("button")).toHaveCount(0);
   expect((await weldingXp(characterId)) - weldingBefore).toBe(
@@ -311,7 +310,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
 
   // Durable across another reload, in the generic repair row.
   await page.reload();
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(REPORT_STATUS);
+  await expect(restored).toHaveText(REPORT_STATUS);
   await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   const [row] = await db
     .select({ completedAt: characterRepairTargets.completedAt })
@@ -324,12 +323,12 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
     );
   expect(row?.completedAt).not.toBeNull();
 
-  // No flight control exists, here or anywhere else on the page.
+  // Restoring the ship launches nothing by itself (#358 adds the Ship panel's
+  // Board Ship control, but no route is flown, shown or enabled until the player
+  // boards): no Launch control and no Stillreach exist anywhere on the page.
   const noFlight = async () => {
-    await expect(
-      page.getByRole("button", { name: /flight controls|launch|board ship/i }),
-    ).toHaveCount(0);
-    await expect(page.getByText(/Flight Controls|Board Ship|Stillreach/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /launch/i })).toHaveCount(0);
+    await expect(page.getByText(/Stillreach/)).toHaveCount(0);
   };
   await noFlight();
 
@@ -353,27 +352,28 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await expect(report.locator("[data-dialogue-item-artwork]")).toHaveCount(0);
   await page.keyboard.press("Escape");
   expect(await weldingXp(characterId)).toBe(xpBeforeReport);
-  await expect(page.locator("[data-mission-strip]")).toHaveCount(0);
+  // Only the Move Along strip remains: Thrust Issues is gone.
+  await expect(page.locator("[data-mission-strip]")).toHaveCount(1);
+  await expect(page.locator(`[data-mission-strip="${MISSION_IDS.moveAlong}"]`)).toHaveCount(1);
 
-  // Exactly once: Wade's follow-up, no report and no new job, and no flight prompt.
+  // Exactly once: the report is gone and cannot be made again. With the story
+  // caught up the report itself started Move Along (#358), so Wade's hub carries its reminder and nothing else.
   await page.reload();
   const after = await openNpcConversation(page, "Wade Rusk");
-  await after.getByRole("button", { name: /Thrust Issues/ }).click();
-  await expect(after.locator("[data-dialogue-text]")).toContainText(
-    "Still looks like hell. But it's a ship.",
-  );
+  await expect(after.getByRole("button", { name: /Thrust Issues/ })).toHaveCount(0);
+  await expect(after.getByRole("button", { name: /Move Along/ })).toBeVisible();
   await expect(after.getByRole("button", { name: "REPORT REPAIR" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   expect(await weldingXp(characterId)).toBe(xpBeforeReport);
-  await expect(page.locator("[data-mission-strip]")).toHaveCount(0);
+  // Only the Move Along strip remains: Thrust Issues is gone.
+  await expect(page.locator("[data-mission-strip]")).toHaveCount(1);
+  await expect(page.locator(`[data-mission-strip="${MISSION_IDS.moveAlong}"]`)).toHaveCount(1);
 
   // Back at the wreck's site: the repaired ship, the story caught up, the Cargo
   // Hold's storage intact, and still no way to fly it.
   await standAt(characterId, LOCATION_IDS.crashSite);
   await page.reload();
-  await expect(system.locator('[data-ship-system-status="complete"]')).toHaveText(
-    FLIGHT_READY_STATUS,
-  );
+  await expect(restored).toHaveText(FLIGHT_READY_STATUS);
   await expect(scene.locator(BACKGROUND)).toHaveAttribute("alt", /repaired Rivet Utility Shuttle/);
   const cargo = page.locator(`[data-ship-system="${REPAIR_TARGET_IDS.cargoHold}"]`);
   await expect(cargo).toHaveAttribute("data-ship-system-state", "complete");
@@ -384,7 +384,7 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
   await noFlight();
 
   // The same page at a representative desktop width: nothing overflows, and the
-  // scene and every ship system are still there.
+  // scene, the Cargo Hold and the restored-systems line are still there.
   for (const viewport of [
     { width: 390, height: 844 },
     { width: 1280, height: 900 },
@@ -392,7 +392,9 @@ test("plays Thrust Issues: Wade's offer at Welding 8, the mounts, sixteen welds,
     await page.setViewportSize(viewport);
     await expect(scene).toBeVisible();
     await expect(scene.locator(BACKGROUND)).toBeVisible();
-    await expect(system).toBeVisible();
+    await expect(system).toHaveCount(0);
+    await expect(restored).toBeVisible();
+    await expect(cargo).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

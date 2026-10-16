@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, characters, type ActiveAction, type Character } from "@/db/rune-space";
+import { ACTION_IDS } from "@/game/config/foundations";
 import {
   calculateResolutionWindow,
   cursorAfterConsumedTicks,
@@ -242,7 +243,38 @@ async function reconcileActiveAction<Snapshot, Outcome>(
  */
 export type OwnedCharacterCommandOptions = {
   allowDuringTrade?: boolean;
+  /**
+   * Whether the command may run while the character's ship is in flight
+   * (#358). Default-deny: a Rivet in the air blocks every player command at this
+   * one shared boundary — walking, activities, trading, Inventory and Equipment
+   * changes, cargo — except the ones that opt out, which are reads and
+   * presentation-only dismissals that change no gameplay state.
+   * `tests/unit/ship-flight-gate.test.ts` keeps the opt-out list exact.
+   */
+  allowDuringFlight?: boolean;
 };
+
+/**
+ * The refusal a command receives when it runs while the character's ship is in
+ * flight (#358). It is an `OwnershipError`, so every action handler already
+ * turns it into a plain `{ error }` for the player, and it rolls the command's
+ * transaction back before anything is written.
+ */
+export class ShipInFlightError extends OwnershipError {
+  constructor() {
+    super("Your ship is in flight. Wait for touchdown.", 409);
+    this.name = "ShipInFlightError";
+  }
+}
+
+function assertNotInFlight(
+  action: Pick<ActiveAction, "actionId"> | undefined,
+  options: OwnedCharacterCommandOptions,
+): void {
+  if (!options.allowDuringFlight && action?.actionId === ACTION_IDS.shipFlight) {
+    throw new ShipInFlightError();
+  }
+}
 
 /**
  * The shared owned-character entry: gameplay access, the ownership-scoped row
@@ -283,6 +315,15 @@ export async function withLockedOwnedCharacter<Result>(
       options.now ?? new Date(),
       options,
     );
+    // This boundary never reconciles, so a flight whose arrival is due is still
+    // a flight here: only a reconciling command (or the Play read) lands it.
+    if (!options.allowDuringFlight) {
+      const [action] = await transaction
+        .select({ actionId: activeActions.actionId })
+        .from(activeActions)
+        .where(eq(activeActions.characterId, character.id));
+      assertNotInFlight(action, options);
+    }
     return command(transaction, { character });
   });
 }
@@ -318,6 +359,9 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
       options,
     );
     const action = await reconcileActiveAction(transaction, character, resolver, now);
+    // After reconciliation, so a flight whose arrival was due has landed and
+    // no longer blocks this command (#358).
+    assertNotInFlight(action, options);
     return command(transaction, { character, action });
   });
 }

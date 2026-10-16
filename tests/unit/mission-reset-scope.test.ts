@@ -61,6 +61,8 @@ describe("missionChainResetScope", () => {
       "wheel_be_right_back",
       // Thrust Issues continues Wheel Be Right Back's chain (#330).
       "thrust_issues",
+      // Move Along follows Thrust Issues (#358).
+      "move_along",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -89,6 +91,8 @@ describe("missionChainResetScope", () => {
       "wheel_be_right_back",
       // Thrust Issues continues Wheel Be Right Back's chain (#330).
       "thrust_issues",
+      // Move Along follows Thrust Issues (#358).
+      "move_along",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -108,6 +112,7 @@ describe("missionChainResetScope", () => {
       "wheel_be_right_back",
       // Thrust Issues continues Wheel Be Right Back's chain (#330).
       "thrust_issues",
+      "move_along",
       "a_cut_above",
       "cutting_costs",
       "curly_must_stash",

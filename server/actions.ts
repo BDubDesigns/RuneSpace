@@ -93,6 +93,14 @@ import {
 } from "@/server/work-order-refresh";
 import { claimCleanPass, type CleanPassClaimResult } from "@/server/clean-pass";
 import { EquipmentRuleError } from "@/game/domain/equipment";
+import {
+  acknowledgeShipArrival,
+  launchShip,
+  refuelShip,
+  type LaunchResult,
+  type RefuelResult,
+  type ShipArrivalAcknowledgmentResult,
+} from "@/server/ship-commands";
 import { TravelRuleError } from "@/server/travel";
 import { turnBackTravel } from "@/server/travel-commands";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -171,6 +179,9 @@ import {
   TurnBackTravelRequestSchema,
   ScavengeClaimRequestSchema,
   ScavengeRevealAcknowledgmentRequestSchema,
+  RefuelShipRequestSchema,
+  LaunchShipRequestSchema,
+  AcknowledgeShipArrivalRequestSchema,
   ClaimPowerCellsRequestSchema,
   TradeRequestSchema,
   LoadPowerCellRequestSchema,
@@ -1069,6 +1080,58 @@ export async function acknowledgeScavengeRevealAction(
       request.data.characterId,
       request.data.revealId,
     );
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type RefuelShipActionResult = RefuelResult | { error: string };
+
+/** Load the Rivet's tank from Inventory or the attached Cargo Hold (#358). */
+export async function refuelShipAction(input: unknown): Promise<RefuelShipActionResult> {
+  const request = RefuelShipRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid refuel command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await refuelShip(user.id, request.data.characterId, request.data);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type LaunchShipActionResult = LaunchResult | { error: string };
+
+/** Launch the Rivet on one authored route (#358). */
+export async function launchShipAction(input: unknown): Promise<LaunchShipActionResult> {
+  const request = LaunchShipRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid launch command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await launchShip(user.id, request.data.characterId, request.data.routeId);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type ShipArrivalAcknowledgmentActionResult =
+  | ShipArrivalAcknowledgmentResult
+  | { error: string };
+
+/** Dismiss one durable landing notice (#358). Presentation only. */
+export async function acknowledgeShipArrivalAction(
+  input: unknown,
+): Promise<ShipArrivalAcknowledgmentActionResult> {
+  const request = AcknowledgeShipArrivalRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid arrival acknowledgment." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acknowledgeShipArrival(user.id, request.data.characterId, request.data.noticeId);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

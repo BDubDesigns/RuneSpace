@@ -6,6 +6,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { usePlay } from "@/features/play/PlayContext";
+import { isPlayInTransit } from "@/features/ship/flight";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
 
 function ChevronIcon({ className = "" }: { className?: string }) {
@@ -167,7 +168,7 @@ export function LocationPopulationPanel() {
   const profilePanelRef = useRef<HTMLElement>(null);
   const populationTriggerRef = useRef<HTMLButtonElement>(null);
   const currentLocationId = state.location.currentLocationId;
-  const inTransit = Boolean(state.travelState);
+  const inTransit = isPlayInTransit(state);
 
   useEffect(() => {
     setPopulationOpen(false);

@@ -129,8 +129,12 @@ describe("layered scene composition (issue #351)", () => {
       const states = [location.presentation.scene, ...location.stateVariants.map((v) => v.scene)];
       for (const scene of states) {
         if (!scene) continue;
-        const crashSiteShip = location.id === LOCATION_IDS.crashSite;
-        expect(scene.overlay !== undefined, `${location.id} overlay`).toBe(crashSiteShip);
+        // A ship overlay belongs only to the places a ship can be: the Crash Site
+        // and, once a Rivet lands, Holo Hollow Landing (#358). The Landing's own
+        // base scene stays the empty pad; only its berthed variant carries one.
+        const shipPlace =
+          location.id === LOCATION_IDS.crashSite || location.id === LOCATION_IDS.holoHollowLanding;
+        if (!shipPlace) expect(scene.overlay, `${location.id} overlay`).toBeUndefined();
       }
     }
   });

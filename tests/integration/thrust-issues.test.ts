@@ -759,7 +759,7 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
       expect((await xp(characterId, SKILL_IDS.welding)) - before).toBe(800);
     });
 
-    it("opens no flight and starts no further job", async () => {
+    it("opens no flight and starts exactly one further job: Move Along (#358)", async () => {
       const { userId, characterId } = await makeCharacter();
       await accept(userId, characterId);
       await installPropulsion(characterId);
@@ -768,9 +768,15 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         .select({ missionId: rune.characterMissions.missionId })
         .from(rune.characterMissions)
         .where(eq(rune.characterMissions.characterId, characterId));
-      // Only the seeded story, plus these two: nothing was auto-accepted after it.
+      // The seeded story, plus these two, plus Move Along: the report hands Wade's
+      // story straight on, and that is the only thing it starts.
       expect(rows.map((row) => row.missionId).sort()).toEqual(
-        [...STORY, MISSION_IDS.wheelBeRightBack, MISSION_IDS.thrustIssues].sort(),
+        [
+          ...STORY,
+          MISSION_IDS.wheelBeRightBack,
+          MISSION_IDS.thrustIssues,
+          MISSION_IDS.moveAlong,
+        ].sort(),
       );
       const state = await stateAt(userId, characterId);
       // The Crash Site keeps its ordinary map presence and walking edges.

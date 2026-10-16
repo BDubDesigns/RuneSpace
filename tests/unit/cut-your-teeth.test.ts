@@ -106,14 +106,14 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     ]);
     expect(offerEntry?.dialogueId).toBe(DIALOGUE_IDS.tansyCutYourTeethOffer);
     expect(offerEntry?.action).toEqual({ kind: "accept_mission", label: "Accept mission" });
-    expect(CUT_YOUR_TEETH.turnIn.actionLabel).toBe("SHOW SHALE");
+    expect(CUT_YOUR_TEETH.turnIn!.actionLabel).toBe("SHOW SHALE");
     const turnInEntry = missionEntry(NPC_IDS.tansyRusk, [
       activeProjection({ requirementsSatisfied: true, turnInAvailable: true }),
     ]);
     expect(turnInEntry?.dialogueId).toBe(DIALOGUE_IDS.tansyCutYourTeethTurnIn);
     expect(turnInEntry?.action).toEqual({ kind: "complete_mission", label: "SHOW SHALE" });
     // Walk It Off's Cutter claim keeps its existing mission-specific copy.
-    expect(WALK_IT_OFF.turnIn.actionLabel).toBe("Claim Cutter");
+    expect(WALK_IT_OFF.turnIn!.actionLabel).toBe("Claim Cutter");
   });
 
   it("resolves contextual active sequences for equip, stack, ready, and busy states", () => {

@@ -1999,7 +1999,7 @@ const dialogue = {
       ),
       wadeAtYard(
         EXPRESSION_IDS.scowl,
-        "Once you get that fixed, you'll finally be able to get your beater ship off my front lawn.",
+        "Fix it, and you're on your own. I'm done holding your hand.",
       ),
     ],
   },
@@ -2043,6 +2043,22 @@ const dialogue = {
         "All right. Landing gear. Propulsion. Hold. Still looks like hell.",
       ),
       wadeAtYard(EXPRESSION_IDS.scowl, "But now it's a ship."),
+      // Move Along's send-off (#358): reporting the drive starts it, so the story
+      // hands straight on. These are the approved Move Along offer lines that
+      // state the job, verbatim; the offer's opening and aside belong to a
+      // return visit this scene never is.
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Holo Hollow Landing. They've got a proper pad. Take the Rivet there. Ten fuel units for the hop.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You'll need fuel first. Make a Full Small Fuel Canister or buy one at Last Leg Trading. You can walk over to the Landing and back if you need to.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.scowl,
+        "Fly it over. Land it. And for once, don't make me come look at it.",
+      ),
     ],
   },
   // His ordinary follow-up wherever he stands. It restates only the locked
@@ -2052,6 +2068,29 @@ const dialogue = {
     npcId: NPC_IDS.wadeRusk,
     presentsAtCurrentVenue: true,
     beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Still looks like hell. But it's a ship.")],
+  },
+  // Move Along (#358). The active reminder and the post-landing idle lines are the
+  // owner-approved locked copy, verbatim; the send-off is the tail of Thrust
+  // Issues' completion. There is no completion scene: touchdown completes the
+  // Mission with a plain presentation, not Wade.
+  [DIALOGUE_IDS.wadeMoveAlongActive]: {
+    id: DIALOGUE_IDS.wadeMoveAlongActive,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostMoveAlong]: {
+    id: DIALOGUE_IDS.wadePostMoveAlong,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Heard the Rivet made the Landing."),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Nobody's asked me to tow it back yet. Good."),
+    ],
   },
   // Return the Favor (#232) — the locked offer scene from the Fabrication
   // design. Tansy teaches the station; Wade supplies the shop's shorthand.
