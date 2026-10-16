@@ -251,6 +251,24 @@ export type MissionRequirement =
       routeId: ShipRouteId;
       /** Player-facing copy; no substitutions. */
       objective: string;
+    }
+  | {
+      /**
+       * The ship's live authoritative tank covers one authored route's approved
+       * fuel cost (#358 playtest). Satisfied by the tank itself, never by a
+       * canister carried or stored: loading spends the canister, and the launch
+       * spends the fuel, so only the tank is the truth. Once the flight on this
+       * route has started, the spent fuel still counts.
+       */
+      kind: "ship_fuel";
+      routeId: ShipRouteId;
+      /**
+       * The canonical item the tank is filled from. Its Sources reference is
+       * offered only while this requirement is unmet.
+       */
+      itemId: ItemId;
+      /** Player-facing copy; `{required}` receives the route's approved cost. */
+      objective: string;
     };
 
 /** The kinds a requirement may take, used for semantic stage routing. */
@@ -1432,11 +1450,19 @@ export const MOVE_ALONG: MissionDefinition = {
   // His reminder while the Mission is open. It stands in for a turn-in
   // conversation this Mission does not have.
   activeNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeMoveAlongActive }],
+  // Two ordered objectives: the fuel is the step that needs a canister, so
+  // the Sources reference for it is what the player needs while it is unmet.
   requirements: [
+    {
+      kind: "ship_fuel",
+      routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
+      itemId: ITEM_IDS.fullSmallFuelCanister,
+      objective: "Fuel the Rivet for the trip ({required} FU).",
+    },
     {
       kind: "ship_flight",
       routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
-      objective: "Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (10 FU).",
+      objective: "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
     },
   ],
   autoCompletion: { kind: "ship_flight", routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding },

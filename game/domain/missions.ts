@@ -1,10 +1,11 @@
 import {
   fabricationActionIds,
   getItemDefinition,
+  getShipFlightBalance,
   skillLevelThresholds,
   tinkeringActionIds,
 } from "@/game/config/balance";
-import { ACTION_IDS, type DialogueId } from "@/game/config/foundations";
+import { ACTION_IDS, type DialogueId, type ShipRouteId } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
@@ -96,7 +97,18 @@ export type MissionObservation = {
    * projection that cannot see the level must not advertise the offer.
    */
   skillLevels?: ReadonlyMap<string, number>;
+  /**
+   * The character's ship as the Mission projection may see it (#358): the live
+   * tank, and the route of a flight already under way. Absent means no ship
+   * information, which reads as an empty tank, never as fuelled.
+   */
+  ship?: { fuelUnits: number; flightRouteId?: string };
 };
+
+/** The approved fuel cost of one authored route, from balance and never a literal. */
+function shipFuelRequired(routeId: ShipRouteId): number {
+  return getShipFlightBalance(routeId).fuelCostFuelUnits;
+}
 
 /**
  * One repair target exactly as the Mission projection is allowed to see it
@@ -351,6 +363,12 @@ function renderRequirementObjective(
   if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
     return requirement.objective;
   }
+  if (requirement.kind === "ship_fuel") {
+    return requirement.objective.replace(
+      "{required}",
+      String(shipFuelRequired(requirement.routeId)),
+    );
+  }
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -434,6 +452,11 @@ function requirementSatisfied(
       // The durable mission-progress row for this authored key is the only
       // evidence; the conversation itself is never replayed as proof.
       return (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= 1;
+    case "ship_fuel":
+      // Whatever the flight has already spent still counts: launching takes the
+      // fuel before the ship lands, and this must not revert in the air.
+      if (observation?.ship?.flightRouteId === requirement.routeId) return true;
+      return (observation?.ship?.fuelUnits ?? 0) >= shipFuelRequired(requirement.routeId);
     case "ship_flight":
       // Only the flight's own landing can satisfy this, and it does so by
       // completing the Mission in the same transaction (#358). No observable
@@ -601,7 +624,7 @@ function deriveGuidance(
     // Nothing to point at is absence of guidance, not empty guidance.
     return Object.keys(guidance).length > 0 ? guidance : undefined;
   }
-  if (firstUnsatisfied.kind === "ship_flight") {
+  if (firstUnsatisfied.kind === "ship_fuel" || firstUnsatisfied.kind === "ship_flight") {
     // The ship departs from one authored place; away from it, that place is the
     // target. Once there, the Ship panel is the only affordance and it needs no
     // semantic halo of its own.
@@ -934,6 +957,22 @@ function projectRequirement(
       objective: requirement.objective,
       satisfied,
       npcId: requirement.npcId,
+    };
+  }
+  if (requirement.kind === "ship_fuel") {
+    const required = shipFuelRequired(requirement.routeId);
+    const tank = observation?.ship?.fuelUnits ?? 0;
+    return {
+      kind: requirement.kind,
+      objective: renderRequirementObjective(requirement, observation),
+      satisfied,
+      progress: {
+        current: satisfied ? required : Math.min(tank, required),
+        target: required,
+      },
+      // The canister is the way to fuel the ship, so its Sources reference is
+      // offered only while the tank is still short of the trip.
+      ...(satisfied ? {} : { itemId: requirement.itemId }),
     };
   }
   if (requirement.kind === "ship_flight") {
@@ -1394,6 +1433,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
+      if (requirement.kind === "ship_fuel") {
+        if (!getShipRoute(requirement.routeId)) {
+          throw new Error(
+            `${where} fuel requirement references unknown ship route "${requirement.routeId}".`,
+          );
+        }
+        continue;
+      }
       if (requirement.kind === "ship_flight") {
         if (!getShipRoute(requirement.routeId)) {
           throw new Error(
@@ -1665,6 +1712,7 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
   repair_target_complete: "repair_reminder",
   npc_conversation: "conversation_reminder",
   // The turn-in NPC never meets a Mission this requirement belongs to (#358).
+  ship_fuel: undefined,
   ship_flight: undefined,
 };
 

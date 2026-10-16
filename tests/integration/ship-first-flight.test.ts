@@ -806,6 +806,51 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
     });
   });
 
+  describe("the fuel objective reads the authoritative tank (#358 playtest)", () => {
+    const moveAlong = (state: Awaited<ReturnType<typeof stateAt>>) =>
+      state.missions.find((mission) => mission.missionId === MISSION_IDS.moveAlong)!;
+
+    it("is unfuelled with an empty tank however many canisters are carried or stored, and offers their Sources", async () => {
+      const { userId, characterId } = await makeCharacter({ carried: 2, cargo: 1 });
+      const mission = moveAlong(await stateAt(userId, characterId));
+      const [fuel, flight] = mission.requirements!;
+      expect(fuel).toMatchObject({
+        kind: "ship_fuel",
+        satisfied: false,
+        itemId: CANISTER,
+        progress: { current: 0, target: 10 },
+      });
+      expect(flight).toMatchObject({ kind: "ship_flight", satisfied: false });
+      expect(mission.currentObjective).toBe("Fuel the Rivet for the trip (10 FU).");
+      // Loading nothing has moved nothing: the canisters are still exactly as they were.
+      expect(await shipRow(characterId)).toBeUndefined();
+    });
+
+    it("is satisfied the moment the tank holds the trip, and then offers no Sources", async () => {
+      const { userId, characterId } = await makeCharacter({ fuel: 50 });
+      const mission = moveAlong(await stateAt(userId, characterId));
+      expect(mission.requirements![0]).toMatchObject({
+        satisfied: true,
+        progress: { current: 10, target: 10 },
+      });
+      expect(mission.requirements![0]!.itemId).toBeUndefined();
+      expect(mission.currentObjective).toBe(
+        "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
+      );
+    });
+
+    it("stays satisfied in the air after the launch has spent the last 10 FU, and the Mission stays open", async () => {
+      const { userId, characterId } = await makeCharacter({ fuel: 10 });
+      await launch(userId, characterId);
+      expect((await shipRow(characterId))?.fuelUnits).toBe(0);
+      const mission = moveAlong(await stateAt(userId, characterId));
+      expect(mission.requirements![0]).toMatchObject({ satisfied: true });
+      expect(mission.requirements![0]!.itemId).toBeUndefined();
+      expect(mission.requirements![1]).toMatchObject({ kind: "ship_flight", satisfied: false });
+      expect(mission.state).toBe("active");
+    });
+  });
+
   describe("walking never moves the ship or completes the Mission", () => {
     it("keeps the ship at the Crash Site and Move Along open when the character walks to the Landing", async () => {
       const { userId, characterId } = await makeCharacter({ fuel: 50 });

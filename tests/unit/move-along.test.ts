@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   DIALOGUE_IDS,
+  ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
   SHIP_ROUTE_IDS,
 } from "@/game/config/foundations";
+import { getShipFlightBalance } from "@/game/config/balance";
 import { getDialogue } from "@/game/content/dialogue";
 import {
   MISSIONS,
@@ -66,12 +68,19 @@ describe("the Mission's shape", () => {
     expect(MOVE_ALONG.summary).toBe(
       "Take your repaired Rivet Utility Shuttle from the Crash Site to Holo Hollow Landing.",
     );
+    // Two ordered objectives: fuel first (the canister is its Sources item),
+    // then the flight, which only the landing can satisfy.
     expect(MOVE_ALONG.requirements).toEqual([
+      {
+        kind: "ship_fuel",
+        routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
+        itemId: ITEM_IDS.fullSmallFuelCanister,
+        objective: "Fuel the Rivet for the trip ({required} FU).",
+      },
       {
         kind: "ship_flight",
         routeId: SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding,
-        objective:
-          "Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (10 FU).",
+        objective: "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
       },
     ]);
   });
@@ -199,7 +208,8 @@ describe("projection", () => {
         expect(projection.state, `${at} ${stationary}`).toBe("active");
         expect(projection.stage?.turnInAvailable).toBe(false);
         expect(projection.requirements?.[0]?.satisfied).toBe(false);
-        expect(projection.currentObjective).toBe(MOVE_ALONG.requirements[0]!.objective);
+        // An empty tank: the fuel step is the current objective, not the flight.
+        expect(projection.currentObjective).toBe("Fuel the Rivet for the trip (10 FU).");
       }
     }
   });
@@ -295,5 +305,139 @@ describe("Wade's locked Move Along copy, verbatim", () => {
     const offer = lines(DIALOGUE_IDS.wadeThrustIssuesOffer);
     expect(offer.join(" ")).not.toMatch(/front lawn/i);
     expect(offer.at(-1)).toBe("Fix it, and you're on your own. I'm done holding your hand.");
+  });
+});
+
+/**
+ * #358 playtest: the ship's live tank is the truth for fuel, so the first
+ * objective reads the authoritative tank (never a canister carried or stored),
+ * offers its Sources only while unmet, and the flight is the step after it.
+ */
+describe("the ship's tank", () => {
+  const route = SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding;
+  const cost = getShipFlightBalance(route).fuelCostFuelUnits;
+
+  function projectWith(
+    ship: { fuelUnits: number; flightRouteId?: string },
+    carriedCanisters = 0,
+  ): MissionProjection {
+    return projectMission(
+      MOVE_ALONG,
+      { acceptedAt: new Date() },
+      LOCATION_IDS.crashSite,
+      true,
+      {
+        ...observation,
+        carriedQuantities: new Map([[ITEM_IDS.fullSmallFuelCanister, carriedCanisters]]),
+        stackLimits: new Map([[ITEM_IDS.fullSmallFuelCanister, 2]]),
+        ship,
+      },
+      true,
+    );
+  }
+
+  it("is unfuelled with an empty tank, however many canisters are carried", () => {
+    const projection = projectWith({ fuelUnits: 0 }, 2);
+    const [fuel, flight] = projection.requirements!;
+    expect(fuel).toMatchObject({
+      kind: "ship_fuel",
+      satisfied: false,
+      progress: { current: 0, target: cost },
+      itemId: ITEM_IDS.fullSmallFuelCanister,
+    });
+    expect(flight).toMatchObject({ kind: "ship_flight", satisfied: false });
+    expect(flight!.itemId).toBeUndefined();
+    expect(projection.currentObjective).toBe("Fuel the Rivet for the trip (10 FU).");
+  });
+
+  it("is short of the trip at 9 FU and covered at exactly 10", () => {
+    expect(projectWith({ fuelUnits: cost - 1 }).requirements![0]).toMatchObject({
+      satisfied: false,
+      progress: { current: cost - 1, target: cost },
+    });
+    expect(projectWith({ fuelUnits: cost }).requirements![0]).toMatchObject({
+      satisfied: true,
+      progress: { current: cost, target: cost },
+    });
+  });
+
+  it("counts a full tank at once, with no Sources offered once satisfied", () => {
+    const projection = projectWith({ fuelUnits: 50 });
+    expect(projection.requirements![0]).toMatchObject({
+      satisfied: true,
+      progress: { current: 10, target: 10 },
+    });
+    expect(projection.requirements![0]!.itemId).toBeUndefined();
+    // Fuel is done, so the flight is the current objective.
+    expect(projection.currentObjective).toBe(
+      "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
+    );
+  });
+
+  it("keeps the fuel step satisfied in the air, after the launch has spent it", () => {
+    const projection = projectWith({
+      fuelUnits: 0,
+      flightRouteId: route,
+    });
+    expect(projection.requirements![0]).toMatchObject({ satisfied: true });
+    expect(projection.requirements![0]!.itemId).toBeUndefined();
+    expect(projection.requirements![1]).toMatchObject({ kind: "ship_flight", satisfied: false });
+  });
+
+  it("is never satisfied by the flight of some other route", () => {
+    expect(
+      projectWith({ fuelUnits: 0, flightRouteId: "elsewhere" }).requirements![0],
+    ).toMatchObject({
+      satisfied: false,
+    });
+  });
+
+  it("reads an absent ship record as the untouched, empty tank", () => {
+    const projection = projectMission(
+      MOVE_ALONG,
+      { acceptedAt: new Date() },
+      LOCATION_IDS.crashSite,
+      true,
+      observation,
+      true,
+    );
+    expect(projection.requirements![0]).toMatchObject({
+      satisfied: false,
+      progress: { current: 0 },
+    });
+  });
+});
+
+/**
+ * Every item-bearing requirement names its item while it is unmet, so the Mission
+ * Log can offer that item's Sources. Repair material rows are covered by their own
+ * projection; this audit pins the requirement kinds that carry an item directly.
+ */
+describe("item Sources on unmet requirements", () => {
+  it("names the item on every unmet item-bearing requirement across all Missions", () => {
+    const gaps: string[] = [];
+    let checked = 0;
+    for (const definition of MISSIONS) {
+      const projection = projectMission(
+        definition,
+        { acceptedAt: new Date() },
+        LOCATION_IDS.crashSite,
+        true,
+        observation,
+        true,
+      );
+      definition.requirements.forEach((requirement, index) => {
+        if (!("itemId" in requirement)) return;
+        const status = projection.requirements?.[index];
+        if (status?.satisfied !== false) return;
+        checked += 1;
+        if (status.itemId !== requirement.itemId) {
+          gaps.push(`${definition.id}#${index} (${requirement.kind})`);
+        }
+      });
+    }
+    // The audit must actually have looked at something, or it proves nothing.
+    expect(checked).toBeGreaterThan(0);
+    expect(gaps).toEqual([]);
   });
 });

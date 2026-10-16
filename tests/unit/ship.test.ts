@@ -44,10 +44,10 @@ describe("approved ship numbers (#358)", () => {
 
   it("keeps the Mission's objective copy in step with the approved cost", () => {
     expect(MOVE_ALONG.requirements[0]).toMatchObject({
-      objective: `Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (${
-        getShipFlightBalance(ROUTE).fuelCostFuelUnits
-      } FU).`,
+      kind: "ship_fuel",
+      objective: "Fuel the Rivet for the trip ({required} FU).",
     });
+    expect(getShipFlightBalance(ROUTE).fuelCostFuelUnits).toBe(10);
   });
 
   it("loads exactly the 50 FU a Full Small Fuel Canister carries", () => {

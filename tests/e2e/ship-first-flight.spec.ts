@@ -198,6 +198,42 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   await expect(ship.locator('[data-ship-system-status="complete"]')).toHaveCount(1);
   await expect(ship.locator(BAY)).toHaveCount(0);
 
+  // The Mission Log states two ordered objectives. Fuel comes first, and while the
+  // tank is short its Sources reference is what the player needs. The flight is
+  // not offered Sources: it is only ever a flight.
+  const openMoveAlong = async () => {
+    await page.getByRole("button", { name: /^Missions/ }).click();
+    const log = page.getByRole("dialog", { name: "Mission Log" });
+    const entry = log.locator(`[data-mission-log-entry="${MISSION_IDS.moveAlong}"]`);
+    if ((await entry.locator("button[aria-expanded]").getAttribute("aria-expanded")) !== "true") {
+      await entry.locator("button[aria-expanded]").click();
+    }
+    return { log, entry, rows: entry.locator("[data-mission-log-requirements] > li") };
+  };
+  let moveAlong = await openMoveAlong();
+  await expect(moveAlong.rows).toHaveCount(2);
+  await expect(moveAlong.rows.nth(0)).toHaveAttribute(
+    "data-mission-requirement-satisfied",
+    "false",
+  );
+  await expect(moveAlong.rows.nth(0)).toContainText("Fuel the Rivet for the trip (10 FU).");
+  await expect(moveAlong.entry.locator("[data-mission-log-next]")).toHaveText(
+    "Fuel the Rivet for the trip (10 FU).",
+  );
+  await expect(moveAlong.rows.nth(1)).toHaveAttribute(
+    "data-mission-requirement-satisfied",
+    "false",
+  );
+  await expect(moveAlong.rows.nth(1).locator("[data-item-sources-trigger]")).toHaveCount(0);
+  // The fuel row's Sources opens the real ways to get a canister, not a copy of them.
+  await moveAlong.rows.nth(0).locator("[data-item-sources-trigger]").click();
+  await expect(
+    page.getByRole("dialog", { name: /^How to get Full Small Fuel Canister/ }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(moveAlong.log).toHaveCount(0);
+
   await ship.locator(BOARD).click();
   const bay = ship.locator(BAY);
   await expect(bay).toBeVisible();
@@ -225,6 +261,15 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   await expect(fromCargo).toHaveText("LOAD 1 CANISTER (+50 FU)");
   await fromInventory.click();
   await expect(bay.locator("[data-ship-tank]")).toContainText("50 / 300 FU");
+  // Fuelled: the step counts at once, offers no Sources, and the flight is next.
+  moveAlong = await openMoveAlong();
+  await expect(moveAlong.rows.nth(0)).toHaveAttribute("data-mission-requirement-satisfied", "true");
+  await expect(moveAlong.rows.nth(0).locator("[data-item-sources-trigger]")).toHaveCount(0);
+  await expect(moveAlong.entry.locator("[data-mission-log-next]")).toHaveText(
+    "Fly the Rivet from the Crash Site to Holo Hollow Landing.",
+  );
+  await page.keyboard.press("Escape");
+  await expect(moveAlong.log).toHaveCount(0);
   await expect(bay.locator("[data-ship-refuel-feedback]")).toContainText("Loaded 50 FU.");
   await fromCargo.click();
   await expect(bay.locator("[data-ship-tank]")).toContainText("100 / 300 FU");

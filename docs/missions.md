@@ -138,6 +138,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
 | `carried_unique_item` (#232) | `itemId`, `turnIn: "show" \| "consume_one"`, `objective` | `consume_one`: at least one instance of the unique `itemId` is carried and **unequipped**, so a hand-in can never take the tool in the player's hand; it hands one over at turn-in, least value first (an uncharged instance before a charged one, then the newest). `show` (#233) takes nothing, so an **equipped** instance counts too. Cargo Hold contents never count for either. No provenance: any instance satisfies it (`uniqueItemRequirementHolds`) |
 | `repair_target_complete` | `targetId`, `objective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop. Phase copy and guidance are generated from the target's own recipe — see §5.1 |
+| `ship_fuel` (#358 playtest) | `routeId`, `itemId`, `objective` (`{required}` = the route's approved fuel cost) | the ship's **live authoritative tank** covers that route's `fuelCostFuelUnits` (`ship.fuelUnits`, read from `character_ships` by the projection). A canister carried or stored never satisfies it: loading spends the canister, the launch spends the fuel, and only the tank is the truth. Once a flight on that route has started, the spent fuel still counts. `itemId` is projected **only while unmet**, so the Mission Log offers that item's Sources reference while fuelling is needed and not on a satisfied row. Absent ship state reads as the empty starting tank, never as fuelled |
 | `ship_flight` (#358) | `routeId`, `objective` | **never satisfied by observation.** Nothing a player can arrange stands in for the flight, so this requirement is always unmet while the Mission is open and the Mission's `autoCompletion` completes it in the landing transaction (§7.1). Validation requires a matching `autoCompletion` on the same route, so the Mission could otherwise never finish |
 | `npc_conversation` | `npcId`, `locationId`, `dialogueId`, `progressKey`, `objective`, `actionLabel?` | the durable marker for that authored key is set, which only the generic `acknowledgeMissionConversation` command does (§12.3). Trade, arrival, or reading prose never satisfy it |
 
@@ -603,6 +604,7 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same NPC-boundary guidance (`npcBoundaryGuidance`) the turn-in NPC uses. While the character is elsewhere, `locationId: requirement.locationId` is the target instead; arriving hands off to the NPC |
 | `tracked_activity` (no `recommendedActionId`, #232) | `activity: requirement.activity` only — the activity itself is the target, with no invented action or destination. Break It Down's "any Tinkering batch" guides the Fabrication Station's Tinker control this way |
 | `carried_unique_item` | no guidance (a Cutter may be carried, equipped, stored or bought — no single route) |
+| `ship_fuel` / `ship_flight` (#358) | the ship's origin location while the character is elsewhere, exactly as the flight itself; once there, the Ship panel is the only affordance |
 | *(carried requirement with no `recommendedActionId`)* | no guidance at all (see Ambiguous acquisition, below) |
 
 **Generic World Location → Local Place → interaction handoff.** Guidance resolves in narrow steps, derived purely from authored data, never from mission IDs or prose:
@@ -784,6 +786,19 @@ requirement projection already carries, so **nothing is authored on a
 Mission**: no recipe hint, price, location or tradeability. Opening the details
 is a read-only reference; it never changes Mission state, guidance, progress or
 the strips, and the compact Current Missions strips carry no source detail.
+
+**The rule for an authored item requirement.** A requirement that names an item
+(`equipped_item`, `carried_stack`, `carried_unique_item`, and `ship_fuel` for the
+Rivet's fuel) must project that item's canonical `itemId` on its status while it
+is unmet, and drop it once satisfied. The generic projection does this for every
+kind that carries an item; nothing about a particular Mission or activity is
+hard-coded. Source methods stay owned by the item-source registry. A Mission
+never names a favoured acquisition route, a price, or a recipe, and Sources is
+never attached to an activity merely because it consumes an ingredient. The
+test `item Sources on unmet requirements` (`tests/unit/move-along.test.ts`) audits
+every authored Mission's item-bearing requirements, so a new one without its
+`itemId` fails the suite. Repair material rows are covered by their own
+projection.
 
 Because a Mission never picks a production route, neither do the sources: all
 discoverable methods are listed. The resolver and its rules are owned by
@@ -1139,7 +1154,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 ### Move Along — the first flight, started by the Thrust Issues report and completed by the landing (#358)
 
 - **Start:** `prerequisiteMissionId: thrustIssues`, no offers (`offers: []`). Thrust Issues' `continuationMissionId` is Move Along, so reporting to Wade at Rusk Recovery accepts it in the same transaction through the normal mission acceptance path (`onConflictDoNothing`, skipped if already complete). Welding the ship alone does not start it. Wade's reminder is Move Along's `activeNpcDialogue`.
-- **Requirement and completion:** one `ship_flight` requirement on `crash_site_to_holo_hollow_landing` — "Fuel the Rivet, then fly it from the Crash Site to Holo Hollow Landing (10 FU)." — and `autoCompletion` on the same route (§7.1). Only the flight's authoritative landing completes it: walking to the Landing, the Launch click, a countdown reaching zero, and a failed flight do not.
+- **Requirements (two, in order):** (1) `ship_fuel` on `crash_site_to_holo_hollow_landing`, `itemId: fullSmallFuelCanister` — "Fuel the Rivet for the trip ({required} FU).", satisfied by the ship's live tank covering the route's 10 FU. A canister is never the proof; the tank is, and fuel spent by the launch still counts in the air. (2) `ship_flight` on the same route — "Fly the Rivet from the Crash Site to Holo Hollow Landing.", which only the landing satisfies. The Mission's `autoCompletion` completes it on the landing (§7.1). The Current objective is the first unmet row, so it reads Fuel, then Fly. Sources for the canister is offered only while the tank is short.
 - **No turn-in, no reward, no completion scene.** No XP, Credits, item or free fuel, and no report back to Wade. The landing shows a compact "Flight complete — Arrived at Holo Hollow Landing" / "Mission Complete: Move Along" notice (a durable, dismissible receipt, not a toast) and the Mission Log carries the normal completed card.
 - **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until the ordinary accepted record exists, even with the ship repaired and fuel loaded; the Ship panel says "Report Thrust Issues to Wade at Rusk Recovery to start Move Along." Once the Mission is complete this gates nothing.
 - **Dialogue (locked copy, verbatim):** the approved send-off is the last three beats of Wade's Thrust Issues completion scene ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."; there is no separate offer), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."

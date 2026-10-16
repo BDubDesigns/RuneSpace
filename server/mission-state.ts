@@ -2,6 +2,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import {
   characterMissionProgress,
   characterMissions,
+  characterShips,
   equippedItems,
   inventoryStacks,
 } from "@/db/rune-space";
@@ -105,40 +106,54 @@ export async function loadMissionProjections(
   characterId: string,
   input: { currentLocationId: string; activeActionId?: string },
 ): Promise<readonly MissionProjection[]> {
-  const [rows, progressRows, itemState, stackRows, assignmentRows, repairStates, skillLevels] =
-    await Promise.all([
-      transaction
-        .select()
-        .from(characterMissions)
-        .where(eq(characterMissions.characterId, characterId)),
-      transaction
-        .select()
-        .from(characterMissionProgress)
-        .where(eq(characterMissionProgress.characterId, characterId)),
-      loadOwnedItemInstances(transaction, characterId),
-      transaction
-        .select()
-        .from(inventoryStacks)
-        .where(eq(inventoryStacks.characterId, characterId))
-        .for("update"),
-      transaction
-        .select()
-        .from(equippedItems)
-        .where(eq(equippedItems.characterId, characterId))
-        .for("update"),
-      loadRepairTargetStates(transaction, characterId),
-      // Every skill an authored `prerequisiteSkillLevels` entry names, so projection
-      // derives the gate from the same authoritative level the player sees
-      // rather than from a literal on a surface (#207).
-      characterSkillLevels(
-        transaction,
-        characterId,
-        missionPrerequisiteSkills().map((skillId) => ({
-          skillId,
-          thresholds: standardSkillLevelThresholds(),
-        })),
-      ),
-    ]);
+  const [
+    rows,
+    progressRows,
+    itemState,
+    stackRows,
+    assignmentRows,
+    repairStates,
+    skillLevels,
+    shipRows,
+  ] = await Promise.all([
+    transaction
+      .select()
+      .from(characterMissions)
+      .where(eq(characterMissions.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterMissionProgress)
+      .where(eq(characterMissionProgress.characterId, characterId)),
+    loadOwnedItemInstances(transaction, characterId),
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId))
+      .for("update"),
+    loadRepairTargetStates(transaction, characterId),
+    // Every skill an authored `prerequisiteSkillLevels` entry names, so projection
+    // derives the gate from the same authoritative level the player sees
+    // rather than from a literal on a surface (#207).
+    characterSkillLevels(
+      transaction,
+      characterId,
+      missionPrerequisiteSkills().map((skillId) => ({
+        skillId,
+        thresholds: standardSkillLevelThresholds(),
+      })),
+    ),
+    // The live tank and any flight under way, the authority `ship_fuel` reads.
+    // No row is the untouched ship, with the balance's starting tank.
+    transaction
+      .select({ fuelUnits: characterShips.fuelUnits, flightRouteId: characterShips.flightRouteId })
+      .from(characterShips)
+      .where(eq(characterShips.characterId, characterId)),
+  ]);
   const byMissionId = new Map(rows.map((row) => [row.missionId, row]));
   const progressByMissionId = new Map<string, Map<string, number>>();
   for (const row of progressRows) {
@@ -153,6 +168,10 @@ export async function loadMissionProjections(
     stackRows,
     repairStates,
     skillLevels,
+    shipRows[0] ?? {
+      fuelUnits: getEffectiveGameBalance().ship.startingFuelUnits,
+      flightRouteId: null,
+    },
   );
   return MISSIONS.map((mission) => {
     const trackedProgress = progressByMissionId.get(mission.id);
@@ -284,6 +303,7 @@ function buildObservation(
   stackRows: readonly { itemId: string; quantity: number }[],
   repairStates: ReadonlyMap<string, RepairTargetState>,
   skillLevels: ReadonlyMap<string, number>,
+  ship: { fuelUnits: number; flightRouteId: string | null },
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedById = new Map(carriedInstances.map((instance) => [instance.id, instance.itemId]));
@@ -336,6 +356,7 @@ function buildObservation(
     itemNames,
     repairTargets,
     skillLevels,
+    ship: { fuelUnits: ship.fuelUnits, flightRouteId: ship.flightRouteId ?? undefined },
   };
 }
 

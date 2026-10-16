@@ -12,6 +12,7 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getItemMaximumCharge,
+  getShipFlightBalance,
   skillLevelThresholds,
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
@@ -779,9 +780,9 @@ async function completeMissionForDefinition(input: {
       }
       continue;
     }
-    if (requirement.kind === "ship_flight") {
+    if (requirement.kind === "ship_fuel" || requirement.kind === "ship_flight") {
       // Unreachable for a Mission with a turn-in (validation forbids the pair),
-      // but a flight is never something a hand-in can vouch for.
+      // but neither the tank nor a flight is something a hand-in can vouch for.
       return stateFor({
         status: "refused",
         reason: "wrong_npc",
@@ -1103,6 +1104,12 @@ function renderRequirementCopy(
   if (requirement.kind === "repair_target_complete") return requirement.objective;
   if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
     return requirement.objective;
+  }
+  if (requirement.kind === "ship_fuel") {
+    return requirement.objective.replace(
+      "{required}",
+      String(getShipFlightBalance(requirement.routeId).fuelCostFuelUnits),
+    );
   }
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
