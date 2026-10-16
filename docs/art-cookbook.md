@@ -432,6 +432,18 @@ Known property of the approved crashed master: its drive ring reaches the right 
 of its 1672 px canvas. It was approved as delivered and is not regenerated here;
 placement keeps that edge well inside the scene.
 
+### Flight cinematic backdrops (issue #359)
+
+A flight's takeoff and touchdown backdrops are 15:8 environments for the
+cinematic frame, not 4:1 location scenes, and they are shipless: the canonical
+repaired Rivet overlay is composited over them and animated separately. The first
+pair (`crash-site-departure.webp`, `holo-hollow-landing-arrival.webp`, 1717×916)
+arrived as approved production WebP and is committed as delivered, masters beside
+them in `assets/location-scenes/`. Ship placement is percent of the backdrop
+canvas in `game/content/flight-cinematics.ts`; QA it in the real frame at 390px
+and desktop width with the wheels on the ground (about 80% down) and the contact
+shadow under them. The route chart is native SVG, never a generated map.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.

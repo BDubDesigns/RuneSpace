@@ -142,6 +142,7 @@ entering a command is **not** an operator mutation and is never logged.
 | --- | --- | --- |
 | STOP CURRENT ACTION | `stop_current_action` | Force-idle after reconcile; no-op when idle. |
 | TELEPORT / SET LOCATION | `teleport_character` | Destination validated against the canonical location registry (`getLocation`), early and under the lock. Relocates `characters.currentLocationId` after reconciling any Travel arrival; never fakes Travel/Scavenge/Rune/adjacency/history. Same-location + not-interrupted is a no-op. |
+| Return Rivet to Crash Site (Overview → Ship playtest) | `return_ship_to_crash_site` | #359 first-flight playtest tooling. After the shared reconcile (a flight already due lands normally first), moves **only** `character_ships.berth_location_id` back to the Crash Site. Refused (409, nothing written) while the ship is in flight; a no-op without audit when it is already there. The character's location, fuel, Cargo Hold contents, repairs, Missions and arrival receipts are untouched, so a replay is an ordinary launch that spends the ordinary 10 FU and never re-completes Move Along. Not a teleport engine and not a player command. |
 | Carried/Cargo REMOVE 1 / REMOVE STACK | `removed_stack_quantity` | Exact identity (`stackId`) + verified `expectedQuantity`; never substitutes another stack. |
 | FORCE UNEQUIP | `force_unequipped_item` | Capacity-validated (`planEquipmentChange`); an equipped unique must be unequipped before deletion. |
 | Delete unique item | `removed_unique_item` | Exact instance deletion (carried or Cargo); equipped uniques are refused until force-unequipped. |
@@ -326,7 +327,10 @@ progress, and the recent operator history.
   resolves canonically), `tests/unit/admin-offered-items.test.ts` (the ADD ITEM
   catalog is derived from the canonical item definitions and restates no id), `tests/unit/operator-audit-target.test.ts` (issue
   #223 target shapes).
-- PostgreSQL integration: `tests/integration/admin-operator.test.ts` exercises
+- PostgreSQL integration: the #359 Rivet re-berth (berth-only change, replay
+  launch with no second Move Along, in-flight refusal, due-flight landing first,
+  no-op silence) is in `tests/integration/ship-first-flight.test.ts`.
+  `tests/integration/admin-operator.test.ts` exercises
   reconcile/interrupt/audit/command-layer rejection, Mining-tool FORCE UNEQUIP
   invalidation, Cargo stack removal reloading post-mutation state, authored-only
   mission reset, and fail-closed unsupported-action interruption, against a real

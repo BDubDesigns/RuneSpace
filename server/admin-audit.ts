@@ -34,6 +34,8 @@ export const OPERATOR_OPERATION_TARGET_KINDS = {
   reset_mission_chain: "character",
   reset_all_missions: "character",
   set_skill_xp: "character",
+  // Issue #359 — playtest re-berth of a landed Rivet.
+  return_ship_to_crash_site: "character",
   grant_early_access: "player_account",
   revoke_early_access: "player_account",
   open_public_gameplay: "system",

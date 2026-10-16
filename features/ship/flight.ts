@@ -44,3 +44,75 @@ export function flightCountdown(
     arrivalPending: remainingMs <= 0,
   };
 }
+
+/**
+ * The first-flight cinematic's three visual phases (#359): lift off the origin
+ * pad, cross the local chart, settle onto the destination pad.
+ */
+export type FlightCinematicPhase = "takeoff" | "travel" | "landing";
+
+/**
+ * Visual tuning targets for the takeoff and landing phases. They divide the
+ * server's recorded flight; they never lengthen it. A flight shorter than these
+ * allow scales them down so the chart always keeps the middle of the flight.
+ */
+export const FLIGHT_CINEMATIC_TAKEOFF_MS = 2_500;
+export const FLIGHT_CINEMATIC_LANDING_MS = 3_000;
+
+export type FlightCinematicFrame = {
+  phase: FlightCinematicPhase;
+  /** How far into the current phase the flight is, so a reload resumes mid-motion. */
+  phaseElapsedMs: number;
+  phaseDurationMs: number;
+  /** Fraction of the chart leg flown, 0..1: 0 through takeoff, 1 from landing on. */
+  travelProgress: number;
+  /** The local clock has passed the scheduled arrival; only the server lands the ship. */
+  arrivalPending: boolean;
+};
+
+/**
+ * Which phase of the cinematic a flight is in, normalised against the server's
+ * own recorded start and arrival instants, never a client stopwatch. Reloading,
+ * reopening or reconnecting therefore lands in the same place the flight
+ * actually is. Past the arrival instant it holds the settled landing pose and
+ * reports arrival pending; it never decides that the ship has landed.
+ */
+export function flightCinematicFrame(
+  flight: { startedAt: string; arrivesAt: string },
+  nowMs: number,
+): FlightCinematicFrame {
+  const start = new Date(flight.startedAt).getTime();
+  const end = new Date(flight.arrivesAt).getTime();
+  const durationMs = Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
+  const takeoffMs = Math.min(FLIGHT_CINEMATIC_TAKEOFF_MS, durationMs / 6);
+  const landingMs = Math.min(FLIGHT_CINEMATIC_LANDING_MS, durationMs / 5);
+  const travelMs = durationMs - takeoffMs - landingMs;
+  const arrivalPending = durationMs === 0 || nowMs >= end;
+  const elapsedMs = arrivalPending ? durationMs : Math.max(0, nowMs - start);
+
+  if (elapsedMs < takeoffMs) {
+    return {
+      phase: "takeoff",
+      phaseElapsedMs: elapsedMs,
+      phaseDurationMs: takeoffMs,
+      travelProgress: 0,
+      arrivalPending,
+    };
+  }
+  if (elapsedMs < takeoffMs + travelMs) {
+    return {
+      phase: "travel",
+      phaseElapsedMs: elapsedMs - takeoffMs,
+      phaseDurationMs: travelMs,
+      travelProgress: (elapsedMs - takeoffMs) / travelMs,
+      arrivalPending,
+    };
+  }
+  return {
+    phase: "landing",
+    phaseElapsedMs: elapsedMs - takeoffMs - travelMs,
+    phaseDurationMs: landingMs,
+    travelProgress: 1,
+    arrivalPending,
+  };
+}

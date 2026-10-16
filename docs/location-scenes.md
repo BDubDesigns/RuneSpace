@@ -152,7 +152,8 @@ and its conversation surface is the separate 15:8 interior
 (`last-leg-trading-interior.webp`, 1717×916) behind Toll's transparent 400×500
 portraits (`public/npc-art/toll-kade-*.png`), so Toll is never baked into a
 background. The approved masters are kept in `assets/`. The two flight-cinematic
-backdrops that shipped in the same art handoff are **not** used here.
+backdrops that shipped in the same art handoff are **not** used here; they belong
+to the flight cinematic below.
 
 ## Layered scenes: one background, a state-selected overlay (issue #351)
 
@@ -235,6 +236,81 @@ with no `composition` renders exactly as before. QC Studio renders through the r
 `DialogueScene`, so its preview shows the ship; its background list still carries
 `asset` (the base layer) and `alt`.
 
+## The Rivet flight cinematic (issue #359)
+
+The first flight (#358) is presented by `features/ship/FlightCinematic.tsx`, inside
+the in-flight `FlightPanel`, in the same 15:8 frame a conversation uses
+(`aspect-[15/8] min-h-56 sm:min-h-72`). It is a **presentation layer** over the
+server's recorded flight: it reads `state.ship.flight` and nothing else, and it
+never lands, refuels or completes anything.
+
+| Phase | Visual target | Backdrop |
+|---|---|---|
+| Takeoff | 0–2.5 s | `crash-site-departure.webp` (1717×916, opaque lossy, shipless) |
+| Chart | 2.5–12 s | native SVG nav chart, no artwork |
+| Touchdown | 12–15 s | `holo-hollow-landing-arrival.webp` (1717×916, opaque lossy, shipless) |
+
+- **Art.** Both backdrops are the approved 15:8 environments from the first-flight
+  art handoff, committed as delivered with their unaltered masters
+  (`assets/location-scenes/*-master.png`). Neither is a 4:1 location pano, and
+  neither has a ship baked in. The Rivet is the one canonical
+  `rivet-repaired.webp` (`REPAIRED_RIVET_OVERLAY`), placed per backdrop in
+  `game/content/flight-cinematics.ts` with the same percent-of-canvas `placement`
+  a location overlay uses, and rendered inside the `SceneComposition` stage (as a
+  stage child) so crop and ship move together. A soft CSS contact shadow stays on
+  the ground while the ship lifts or settles.
+- **Timing.** `flightCinematicFrame` (`features/ship/flight.ts`) derives the phase,
+  the time already spent in it and the chart progress from the flight's own
+  `startedAt` / `arrivesAt`. Takeoff and touchdown are 2.5 s and 3 s targets that
+  divide the recorded duration (and shrink for a shorter flight); the chart is the
+  rest. The touchdown pose is reached at the scheduled arrival, so the cinematic
+  adds no time. Each phase mounts a CSS keyframe animation whose negative
+  `animation-delay` is the time already spent in that phase, so a reload, a
+  reopened panel or a reconnect resumes mid-motion instead of restarting takeoff.
+  Past the arrival instant the frame holds the settled pose and the panel says
+  touchdown is pending until the server confirms; the Play surface then shows the
+  arrived location and the durable arrival notice. A player who returns after
+  landing never sees the cinematic.
+- **Chart.** `features/ship/flight-chart.ts` points the leg in the same direction as
+  the Local Map (from the two places' authored axial coordinates), labels both
+  real places, and titles the chart from the cinematic content ("Skatboll local
+  flight"). It invents no distance and implies no second planet. The marker is a
+  miniature of the approved Rivet through the Next.js image optimizer.
+- **Effects.** Small CSS-only effects ride the same phase envelope (inline duration
+  and negative delay) as the ship: two lift plumes under the fore and aft hull and
+  a glow on the drive ring (inside the moving ship layer), and dust on the ground
+  line in front of the wheels (a ground layer, coloured per backdrop by
+  `dustColor`: brown mud at the Crash Site, grey spray on the pad). Takeoff:
+  ignition in the first ~0.3 s, dust peaking ~0.4 s and thinning as the ship
+  climbs. Touchdown: thrust holds through the descent and spools down over the
+  last ~0.6 s, with a short dust puff as the wheels meet the pad that has settled
+  by the arrival instant. The flicker only dims and brightens (0.8–1.0 opacity,
+  150 ms); nothing switches fully on and off. Positions are percent of the ship's
+  mark, so they crop with the art.
+- **Art ready before Launch.** `features/ship/flight-cinematic-images.ts` derives the
+  exact optimized `/_next/image` variants the frame renders (backdrops with their
+  srcset and sizes, the ship overlay, the chart miniature), and the components read
+  the same props. Opening the Flight Controls (Board Ship) fetches and decodes
+  them. A LAUNCH tap before that has finished shows "Preparing launch visuals…"
+  and sends the ordinary launch command as soon as the art is ready, fails, or
+  `FLIGHT_VISUALS_WAIT_MS` (6 s) passes. Nothing is spent, recorded or timed before
+  that command succeeds, and the art never decides whether a launch is allowed. A
+  warm-up older than 45 s is refreshed at Launch, because optimizer responses are
+  cacheable for 60 s before revalidation. After a mid-flight reload, the cinematic
+  warms the later phases' art itself.
+- **Reduced motion and access.** Under `prefers-reduced-motion` the ship rests on
+  its mark with no effects, the chart's moving marker and growing trail are **not
+  rendered** (followed live through `matchMedia`, not hidden by CSS, so no browser's
+  visibility heuristic for an SVG group can disagree), and the panel's countdown
+  and progress meter carry the flight. The frame is a `<figure>` whose caption names
+  the phase; one polite live announcement is made per phase, and the chart is an
+  `img` with a factual label. No flashing.
+- **Hydration.** The frame depends on the browser clock, so its phase layers render
+  only after mount; server markup is a stable empty frame.
+
+A later route adds its own entry to `FLIGHT_CINEMATICS` (typed over every
+`ShipRouteId`); there is no generic cinematic engine.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's
@@ -242,7 +318,7 @@ While traveling, `state.travelState` is authoritative and the character's
 `docs/gameplay-foundations.md` + `server/play.ts` resolution). The header:
 
 - **Omits the scene entirely during transit** (no destination preview). `PlayConsole` renders no `LocationSceneHeader` when `inTransit === true`.
-- Therefore the destination scene is never shown as though arrival already occurred. No travel cinematic, vehicle scene, or intermediate state is invented.
+- Therefore the destination scene is never shown as though arrival already occurred. No walking-Travel cinematic, vehicle scene, or intermediate state is invented. (A Rivet flight is not Travel: its cinematic above shows the arrival backdrop during touchdown, but the arrived location scene still appears only once the server confirms the landing.)
 
 When the authoritative Travel state disappears, the primary surface composes
 the destination Location on its next accepted state; no client-side arrival

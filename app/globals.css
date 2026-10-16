@@ -892,6 +892,405 @@ body {
   }
 }
 
+/* Rivet flight cinematic (#359). Durations and negative delays are set inline
+   from the server's recorded flight, so a reload resumes mid-motion. Motion is
+   transform/opacity only: no flashing, no strobing. */
+.rs-flight-cinematic__plate {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.rs-flight-cinematic__phase {
+  animation: rs-dialogue-portrait-fade-in 500ms ease-out both;
+}
+
+.rs-flight-cinematic__ship {
+  animation-fill-mode: both;
+  transform-origin: 50% 100%;
+}
+
+.rs-flight-cinematic__ship[data-flight-motion="takeoff"] {
+  animation-name: rs-flight-takeoff;
+}
+
+.rs-flight-cinematic__ship[data-flight-motion="landing"] {
+  animation-name: rs-flight-landing;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1);
+}
+
+.rs-flight-cinematic__shadow {
+  left: 8%;
+  right: 8%;
+  bottom: -5%;
+  height: 12%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0));
+  animation-fill-mode: both;
+}
+
+.rs-flight-cinematic__shadow[data-flight-motion="takeoff"] {
+  animation-name: rs-flight-shadow-takeoff;
+  animation-timing-function: ease-in;
+}
+
+.rs-flight-cinematic__shadow[data-flight-motion="landing"] {
+  animation-name: rs-flight-shadow-landing;
+  animation-timing-function: ease-out;
+}
+
+/* Spool up on the gear, lift clear of the dust, then climb away nose-first. */
+@keyframes rs-flight-takeoff {
+  0% {
+    transform: translate(0, 0) scale(1);
+    animation-timing-function: ease-in-out;
+  }
+
+  14% {
+    transform: translate(0, 1%) scale(1);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1);
+  }
+
+  55% {
+    transform: translate(-4%, -55%) scale(0.95);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5);
+  }
+
+  100% {
+    transform: translate(-38%, -195%) scale(0.68);
+  }
+}
+
+@keyframes rs-flight-landing {
+  0% {
+    transform: translate(28%, -170%) scale(0.72);
+  }
+
+  75% {
+    transform: translate(0, -6%) scale(1);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes rs-flight-shadow-takeoff {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+
+@keyframes rs-flight-shadow-landing {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Takeoff and touchdown effects (#359): small, ship-anchored, CSS only. Each
+   effect's envelope runs on the phase's own duration and negative delay (set
+   inline), so it resumes with the ship. Placement is percent of the ship's mark,
+   read off the canonical repaired Rivet: lift plumes under the fore and aft
+   hull, the glow on the drive ring's rear face, and dust on the ground line. The
+   flicker only dims and brightens; nothing switches fully on and off. */
+.rs-flight-vfx {
+  pointer-events: none;
+  animation-fill-mode: both;
+}
+
+/* The glow is painted only by the flicker layer, from its parent's fill. */
+.rs-flight-vfx__flicker {
+  border-radius: inherit;
+  background: var(--rs-flight-vfx-fill);
+  animation: rs-flight-flicker 150ms ease-in-out infinite alternate;
+}
+
+.rs-flight-vfx__plume {
+  top: 70%;
+  width: 9%;
+  height: 46%;
+  border-radius: 50% 50% 45% 45% / 20% 20% 80% 80%;
+  --rs-flight-vfx-fill: radial-gradient(
+    ellipse 50% 100% at 50% 0%,
+    rgb(255 236 196 / 0.95) 0%,
+    rgb(255 166 82 / 0.75) 28%,
+    rgb(255 104 46 / 0.3) 58%,
+    rgb(255 90 40 / 0) 80%
+  );
+  mix-blend-mode: screen;
+  transform-origin: 50% 0%;
+}
+
+.rs-flight-vfx__plume[data-position="fore"] {
+  left: 22%;
+}
+
+.rs-flight-vfx__plume[data-position="aft"] {
+  left: 64%;
+}
+
+.rs-flight-vfx__engine {
+  left: 86%;
+  top: 22%;
+  width: 22%;
+  height: 52%;
+  border-radius: 50%;
+  --rs-flight-vfx-fill: radial-gradient(
+    closest-side,
+    rgb(255 226 180 / 0.85) 0%,
+    rgb(255 140 64 / 0.45) 45%,
+    rgb(255 110 40 / 0) 100%
+  );
+  mix-blend-mode: screen;
+}
+
+.rs-flight-vfx__dust {
+  bottom: -18%;
+  width: 78%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    var(--rs-flight-dust) 0%,
+    var(--rs-flight-dust) 35%,
+    rgb(0 0 0 / 0) 100%
+  );
+  filter: blur(3px);
+}
+
+.rs-flight-vfx__dust[data-side="left"] {
+  left: -22%;
+  transform-origin: 85% 60%;
+}
+
+.rs-flight-vfx__dust[data-side="right"] {
+  right: -22%;
+  transform-origin: 15% 60%;
+}
+
+.rs-flight-vfx__plume[data-flight-motion="takeoff"] {
+  animation-name: rs-flight-plume-takeoff;
+  animation-timing-function: ease-out;
+}
+
+.rs-flight-vfx__plume[data-flight-motion="landing"] {
+  animation-name: rs-flight-plume-landing;
+  animation-timing-function: ease-in;
+}
+
+.rs-flight-vfx__engine[data-flight-motion="takeoff"] {
+  animation-name: rs-flight-engine-takeoff;
+  animation-timing-function: ease-out;
+}
+
+.rs-flight-vfx__engine[data-flight-motion="landing"] {
+  animation-name: rs-flight-engine-landing;
+  animation-timing-function: ease-in;
+}
+
+.rs-flight-vfx__dust[data-flight-motion="takeoff"] {
+  animation-name: rs-flight-dust-takeoff;
+  animation-timing-function: ease-out;
+}
+
+.rs-flight-vfx__dust[data-flight-motion="landing"] {
+  animation-name: rs-flight-dust-landing;
+  animation-timing-function: ease-out;
+}
+
+@keyframes rs-flight-flicker {
+  from {
+    opacity: 0.8;
+    transform: scaleY(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleY(1.05);
+  }
+}
+
+/* Ignition in the first ~0.3 s, full lift thrust as the ship climbs out. */
+@keyframes rs-flight-plume-takeoff {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.25);
+  }
+
+  12% {
+    opacity: 1;
+    transform: scaleY(0.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleY(1.3);
+  }
+}
+
+/* Thrust holds through the descent and spools down over the last ~0.6 s. */
+@keyframes rs-flight-plume-landing {
+  0%,
+  72% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  92% {
+    opacity: 0.35;
+    transform: scaleY(0.45);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+}
+
+@keyframes rs-flight-engine-takeoff {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  10%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rs-flight-engine-landing {
+  0%,
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.15;
+    transform: scale(0.7);
+  }
+}
+
+/* Dust kicks up as the plumes reach the ground, spreads outward and thins as
+   the ship climbs away; it is gone well before the chart. */
+@keyframes rs-flight-dust-takeoff {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+
+  16% {
+    opacity: 0.95;
+    transform: scale(0.9);
+  }
+
+  55% {
+    opacity: 0.55;
+    transform: scale(1.5);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+/* A short puff as the wheels meet the pad, settled by the arrival instant. */
+@keyframes rs-flight-dust-landing {
+  0%,
+  62% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+
+  80% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+.rs-flight-chart {
+  background: radial-gradient(ellipse at 50% 55%, rgb(75 216 245 / 0.1), transparent 70%),
+    var(--rs-surface-page);
+}
+
+.rs-flight-chart__grid {
+  stroke: var(--rs-border-subtle);
+  stroke-width: 1;
+}
+
+.rs-flight-chart__title {
+  fill: var(--rs-text-muted);
+  font-family: var(--rs-font-display);
+  font-size: 14px;
+  letter-spacing: 0.16em;
+}
+
+.rs-flight-chart__route {
+  stroke: var(--rs-border-structural);
+  stroke-dasharray: 6 8;
+  stroke-width: 3;
+}
+
+.rs-flight-chart__flown {
+  stroke: var(--rs-accent-primary);
+  stroke-linecap: round;
+  stroke-width: 3;
+  transition: stroke-dashoffset 250ms linear;
+}
+
+.rs-flight-chart__place {
+  fill: var(--rs-surface-panel);
+  stroke: var(--rs-accent-primary);
+  stroke-width: 3;
+}
+
+.rs-flight-chart__label {
+  fill: var(--rs-text-primary);
+  font-family: var(--rs-font-display);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.rs-flight-chart__marker {
+  transition: transform 250ms linear;
+}
+
+/* Reduced motion: the ship rests on its mark with no thrust, glow or dust, and
+   the panel's countdown and progress meter carry the flight. The chart's moving
+   marker and trail are not rendered at all (FlightCinematic). Phases still
+   change, without a fade. */
+@media (prefers-reduced-motion: reduce) {
+  .rs-flight-cinematic__phase,
+  .rs-flight-cinematic__ship[data-flight-motion],
+  .rs-flight-cinematic__shadow[data-flight-motion] {
+    animation: none;
+  }
+
+  .rs-flight-vfx {
+    display: none;
+  }
+}
+
 @keyframes rs-result-success {
   0% {
     box-shadow: none;

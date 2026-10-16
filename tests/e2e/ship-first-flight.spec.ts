@@ -446,3 +446,190 @@ test("an offline player who reconnects after touchdown is told of the landing wi
   await expect(page.locator(NOTICE)).toBeVisible({ timeout: 30_000 });
   expect((await shipRow(characterId))?.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
 });
+
+/** A whole, fuelled Rivet at the Crash Site with Move Along under way. */
+async function seedLaunchReady(characterId: string) {
+  const now = new Date();
+  await db.insert(characterMissions).values(
+    [MISSION_IDS.thrustIssues, MISSION_IDS.moveAlong].map((missionId) => ({
+      characterId,
+      missionId,
+      acceptedAt: now,
+      completedAt: missionId === MISSION_IDS.thrustIssues ? now : null,
+    })),
+  );
+  for (const targetId of [
+    REPAIR_TARGET_IDS.cargoHold,
+    REPAIR_TARGET_IDS.landingGear,
+    REPAIR_TARGET_IDS.propulsionSystem,
+  ]) {
+    await finishRepair(characterId, targetId);
+  }
+  await db.insert(characterShips).values({ characterId, fuelUnits: 100 });
+  await standAt(characterId, LOCATION_IDS.crashSite);
+}
+
+/**
+ * Issue #359 — the flight cinematic over the same authoritative flight: takeoff
+ * over the departure backdrop, the local chart, touchdown over the arrival
+ * backdrop, resumed in the right phase after a mid-flight reload, honouring
+ * reduced motion, and handing over to the arrived scene and the durable notice.
+ */
+test("plays the first-flight cinematic in phase with the recorded flight", async ({
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(90_000);
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedLaunchReady(characterId);
+  await openTestCharacter(page, characterId);
+  // A cold cache on a slow mobile link, throttled in the browser itself so its
+  // HTTP cache stays on, exactly as a player's would (Playwright request routing
+  // would disable it).
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: false });
+  await cdp.send("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: 300,
+    downloadThroughput: 120 * 1024,
+    uploadThroughput: 64 * 1024,
+  });
+  await page.locator(SHIP).locator(BOARD).click();
+  const launch = page.locator(SHIP).locator(LAUNCH);
+  await launch.click();
+
+  // The tap waits for the art, visibly, and nothing is sent to the server yet. The
+  // launch command is only sent once "Preparing" clears, so a server row read while
+  // it is still showing (before and after the read) proves nothing was spent early.
+  const preparing = page.locator("[data-ship-launch-preparing]");
+  await expect(preparing).toHaveText("Preparing launch visuals…");
+  await expect(launch).toBeDisabled();
+  const waiting = await shipRow(characterId);
+  if (await preparing.isVisible()) {
+    expect(waiting?.flightStartedAt).toBeNull();
+    expect(waiting?.fuelUnits).toBe(100);
+  }
+
+  // Takeoff begins as soon as the launch is accepted, on an already-decoded backdrop
+  // and ship, with its effects composited on the Rivet's mark. One browser snapshot,
+  // so a slow runner cannot drift into the chart between assertions.
+  const cinematic = page.locator("[data-flight-cinematic]");
+  await expect(cinematic).toHaveAttribute("data-flight-phase", "takeoff", { timeout: 10_000 });
+  const takeoff = () =>
+    cinematic.evaluate((frame) => {
+      const background = frame.querySelector<HTMLImageElement>(
+        'img[data-scene-layer="background"]',
+      );
+      const ships = frame.querySelectorAll<HTMLImageElement>("img[data-flight-ship]");
+      const painted = (img: HTMLImageElement | null | undefined) =>
+        Boolean(img?.complete && img.naturalWidth > 0);
+      return {
+        phase: frame.getAttribute("data-flight-phase"),
+        caption: frame.querySelector("[data-flight-cinematic-caption]")?.textContent,
+        backdrop: background?.getAttribute("src")?.includes("crash-site-departure") ?? false,
+        ships: ships.length,
+        effects: frame.querySelectorAll("[data-flight-vfx]").length,
+        painted: painted(background) && painted(ships[0]),
+      };
+    });
+  // Already fetched and decoded before the launch: painted within a frame or two.
+  await expect.poll(takeoff, { timeout: 300, intervals: [50] }).toEqual({
+    phase: "takeoff",
+    caption: "Takeoff · Crash Site",
+    backdrop: true,
+    ships: 1,
+    effects: 5,
+    painted: true,
+  });
+  await cdp.send("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
+  // One launch only: one fuel charge.
+  expect((await shipRow(characterId))?.fuelUnits).toBe(90);
+  const row = (await shipRow(characterId))!;
+  const startedAt = row.flightStartedAt!.getTime();
+  const arrivesAt = row.flightArrivesAt!.getTime();
+  // The cinematic adds nothing to the authoritative 15-second flight.
+  expect(arrivesAt - startedAt).toBe(15_000);
+
+  // The chart: the local leg between the two real places.
+  await expect(cinematic).toHaveAttribute("data-flight-phase", "travel", { timeout: 6_000 });
+  const chart = cinematic.locator("[data-flight-chart]");
+  await expect(chart).toContainText("CRASH SITE");
+  await expect(chart).toContainText("HOLO HOLLOW LANDING");
+  await expect(chart).toContainText("SKATBOLL LOCAL FLIGHT");
+  await expect(chart.locator("[data-flight-chart-marker]")).toBeVisible();
+
+  // A reload mid-chart resumes the chart; it never restarts the takeoff.
+  await page.reload();
+  await expect(page.locator("[data-flight-cinematic]")).toHaveAttribute(
+    "data-flight-phase",
+    "travel",
+  );
+
+  // Reduced motion: a static chart. The moving marker and trail are not rendered at
+  // all (asserting absence, not a browser's visibility heuristic for an SVG group);
+  // the countdown remains.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator("[data-flight-chart]")).toBeVisible();
+  await expect(page.locator("[data-flight-chart-marker]")).toHaveCount(0);
+  await expect(page.locator("[data-flight-chart-flown]")).toHaveCount(0);
+  await expect(page.locator("[data-flight-progress]")).toContainText(/seconds? remaining/);
+
+  // Touchdown over the arrival backdrop, the ship resting on its mark without motion.
+  await expect(page.locator("[data-flight-cinematic]")).toHaveAttribute(
+    "data-flight-phase",
+    "landing",
+    { timeout: 12_000 },
+  );
+  await expect(
+    page.locator('[data-flight-cinematic] img[data-scene-layer="background"]'),
+  ).toHaveAttribute("src", /holo-hollow-landing-arrival/);
+  expect(
+    await page
+      .locator(".rs-flight-cinematic__ship")
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("none");
+  // No thrust, glow or dust under reduced motion.
+  for (const display of await page
+    .locator("[data-flight-vfx]")
+    .evaluateAll((effects) => effects.map((effect) => getComputedStyle(effect).display))) {
+    expect(display).toBe("none");
+  }
+
+  // Only the server lands it: then the arrived scene and the durable notice take over.
+  await expect(page.locator(NOTICE)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("[data-flight-cinematic]")).toHaveCount(0);
+  await expect(
+    page.locator(`[data-location-scene="${LOCATION_IDS.holoHollowLanding}"]`).locator(OVERLAY),
+  ).toHaveCount(1);
+  expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).not.toBeNull();
+});
+
+/**
+ * #359 playtest follow-up — art that cannot load never gates the flight: the
+ * launch goes ahead as the ordinary authoritative command, once, and the panel's
+ * countdown carries it.
+ */
+test("launches normally when the cinematic art fails to load", async ({ page, testCharacter }) => {
+  test.setTimeout(60_000);
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedLaunchReady(characterId);
+  await page.route(/crash-site-departure/, (route) => route.abort());
+  await openTestCharacter(page, characterId);
+  await page.locator(SHIP).locator(BOARD).click();
+  await page.locator(SHIP).locator(LAUNCH).click();
+
+  await expect(page.locator("[data-flight-surface]")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("[data-ship-launch-preparing]")).toHaveCount(0);
+  await expect(page.locator("[data-flight-progress]")).toContainText(/seconds? remaining/);
+  const row = (await shipRow(characterId))!;
+  expect(row.flightStartedAt).not.toBeNull();
+  expect(row.fuelUnits).toBe(90);
+});

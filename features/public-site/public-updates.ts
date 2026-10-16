@@ -9,6 +9,30 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #359 — the first-flight cinematic.
+    slug: "watch-the-rivet-fly",
+    title: "Watch the Rivet Fly",
+    publishedAt: "2026-10-15T23:30:00-07:00",
+    summary:
+      "The Rivet's first flight now plays out on screen: liftoff from the Crash Site, a short hop across a local chart, and touchdown on the Holo Hollow Landing pad. It still takes exactly 15 seconds.",
+    body: [
+      [
+        "Flying your Rivet Utility Shuttle for ",
+        { text: "Move Along", articleSlug: "mission-move-along" },
+        " is no longer just a countdown. The moment you launch, the Rivet lifts off the mud at the Crash Site. Then a small nav chart shows the hop across Skatboll from the Crash Site to Holo Hollow Landing, with your ship crossing it and the seconds to touchdown in the corner. The last few seconds show the Rivet settling onto the pad.",
+      ],
+      "None of this changes the flight. It is still 10 Fuel Units and 15 seconds, it still cannot be cancelled, and the ship is still only landed once the game confirms it. If you reload, minimize the flight or lose your connection, the picture picks up where the flight actually is instead of starting over, and if you come back after the ship has landed you go straight to the pad and your Flight complete notice. With reduced motion turned on in your device settings, the ship and the chart stay still and the countdown carries the flight.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A flight scene for the Rivet's first flight: takeoff at the Crash Site, a local chart of the hop to Holo Hollow Landing, and touchdown on the pad.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #358 — the Rivet's first flight.
     slug: "the-rivet-takes-off",
     title: "The Rivet Takes Off",

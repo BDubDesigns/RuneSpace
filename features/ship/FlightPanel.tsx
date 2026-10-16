@@ -6,12 +6,14 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { usePlay } from "@/features/play/PlayContext";
+import { FlightCinematic } from "@/features/ship/FlightCinematic";
 import { flightCountdown, flightProgressPercent } from "@/features/ship/flight";
 import { getLocation } from "@/game/content/locations";
 
 /**
- * The Rivet in flight (#358): a straightforward authoritative countdown, with
- * no animation and no asset dependency.
+ * The Rivet in flight (#358): an authoritative countdown, led by the flight
+ * cinematic (#359) — takeoff, a local nav chart, touchdown — which is a
+ * presentation layer over the same recorded flight and adds no time to it.
  *
  * Every figure comes from the server's recorded flight, so a reload resumes the
  * remaining time rather than restarting it. When the local clock passes the
@@ -64,6 +66,14 @@ export function FlightPanel() {
   return (
     <Panel data-flight-surface tone="raised">
       <SectionHeader eyebrow="In flight">Rivet flight</SectionHeader>
+      <div className="mt-4">
+        <FlightCinematic
+          destinationName={flight.destinationName}
+          flight={flight}
+          now={now}
+          originName={origin}
+        />
+      </div>
       <p className="mt-4 text-sm text-[color:var(--rs-text-primary)]" data-flight-route>
         Flying the Rivet Utility Shuttle from <strong>{origin}</strong> to{" "}
         <strong>{flight.destinationName}</strong>.

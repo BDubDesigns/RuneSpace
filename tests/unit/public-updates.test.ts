@@ -118,10 +118,23 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Rivet first-flight Update as the newest (#358)", () => {
+  it("publishes the first-flight cinematic Update as the newest (#359)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("the-rivet-takes-off");
+    expect(latest.slug).toBe("watch-the-rivet-fly");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("the-rivet-takes-off")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    // A presentation change: the flight itself is announced as unchanged and local.
+    expect(text).toContain("10 Fuel Units and 15 seconds");
+    expect(text).toContain("Skatboll");
+    expect(text).not.toMatch(/stillreach|orbit|planet|return flight|fly back to the Crash Site/i);
+  });
+
+  it("keeps the Rivet first-flight Update published beneath it (#358)", () => {
+    const latest = getPublicUpdate("the-rivet-takes-off")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("holo-hollow-landing")!.publishedAt),
     );

@@ -41,6 +41,7 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
   let missions: typeof import("@/server/missions");
   let ship: typeof import("@/server/ship-commands");
   let cargo: typeof import("@/server/cargo-hold");
+  let adminSeams: typeof import("@/server/admin-command-seams");
   const createdUsers: string[] = [];
   const now = new Date("2026-10-15T12:00:00.000Z");
   const balance = getEffectiveGameBalance();
@@ -58,6 +59,7 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
     missions = await import("@/server/missions");
     ship = await import("@/server/ship-commands");
     cargo = await import("@/server/cargo-hold");
+    adminSeams = await import("@/server/admin-command-seams");
   });
 
   afterEach(async () => {
@@ -936,6 +938,149 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
         .where(eq(rune.activeActions.characterId, characterId));
       expect(actions).toHaveLength(1);
       expect(await locationOf(characterId)).toBe(LOCATION_IDS.holoHollowLanding);
+    });
+  });
+
+  describe("admin playtest re-berth (#359)", () => {
+    const ADMIN = "admin-first-flight-test";
+
+    async function landedCharacter(options: { cargo?: number } = {}) {
+      const made = await makeCharacter({ fuel: 50, ...options });
+      await launch(made.userId, made.characterId);
+      const state = await stateAt(made.userId, made.characterId, after(now, FLIGHT_MS));
+      return { ...made, state };
+    }
+
+    async function auditRows(characterId: string) {
+      return db
+        .select()
+        .from(rune.operatorAuditLogs)
+        .where(eq(rune.operatorAuditLogs.characterId, characterId));
+    }
+
+    it("returns a landed Rivet to the Crash Site and changes nothing but its berth", async () => {
+      const { userId, characterId, state } = await landedCharacter({ cargo: 1 });
+      const noticeId = state.ship.arrivalNotice!.noticeId;
+      const moveAlongBefore = await missionRow(characterId, MISSION_IDS.moveAlong);
+      const at = after(now, FLIGHT_MS + 60_000);
+
+      const result = await adminSeams.returnShipToCrashSiteAsAdmin(ADMIN, characterId, at);
+      expect(result.outcome).toEqual({
+        kind: "returned",
+        fromBerthLocationId: LOCATION_IDS.holoHollowLanding,
+        toBerthLocationId: LOCATION_IDS.crashSite,
+      });
+      expect(result.state.ship.berthLocationId).toBe(LOCATION_IDS.crashSite);
+
+      // Only the berth moved: the character, tank, Cargo Hold, Mission and receipt are as they were.
+      const row = await shipRow(characterId);
+      expect(row?.berthLocationId).toBe(LOCATION_IDS.crashSite);
+      expect(row?.fuelUnits).toBe(40);
+      expect(row?.flightRouteId).toBeNull();
+      expect(await locationOf(characterId)).toBe(LOCATION_IDS.holoHollowLanding);
+      expect(await cargoCanisters(characterId)).toBe(1);
+      expect(await missionRow(characterId, MISSION_IDS.moveAlong)).toEqual(moveAlongBefore);
+      expect(result.state.ship.arrivalNotice?.noticeId).toBe(noticeId);
+
+      const audit = await auditRows(characterId);
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({
+        operation: "return_ship_to_crash_site",
+        adminUserId: ADMIN,
+        targetIdentity: LOCATION_IDS.crashSite,
+        details: {
+          fromBerthLocationId: LOCATION_IDS.holoHollowLanding,
+          toBerthLocationId: LOCATION_IDS.crashSite,
+        },
+      });
+
+      // Scenes and Cargo Hold access follow the berth through their normal projections.
+      const reread = await stateAt(userId, characterId, after(at, 1_000));
+      expect(reread.locationStates[LOCATION_IDS.crashSite]!.scene.overlay).toBeDefined();
+      expect(reread.locationStates[LOCATION_IDS.holoHollowLanding]!.scene.overlay).toBeUndefined();
+      const atOldBerth = await cargo.depositCargoStack(
+        userId,
+        characterId,
+        { stackId: "00000000-0000-4000-8000-000000000000", mode: "one", expectedQuantity: 1 },
+        after(at, 2_000),
+      );
+      expect(atOldBerth.cargo).toMatchObject({ status: "refused", reason: "not_at_ship" });
+    });
+
+    it("replays the ordinary first flight: normal fuel, a new receipt, no second Move Along", async () => {
+      const { userId, characterId } = await landedCharacter();
+      const firstCompletedAt = (await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt;
+      const at = after(now, FLIGHT_MS + 60_000);
+      await adminSeams.returnShipToCrashSiteAsAdmin(ADMIN, characterId, at);
+
+      // The character walks back; here they are simply placed at the Crash Site.
+      const away = await launch(userId, characterId, after(at, 1_000));
+      expect(away.launch).toMatchObject({ status: "refused", reason: "not_at_berth" });
+      await db
+        .update(rune.characters)
+        .set({ currentLocationId: LOCATION_IDS.crashSite })
+        .where(eq(rune.characters.id, characterId));
+
+      const replayAt = after(at, 2_000);
+      const replay = await launch(userId, characterId, replayAt);
+      expect(replay.launch.status).toBe("launched");
+      expect((await shipRow(characterId))?.fuelUnits).toBe(30);
+
+      const landed = await stateAt(userId, characterId, after(replayAt, FLIGHT_MS));
+      expect(landed.ship.flight).toBeUndefined();
+      expect(landed.ship.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+      expect(landed.location.currentLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+      expect((await shipRow(characterId))?.fuelUnits).toBe(30);
+      expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).toEqual(
+        firstCompletedAt,
+      );
+      const receipts = await notices(characterId);
+      expect(receipts).toHaveLength(2);
+      const latest = receipts.find(
+        (receipt) => receipt.arrivedAt.getTime() === after(replayAt, FLIGHT_MS).getTime(),
+      );
+      expect(latest?.completedMissionId).toBeNull();
+    });
+
+    it("refuses while the Rivet is in the air and leaves the flight untouched", async () => {
+      const { userId, characterId } = await makeCharacter({ fuel: 50 });
+      await launch(userId, characterId);
+      const before = await shipRow(characterId);
+      await expect(
+        adminSeams.returnShipToCrashSiteAsAdmin(ADMIN, characterId, after(now, 3_000)),
+      ).rejects.toThrow(/in flight/);
+      expect(await shipRow(characterId)).toEqual(before);
+      expect(await auditRows(characterId)).toHaveLength(0);
+      // The flight still lands normally afterwards.
+      const landed = await stateAt(userId, characterId, after(now, FLIGHT_MS));
+      expect(landed.ship.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+    });
+
+    it("lands a flight that is already due before re-berthing it", async () => {
+      const { userId, characterId } = await makeCharacter({ fuel: 50 });
+      await launch(userId, characterId);
+      const result = await adminSeams.returnShipToCrashSiteAsAdmin(
+        ADMIN,
+        characterId,
+        after(now, FLIGHT_MS + 1_000),
+      );
+      expect(result.outcome.kind).toBe("returned");
+      expect(await locationOf(characterId)).toBe(LOCATION_IDS.holoHollowLanding);
+      expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).not.toBeNull();
+      expect(await notices(characterId)).toHaveLength(1);
+      expect(
+        (await stateAt(userId, characterId, after(now, FLIGHT_MS + 2_000))).ship.berthLocationId,
+      ).toBe(LOCATION_IDS.crashSite);
+    });
+
+    it("is a no-op, with no audit, for a ship already at the Crash Site", async () => {
+      const { characterId } = await makeCharacter({ fuel: 50 });
+      const result = await adminSeams.returnShipToCrashSiteAsAdmin(ADMIN, characterId, now);
+      expect(result.outcome).toEqual({
+        kind: "no_change",
+        berthLocationId: LOCATION_IDS.crashSite,
+      });
+      expect(await auditRows(characterId)).toHaveLength(0);
     });
   });
 });
