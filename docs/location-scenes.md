@@ -276,11 +276,35 @@ never lands, refuels or completes anything.
   real places, and titles the chart from the cinematic content ("Skatboll local
   flight"). It invents no distance and implies no second planet. The marker is a
   miniature of the approved Rivet through the Next.js image optimizer.
+- **Effects.** Small CSS-only effects ride the same phase envelope (inline duration
+  and negative delay) as the ship: two lift plumes under the fore and aft hull and
+  a glow on the drive ring (inside the moving ship layer), and dust on the ground
+  line in front of the wheels (a ground layer, coloured per backdrop by
+  `dustColor`: brown mud at the Crash Site, grey spray on the pad). Takeoff:
+  ignition in the first ~0.3 s, dust peaking ~0.4 s and thinning as the ship
+  climbs. Touchdown: thrust holds through the descent and spools down over the
+  last ~0.6 s, with a short dust puff as the wheels meet the pad that has settled
+  by the arrival instant. The flicker only dims and brightens (0.8–1.0 opacity,
+  150 ms); nothing switches fully on and off. Positions are percent of the ship's
+  mark, so they crop with the art.
+- **Art ready before Launch.** `features/ship/flight-cinematic-images.ts` derives the
+  exact optimized `/_next/image` variants the frame renders (backdrops with their
+  srcset and sizes, the ship overlay, the chart miniature), and the components read
+  the same props. Opening the Flight Controls (Board Ship) fetches and decodes
+  them. A LAUNCH tap before that has finished shows "Preparing launch visuals…"
+  and sends the ordinary launch command as soon as the art is ready, fails, or
+  `FLIGHT_VISUALS_WAIT_MS` (6 s) passes. Nothing is spent, recorded or timed before
+  that command succeeds, and the art never decides whether a launch is allowed. A
+  warm-up older than 45 s is refreshed at Launch, because optimizer responses are
+  cacheable for 60 s before revalidation. After a mid-flight reload, the cinematic
+  warms the later phases' art itself.
 - **Reduced motion and access.** Under `prefers-reduced-motion` the ship rests on
-  its mark, the chart drops the moving marker and growing trail, and the panel's
-  countdown and progress meter carry the flight. The frame is a `<figure>` whose
-  caption names the phase; one polite live announcement is made per phase, and the
-  chart is an `img` with a factual label. No flashing.
+  its mark with no effects, the chart's moving marker and growing trail are **not
+  rendered** (followed live through `matchMedia`, not hidden by CSS, so no browser's
+  visibility heuristic for an SVG group can disagree), and the panel's countdown
+  and progress meter carry the flight. The frame is a `<figure>` whose caption names
+  the phase; one polite live announcement is made per phase, and the chart is an
+  `img` with a factual label. No flashing.
 - **Hydration.** The frame depends on the browser clock, so its phase layers render
   only after mount; server markup is a stable empty frame.
 

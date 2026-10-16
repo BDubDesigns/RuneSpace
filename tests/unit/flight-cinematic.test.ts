@@ -21,6 +21,12 @@ import {
   pointOnFlightChart,
 } from "@/features/ship/flight-chart";
 import { readImageHeader } from "./image-header";
+import {
+  FLIGHT_VISUALS_WAIT_MS,
+  flightBackdropImageProps,
+  flightCinematicImageVariants,
+  flightShipImageProps,
+} from "@/features/ship/flight-cinematic-images";
 
 /**
  * Issue #359 — the Rivet's first-flight cinematic. A presentation layer over
@@ -153,6 +159,36 @@ describe("flight cinematic art (#359)", () => {
       expect(top + heightPercent).toBeGreaterThan(75);
       expect(top + heightPercent).toBeLessThan(90);
     }
+  });
+});
+
+describe("flight cinematic image warm-up (#359 playtest)", () => {
+  const content = getFlightCinematic(ROUTE)!;
+
+  it("warms exactly the optimized variants the frame renders, never a source or master", () => {
+    const variants = flightCinematicImageVariants(content);
+    // Departure and arrival backdrops, the ship overlay (one URL set for both
+    // backdrops' widths when equal, otherwise two), and the chart miniature.
+    expect(variants.length).toBeGreaterThanOrEqual(4);
+    for (const variant of variants) {
+      expect(variant.src).toMatch(/^\/_next\/image\?url=%2Flocation-scenes%2F/);
+      expect(variant.src).not.toContain("master");
+    }
+    const sources = variants.map((variant) => decodeURIComponent(variant.src));
+    expect(sources.some((src) => src.includes("crash-site-departure.webp"))).toBe(true);
+    expect(sources.some((src) => src.includes("holo-hollow-landing-arrival.webp"))).toBe(true);
+    expect(sources.some((src) => src.includes("rivet-repaired.webp"))).toBe(true);
+    expect(variants).toContainEqual(flightBackdropImageProps(content.departure));
+    expect(variants).toContainEqual(flightShipImageProps(content.departure));
+    // Responsive backdrops carry the frame's own srcset and sizes.
+    expect(flightBackdropImageProps(content.departure)).toMatchObject({
+      sizes: "(max-width: 640px) 100vw, 56rem",
+      srcSet: expect.stringContaining("w,"),
+    });
+  });
+
+  it("never holds a launch for long: the wait is capped", () => {
+    expect(FLIGHT_VISUALS_WAIT_MS).toBeLessThanOrEqual(6_000);
   });
 });
 

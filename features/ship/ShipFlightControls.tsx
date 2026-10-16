@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { usePlay } from "@/features/play/PlayContext";
+import {
+  flightVisualsSettled,
+  waitForFlightVisuals,
+  warmFlightCinematic,
+} from "@/features/ship/flight-cinematic-images";
 import { launchShipAction } from "@/server/actions";
 
 /**
@@ -17,13 +22,50 @@ import { launchShipAction } from "@/server/actions";
  * server's own verdict from the same facts the launch command re-checks, so
  * "Report Thrust Issues to Wade at Rusk Recovery to start Move Along" is shown instead of a
  * dead control. The browser contributes a route ID and nothing else.
+ *
+ * Opening these controls (Board Ship) starts fetching and decoding the flight
+ * cinematic's art (#359), so takeoff never opens on a blank frame. A LAUNCH tap
+ * before that has finished shows "Preparing launch visuals…" and sends the
+ * ordinary launch command as soon as the art is ready, fails, or
+ * `FLIGHT_VISUALS_WAIT_MS` passes. Nothing is spent, recorded or timed until
+ * that command succeeds, and the art never decides whether a launch is allowed.
  */
 export function ShipFlightControls() {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const { ship } = state;
   const [feedback, setFeedback] = useState<string>();
   const [launching, setLaunching] = useState(false);
+  const [preparingRouteId, setPreparingRouteId] = useState<string>();
   const [, startTransition] = useTransition();
+  const mounted = useRef(true);
+  const routeIds = ship.routes.map((route) => route.routeId).join("|");
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    for (const routeId of routeIds.split("|")) if (routeId) warmFlightCinematic(routeId);
+  }, [routeIds]);
+
+  function requestLaunch(routeId: string) {
+    if (launching || preparingRouteId) return;
+    setFeedback(undefined);
+    if (flightVisualsSettled(routeId)) {
+      launch(routeId);
+      return;
+    }
+    setPreparingRouteId(routeId);
+    void waitForFlightVisuals(routeId).then(() => {
+      // Closing the panel while waiting abandons the tap: nothing was sent.
+      if (!mounted.current) return;
+      setPreparingRouteId(undefined);
+      launch(routeId);
+    });
+  }
 
   function launch(routeId: string) {
     enqueueForeground(() => {
@@ -88,13 +130,24 @@ export function ShipFlightControls() {
             </p>
             <ActionButton
               data-ship-launch={route.routeId}
-              disabled={route.launchRefusal !== undefined || launching}
+              disabled={
+                route.launchRefusal !== undefined || launching || preparingRouteId !== undefined
+              }
               intent="primary"
-              loading={foregroundBusy && launching}
-              onClick={() => launch(route.routeId)}
+              loading={(foregroundBusy && launching) || preparingRouteId === route.routeId}
+              onClick={() => requestLaunch(route.routeId)}
             >
               LAUNCH
             </ActionButton>
+            {preparingRouteId === route.routeId ? (
+              <p
+                className="text-sm text-[color:var(--rs-text-secondary)]"
+                data-ship-launch-preparing
+                role="status"
+              >
+                Preparing launch visuals…
+              </p>
+            ) : null}
             {route.launchRefusal ? (
               <p
                 className="text-sm text-[color:var(--rs-text-muted)]"

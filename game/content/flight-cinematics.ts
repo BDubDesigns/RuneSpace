@@ -24,6 +24,8 @@ import { LocationSceneSchema, SceneOverlaySchema } from "@/game/schemas/location
 export type FlightCinematicBackdrop = {
   scene: z.infer<typeof LocationSceneSchema>;
   ship: z.infer<typeof SceneOverlaySchema>;
+  /** The colour of what the thrusters kick up off this ground: mud, or pad spray. */
+  dustColor: string;
 };
 
 export type FlightCinematic = {
@@ -41,8 +43,10 @@ const CINEMATIC_SIZE = { width: 1717, height: 916 } as const;
 function backdrop(
   scene: { asset: string; alt: string; focal?: { x: number; y: number } },
   placement: { left: number; top: number; width: number },
+  dustColor: string,
 ): FlightCinematicBackdrop {
   return {
+    dustColor,
     scene: LocationSceneSchema.parse({ ...scene, ...CINEMATIC_SIZE }),
     ship: SceneOverlaySchema.parse({
       asset: REPAIRED_RIVET_OVERLAY.asset,
@@ -63,6 +67,8 @@ export const FLIGHT_CINEMATICS: Readonly<Record<ShipRouteId, FlightCinematic>> =
         focal: { x: 50, y: 60 },
       },
       { left: 22, top: 49, width: 38 },
+      // The Crash Site's wet brown mud.
+      "rgb(186 160 128 / 0.8)",
     ),
     arrival: backdrop(
       {
@@ -71,6 +77,8 @@ export const FLIGHT_CINEMATICS: Readonly<Record<ShipRouteId, FlightCinematic>> =
         focal: { x: 50, y: 60 },
       },
       { left: 29, top: 43, width: 42 },
+      // Grey spray and grit off the wet pad.
+      "rgb(200 206 214 / 0.7)",
     ),
   },
 };

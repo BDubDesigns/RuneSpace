@@ -1,8 +1,7 @@
 "use client";
 
-import Image, { getImageProps } from "next/image";
+import Image from "next/image";
 import { useEffect, useState, type CSSProperties } from "react";
-import { preload } from "react-dom";
 import { SceneComposition } from "@/features/location-scene/SceneComposition";
 import {
   flightCinematicFrame,
@@ -18,12 +17,17 @@ import {
   type ChartPoint,
 } from "@/features/ship/flight-chart";
 import {
+  FLIGHT_BACKDROP_SIZES,
+  FLIGHT_STAGE_WIDTH_HINT,
+  flightChartGlyph,
+  flightShipSizes,
+  warmFlightCinematic,
+} from "@/features/ship/flight-cinematic-images";
+import {
   getFlightCinematic,
   type FlightCinematic as FlightCinematicContent,
   type FlightCinematicBackdrop,
 } from "@/game/content/flight-cinematics";
-
-const BACKDROP_SIZES = "(max-width: 640px) 100vw, 56rem";
 
 type Flight = {
   routeId: string;
@@ -49,9 +53,13 @@ type Flight = {
  *
  * Motion is CSS only. Each phase mounts its own keyframe animation with a
  * negative delay equal to the time already spent in that phase, so resuming
- * mid-phase is a single computed offset. With `prefers-reduced-motion` the ship
- * rests on the pad, the chart shows the leg without a moving marker, and the
- * factual progress and countdown below carry the flight.
+ * mid-phase is a single computed offset; the small thrust, engine-glow and dust
+ * effects share that same envelope. With `prefers-reduced-motion` the ship rests
+ * on the pad without effects, the chart shows the leg without a moving marker or
+ * trail, and the factual progress and countdown below carry the flight.
+ *
+ * Its images are the exact optimized variants `flight-cinematic-images` warms and
+ * decodes before Launch is sent, so takeoff does not start on a blank frame.
  */
 export function FlightCinematic({
   flight,
@@ -68,6 +76,11 @@ export function FlightCinematic({
   // server markup and the first client render agree on an empty 15:8 frame.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Normally already warm from Board Ship; after a mid-flight reload this fetches
+  // the later phases' art while the current one plays.
+  useEffect(() => {
+    warmFlightCinematic(flight.routeId);
+  }, [flight.routeId]);
 
   const content = getFlightCinematic(flight.routeId);
   if (!content) return null;
@@ -143,6 +156,26 @@ function phaseCaption(
   }
 }
 
+/**
+ * The viewer's reduced-motion preference, followed live. The chart renders only
+ * after mount, so reading it in the initializer cannot mismatch server markup.
+ */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
 /** Resume a phase's keyframes from where the flight already is. */
 function useResumedAnimation(frame: FlightCinematicFrame): CSSProperties {
   // Captured once per phase mount: re-deriving the delay on every countdown tick
@@ -173,9 +206,8 @@ function FlightBackdrop({
     <div className="rs-flight-cinematic__phase absolute inset-0" data-flight-backdrop={motion}>
       <SceneComposition
         scene={backdrop.scene}
-        sizes={BACKDROP_SIZES}
-        // A 15:8 frame at its widest (56rem) is ~896px wide.
-        stageWidthHint={896}
+        sizes={FLIGHT_BACKDROP_SIZES}
+        stageWidthHint={FLIGHT_STAGE_WIDTH_HINT}
         priority
       >
         <div
@@ -189,7 +221,7 @@ function FlightBackdrop({
             aspectRatio: `${ship.width} / ${ship.height}`,
           }}
         >
-          {/* The contact shadow stays on the ground while the ship rises off it. */}
+          {/* The contact shadow stays on the ground while the ship rises off or settles. */}
           <span
             className="rs-flight-cinematic__shadow absolute"
             data-flight-motion={motion}
@@ -200,17 +232,51 @@ function FlightBackdrop({
             data-flight-motion={motion}
             style={animation}
           >
+            {/* Thrust rides with the ship: two lift plumes under the hull and the
+                drive ring's glow. The envelope follows the phase; the inner span
+                only flickers gently, never on and off. */}
+            {(["fore", "aft"] as const).map((position) => (
+              <span
+                className="rs-flight-vfx rs-flight-vfx__plume absolute"
+                data-flight-motion={motion}
+                data-flight-vfx="plume"
+                data-position={position}
+                key={position}
+                style={animation}
+              >
+                <span className="rs-flight-vfx__flicker absolute inset-0" />
+              </span>
+            ))}
+            <span
+              className="rs-flight-vfx rs-flight-vfx__engine absolute"
+              data-flight-motion={motion}
+              data-flight-vfx="engine"
+              style={animation}
+            >
+              <span className="rs-flight-vfx__flicker absolute inset-0" />
+            </span>
             <Image
               src={ship.asset}
               alt=""
               width={ship.width}
               height={ship.height}
-              sizes={`${Math.ceil((896 * ship.placement.width) / 100)}px`}
+              sizes={flightShipSizes(backdrop)}
               className="block h-full w-full"
               data-flight-ship
               loading="eager"
             />
           </div>
+          {/* Dust is kicked up in front of the wheels, on the ground line. */}
+          {(["left", "right"] as const).map((side) => (
+            <span
+              className="rs-flight-vfx rs-flight-vfx__dust absolute"
+              data-flight-motion={motion}
+              data-flight-vfx="dust"
+              data-side={side}
+              key={side}
+              style={{ ...animation, "--rs-flight-dust": backdrop.dustColor } as CSSProperties}
+            />
+          ))}
         </div>
       </SceneComposition>
     </div>
@@ -235,38 +301,16 @@ function FlightChart({
   originName: string;
   destinationName: string;
 }) {
-  // Warm the touchdown backdrop while the chart plays, so it is there at 12 s.
-  const arrival = getImageProps({
-    src: content.arrival.scene.asset,
-    alt: "",
-    width: content.arrival.scene.width,
-    height: content.arrival.scene.height,
-    sizes: BACKDROP_SIZES,
-  }).props;
-  preload(arrival.src, {
-    as: "image",
-    imageSrcSet: arrival.srcSet,
-    imageSizes: BACKDROP_SIZES,
-  });
+  const reducedMotion = usePrefersReducedMotion();
   const geometry = flightChartGeometry(flight.originLocationId, flight.destinationLocationId);
   const marker = pointOnFlightChart(geometry, frame.travelProgress);
   const percent = Math.round(frame.travelProgress * 100);
-  const shipAsset = content.departure.ship;
   // The ship art faces left. Heading right, it is mirrored first so it never flies upside down.
   const headingRight = Math.abs(marker.headingDegrees) <= 90;
   const glyphTransform = headingRight
     ? `rotate(${marker.headingDegrees.toFixed(1)}deg) scaleX(-1)`
     : `rotate(${(marker.headingDegrees - 180).toFixed(1)}deg)`;
-  const glyphWidth = 76;
-  const glyphHeight = (glyphWidth * shipAsset.height) / shipAsset.width;
-  // The same optimizer next/image uses, sized for the miniature, so the chart does
-  // not fetch the full-size overlay.
-  const glyphSrc = getImageProps({
-    src: shipAsset.asset,
-    alt: "",
-    width: glyphWidth * 2,
-    height: Math.round(glyphHeight * 2),
-  }).props.src;
+  const glyph = flightChartGlyph(content);
 
   return (
     <div className="rs-flight-cinematic__phase rs-flight-chart absolute inset-0" data-flight-chart>
@@ -291,32 +335,38 @@ function FlightChart({
           {content.chartTitle.toUpperCase()}
         </text>
         <path className="rs-flight-chart__route" d={geometry.path} fill="none" />
-        <path
-          className="rs-flight-chart__flown"
-          d={geometry.path}
-          data-flight-chart-flown
-          fill="none"
-          pathLength={1}
-          strokeDasharray="1 1"
-          strokeDashoffset={1 - frame.travelProgress}
-        />
+        {/* Reduced motion: a static chart. The moving marker and growing trail are
+            not rendered at all; the panel's countdown and meter carry progress. */}
+        {reducedMotion ? null : (
+          <path
+            className="rs-flight-chart__flown"
+            d={geometry.path}
+            data-flight-chart-flown
+            fill="none"
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset={1 - frame.travelProgress}
+          />
+        )}
         <ChartPlace label={originName} point={geometry.origin} />
         <ChartPlace label={destinationName} point={geometry.destination} />
-        <g
-          className="rs-flight-chart__marker"
-          data-flight-chart-marker
-          style={{ transform: `translate(${marker.x.toFixed(1)}px, ${marker.y.toFixed(1)}px)` }}
-        >
-          <g style={{ transform: glyphTransform }}>
-            <image
-              height={glyphHeight}
-              href={glyphSrc}
-              width={glyphWidth}
-              x={-glyphWidth / 2}
-              y={-glyphHeight / 2}
-            />
+        {reducedMotion ? null : (
+          <g
+            className="rs-flight-chart__marker"
+            data-flight-chart-marker
+            style={{ transform: `translate(${marker.x.toFixed(1)}px, ${marker.y.toFixed(1)}px)` }}
+          >
+            <g style={{ transform: glyphTransform }}>
+              <image
+                height={glyph.height}
+                href={glyph.src}
+                width={glyph.width}
+                x={-glyph.width / 2}
+                y={-glyph.height / 2}
+              />
+            </g>
           </g>
-        </g>
+        )}
       </svg>
     </div>
   );
