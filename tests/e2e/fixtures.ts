@@ -425,6 +425,20 @@ export async function openEquipmentTab(page: Page) {
   return equipmentDialog;
 }
 
+/** One Equipment loadout tile (#364): its label, grid button and artwork wrapper. */
+export function equipmentSlotTile(equipment: Locator, label: string) {
+  return equipment.locator("[data-equipment-slot]").filter({ hasText: label });
+}
+
+/** Select a loadout slot (a no-op when already selected) and return its details panel. */
+export async function selectEquipmentSlot(equipment: Locator, label: string) {
+  const button = equipmentSlotTile(equipment, label).getByRole("button");
+  if ((await button.getAttribute("aria-pressed")) !== "true") await button.click();
+  const details = equipment.getByRole("region", { name: `${label} details` });
+  await expect(details).toBeVisible();
+  return details;
+}
+
 /** Open Equipment through the active mission's contextual Play entry point. */
 export async function openEquipmentFromMissionGuidance(page: Page) {
   await page.getByRole("button", { name: "Open Equipment", exact: true }).click();

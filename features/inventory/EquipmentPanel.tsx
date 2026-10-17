@@ -1,23 +1,142 @@
 "use client";
 
-import { useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
-import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS } from "@/game/config/foundations";
 import { formatMassGrams } from "@/game/domain/mass";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import type { PlayGameplayState } from "@/server/play";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
+import { EquipmentSlotIcon } from "./EquipmentSlotIcon";
+import { EquipmentToolDetails } from "./EquipmentToolDetails";
+import {
+  candidateBlockedReasons,
+  deriveLoadoutTiles,
+  equipmentSlotKey,
+  resolveSelectedCandidate,
+  resolveSelectedSlot,
+  type EquipmentCandidate,
+  type EquipmentSlotState,
+  type LoadoutTile,
+} from "./equipment-loadout";
 
-function secondsForTicks(ticks: number) {
-  return (ticks * GAME_TICK_MS) / 1_000;
+const SELECTION_ACCENT = "var(--rs-accent-primary)";
+
+function itemFacts(item: { massGrams: number; slotCapacity?: number }) {
+  return (
+    <>
+      {formatMassGrams(item.massGrams)}
+      {item.slotCapacity !== undefined ? ` · +${item.slotCapacity} Inventory slots` : ""}
+    </>
+  );
+}
+
+function SlotTile({
+  tile,
+  selected,
+  onSelect,
+}: {
+  tile: LoadoutTile;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { slot } = tile;
+  const available = slot.eligibleItems.length;
+  return (
+    <div
+      className={tile.span === 2 ? "col-span-2" : undefined}
+      data-equipment-slot={tile.key}
+      data-slot-state={slot.item ? "occupied" : "empty"}
+    >
+      <p className="mb-1 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+        {slot.label}
+      </p>
+      {slot.item ? (
+        <ItemVisual
+          accessibleLabel={`${slot.label}: ${slot.item.name}, equipped`}
+          interactive
+          itemId={slot.item.itemId}
+          name={slot.item.name}
+          onSelect={onSelect}
+          selected={selected}
+          selectionAccent={SELECTION_ACCENT}
+        />
+      ) : (
+        <button
+          aria-label={`${slot.label}: empty${available ? `, ${available} compatible ${available === 1 ? "item" : "items"} carried` : ""}`}
+          aria-pressed={selected}
+          className={`rs-focus flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1 border border-dashed border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-3 text-[color:var(--rs-text-muted)] ${selected ? "ring-2 ring-[color:var(--rs-accent-primary)]" : ""}`}
+          onClick={onSelect}
+          type="button"
+        >
+          <EquipmentSlotIcon kind={tile.icon} />
+          <span className="text-xs uppercase tracking-wide">
+            {available ? `Empty · ${available} available` : "Empty"}
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CandidateDetails({
+  candidate,
+  slot,
+  guided,
+  busy,
+  onEquip,
+}: {
+  candidate: EquipmentCandidate;
+  slot: EquipmentSlotState;
+  guided: boolean;
+  busy: boolean;
+  onEquip: () => void;
+}) {
+  const reasons = candidateBlockedReasons(candidate);
+  return (
+    <div
+      className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-3"
+      data-candidate-details={candidate.itemInstanceId}
+    >
+      <ItemVisual itemId={candidate.itemId} name={candidate.name} />
+      <div className="min-w-0 space-y-2 text-sm text-[color:var(--rs-text-secondary)]">
+        <p>
+          <strong>{candidate.name}</strong>
+          <br />
+          {itemFacts(candidate)}
+        </p>
+        {reasons.length ? (
+          <ul className="space-y-1" data-equip-blocked>
+            {reasons.map((reason) => (
+              <li
+                className="text-[color:var(--rs-accent-danger)]"
+                data-equip-blocked-reason
+                key={reason}
+              >
+                Cannot equip: {reason}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Ready to equip in {slot.label}.</p>
+        )}
+        <MissionActionButton
+          disabled={busy || reasons.length > 0}
+          guidance={guided && reasons.length === 0 ? "active" : undefined}
+          intent="mining"
+          onClick={onEquip}
+        >
+          Equip in {slot.label}
+        </MissionActionButton>
+      </div>
+    </div>
+  );
 }
 
 export function EquipmentPanel({
@@ -32,24 +151,65 @@ export function EquipmentPanel({
   embedded?: boolean;
 }) {
   const { foregroundBusy } = usePlay();
+  const [selectedKey, setSelectedKey] = useState<string>();
+  const [candidateId, setCandidateId] = useState<string>();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
+  const gridRef = useRef<HTMLDivElement>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
+  const focusDetailsOnOpen = useRef(false);
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell((feedback) => {
     setMessage(feedback.message);
     setMessageTone(feedback.tone);
   });
-  const { equip, unequip } = useEquipCommand((feedback) => {
-    setMessage(feedback.tone === "muted" ? undefined : feedback.message);
-    setMessageTone(feedback.tone);
-  });
+  const focusSlotTile = (key: string) =>
+    gridRef.current?.querySelector<HTMLElement>(`[data-equipment-slot="${key}"] button`)?.focus();
+  const { equip, unequip } = useEquipCommand(
+    (feedback) => {
+      setMessage(feedback.message || undefined);
+      setMessageTone(feedback.tone);
+    },
+    // Confirmed only: the equipped candidate left the list, so its selection is
+    // stale. The slot stays selected and keeps focus on its (re-artworked) tile.
+    () => {
+      setCandidateId(undefined);
+      if (selectedKey) requestAnimationFrame(() => focusSlotTile(selectedKey));
+    },
+  );
   const miningToolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
-  // Whichever authored Mining tool is equipped (#233): its own name, charge
-  // ceiling and effects. The Salvage Cutter is one such tool, never the rule.
+  const tiles = deriveLoadoutTiles(state.equipment.slots, miningToolSlotId);
+  const slot = resolveSelectedSlot(state.equipment.slots, selectedKey);
+  const candidate = resolveSelectedCandidate(slot, candidateId);
   const tool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching item's
   // equip affordance receives the treatment. No mission-ID branching here.
   const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
+
+  // Opening a slot's details moves focus to them so a keyboard or screen-reader
+  // player lands on what they asked for; collapsing leaves focus on the tile.
+  useEffect(() => {
+    if (!focusDetailsOnOpen.current || !slot) return;
+    focusDetailsOnOpen.current = false;
+    detailsRef.current?.focus();
+  }, [slot]);
+
+  const selectSlot = (key: string) => {
+    setCandidateId(undefined);
+    setMessage(undefined);
+    if (key === selectedKey) {
+      setSelectedKey(undefined);
+      return;
+    }
+    focusDetailsOnOpen.current = true;
+    setSelectedKey(key);
+  };
+
+  const messageNode = message ? (
+    <div aria-live="polite">
+      <Feedback tone={messageTone}>{message}</Feedback>
+    </div>
+  ) : null;
 
   const content = (
     <>
@@ -71,183 +231,116 @@ export function EquipmentPanel({
           </strong>
         </p>
       </div>
-      {message ? (
-        <div className="mt-4">
-          <Feedback tone={messageTone}>{message}</Feedback>
-        </div>
-      ) : null}
-      <div className="mt-4 space-y-4">
-        {state.equipment.slots.map((slot) => (
-          <section
-            aria-label={slot.label}
-            className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-            key={`${slot.target.assignmentKind}:${slot.target.suitSlotId}`}
-          >
-            <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-              {slot.label}
-            </p>
-            {slot.item ? (
-              <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
-                  <ItemVisual
-                    accessibleLabel={`${slot.item.name} equipped`}
-                    badge="Equipped"
-                    itemId={slot.item.itemId}
-                    name={slot.item.name}
-                  />
-                  <p className="self-end text-sm text-[color:var(--rs-text-secondary)]">
-                    {slot.item.name}
-                    <br />
-                    {formatMassGrams(slot.item.massGrams)}
-                    {slot.item.slotCapacity !== undefined ? (
-                      <>
-                        <br />+{slot.item.slotCapacity} Inventory slots
-                      </>
-                    ) : null}
-                  </p>
-                </div>
-                {slot.target.assignmentKind === "gear" &&
-                slot.target.suitSlotId === miningToolSlotId &&
-                tool ? (
-                  <div
-                    className="border-t border-[color:var(--rs-border-subtle)] pt-3 sm:col-span-2"
-                    data-equipped-mining-tool={tool.itemId}
-                  >
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-                        Power Cell charge
-                      </p>
-                      <p className="text-sm text-[color:var(--rs-text-secondary)]">
-                        {tool.currentCharge > 0 ? "Loaded · " : "Depleted · "}
-                        {tool.currentCharge} / {tool.maximumCharge}
-                      </p>
-                    </div>
-                    <div className="mt-2">
-                      <StatusMeter
-                        label="Boosted attempts"
-                        value={(tool.currentCharge / tool.maximumCharge) * 100}
-                        detail={`${tool.currentCharge} remaining`}
-                      />
-                    </div>
-                    {tool.baseDurationMultiplierBps !== 10_000 ? (
-                      // Only a tool whose own definition changes the base
-                      // duration says so; the Salvage Cutter's 1.00× does not.
-                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                        Normal attempt: {tool.attemptDurationTicks} ticks /{" "}
-                        {secondsForTicks(tool.attemptDurationTicks)} seconds (
-                        {tool.baseDurationMultiplierBps / 10_000}× base time, charged or not)
-                      </p>
-                    ) : null}
-                    {tool.chargedEffect.kind === "speed" ? (
-                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                        Boosted attempt: {tool.boostedAttemptDurationTicks} ticks /{" "}
-                        {secondsForTicks(tool.boostedAttemptDurationTicks)} seconds
-                      </p>
-                    ) : (
-                      // A tool whose charge buys ore says so, and that its
-                      // attempts are no faster for it (#233).
-                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                        While charged: +{tool.chargedEffect.units} ore on any attempt that yields
-                        ore · attempt time unchanged
-                      </p>
-                    )}
-                    {!tool.usable ? (
-                      <Feedback tone="danger">
-                        Requires Mining {tool.requiredMiningLevel} to use.
-                      </Feedback>
-                    ) : null}
-                    <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-                      Carried Power Cells: {state.equipment.carriedPowerCellQuantity}
-                    </p>
-                    {tool.currentCharge > 0 ? (
-                      <Feedback>
-                        Power Cell already loaded — {tool.currentCharge} boosted attempts remain.
-                      </Feedback>
-                    ) : state.equipment.carriedPowerCellQuantity > 0 ? (
-                      <ActionButton
-                        className="mt-3"
-                        disabled={foregroundBusy}
-                        intent="mining"
-                        loading={loadBusy}
-                        onClick={loadPowerCell}
-                      >
-                        Load Power Cell
-                      </ActionButton>
-                    ) : (
-                      <Feedback>No loose Power Cells are carried.</Feedback>
-                    )}
-                  </div>
-                ) : null}
+      <div
+        aria-label="Equipment loadout"
+        className="mt-4 grid grid-cols-2 gap-3"
+        ref={gridRef}
+        role="group"
+      >
+        {tiles.map((tile) => (
+          <SlotTile
+            key={tile.key}
+            onSelect={() => selectSlot(tile.key)}
+            selected={tile.key === selectedKey}
+            tile={tile}
+          />
+        ))}
+      </div>
+      {slot ? (
+        <section
+          aria-label={`${slot.label} details`}
+          className="mt-4 border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-panel)] p-3 outline-none"
+          data-equipment-details={equipmentSlotKey(slot.target)}
+          ref={detailsRef}
+          tabIndex={-1}
+        >
+          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+            {slot.label}
+          </p>
+          {slot.item ? (
+            <div className="mt-2 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-[color:var(--rs-text-secondary)]">
+                  <strong>{slot.item.name}</strong> · Equipped
+                  <br />
+                  {itemFacts(slot.item)}
+                </p>
                 <ActionButton
                   disabled={foregroundBusy}
                   intent="secondary"
-                  onClick={() => unequip(slot.target, "")}
+                  onClick={() => unequip(slot.target, `${slot.item?.name} unequipped.`)}
                 >
                   Unequip
                 </ActionButton>
               </div>
-            ) : (
-              <p className="mt-2 text-sm text-[color:var(--rs-text-muted)]">Empty</p>
-            )}
+              {slot.target.assignmentKind === "gear" &&
+              slot.target.suitSlotId === miningToolSlotId &&
+              tool ? (
+                <EquipmentToolDetails
+                  carriedPowerCellQuantity={state.equipment.carriedPowerCellQuantity}
+                  loadBusy={loadBusy}
+                  loadDisabled={foregroundBusy}
+                  onLoadPowerCell={loadPowerCell}
+                  tool={tool}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-[color:var(--rs-text-muted)]">Empty</p>
+          )}
+          <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+            <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+              Carried items that fit {slot.label}
+            </p>
             {slot.eligibleItems.length ? (
-              <div className="mt-3 space-y-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
-                <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                  Eligible owned items
-                </p>
-                {slot.eligibleItems.map((item) => (
-                  <div
-                    className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
-                    key={item.itemInstanceId}
-                  >
-                    <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3">
-                      <ItemVisual
-                        accessibleLabel={`${item.name}, available to equip`}
-                        badge="Available"
-                        itemId={item.itemId}
-                        name={item.name}
-                      />
-                      <p className="self-end text-sm text-[color:var(--rs-text-secondary)]">
-                        {item.name}
-                        <br />
-                        {formatMassGrams(item.massGrams)}
-                        {item.slotCapacity !== undefined ? (
-                          <>
-                            <br />+{item.slotCapacity} Inventory slots
-                          </>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <MissionActionButton
-                        guidance={
-                          item.requiredMiningLevel === undefined &&
-                          missionGuidanceTargets.equipmentItemIds.has(item.itemId)
-                            ? "active"
-                            : undefined
-                        }
-                        disabled={foregroundBusy || item.requiredMiningLevel !== undefined}
-                        intent="mining"
-                        onClick={() => equip(item.itemInstanceId, slot.target, "")}
+              <ul className="mt-2 space-y-2">
+                {slot.eligibleItems.map((item) => {
+                  const blocked = candidateBlockedReasons(item).length > 0;
+                  const selected = item.itemInstanceId === candidate?.itemInstanceId;
+                  return (
+                    <li key={item.itemInstanceId}>
+                      <button
+                        aria-pressed={selected}
+                        className={`rs-focus min-h-[var(--rs-touch-target)] w-full border px-3 py-2 text-left text-sm ${selected ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]" : "border-[color:var(--rs-border-structural)]"} ${blocked ? "border-dashed text-[color:var(--rs-text-muted)]" : "text-[color:var(--rs-text-secondary)]"}`}
+                        data-candidate={item.itemInstanceId}
+                        data-candidate-state={blocked ? "blocked" : "available"}
+                        onClick={() => setCandidateId(selected ? undefined : item.itemInstanceId)}
+                        type="button"
                       >
-                        Equip in {slot.label}
-                      </MissionActionButton>
-                      {item.requiredMiningLevel !== undefined ? (
-                        // The server refuses it too; this only says why first.
-                        <p
-                          className="text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]"
-                          data-equip-requirement
-                        >
-                          Requires Mining {item.requiredMiningLevel} (you are {state.mining.level})
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                          <strong>{item.name}</strong>
+                          <span className="text-xs uppercase tracking-wide">
+                            {blocked ? "Blocked" : "Available"}
+                          </span>
+                        </span>
+                        <span className="block text-xs">{itemFacts(item)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-[color:var(--rs-text-muted)]">
+                No other carried item fits this slot.
+              </p>
+            )}
+            {candidate ? (
+              <CandidateDetails
+                busy={foregroundBusy}
+                candidate={candidate}
+                guided={missionGuidanceTargets.equipmentItemIds.has(candidate.itemId)}
+                onEquip={() =>
+                  equip(candidate.itemInstanceId, slot.target, `${candidate.name} equipped.`)
+                }
+                slot={slot}
+              />
             ) : null}
-          </section>
-        ))}
-      </div>
+          </div>
+          {messageNode}
+        </section>
+      ) : (
+        messageNode
+      )}
     </>
   );
 

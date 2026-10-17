@@ -22,6 +22,8 @@ import {
 import {
   expect,
   openEquipmentTab,
+  equipmentSlotTile,
+  selectEquipmentSlot,
   openNpcConversation,
   openTestCharacter,
   openUtility,
@@ -387,9 +389,10 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
 
   // Below Mining 5 it is listed, but locked, with the reason.
   let equipment = await openEquipmentTab(page);
-  const toolSlot = equipment.getByRole("region", { name: "Mining tool" });
-  await expect(toolSlot.locator("[data-equip-requirement]")).toHaveText(
-    "Requires Mining 5 (you are 4)",
+  const toolSlot = await selectEquipmentSlot(equipment, "Mining tool");
+  await toolSlot.locator("[data-candidate]").click();
+  await expect(toolSlot.locator("[data-equip-blocked-reason]")).toHaveText(
+    "Cannot equip: Requires Mining 5 (current 4).",
   );
   await expect(toolSlot.getByRole("button", { name: "Equip in Mining tool" })).toBeDisabled();
   await expectNoHorizontalOverflow(page);
@@ -398,10 +401,9 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   await setLevel(characterId, SKILL_IDS.mining, 5);
   await page.reload();
   equipment = await openEquipmentTab(page);
-  await equipment
-    .getByRole("region", { name: "Mining tool" })
-    .getByRole("button", { name: "Equip in Mining tool" })
-    .click();
+  const upgradeSlot = await selectEquipmentSlot(equipment, "Mining tool");
+  await upgradeSlot.locator("[data-candidate]").click();
+  await upgradeSlot.getByRole("button", { name: "Equip in Mining tool" }).click();
   const tool = equipment.locator(`[data-equipped-mining-tool="${ITEM_IDS.loadsteelCutter}"]`);
   await expect(tool).toBeVisible();
   await expect(tool.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
@@ -413,10 +415,7 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   await expect(tool).toContainText(
     "While charged: +1 ore on any attempt that yields ore · attempt time unchanged",
   );
-  await expectArtwork(
-    equipment.getByRole("region", { name: "Mining tool" }),
-    "loadsteel-cutter.webp",
-  );
+  await expectArtwork(equipmentSlotTile(equipment, "Mining tool"), "loadsteel-cutter.webp");
   await tool.getByRole("button", { name: "Load Power Cell" }).click();
   await expect(tool.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -449,10 +448,9 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
 
   // Swap back to the Salvage Cutter: its own 10-tick attempts, no Loadsteel line.
   equipment = await openEquipmentTab(page);
-  await equipment
-    .getByRole("region", { name: "Mining tool" })
-    .getByRole("button", { name: "Equip in Mining tool" })
-    .click();
+  const swapSlot = await selectEquipmentSlot(equipment, "Mining tool");
+  await swapSlot.locator("[data-candidate]").click();
+  await swapSlot.getByRole("button", { name: "Equip in Mining tool" }).click();
   await expect(
     equipment.locator(`[data-equipped-mining-tool="${ITEM_IDS.salvageCutter}"]`),
   ).toBeVisible();
@@ -504,19 +502,23 @@ test("the Freight Harness equips as a container for six more Inventory slots", a
 
   const equipment = await openEquipmentTab(page);
   await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
-  const second = equipment.getByRole("region", { name: "Container attachment 2" });
-  await expect(second).toContainText("+6 Inventory slots");
-  await expectArtwork(second, "freight-harness.webp");
-  await second.getByRole("button", { name: "Equip in Container attachment 2" }).click();
+  const secondDetails = await selectEquipmentSlot(equipment, "Container attachment 2");
+  await secondDetails.locator("[data-candidate]").click();
+  await expect(secondDetails).toContainText("+6 Inventory slots");
+  await expectArtwork(secondDetails, "freight-harness.webp");
+  await secondDetails.getByRole("button", { name: "Equip in Container attachment 2" }).click();
   await expect(equipment.getByText("14 slots", { exact: true })).toBeVisible();
-  await expect(second).toContainText("Freight Harness");
+  const second = equipmentSlotTile(equipment, "Container attachment 2");
+  await expect(second.getByRole("button")).toHaveAccessibleName(
+    "Container attachment 2: Freight Harness, equipped",
+  );
   await expectArtwork(second, "freight-harness.webp");
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "freight-harness-equipment-desktop.png");
   await page.setViewportSize(PHONE);
   // The docked Equipment panel became the phone's Drawer, a new instance.
   await expect(
-    utilitySurface(page, "Equipment").getByRole("region", { name: "Container attachment 2" }),
+    equipmentSlotTile(utilitySurface(page, "Equipment"), "Container attachment 2"),
   ).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await utilitySurface(page, "Equipment").getByRole("button", { name: "Close equipment" }).click();

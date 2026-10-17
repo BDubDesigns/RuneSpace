@@ -545,6 +545,7 @@ describe("inventory equip availability", () => {
             name: "Loadsteel Cutter",
             massGrams: 8_000,
             requiredMiningLevel: 5,
+            blockedReasons: ["Requires Mining 5 (current 1)."],
           },
         ],
       },
@@ -556,7 +557,7 @@ describe("inventory equip availability", () => {
     expect(deriveInventoryEquipAvailability(state, selection, false)).toEqual({
       enabled: false,
       reason: "blocked",
-      messages: ["Requires Mining 5 (current 1)"],
+      messages: ["Requires Mining 5 (current 1)."],
     });
   });
 
@@ -581,7 +582,7 @@ describe("inventory equip availability", () => {
     name: "MYKEA Schleppraum-8",
     massGrams: 10_000,
   };
-  const spareEligible = (extra: { blockedReason?: string } = {}) => ({
+  const spareEligible = (extra: { blockedReasons?: readonly string[] } = {}) => ({
     itemInstanceId: spareMykea.id,
     itemId: spareMykea.itemId,
     name: spareMykea.name,
@@ -674,7 +675,7 @@ describe("inventory equip availability", () => {
   it("keeps an item the authoritative evaluator blocks inspectable with its reason", () => {
     const reason =
       "Cannot change containers: current inventory would not fit (26 slots used / 24 capacity).";
-    const state = containerState(true, false, { blockedReason: reason });
+    const state = containerState(true, false, { blockedReasons: [reason] });
     expect(deriveInventoryEquipAvailability(state, spareSelection(state), false)).toEqual({
       enabled: false,
       reason: "blocked",

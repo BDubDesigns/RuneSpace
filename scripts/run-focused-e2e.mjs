@@ -53,6 +53,7 @@ export const FOCUSED_PHASES = [
   "character-portraits",
   "cargo-hold",
   "inventory-equip",
+  "equipment-loadout",
   "travel",
   "walk-it-off",
   "cut-your-teeth",

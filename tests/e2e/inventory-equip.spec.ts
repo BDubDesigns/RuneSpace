@@ -2,6 +2,7 @@ import {
   test,
   expect,
   openEquipmentTab,
+  equipmentSlotTile,
   openUtility,
   utilitySurface,
   openTestCharacter,
@@ -128,10 +129,11 @@ test.describe("Inventory equip and compact selected visual", () => {
     // "Equipped" badge confirms the slot is occupied and the section's content
     // contains the Cutter nameplate. toContainText checks text content and is
     // robust to the nameplate being below the drawer fold / truncation.
-    const miningToolSection = equipmentDrawer.locator('section[aria-label="Mining tool"]');
-    await expect(miningToolSection).toBeVisible();
-    await expect(miningToolSection.getByText("Equipped", { exact: true })).toBeVisible();
-    await expect(miningToolSection).toContainText("Salvage Cutter");
+    const miningToolTile = equipmentSlotTile(equipmentDrawer, "Mining tool");
+    await expect(miningToolTile).toBeVisible();
+    await expect(miningToolTile.getByRole("button")).toHaveAccessibleName(
+      "Mining tool: Salvage Cutter, equipped",
+    );
 
     // Frozen review screenshot: the Salvage Cutter Equip state, shown equipped
     // in the Mining-tool slot without a reload (Issue #68).
@@ -269,11 +271,10 @@ test.describe("Inventory equip and compact selected visual", () => {
       });
       await surface.getByRole("tab", { name: "Equipment", exact: true }).click();
       await expect(
-        page
-          .getByRole("region", { name: "Container attachment 2" })
-          .getByText("Scrap Box", { exact: false })
-          .first(),
-      ).toBeVisible();
+        equipmentSlotTile(utilitySurface(page, "Equipment"), "Container attachment 2").getByRole(
+          "button",
+        ),
+      ).toHaveAccessibleName("Container attachment 2: Scrap Box, equipped");
     });
 
     test(`routes to Equipment and hands focus over without replacing when both container slots are occupied (${viewport.name})`, async ({

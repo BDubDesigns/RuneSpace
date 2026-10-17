@@ -1462,8 +1462,8 @@ Cargo Hold and Mining presentation of charge read the same definition. No
 consumer branches on a particular item ID.
 
 Equipping a Mining tool whose Mining requirement the character has not met is
-refused by the equipment command (the Equipment surface lists it, disabled, with
-the requirement); an equipped tool whose requirement is not met is treated by
+refused by the equipment command (the Equipment surface lists it as a blocked
+candidate with the requirement); an equipped tool whose requirement is not met is treated by
 Mining as no usable tool.
 
 ### Inventory item actions (issue #58)
@@ -1499,10 +1499,20 @@ Mining as no usable tool.
   **Manage Equipment** button switches the shared overlay to the Equipment tab,
   where the player chooses the slot to replace. An item the authoritative
   evaluator refuses (Mining level, container capacity, mass) stays inspectable
-  with the reason. Each eligible item carries `blockedReason`, produced by
-  `evaluateEquipmentChange` (the refusal-as-data form of `planEquipmentChange`),
-  so the projection and the equip command share one rule set; the command still
-  re-validates and its refusal is shown as-is.
+  with the reason. Each eligible item carries `blockedReasons` (every blocker,
+  Mining requirement included), produced by `evaluateEquipmentChange` (the
+  refusal-as-data form of `planEquipmentChange`), so the projection and the
+  equip command share one rule set; the command still re-validates and its
+  refusal is shown as-is.
+- The Equipment tab (#364) is a compact two-column slot grid: the Mining tool
+  spans a row and the container attachments pair beneath it, drawn only from
+  the authoritative `equipment.slots` (gloves and boots will pair the same way
+  once real slots exist). Occupied slots show the item's artwork; empty slots
+  show a category silhouette. Selecting any slot opens ONE details panel beneath
+  the grid: the equipped item with Unequip (and, for the Mining tool, Power Cell
+  charge and Load), plus every carried item compatible with that slot, blocked
+  ones included. A blocked candidate is inspectable with all its reasons and a
+  disabled Equip; an eligible one equips into exactly the selected slot.
 - Inventory Power Cell loading is a convenience route to the same
   server-authoritative `loadMiningToolPowerCell` command and transaction the
   Equipment surface uses, via the same `loadPowerCellAction` client action. It

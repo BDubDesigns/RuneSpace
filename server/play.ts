@@ -578,11 +578,11 @@ export type EquipmentSlotItemProjection = {
   /** Present only while the character's Mining level is below the item's requirement. */
   requiredMiningLevel?: number;
   /**
-   * Eligible items only: why equipping this item into THIS slot would be
-   * refused right now, from the same evaluator the equip command runs. Advisory;
-   * the command re-validates.
+   * Eligible items only: every reason equipping this item into THIS slot would
+   * be refused right now, from the same evaluator the equip command runs
+   * (Mining requirement included). Advisory; the command re-validates.
    */
-  blockedReason?: string;
+  blockedReasons?: readonly string[];
 };
 
 /** One authored Refining recipe as the console presents it (#209). */
@@ -2632,7 +2632,7 @@ export async function stateFromTransaction(
             });
             return {
               ...slotItemProjection(instance, miningProgress.level, balance),
-              ...(evaluation.allowed ? {} : { blockedReason: evaluation.reason }),
+              ...(evaluation.allowed ? {} : { blockedReasons: evaluation.reasons }),
             };
           });
         return {
