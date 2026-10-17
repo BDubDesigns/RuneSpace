@@ -54,8 +54,14 @@ export function InventoryPanel({
   triggerRef: RefObject<HTMLButtonElement | null>;
   embedded?: boolean;
 }) {
-  const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
-    usePlay();
+  const {
+    acquireCommand,
+    acceptState,
+    enqueueForeground,
+    foregroundBusy,
+    openInventory,
+    releaseCommand,
+  } = usePlay();
   const [, startTransition] = useTransition();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
@@ -439,16 +445,33 @@ export function InventoryPanel({
                       >
                         {equipAvailability.enabled
                           ? `Equip in ${equipAvailability.slotLabel}`
-                          : "Equip Cutter"}
+                          : "Equip"}
                       </ActionButton>
-                      {!equipAvailability.enabled ? (
-                        equipAvailability.reason === "mining_level" ? (
-                          <Feedback>
-                            Requires Mining {equipAvailability.requiredMiningLevel} to equip.
-                          </Feedback>
-                        ) : (
-                          <Feedback>Another command is in progress.</Feedback>
-                        )
+                      {equipAvailability.enabled || equipAvailability.reason === "busy" ? null : (
+                        <>
+                          {equipAvailability.reason === "slots_occupied" ? (
+                            <Feedback>
+                              {equipAvailability.slotLabels.join(" and ")}{" "}
+                              {equipAvailability.slotLabels.length === 1 ? "is" : "are"} occupied.
+                              Choose which one to replace in Equipment.
+                            </Feedback>
+                          ) : null}
+                          {equipAvailability.messages.map((reason) => (
+                            <Feedback key={reason}>{reason}</Feedback>
+                          ))}
+                          {equipAvailability.reason === "slots_occupied" ? (
+                            <ActionButton
+                              className="mt-2"
+                              intent="secondary"
+                              onClick={() => openInventory("equipment")}
+                            >
+                              Manage Equipment
+                            </ActionButton>
+                          ) : null}
+                        </>
+                      )}
+                      {!equipAvailability.enabled && equipAvailability.reason === "busy" ? (
+                        <Feedback>Another command is in progress.</Feedback>
                       ) : null}
                     </div>
                   ) : null}

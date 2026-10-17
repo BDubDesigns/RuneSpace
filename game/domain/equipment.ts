@@ -189,7 +189,9 @@ function validateCandidateLoadout(loadout: EquipmentLoadout): EquipmentLoadout {
   if (!loadout.assignments.some((assignment) => assignment.assignmentKind === "container"))
     throw new EquipmentRuleError("At least one compatible container must remain equipped.");
   if (loadout.inventorySlotsUsed > loadout.containerSlotCapacity)
-    throw new EquipmentRuleError("Cannot change containers: current inventory would not fit.");
+    throw new EquipmentRuleError(
+      `Cannot change containers: current inventory would not fit (${loadout.inventorySlotsUsed} slots used / ${loadout.containerSlotCapacity} capacity).`,
+    );
   if (loadout.carriedMassGrams > loadout.maximumCarryCapacityGrams)
     throw new EquipmentRuleError("Cannot change equipment: carried mass would exceed capacity.");
   return loadout;
@@ -257,4 +259,25 @@ export function planEquipmentChange(input: {
   return validateCandidateLoadout(
     deriveEquipmentLoadout({ assignments: nextAssignments, instances, stacks, balance }),
   );
+}
+
+export type EquipmentChangeEvaluation =
+  | { allowed: true; loadout: EquipmentLoadout }
+  | { allowed: false; reason: string };
+
+/**
+ * The refusal-as-data form of `planEquipmentChange`: the same complete
+ * resulting-loadout validation, returning the authoritative reason instead of
+ * throwing. Projections use it to say why an Equip is blocked without a second
+ * copy of the rules; the equip command still runs `planEquipmentChange` itself.
+ */
+export function evaluateEquipmentChange(
+  input: Parameters<typeof planEquipmentChange>[0],
+): EquipmentChangeEvaluation {
+  try {
+    return { allowed: true, loadout: planEquipmentChange(input) };
+  } catch (error) {
+    if (error instanceof EquipmentRuleError) return { allowed: false, reason: error.message };
+    throw error;
+  }
 }

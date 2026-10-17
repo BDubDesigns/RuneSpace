@@ -555,8 +555,8 @@ describe("inventory equip availability", () => {
     });
     expect(deriveInventoryEquipAvailability(state, selection, false)).toEqual({
       enabled: false,
-      reason: "mining_level",
-      requiredMiningLevel: 5,
+      reason: "blocked",
+      messages: ["Requires Mining 5 (current 1)"],
     });
   });
 
@@ -575,40 +575,111 @@ describe("inventory equip availability", () => {
     expect(deriveInventoryEquipAvailability(state, selection, true)).toBe(undefined);
   });
 
-  it("offers no Inventory Equip action for a spare carried container listed in a container slot", () => {
-    const inventory = inventoryState(
-      [],
-      [
-        {
-          id: "spare-container",
-          itemId: ITEM_IDS.mykeaSchleppraum8,
-          name: "MYKEA Schleppraum-8",
-          massGrams: 10_000,
-        },
-      ],
-    );
-    const state = baseState(inventory);
+  const spareMykea = {
+    id: "spare-container",
+    itemId: ITEM_IDS.mykeaSchleppraum8,
+    name: "MYKEA Schleppraum-8",
+    massGrams: 10_000,
+  };
+  const spareEligible = (extra: { blockedReason?: string } = {}) => ({
+    itemInstanceId: spareMykea.id,
+    itemId: spareMykea.itemId,
+    name: spareMykea.name,
+    massGrams: spareMykea.massGrams,
+    ...extra,
+  });
+  const secondContainerTarget = {
+    assignmentKind: "container" as const,
+    suitSlotId: balance.carrying.containerSuitSlotIds[1],
+  };
+  const equippedStarter = {
+    itemInstanceId: "starter",
+    itemId: ITEM_IDS.mykeaSchleppraum8,
+    name: "MYKEA Schleppraum-8",
+    massGrams: 10_000,
+  };
+  function containerState(slotOne: boolean, slotTwo: boolean, extra = {}): PlayGameplayState {
+    const state = baseState(inventoryState([], [spareMykea]));
     state.equipment.slots = [
       { target: toolTarget, label: "Mining tool", item: undefined, eligibleItems: [] },
       {
         target: containerTarget,
         label: "Container attachment 1",
-        item: undefined,
-        eligibleItems: [
-          {
-            itemInstanceId: "spare-container",
-            itemId: ITEM_IDS.mykeaSchleppraum8,
-            name: "MYKEA Schleppraum-8",
-            massGrams: 10_000,
-          },
-        ],
+        item: slotOne ? equippedStarter : undefined,
+        eligibleItems: [spareEligible(extra)],
+      },
+      {
+        target: secondContainerTarget,
+        label: "Container attachment 2",
+        item: slotTwo ? equippedStarter : undefined,
+        eligibleItems: [spareEligible(extra)],
       },
     ];
+    return state;
+  }
+  const spareSelection = (state: PlayGameplayState) =>
+    resolveInventorySelection(state.inventory, { kind: "unique", id: spareMykea.id });
+
+  it("equips a carried container directly into the one empty container slot", () => {
+    const state = containerState(true, false);
+    expect(deriveInventoryEquipAvailability(state, spareSelection(state), false)).toEqual({
+      enabled: true,
+      target: secondContainerTarget,
+      itemInstanceId: spareMykea.id,
+      slotLabel: "Container attachment 2",
+    });
+  });
+
+  it("prefers Container 1 when both container slots are empty", () => {
+    const state = containerState(false, false);
+    expect(deriveInventoryEquipAvailability(state, spareSelection(state), false)).toMatchObject({
+      enabled: true,
+      target: containerTarget,
+    });
+  });
+
+  it("never picks a slot when every compatible container slot is occupied", () => {
+    const state = containerState(true, true);
+    expect(deriveInventoryEquipAvailability(state, spareSelection(state), false)).toEqual({
+      enabled: false,
+      reason: "slots_occupied",
+      slotLabels: ["Container attachment 1", "Container attachment 2"],
+      messages: [],
+    });
+    // Busy does not turn the deliberate route into an actionable Equip either.
+    expect(deriveInventoryEquipAvailability(state, spareSelection(state), true)).toMatchObject({
+      reason: "slots_occupied",
+    });
+  });
+
+  it("does not auto-replace an occupied Mining-tool slot", () => {
+    const state = stateWith(carriedCutter.id);
+    state.equipment.slots[0]!.item = {
+      itemInstanceId: "equipped-cutter",
+      itemId: ITEM_IDS.salvageCutter,
+      name: "Salvage Cutter",
+      massGrams: 5_000,
+    };
     const selection = resolveInventorySelection(state.inventory, {
       kind: "unique",
-      id: "spare-container",
+      id: carriedCutter.id,
     });
-    expect(deriveInventoryEquipAvailability(state, selection, false)).toBe(undefined);
+    expect(deriveInventoryEquipAvailability(state, selection, false)).toMatchObject({
+      enabled: false,
+      reason: "slots_occupied",
+      slotLabels: ["Mining tool"],
+    });
+  });
+
+  it("keeps an item the authoritative evaluator blocks inspectable with its reason", () => {
+    const reason =
+      "Cannot change containers: current inventory would not fit (26 slots used / 24 capacity).";
+    const state = containerState(true, false, { blockedReason: reason });
+    expect(deriveInventoryEquipAvailability(state, spareSelection(state), false)).toEqual({
+      enabled: false,
+      reason: "blocked",
+      messages: [reason],
+    });
   });
 
   it("offers no Equip surface for stack selections or a cleared selection", () => {

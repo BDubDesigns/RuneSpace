@@ -81,6 +81,7 @@ import { loadMerchantDailyPurchases } from "@/server/merchant-daily-purchases";
 import {
   carriedItemMassGrams,
   isCompatibleEquipmentAssignment,
+  evaluateEquipmentChange,
   unmetEquipRequirement,
   type EquipmentTarget,
 } from "@/game/domain/equipment";
@@ -576,6 +577,12 @@ export type EquipmentSlotItemProjection = {
   slotCapacity?: number;
   /** Present only while the character's Mining level is below the item's requirement. */
   requiredMiningLevel?: number;
+  /**
+   * Eligible items only: why equipping this item into THIS slot would be
+   * refused right now, from the same evaluator the equip command runs. Advisory;
+   * the command re-validates.
+   */
+  blockedReason?: string;
 };
 
 /** One authored Refining recipe as the console presents it (#209). */
@@ -2614,7 +2621,20 @@ export async function stateFromTransaction(
               !snapshot.equipmentLoadout.equippedItemInstanceIds.has(instance.id) &&
               isCompatibleEquipmentAssignment(instance.itemId, slot.target, balance),
           )
-          .map((instance) => slotItemProjection(instance, miningProgress.level, balance));
+          .map((instance) => {
+            const evaluation = evaluateEquipmentChange({
+              assignments: snapshot.equipmentLoadout.assignments,
+              instances: snapshot.carriedInstances,
+              stacks: snapshot.stacks,
+              balance,
+              miningLevel: miningProgress.level,
+              change: { kind: "equip", itemInstanceId: instance.id, target: slot.target },
+            });
+            return {
+              ...slotItemProjection(instance, miningProgress.level, balance),
+              ...(evaluation.allowed ? {} : { blockedReason: evaluation.reason }),
+            };
+          });
         return {
           ...slot,
           item: item ? slotItemProjection(item, miningProgress.level, balance) : undefined,
