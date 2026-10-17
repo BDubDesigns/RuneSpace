@@ -41,6 +41,8 @@ type VisualTileProps = {
   missionGuidance?: boolean;
   /** Exposed accessibly through `aria-pressed` and visually through a ring. */
   selected?: boolean;
+  /** Overrides the selection ring's Mining-orange (Equipment's slot grid selects in cyan, #364). */
+  selectionAccent?: string;
 };
 
 /** Shared compact frame for inventory content and non-inventory reward presentation. */
@@ -60,6 +62,7 @@ export function VisualTile({
   onSelect,
   missionGuidance = false,
   selected = false,
+  selectionAccent,
 }: VisualTileProps) {
   const descriptionId = useId();
   const rootClassName = `relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3 ${interactive ? "rs-focus w-full cursor-pointer text-left" : ""} ${selected ? "ring-2 ring-[color:var(--rs-accent-mining)]" : ""} ${className}`;
@@ -69,11 +72,14 @@ export function VisualTile({
     "data-mission-guidance": missionGuidance ? "active" : undefined,
     className: rootClassName,
     "data-item-rarity": rarity,
-    style: accentColor
-      ? { borderColor: accentColor }
-      : rarity
-        ? { borderColor: ITEM_RARITY_STYLE[rarity].accent }
-        : undefined,
+    style: {
+      ...(accentColor
+        ? { borderColor: accentColor }
+        : rarity
+          ? { borderColor: ITEM_RARITY_STYLE[rarity].accent }
+          : {}),
+      ...(selectionAccent ? ({ "--tw-ring-color": selectionAccent } as object) : {}),
+    },
   };
   const content = (
     <>

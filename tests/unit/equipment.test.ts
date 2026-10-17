@@ -138,4 +138,33 @@ describe("equipment loadout rules", () => {
       reason: expect.stringMatching(/slots used \/ \d+ capacity/),
     });
   });
+
+  it("collects the Mining requirement and every resulting-loadout blocker together", () => {
+    const loadsteel = { id: "loadsteel", itemId: ITEM_IDS.loadsteelCutter };
+    const evaluation = evaluateEquipmentChange({
+      balance,
+      miningLevel: 1,
+      instances: [cutter, loadsteel, firstContainer],
+      stacks: [],
+      assignments: [
+        { ...toolTarget, itemInstanceId: cutter.id },
+        { ...firstContainerTarget, itemInstanceId: firstContainer.id },
+      ],
+      change: { kind: "equip", itemInstanceId: loadsteel.id, target: toolTarget },
+    });
+    expect(evaluation).toMatchObject({ allowed: false, reason: "Requires Mining 5 (current 1)." });
+    // A mass or capacity breach arrives alongside it rather than hiding behind it.
+    const overloaded = evaluateEquipmentChange({
+      balance,
+      miningLevel: 1,
+      instances: [cutter, loadsteel, firstContainer],
+      stacks: [{ itemId: ITEM_IDS.ferriteShale, quantity: 999_999 }],
+      assignments: [
+        { ...toolTarget, itemInstanceId: cutter.id },
+        { ...firstContainerTarget, itemInstanceId: firstContainer.id },
+      ],
+      change: { kind: "equip", itemInstanceId: loadsteel.id, target: toolTarget },
+    });
+    expect(overloaded.allowed === false && overloaded.reasons.length).toBeGreaterThan(1);
+  });
 });

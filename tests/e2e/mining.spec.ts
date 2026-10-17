@@ -12,6 +12,8 @@ import {
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import {
   openEquipmentTab,
+  equipmentSlotTile,
+  selectEquipmentSlot,
   openMapSurface,
   openTestCharacter,
   test,
@@ -613,20 +615,30 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   const footer = page.getByRole("navigation", { name: "Primary" });
   const equipmentTrigger = footer.getByRole("button", { name: "Inventory" });
   const equipment = await openEquipmentTab(page);
-  const miningTool = equipment.getByLabel("Mining tool");
-  const firstContainer = equipment.getByLabel("Container attachment 1");
-  const secondContainer = equipment.getByLabel("Container attachment 2");
   await expect(equipment).toBeVisible();
-  await expect(miningTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
-  await expect(miningTool.getByText(/5(?:\.0)? kg/)).toBeVisible();
-  await expect(
-    firstContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
-  ).toBeVisible();
-  await expect(firstContainer.getByText(/10(?:\.0)? kg/)).toBeVisible();
-  await expect(secondContainer.getByText("Empty", { exact: true })).toBeVisible();
+  // The loadout opens as a compact grid of real slots with no details panel yet.
+  const miningTool = equipmentSlotTile(equipment, "Mining tool");
+  const firstContainer = equipmentSlotTile(equipment, "Container attachment 1");
+  const secondContainer = equipmentSlotTile(equipment, "Container attachment 2");
+  await expect(miningTool.getByRole("button")).toHaveAccessibleName(
+    "Mining tool: Salvage Cutter, equipped",
+  );
+  await expect(firstContainer.getByRole("button")).toHaveAccessibleName(
+    "Container attachment 1: MYKEA SCHLEPPRAUM-8, equipped",
+  );
+  await expect(secondContainer.getByRole("button")).toHaveAccessibleName(
+    "Container attachment 2: empty",
+  );
+  await expect(equipment.locator("[data-equipment-details]")).toHaveCount(0);
   await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
   await expect(equipment.getByText(/15(?:\.0)? kg \/ 50(?:\.0)? kg/)).toBeVisible();
-  await firstContainer.getByRole("button", { name: "Unequip" }).click();
+  const toolDetails = await selectEquipmentSlot(equipment, "Mining tool");
+  await expect(toolDetails.getByText(/5(?:\.0)? kg/)).toBeVisible();
+  const firstDetails = await selectEquipmentSlot(equipment, "Container attachment 1");
+  // Switching slots replaces the one details panel instead of stacking another.
+  await expect(equipment.locator("[data-equipment-details]")).toHaveCount(1);
+  await expect(firstDetails.getByText(/10(?:\.0)? kg/)).toBeVisible();
+  await firstDetails.getByRole("button", { name: "Unequip" }).click();
   await expect(equipment.getByRole("alert")).toContainText(
     "At least one compatible container must remain equipped.",
   );
@@ -640,7 +652,11 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   });
   await page.getByRole("button", { name: "Refresh status" }).click();
   await openEquipmentTab(page);
-  const equipSecondContainer = secondContainer.getByRole("button", {
+  // An empty slot lists the carried candidates right away; the player inspects
+  // one, then equips it into exactly the slot they selected.
+  const secondDetails = await selectEquipmentSlot(equipment, "Container attachment 2");
+  await secondDetails.locator("[data-candidate]").click();
+  const equipSecondContainer = secondDetails.getByRole("button", {
     name: "Equip in Container attachment 2",
   });
   await expect(equipSecondContainer).toBeVisible();
@@ -648,9 +664,9 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   expect(mobileControlBox).not.toBeNull();
   expect(mobileControlBox!.height).toBeGreaterThanOrEqual(44);
   await equipSecondContainer.click();
-  await expect(
-    secondContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
-  ).toBeVisible();
+  await expect(secondContainer.getByRole("button")).toHaveAccessibleName(
+    "Container attachment 2: MYKEA SCHLEPPRAUM-8, equipped",
+  );
   await expect(equipment.getByText("16 slots", { exact: true })).toBeVisible();
   await equipment.getByRole("button", { name: "Close equipment" }).click();
   const inventoryTrigger = footer.getByRole("button", { name: "Inventory" });
@@ -679,6 +695,7 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await page.getByRole("button", { name: "Refresh status" }).click();
 
   const equipment = await openEquipmentTab(page);
+  await selectEquipmentSlot(equipment, "Mining tool");
   await expect(equipment.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
   await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
@@ -767,6 +784,7 @@ test("an interrupted equipment command is presented as an error after a muted su
   await page.getByRole("button", { name: "Refresh status" }).click();
 
   const equipment = await openEquipmentTab(page);
+  await selectEquipmentSlot(equipment, "Mining tool");
   await equipment.getByRole("button", { name: "Load Power Cell" }).click();
   await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
   // The successful load is muted, never an alert.
@@ -789,8 +807,9 @@ test("an interrupted equipment command is presented as an error after a muted su
     await route.continue();
   });
   await openEquipmentTab(page);
-  const secondContainer = equipment.getByLabel("Container attachment 2");
-  await secondContainer.getByRole("button", { name: "Equip in Container attachment 2" }).click();
+  const secondDetails = await selectEquipmentSlot(equipment, "Container attachment 2");
+  await secondDetails.locator("[data-candidate]").click();
+  await secondDetails.getByRole("button", { name: "Equip in Container attachment 2" }).click();
   const interruption = equipment.getByRole("alert");
   await expect(interruption).toContainText("Comms interruption. Equipment could not be confirmed.");
   await page.unroute("**/*");
@@ -826,8 +845,8 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const footer = page.getByRole("navigation", { name: "Primary" });
   const equipment = await openEquipmentTab(page);
 
-  const miningTool = equipment.getByLabel("Mining tool");
-  const firstContainer = equipment.getByLabel("Container attachment 1");
+  const miningTool = equipmentSlotTile(equipment, "Mining tool");
+  const firstContainer = equipmentSlotTile(equipment, "Container attachment 1");
 
   // Salvage Cutter artwork
   const cutterArt = miningTool.getByTestId("item-artwork");
@@ -848,8 +867,8 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   expect(cutterState.cssHeight).toBe("80px");
 
   // Verify accessible description and name on the Cutter tile
-  const cutterTile = miningTool.locator("article").first();
-  await expect(cutterTile).toHaveAccessibleName("Salvage Cutter equipped");
+  const cutterTile = miningTool.getByRole("button");
+  await expect(cutterTile).toHaveAccessibleName("Mining tool: Salvage Cutter, equipped");
   const cutterDescId = await cutterTile.getAttribute("aria-describedby");
   expect(cutterDescId).toBeTruthy();
   const cutterDesc = miningTool.locator(`#${cutterDescId}`);
@@ -1016,7 +1035,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
 
   // Unequip the Cutter with exactly one slot remaining.
   const equipment = await openEquipmentTab(page);
-  const miningTool = equipment.getByLabel("Mining tool");
+  const miningTool = await selectEquipmentSlot(equipment, "Mining tool");
   await miningTool.getByRole("button", { name: "Unequip" }).click();
   await expect(equipment.getByRole("alert")).toHaveCount(0);
   await expect(miningTool.getByText("Empty", { exact: true })).toBeVisible();
@@ -1070,9 +1089,12 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
 
   // Re-equipping the same instance removes it from Inventory again.
   await openEquipmentTab(page);
-  const reequipTool = equipment.getByLabel("Mining tool");
+  const reequipTool = await selectEquipmentSlot(equipment, "Mining tool");
+  await reequipTool.locator("[data-candidate]").click();
   await reequipTool.getByRole("button", { name: "Equip in Mining tool" }).click();
-  await expect(reequipTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
+  await expect(
+    equipmentSlotTile(equipment, "Mining tool").getByRole("button"),
+  ).toHaveAccessibleName("Mining tool: Salvage Cutter, equipped");
   await expect(equipment.getByRole("alert")).toHaveCount(0);
   await equipment.getByRole("button", { name: "Close equipment" }).click();
   await expect(equipment).toBeHidden();
@@ -1484,6 +1506,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   // The Equipment surface reflects the same authoritative charge.
   await inventory.getByRole("button", { name: "Close inventory" }).click();
   const equipment = await openEquipmentTab(page);
+  await selectEquipmentSlot(equipment, "Mining tool");
   await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 10", { exact: true })).toBeVisible();
 });

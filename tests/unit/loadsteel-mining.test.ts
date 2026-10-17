@@ -199,7 +199,7 @@ describe("equipping through the boundary", () => {
         miningLevel,
         change: { kind: "equip", itemInstanceId: item.id, target: tool },
       });
-    expect(() => plan(loadsteelItem, 4)).toThrow("Requires Mining 5 to equip.");
+    expect(() => plan(loadsteelItem, 4)).toThrow("Requires Mining 5 (current 4).");
     expect(plan(loadsteelItem, 5).miningTool?.itemId).toBe(ITEM_IDS.loadsteelCutter);
     expect(plan(salvageItem, 1).miningTool?.itemId).toBe(ITEM_IDS.salvageCutter);
     expect(unmetEquipRequirement(ITEM_IDS.loadsteelCutter, 4, balance)).toEqual({

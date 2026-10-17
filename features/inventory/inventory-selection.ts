@@ -144,12 +144,9 @@ export function deriveInventoryEquipAvailability(
   });
   if (candidates.length === 0) return undefined;
 
-  const reasonOf = (item: (typeof candidates)[number]["item"]) =>
-    item.requiredMiningLevel !== undefined
-      ? `Requires Mining ${item.requiredMiningLevel} (current ${state.mining.level})`
-      : item.blockedReason;
+  const reasonsOf = (item: (typeof candidates)[number]["item"]) => item.blockedReasons ?? [];
   const reasons = (list: typeof candidates) => [
-    ...new Set(list.flatMap(({ item }) => reasonOf(item) ?? [])),
+    ...new Set(list.flatMap(({ item }) => reasonsOf(item))),
   ];
 
   const empty = candidates.filter(({ slot }) => !slot.item);
@@ -160,7 +157,7 @@ export function deriveInventoryEquipAvailability(
       slotLabels: candidates.map(({ slot }) => slot.label),
       messages: reasons(candidates),
     };
-  const open = empty.find(({ item }) => reasonOf(item) === undefined);
+  const open = empty.find(({ item }) => reasonsOf(item).length === 0);
   if (!open) return { enabled: false, reason: "blocked", messages: reasons(empty) };
   if (busy) return { enabled: false, reason: "busy" };
   return {
