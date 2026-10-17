@@ -1,5 +1,4 @@
 import { ITEM_IDS } from "@/game/config/foundations";
-import { getEffectiveGameBalance } from "@/game/config/balance";
 import type { EquipmentTarget } from "@/game/domain/equipment";
 import type { PlayGameplayState } from "@/server/play";
 
@@ -103,28 +102,34 @@ export function derivePowerCellLoadAvailability(
 export type InventoryEquipAvailability =
   | { enabled: true; target: EquipmentTarget; itemInstanceId: string; slotLabel: string }
   | { enabled: false; reason: "busy" }
-  /** The tool's own Mining requirement is unmet (#233); the server refuses it too. */
-  | { enabled: false; reason: "mining_level"; requiredMiningLevel: number };
+  /** The authoritative evaluator refuses every empty compatible slot; `messages` say why. */
+  | { enabled: false; reason: "blocked"; messages: readonly string[] }
+  /**
+   * Every compatible slot is occupied, so replacing is the player's choice of
+   * slot in Equipment. Inventory never picks one for them.
+   */
+  | {
+      enabled: false;
+      reason: "slots_occupied";
+      slotLabels: readonly string[];
+      messages: readonly string[];
+    };
 
 /**
  * Client-advisory equip availability for a carried unique item selected in
- * Inventory.
+ * Inventory (#363, extending #68).
  *
- * Issue #68 is specifically about equipping a carried Salvage Cutter into the
- * authoritative Mining-tool slot. This helper therefore resolves the Mining-tool
- * slot from the authoritative equipment projection (the `gear` slot whose
- * `suitSlotId` matches the Salvage Cutter's approved slot) and requires the
- * selected unique instance to appear in THAT slot's `eligibleItems`. It does not
- * search other equipment slots (so a carried MYKEA or other listed container is
- * never offered an Equip action via Inventory) and it never hard-codes
- * compatibility from the item name or re-creates the server compatibility
- * matrix — the server's `eligibleItems` projection stays the single source of
- * truth.
+ * Compatibility, eligibility and refusal reasons all come from the server's
+ * `equipment.slots[].eligibleItems` projection (which runs the same
+ * `evaluateEquipmentChange` the equip command does); nothing here knows an item
+ * name or re-creates the rules. Inventory only automates allocation to an EMPTY
+ * compatible slot, preferring the first one in authored order. When every
+ * compatible slot is occupied it offers no target at all, so a replacement is
+ * always a deliberate choice in Equipment.
  *
- * Eligibility is decided BEFORE the busy check: an otherwise ineligible unique
- * item returns `undefined` and never gains a disabled Equip control merely
- * because another command is in flight. The equip command itself remains
- * authoritative.
+ * An item no slot lists is not equippable gear and gets no Equip surface.
+ * Eligibility is decided BEFORE the busy check, so an ineligible item never
+ * gains a control merely because another command is in flight.
  */
 export function deriveInventoryEquipAvailability(
   state: PlayGameplayState,
@@ -132,25 +137,36 @@ export function deriveInventoryEquipAvailability(
   busy: boolean,
 ): InventoryEquipAvailability | undefined {
   if (!selection || selection.kind !== "unique") return undefined;
-  const toolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
-  const toolSlot = state.equipment.slots.find(
-    (slot) => slot.target.assignmentKind === "gear" && slot.target.suitSlotId === toolSlotId,
-  );
-  const eligible = toolSlot?.eligibleItems.find(
-    (item) => item.itemInstanceId === selection.entry.id,
-  );
-  if (!toolSlot || !eligible) return undefined;
-  if (eligible.requiredMiningLevel !== undefined)
+  const instanceId = selection.entry.id;
+  const candidates = state.equipment.slots.flatMap((slot) => {
+    const item = slot.eligibleItems.find((eligible) => eligible.itemInstanceId === instanceId);
+    return item ? [{ slot, item }] : [];
+  });
+  if (candidates.length === 0) return undefined;
+
+  const reasonOf = (item: (typeof candidates)[number]["item"]) =>
+    item.requiredMiningLevel !== undefined
+      ? `Requires Mining ${item.requiredMiningLevel} (current ${state.mining.level})`
+      : item.blockedReason;
+  const reasons = (list: typeof candidates) => [
+    ...new Set(list.flatMap(({ item }) => reasonOf(item) ?? [])),
+  ];
+
+  const empty = candidates.filter(({ slot }) => !slot.item);
+  if (empty.length === 0)
     return {
       enabled: false,
-      reason: "mining_level",
-      requiredMiningLevel: eligible.requiredMiningLevel,
+      reason: "slots_occupied",
+      slotLabels: candidates.map(({ slot }) => slot.label),
+      messages: reasons(candidates),
     };
+  const open = empty.find(({ item }) => reasonOf(item) === undefined);
+  if (!open) return { enabled: false, reason: "blocked", messages: reasons(empty) };
   if (busy) return { enabled: false, reason: "busy" };
   return {
     enabled: true,
-    target: toolSlot.target,
-    itemInstanceId: selection.entry.id,
-    slotLabel: toolSlot.label,
+    target: open.slot.target,
+    itemInstanceId: instanceId,
+    slotLabel: open.slot.label,
   };
 }

@@ -221,44 +221,80 @@ test.describe("Inventory equip and compact selected visual", () => {
       .toBe(true);
   });
 
-  test("exposes no Equip action in Inventory details for an ineligible carried unique item", async ({
+  test("equips a carried Scrap Box directly into the empty Container 2 from Inventory", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const characterId = page.url().split("/").at(-1)!;
-
-    // beforeEach opens an isolated character and first-play provisioning
-    // supplies the starter container only; no legacy Cutter is present. Add a
-    // spare carried MYKEA container: it is a unique item that is eligible for a
-    // CONTAINER slot, but Issue #68 scopes Inventory Equip to the authoritative
-    // Mining-tool slot only, so its details must expose NO Equip action.
-    await db.insert(itemInstances).values({
-      characterId,
-      itemId: ITEM_IDS.mykeaSchleppraum8,
-    });
+    const balance = getEffectiveGameBalance();
+    // The starter MYKEA fills Container 1; a crafted Scrap Box is carried.
+    await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
     await page.reload();
 
     const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
     await page.getByRole("button", { name: "Inventory" }).click();
-    await expect(inventoryDrawer).toBeVisible();
-
-    // Select the carried spare MYKEA (the unique item added by this test); the
-    // starter container remains the only equipped item.
-    const spareTile = inventoryDrawer
+    await inventoryDrawer
       .locator("button[aria-pressed]")
-      .filter({ hasText: "MYKEA SCHLEPPRAUM-8" })
-      .first();
-    await expect(spareTile).toBeVisible();
-    await spareTile.click();
-
+      .filter({ hasText: /Scrap Box/i })
+      .first()
+      .click();
     const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
-    await expect(detailsPanel).toBeVisible();
+    await detailsPanel.getByRole("button", { name: "Equip in Container attachment 2" }).click();
     await expect(
-      detailsPanel.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
+      inventoryDrawer.getByText(/Equipped Scrap Box into Container attachment 2/),
     ).toBeVisible();
+    await expect(detailsPanel).toHaveCount(0);
 
-    // A carried container is ineligible for the Mining-tool equip action this
-    // feature adds, so NO Equip control may appear in its Inventory details.
-    await expect(detailsPanel.getByRole("button", { name: /Equip in/ })).toHaveCount(0);
+    const rows = await db
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId));
+    expect(rows.map((row) => row.suitSlotId).sort()).toEqual(
+      [...balance.carrying.containerSuitSlotIds].sort(),
+    );
+  });
+
+  test("routes to Equipment instead of replacing when both container slots are occupied", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+    const balance = getEffectiveGameBalance();
+    const second = (
+      await db
+        .insert(itemInstances)
+        .values({ characterId, itemId: ITEM_IDS.mykeaSchleppraum8 })
+        .returning()
+    )[0]!;
+    await db.insert(equippedItems).values({
+      characterId,
+      assignmentKind: "container",
+      suitSlotId: balance.carrying.containerSuitSlotIds[1],
+      itemInstanceId: second.id,
+    });
+    await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
+    await page.reload();
+
+    const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
+    await page.getByRole("button", { name: "Inventory" }).click();
+    await inventoryDrawer
+      .locator("button[aria-pressed]")
+      .filter({ hasText: /Scrap Box/i })
+      .first()
+      .click();
+    const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
+    await expect(detailsPanel.getByRole("button", { name: "Equip", exact: true })).toBeDisabled();
+    await expect(detailsPanel.getByText(/Choose which one to replace in Equipment/)).toBeVisible();
+    await detailsPanel.getByRole("button", { name: "Manage Equipment" }).click();
+    await expect(page.getByRole("tab", { name: "Equipment" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // Nothing was replaced.
+    const rows = await db
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId));
+    expect(rows).toHaveLength(2);
   });
 });

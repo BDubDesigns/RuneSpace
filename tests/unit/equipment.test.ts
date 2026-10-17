@@ -5,6 +5,7 @@ import {
   carriedItemMassGrams,
   deriveEquipmentLoadout,
   isCompatibleEquipmentAssignment,
+  evaluateEquipmentChange,
   planEquipmentChange,
 } from "@/game/domain/equipment";
 
@@ -114,5 +115,27 @@ describe("equipment loadout rules", () => {
         change: { kind: "unequip", target: secondContainerTarget },
       }),
     ).toThrow(/current inventory would not fit/i);
+  });
+
+  it("reports a refusal as data, with the numbers, instead of throwing", () => {
+    const evaluation = evaluateEquipmentChange({
+      balance,
+      miningLevel: 1,
+      instances: [cutter, firstContainer, secondContainer],
+      stacks: Array.from({ length: 9 }, (_, index) => ({
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: index + 1,
+      })),
+      assignments: [
+        { ...toolTarget, itemInstanceId: cutter.id },
+        { ...firstContainerTarget, itemInstanceId: firstContainer.id },
+        { ...secondContainerTarget, itemInstanceId: secondContainer.id },
+      ],
+      change: { kind: "unequip", target: secondContainerTarget },
+    });
+    expect(evaluation.allowed).toBe(false);
+    expect(evaluation).toMatchObject({
+      reason: expect.stringMatching(/slots used \/ \d+ capacity/),
+    });
   });
 });

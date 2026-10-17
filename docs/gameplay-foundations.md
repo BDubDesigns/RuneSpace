@@ -1478,7 +1478,8 @@ Mining as no usable tool.
   approved artwork, display name, quantity, per-item and total mass, and the
   approved stack limit. Carried unique items show their artwork, display name,
   mass, and approved persistent state (such as Cutter charge) and carry no
-  Drop, Equip, Use, or Destroy action.
+  Drop, Use, or Destroy action. Carried equippable gear (Mining tools and
+  containers alike) gets an Equip action, below.
 - `Drop 1` and `Drop stack` are available for stack rows only. Both require an
   inline confirmation stating the item, the exact quantity, and that dropped
   items are **permanently destroyed in the current development build**. The
@@ -1490,6 +1491,18 @@ Mining as no usable tool.
   future work; no world object is created by dropping. Selling to an approved
   NPC merchant is a separate authoritative command (see Credits below), not a
   drop or a transfer.
+- Inventory Equip (#68, extended by #363) is offered for every carried unique
+  item that any authored equipment slot lists in its `eligibleItems`, with no
+  item-ID branch. Inventory only allocates to an EMPTY compatible slot (the first
+  in authored order, so Container 1 before Container 2). When every compatible
+  slot is occupied it never picks one: the disabled Equip explains this and a
+  **Manage Equipment** button switches the shared overlay to the Equipment tab,
+  where the player chooses the slot to replace. An item the authoritative
+  evaluator refuses (Mining level, container capacity, mass) stays inspectable
+  with the reason. Each eligible item carries `blockedReason`, produced by
+  `evaluateEquipmentChange` (the refusal-as-data form of `planEquipmentChange`),
+  so the projection and the equip command share one rule set; the command still
+  re-validates and its refusal is shown as-is.
 - Inventory Power Cell loading is a convenience route to the same
   server-authoritative `loadMiningToolPowerCell` command and transaction the
   Equipment surface uses, via the same `loadPowerCellAction` client action. It
