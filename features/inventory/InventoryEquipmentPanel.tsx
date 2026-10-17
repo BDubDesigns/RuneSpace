@@ -1,6 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import {
   UtilitySurface,
   type DockedUtilityRegion,
@@ -26,6 +26,21 @@ export function InventoryEquipmentPanel({
 }) {
   const { inventoryTab, setInventoryTab } = usePlay();
   const inventorySelected = inventoryTab === "inventory";
+  const tabRefs = useRef<Record<"inventory" | "equipment", HTMLButtonElement | null>>({
+    inventory: null,
+    equipment: null,
+  });
+  const previousTab = useRef(inventoryTab);
+
+  // A programmatic switch (Inventory's "Manage Equipment") unmounts the button
+  // that was activated, which drops focus to <body>. Hand it to the newly
+  // selected tab. A tab click keeps focus on the clicked tab, so it is left alone.
+  useEffect(() => {
+    if (previousTab.current === inventoryTab) return;
+    previousTab.current = inventoryTab;
+    const active = document.activeElement;
+    if (!active || active === document.body) tabRefs.current[inventoryTab]?.focus();
+  }, [inventoryTab]);
 
   return (
     <UtilitySurface
@@ -47,6 +62,9 @@ export function InventoryEquipmentPanel({
           aria-selected={inventorySelected}
           className={`rs-focus min-h-[var(--rs-touch-target)] border px-3 py-2 font-display text-xs uppercase tracking-[0.12em] outline-none ${inventorySelected ? "border-[color:var(--rs-accent-primary)] text-[color:var(--rs-accent-primary)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-secondary)]"}`}
           data-inventory-tab="inventory"
+          ref={(element) => {
+            tabRefs.current.inventory = element;
+          }}
           id="inventory-tab"
           onClick={() => setInventoryTab("inventory")}
           role="tab"
@@ -59,6 +77,9 @@ export function InventoryEquipmentPanel({
           aria-selected={!inventorySelected}
           className={`rs-focus min-h-[var(--rs-touch-target)] border px-3 py-2 font-display text-xs uppercase tracking-[0.12em] outline-none ${!inventorySelected ? "border-[color:var(--rs-accent-primary)] text-[color:var(--rs-accent-primary)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-secondary)]"}`}
           data-inventory-tab="equipment"
+          ref={(element) => {
+            tabRefs.current.equipment = element;
+          }}
           id="equipment-tab"
           onClick={() => setInventoryTab("equipment")}
           role="tab"

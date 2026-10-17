@@ -2,6 +2,8 @@ import {
   test,
   expect,
   openEquipmentTab,
+  openUtility,
+  utilitySurface,
   openTestCharacter,
   WIDEST_COMPACT_VIEWPORT,
 } from "./fixtures";
@@ -221,80 +223,107 @@ test.describe("Inventory equip and compact selected visual", () => {
       .toBe(true);
   });
 
-  test("equips a carried Scrap Box directly into the empty Container 2 from Inventory", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const characterId = page.url().split("/").at(-1)!;
-    const balance = getEffectiveGameBalance();
-    // The starter MYKEA fills Container 1; a crafted Scrap Box is carried.
-    await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
-    await page.reload();
-
-    const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
-    await page.getByRole("button", { name: "Inventory" }).click();
-    await inventoryDrawer
-      .locator("button[aria-pressed]")
-      .filter({ hasText: /Scrap Box/i })
-      .first()
-      .click();
-    const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
-    await detailsPanel.getByRole("button", { name: "Equip in Container attachment 2" }).click();
-    await expect(
-      inventoryDrawer.getByText(/Equipped Scrap Box into Container attachment 2/),
-    ).toBeVisible();
-    await expect(detailsPanel).toHaveCount(0);
-
-    const rows = await db
-      .select()
-      .from(equippedItems)
-      .where(eq(equippedItems.characterId, characterId));
-    expect(rows.map((row) => row.suitSlotId).sort()).toEqual(
-      [...balance.carrying.containerSuitSlotIds].sort(),
+  const assignmentsOf = async (characterId: string) =>
+    Object.fromEntries(
+      (await db.select().from(equippedItems).where(eq(equippedItems.characterId, characterId))).map(
+        (row) => [row.suitSlotId, row.itemInstanceId],
+      ),
     );
-  });
 
-  test("routes to Equipment instead of replacing when both container slots are occupied", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const characterId = page.url().split("/").at(-1)!;
-    const balance = getEffectiveGameBalance();
-    const second = (
-      await db
-        .insert(itemInstances)
-        .values({ characterId, itemId: ITEM_IDS.mykeaSchleppraum8 })
-        .returning()
-    )[0]!;
-    await db.insert(equippedItems).values({
-      characterId,
-      assignmentKind: "container",
-      suitSlotId: balance.carrying.containerSuitSlotIds[1],
-      itemInstanceId: second.id,
+  for (const viewport of [
+    { name: "portrait", width: 390, height: 844 },
+    { name: "desktop", width: 1280, height: 720 },
+  ]) {
+    test(`equips a carried Scrap Box directly into the empty Container 2 from Inventory (${viewport.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const characterId = page.url().split("/").at(-1)!;
+      const [first, second] = getEffectiveGameBalance().carrying.containerSuitSlotIds;
+      const before = await assignmentsOf(characterId);
+      expect(Object.keys(before)).toEqual([first]);
+      const scrapBox = (
+        await db
+          .insert(itemInstances)
+          .values({ characterId, itemId: ITEM_IDS.scrapBox })
+          .returning()
+      )[0]!;
+      await page.reload();
+
+      await openUtility(page, "inventory");
+      const surface = utilitySurface(page, "Inventory");
+      const tile = surface.locator("button[aria-pressed]").filter({ hasText: /Scrap Box/i });
+      await tile.first().click();
+      const detailsPanel = surface.locator("[data-details-panel]");
+      await detailsPanel.getByRole("button", { name: "Equip in Container attachment 2" }).click();
+      await expect(
+        surface.getByText(/Equipped Scrap Box into Container attachment 2/),
+      ).toBeVisible();
+
+      // No reload: the Scrap Box left carried Inventory and now shows in Equipment.
+      await expect(tile).toHaveCount(0);
+      await expect(detailsPanel).toHaveCount(0);
+      expect(await assignmentsOf(characterId)).toEqual({
+        [first]: before[first],
+        [second]: scrapBox.id,
+      });
+      await surface.getByRole("tab", { name: "Equipment", exact: true }).click();
+      await expect(
+        page
+          .getByRole("region", { name: "Container attachment 2" })
+          .getByText("Scrap Box", { exact: false })
+          .first(),
+      ).toBeVisible();
     });
-    await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
-    await page.reload();
 
-    const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
-    await page.getByRole("button", { name: "Inventory" }).click();
-    await inventoryDrawer
-      .locator("button[aria-pressed]")
-      .filter({ hasText: /Scrap Box/i })
-      .first()
-      .click();
-    const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
-    await expect(detailsPanel.getByRole("button", { name: "Equip", exact: true })).toBeDisabled();
-    await expect(detailsPanel.getByText(/Choose which one to replace in Equipment/)).toBeVisible();
-    await detailsPanel.getByRole("button", { name: "Manage Equipment" }).click();
-    await expect(page.getByRole("tab", { name: "Equipment" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    // Nothing was replaced.
-    const rows = await db
-      .select()
-      .from(equippedItems)
-      .where(eq(equippedItems.characterId, characterId));
-    expect(rows).toHaveLength(2);
-  });
+    test(`routes to Equipment and hands focus over without replacing when both container slots are occupied (${viewport.name})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const characterId = page.url().split("/").at(-1)!;
+      const [, secondSlot] = getEffectiveGameBalance().carrying.containerSuitSlotIds;
+      const second = (
+        await db
+          .insert(itemInstances)
+          .values({ characterId, itemId: ITEM_IDS.mykeaSchleppraum8 })
+          .returning()
+      )[0]!;
+      await db.insert(equippedItems).values({
+        characterId,
+        assignmentKind: "container",
+        suitSlotId: secondSlot,
+        itemInstanceId: second.id,
+      });
+      await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
+      await page.reload();
+      const before = await assignmentsOf(characterId);
+      expect(Object.keys(before)).toHaveLength(2);
+
+      await openUtility(page, "inventory");
+      const surface = utilitySurface(page, "Inventory");
+      const tile = surface.locator("button[aria-pressed]").filter({ hasText: /Scrap Box/i });
+      await tile.first().click();
+      const detailsPanel = surface.locator("[data-details-panel]");
+      await expect(detailsPanel.getByRole("button", { name: "Equip", exact: true })).toBeDisabled();
+      await expect(
+        detailsPanel.getByText(/Choose which one to replace in Equipment/),
+      ).toBeVisible();
+
+      // Keyboard activation: the activated button unmounts with the Inventory
+      // tab, so focus must land on an intentional control in the new panel.
+      const manage = detailsPanel.getByRole("button", { name: "Manage Equipment" });
+      await manage.focus();
+      await page.keyboard.press("Enter");
+      const equipmentTab = page.getByRole("tab", { name: "Equipment", exact: true });
+      await expect(equipmentTab).toHaveAttribute("aria-selected", "true");
+      await expect
+        .poll(() => equipmentTab.evaluate((element) => element === document.activeElement))
+        .toBe(true);
+
+      // Nothing was replaced, and the Scrap Box is still carried.
+      expect(await assignmentsOf(characterId)).toEqual(before);
+      await page.locator('[data-inventory-tab="inventory"]').click();
+      await expect(tile).toHaveCount(1);
+    });
+  }
 });
