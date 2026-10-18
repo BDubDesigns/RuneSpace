@@ -510,7 +510,7 @@ test("the Freight Harness equips as a container for six more Inventory slots", a
   await expect(equipment.getByText("14 slots", { exact: true })).toBeVisible();
   const second = equipmentSlotTile(equipment, "Container attachment 2");
   await expect(second.getByRole("button")).toHaveAccessibleName(
-    "Container attachment 2: Freight Harness, equipped",
+    "Container 2: Freight Harness, equipped",
   );
   await expectArtwork(second, "freight-harness.webp");
   await expectNoHorizontalOverflow(page);

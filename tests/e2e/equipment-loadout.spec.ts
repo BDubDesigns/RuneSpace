@@ -55,20 +55,45 @@ test.describe("Equipment loadout grid (#364)", () => {
       const first = equipmentSlotTile(equipment, "Container attachment 1");
       const second = equipmentSlotTile(equipment, "Container attachment 2");
       const toolBox = (await tool.boundingBox())!;
+      const cellBox = (await equipment
+        .locator('[data-equipment-slot="utility:power_cell"]')
+        .boundingBox())!;
+      const glovesBox = (await equipment
+        .locator('[data-equipment-slot="placeholder:gloves"]')
+        .boundingBox())!;
+      const bootsBox = (await equipment
+        .locator('[data-equipment-slot="placeholder:boots"]')
+        .boundingBox())!;
       const firstBox = (await first.boundingBox())!;
       const secondBox = (await second.boundingBox())!;
-      // The tool spans the row; both containers sit side by side beneath it.
-      expect(secondBox.x).toBeGreaterThan(firstBox.x + firstBox.width / 2);
-      expect(Math.abs(secondBox.y - firstBox.y)).toBeLessThan(2);
-      expect(firstBox.y).toBeGreaterThan(toolBox.y + toolBox.height - 2);
-      expect(toolBox.width).toBeGreaterThan(firstBox.width * 1.5);
+      // Three rows of two equal columns: tool | cell, gloves | boots, C1 | C2.
+      const pairs = [
+        [toolBox, cellBox],
+        [glovesBox, bootsBox],
+        [firstBox, secondBox],
+      ] as const;
+      for (const [left, right] of pairs) {
+        expect(right.x).toBeGreaterThan(left.x + left.width / 2);
+        expect(Math.abs(right.y - left.y)).toBeLessThan(2);
+        expect(Math.abs(right.width - left.width)).toBeLessThan(2);
+      }
+      // The Mining tool is a half-width tile, never stretched across the grid.
+      expect(toolBox.width).toBeLessThan(viewport.width * 0.6);
+      expect(glovesBox.y).toBeGreaterThan(toolBox.y + toolBox.height - 2);
+      expect(firstBox.y).toBeGreaterThan(glovesBox.y + glovesBox.height - 2);
       // Everything is in the first portrait viewport, with no details card yet.
       const viewportHeight = viewport.height;
-      expect(secondBox.y + secondBox.height).toBeLessThan(viewportHeight);
+      // At 390x844 all three rows fit; at 320x640 the Drawer scrolls them instead.
+      if (viewportHeight >= 800)
+        expect(secondBox.y + secondBox.height).toBeLessThan(viewportHeight);
+      // Gloves and Boots are labelled visual placeholders, not live slots.
+      for (const name of ["Gloves", "Boots"]) {
+        await expect(
+          equipment.getByRole("button", { name: `${name}: coming soon, not yet equippable` }),
+        ).toBeVisible();
+      }
       await expect(equipment.locator("[data-equipment-details]")).toHaveCount(0);
-      await expect(second.getByRole("button")).toHaveAccessibleName(
-        /^Container attachment 2: empty/,
-      );
+      await expect(second.getByRole("button")).toHaveAccessibleName(/^Container 2: empty/);
       await expect(second.locator("svg")).toBeVisible();
       await expectNoHorizontalOverflow(page);
       if (viewport.width === 390)
@@ -85,13 +110,21 @@ test.describe("Equipment loadout grid (#364)", () => {
     await page.reload();
     const equipment = await openEquipmentTab(page);
     const details = await selectEquipmentSlot(equipment, "Container attachment 2");
-    await expect(details.getByRole("button", { name: /Scrap Box/ })).toBeVisible();
+    const scrapBoxRow = details.getByRole("button", { name: /Scrap Box/ });
+    await expect(scrapBoxRow).toBeVisible();
+    // Candidate rows carry a small real-artwork thumbnail.
+    const thumbnail = scrapBoxRow.locator("[data-candidate-thumbnail]");
+    await expect(thumbnail).toBeVisible();
+    const thumbBox = (await thumbnail.boundingBox())!;
+    expect(thumbBox.width).toBeGreaterThanOrEqual(56);
+    expect(thumbBox.width).toBeLessThanOrEqual(64);
+    await expect(thumbnail.locator("img")).toHaveCount(1);
     await details.locator("[data-candidate]").click();
     await captureReviewScreenshot(page, "equipment-loadout-empty-slot-candidate.png");
     await details.getByRole("button", { name: "Equip in Container attachment 2" }).click();
     await expect(
       equipmentSlotTile(equipment, "Container attachment 2").getByRole("button"),
-    ).toHaveAccessibleName("Container attachment 2: Scrap Box, equipped");
+    ).toHaveAccessibleName("Container 2: Scrap Box, equipped");
     // The first container was never touched, and the candidate left the list.
     await expect(
       equipmentSlotTile(equipment, "Container attachment 1").getByRole("button"),
@@ -149,6 +182,8 @@ test.describe("Equipment loadout grid (#364)", () => {
     const details = await selectEquipmentSlot(equipment, "Mining tool");
     const candidate = details.locator("[data-candidate]");
     await expect(candidate).toHaveAttribute("data-candidate-state", "blocked");
+    // A blocked candidate keeps its thumbnail too.
+    await expect(candidate.locator("[data-candidate-thumbnail] img")).toHaveCount(1);
     await candidate.click();
     await expect(candidate).toHaveAttribute("aria-pressed", "true");
     await expect(details.locator("[data-equip-blocked-reason]").first()).toContainText(
@@ -164,21 +199,71 @@ test.describe("Equipment loadout grid (#364)", () => {
     expect(rows.some((row) => row.suitSlotId === balance.carrying.miningToolSuitSlotId)).toBe(true);
   });
 
-  test("the Mining tool's Power Cell controls live in its on-demand details", async ({ page }) => {
+  test("the Power Cell utility loads from the smallest stack and the tool details agree", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const characterId = page.url().split("/").at(-1)!;
     await equipStarterCutter(characterId);
-    await db
+    const [large, small] = await db
       .insert(inventoryStacks)
-      .values({ characterId, itemId: ITEM_IDS.powerCell, quantity: 1 });
+      .values([
+        { characterId, itemId: ITEM_IDS.powerCell, quantity: 5 },
+        { characterId, itemId: ITEM_IDS.powerCell, quantity: 2 },
+      ])
+      .returning();
     await page.reload();
     const equipment = await openEquipmentTab(page);
-    await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toHaveCount(0);
+    const utility = equipment.locator("[data-power-cell-utility]");
+    await expect(utility).toHaveAttribute("data-power-cell-utility", "ready");
+    await expect(utility).toContainText("Charge 0 / 10");
+    // Total loose cells across every stack.
+    await expect(utility).toContainText("7 carried");
+    // Real Power Cell artwork, and no stack-fill/capacity bar.
+    await expect(utility.locator("img")).toHaveCount(1);
+    await expect(utility.getByRole("progressbar")).toHaveCount(0);
+    await utility.getByRole("button", { name: "Load Power Cell" }).click();
+    await expect(utility).toHaveAttribute("data-power-cell-utility", "charged");
+    await expect(utility).toContainText("Charge 10 / 10");
+    await expect(utility).toContainText("6 carried");
+    await expect(utility.getByRole("button")).toHaveCount(0);
+    // The server consumed from the lowest-quantity stack, not the larger one.
+    const quantities = Object.fromEntries(
+      (
+        await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
+      ).map((row) => [row.id, row.quantity]),
+    );
+    expect(quantities[small!.id]).toBe(1);
+    expect(quantities[large!.id]).toBe(5);
+    // The tool's own on-demand details remain and agree.
     const details = await selectEquipmentSlot(equipment, "Mining tool");
-    await details.getByRole("button", { name: "Load Power Cell" }).click();
     await expect(details.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await captureReviewScreenshot(page, "equipment-loadout-tool-details.png");
+  });
+
+  test("the Power Cell utility explains when there is no tool or no loose cells", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    const equipment = await openEquipmentTab(page);
+    const utility = equipment.locator("[data-power-cell-utility]");
+    await expect(utility).toHaveAttribute("data-power-cell-utility", "no_tool");
+    await expect(utility).toContainText("Unavailable · no Mining tool equipped");
+    await expect(utility.getByRole("button")).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("Gloves and Boots are informational placeholders that offer no equip actions", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const equipment = await openEquipmentTab(page);
+    await equipment.getByRole("button", { name: /^Gloves: coming soon/ }).click();
+    const details = equipment.getByRole("region", { name: "Gloves details" });
+    await expect(details).toContainText("Coming soon");
+    await expect(details.getByRole("button")).toHaveCount(0);
+    await expect(details.locator("[data-candidate]")).toHaveCount(0);
   });
 
   test("lays the same grid out on desktop", async ({ page }) => {

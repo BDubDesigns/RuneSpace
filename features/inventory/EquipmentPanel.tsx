@@ -13,20 +13,25 @@ import type { PlayGameplayState } from "@/server/play";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
-import { EquipmentSlotIcon } from "./EquipmentSlotIcon";
 import { EquipmentToolDetails } from "./EquipmentToolDetails";
 import {
+  CandidateThumbnail,
+  PlaceholderTile,
+  PowerCellTile,
+  SlotTile,
+} from "./EquipmentLoadoutTiles";
+import {
+  FUTURE_SLOT_PLACEHOLDERS,
   candidateBlockedReasons,
-  deriveLoadoutTiles,
+  deriveLoadoutCells,
+  derivePowerCellUtility,
   equipmentSlotKey,
+  placeholderKey,
   resolveSelectedCandidate,
   resolveSelectedSlot,
   type EquipmentCandidate,
   type EquipmentSlotState,
-  type LoadoutTile,
 } from "./equipment-loadout";
-
-const SELECTION_ACCENT = "var(--rs-accent-primary)";
 
 function itemFacts(item: { massGrams: number; slotCapacity?: number }) {
   return (
@@ -34,54 +39,6 @@ function itemFacts(item: { massGrams: number; slotCapacity?: number }) {
       {formatMassGrams(item.massGrams)}
       {item.slotCapacity !== undefined ? ` · +${item.slotCapacity} Inventory slots` : ""}
     </>
-  );
-}
-
-function SlotTile({
-  tile,
-  selected,
-  onSelect,
-}: {
-  tile: LoadoutTile;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { slot } = tile;
-  const available = slot.eligibleItems.length;
-  return (
-    <div
-      className={tile.span === 2 ? "col-span-2" : undefined}
-      data-equipment-slot={tile.key}
-      data-slot-state={slot.item ? "occupied" : "empty"}
-    >
-      <p className="mb-1 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-        {slot.label}
-      </p>
-      {slot.item ? (
-        <ItemVisual
-          accessibleLabel={`${slot.label}: ${slot.item.name}, equipped`}
-          interactive
-          itemId={slot.item.itemId}
-          name={slot.item.name}
-          onSelect={onSelect}
-          selected={selected}
-          selectionAccent={SELECTION_ACCENT}
-        />
-      ) : (
-        <button
-          aria-label={`${slot.label}: empty${available ? `, ${available} compatible ${available === 1 ? "item" : "items"} carried` : ""}`}
-          aria-pressed={selected}
-          className={`rs-focus flex min-h-28 w-full cursor-pointer flex-col items-center justify-center gap-1 border border-dashed border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-3 text-[color:var(--rs-text-muted)] ${selected ? "ring-2 ring-[color:var(--rs-accent-primary)]" : ""}`}
-          onClick={onSelect}
-          type="button"
-        >
-          <EquipmentSlotIcon kind={tile.icon} />
-          <span className="text-xs uppercase tracking-wide">
-            {available ? `Empty · ${available} available` : "Empty"}
-          </span>
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -158,6 +115,7 @@ export function EquipmentPanel({
   const gridRef = useRef<HTMLDivElement>(null);
   const detailsRef = useRef<HTMLDivElement>(null);
   const focusDetailsOnOpen = useRef(false);
+  const [pendingFocusKey, setPendingFocusKey] = useState<string>();
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell((feedback) => {
     setMessage(feedback.message);
     setMessageTone(feedback.tone);
@@ -173,13 +131,18 @@ export function EquipmentPanel({
     // stale. The slot stays selected and keeps focus on its (re-artworked) tile.
     () => {
       setCandidateId(undefined);
-      if (selectedKey) requestAnimationFrame(() => focusSlotTile(selectedKey));
+      setPendingFocusKey(selectedKey);
     },
   );
   const miningToolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
-  const tiles = deriveLoadoutTiles(state.equipment.slots, miningToolSlotId);
+  const cells = deriveLoadoutCells(state.equipment.slots, miningToolSlotId);
+  const powerCellUtility = derivePowerCellUtility(state.equipment);
   const slot = resolveSelectedSlot(state.equipment.slots, selectedKey);
   const candidate = resolveSelectedCandidate(slot, candidateId);
+  const placeholder = FUTURE_SLOT_PLACEHOLDERS.map(({ id, label }) => ({
+    key: placeholderKey(id),
+    label,
+  })).find(({ key }) => key === selectedKey);
   const tool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching item's
@@ -189,10 +152,19 @@ export function EquipmentPanel({
   // Opening a slot's details moves focus to them so a keyboard or screen-reader
   // player lands on what they asked for; collapsing leaves focus on the tile.
   useEffect(() => {
-    if (!focusDetailsOnOpen.current || !slot) return;
+    if (!focusDetailsOnOpen.current || !(slot || placeholder)) return;
     focusDetailsOnOpen.current = false;
     detailsRef.current?.focus();
-  }, [slot]);
+  }, [slot, placeholder?.key]);
+
+  // Focus returns to the slot tile only after the confirmed state has rendered,
+  // so it lands on the new (re-artworked) tile rather than one being replaced.
+  useEffect(() => {
+    if (!pendingFocusKey) return;
+    focusSlotTile(pendingFocusKey);
+    setPendingFocusKey(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFocusKey, state.equipment.slots]);
 
   const selectSlot = (key: string) => {
     setCandidateId(undefined);
@@ -237,16 +209,60 @@ export function EquipmentPanel({
         ref={gridRef}
         role="group"
       >
-        {tiles.map((tile) => (
-          <SlotTile
-            key={tile.key}
-            onSelect={() => selectSlot(tile.key)}
-            selected={tile.key === selectedKey}
-            tile={tile}
-          />
+        {cells.map((cell) => (
+          <div
+            className="flex min-w-0 flex-col"
+            data-equipment-slot={cell.key}
+            data-slot-label={cell.kind === "slot" ? cell.slot.label : undefined}
+            data-slot-state={
+              cell.kind === "slot" ? (cell.slot.item ? "occupied" : "empty") : cell.kind
+            }
+            key={cell.key}
+          >
+            {cell.kind === "slot" ? (
+              <SlotTile
+                icon={cell.icon}
+                onSelect={() => selectSlot(cell.key)}
+                selected={cell.key === selectedKey}
+                shortLabel={cell.shortLabel}
+                slot={cell.slot}
+              />
+            ) : cell.kind === "placeholder" ? (
+              <PlaceholderTile
+                icon={cell.icon}
+                label={cell.label}
+                onSelect={() => selectSlot(cell.key)}
+                selected={cell.key === selectedKey}
+              />
+            ) : (
+              <PowerCellTile
+                busy={foregroundBusy}
+                loading={loadBusy}
+                onLoad={loadPowerCell}
+                utility={powerCellUtility}
+              />
+            )}
+          </div>
         ))}
       </div>
-      {slot ? (
+      {placeholder ? (
+        <section
+          aria-label={`${placeholder.label} details`}
+          className="mt-4 border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-panel)] p-3 outline-none"
+          data-equipment-details={placeholder.key}
+          ref={detailsRef}
+          tabIndex={-1}
+        >
+          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+            {placeholder.label} · Coming soon
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-muted)]">
+            No {placeholder.label.toLowerCase()} exist yet, so this slot cannot hold or equip
+            anything.
+          </p>
+          {messageNode}
+        </section>
+      ) : slot ? (
         <section
           aria-label={`${slot.label} details`}
           className="mt-4 border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-panel)] p-3 outline-none"
@@ -301,19 +317,22 @@ export function EquipmentPanel({
                     <li key={item.itemInstanceId}>
                       <button
                         aria-pressed={selected}
-                        className={`rs-focus min-h-[var(--rs-touch-target)] w-full border px-3 py-2 text-left text-sm ${selected ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]" : "border-[color:var(--rs-border-structural)]"} ${blocked ? "border-dashed text-[color:var(--rs-text-muted)]" : "text-[color:var(--rs-text-secondary)]"}`}
+                        className={`rs-focus min-h-[var(--rs-touch-target)] w-full border px-2 py-2 text-left text-sm ${selected ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]" : "border-[color:var(--rs-border-structural)]"} ${blocked ? "border-dashed text-[color:var(--rs-text-muted)]" : "text-[color:var(--rs-text-secondary)]"}`}
                         data-candidate={item.itemInstanceId}
                         data-candidate-state={blocked ? "blocked" : "available"}
                         onClick={() => setCandidateId(selected ? undefined : item.itemInstanceId)}
                         type="button"
                       >
-                        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                          <strong>{item.name}</strong>
-                          <span className="text-xs uppercase tracking-wide">
+                        <span className="flex items-center gap-3">
+                          <CandidateThumbnail candidate={item} />
+                          <span className="min-w-0 flex-1">
+                            <strong className="block">{item.name}</strong>
+                            <span className="block text-xs">{itemFacts(item)}</span>
+                          </span>
+                          <span className="shrink-0 text-xs uppercase tracking-wide">
                             {blocked ? "Blocked" : "Available"}
                           </span>
                         </span>
-                        <span className="block text-xs">{itemFacts(item)}</span>
                       </button>
                     </li>
                   );

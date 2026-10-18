@@ -274,7 +274,7 @@ test.describe("Inventory equip and compact selected visual", () => {
         equipmentSlotTile(utilitySurface(page, "Equipment"), "Container attachment 2").getByRole(
           "button",
         ),
-      ).toHaveAccessibleName("Container attachment 2: Scrap Box, equipped");
+      ).toHaveAccessibleName("Container 2: Scrap Box, equipped");
     });
 
     test(`routes to Equipment and hands focus over without replacing when both container slots are occupied (${viewport.name})`, async ({

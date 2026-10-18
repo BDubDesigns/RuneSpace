@@ -624,11 +624,9 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
     "Mining tool: Salvage Cutter, equipped",
   );
   await expect(firstContainer.getByRole("button")).toHaveAccessibleName(
-    "Container attachment 1: MYKEA SCHLEPPRAUM-8, equipped",
+    "Container 1: MYKEA SCHLEPPRAUM-8, equipped",
   );
-  await expect(secondContainer.getByRole("button")).toHaveAccessibleName(
-    "Container attachment 2: empty",
-  );
+  await expect(secondContainer.getByRole("button")).toHaveAccessibleName("Container 2: empty");
   await expect(equipment.locator("[data-equipment-details]")).toHaveCount(0);
   await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
   await expect(equipment.getByText(/15(?:\.0)? kg \/ 50(?:\.0)? kg/)).toBeVisible();
@@ -665,7 +663,7 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   expect(mobileControlBox!.height).toBeGreaterThanOrEqual(44);
   await equipSecondContainer.click();
   await expect(secondContainer.getByRole("button")).toHaveAccessibleName(
-    "Container attachment 2: MYKEA SCHLEPPRAUM-8, equipped",
+    "Container 2: MYKEA SCHLEPPRAUM-8, equipped",
   );
   await expect(equipment.getByText("16 slots", { exact: true })).toBeVisible();
   await equipment.getByRole("button", { name: "Close equipment" }).click();
@@ -695,13 +693,19 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await page.getByRole("button", { name: "Refresh status" }).click();
 
   const equipment = await openEquipmentTab(page);
-  await selectEquipmentSlot(equipment, "Mining tool");
-  await expect(equipment.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
-  await expect(equipment.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
-  await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
-  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
-  await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
-  await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+  // The Power Cell utility tile shows the same authoritative state at a glance.
+  const utility = equipment.locator("[data-power-cell-utility]");
+  await expect(utility).toContainText("Charge 0 / 10");
+  await expect(utility).toContainText("2 carried");
+  const toolDetails = await selectEquipmentSlot(equipment, "Mining tool");
+  await expect(toolDetails.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
+  await expect(toolDetails.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
+  await expect(utility.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
+  await utility.getByRole("button", { name: "Load Power Cell" }).click();
+  await expect(toolDetails.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
+  await expect(toolDetails.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+  await expect(utility).toContainText("Charge 10 / 10");
+  await expect(utility.getByRole("button", { name: "Load Power Cell" })).toHaveCount(0);
   const loadSuccess = equipment.getByText("Power Cell loaded · 10 boosted attempts ready.", {
     exact: true,
   });
@@ -784,8 +788,10 @@ test("an interrupted equipment command is presented as an error after a muted su
   await page.getByRole("button", { name: "Refresh status" }).click();
 
   const equipment = await openEquipmentTab(page);
-  await selectEquipmentSlot(equipment, "Mining tool");
-  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
+  await equipment
+    .locator("[data-power-cell-utility]")
+    .getByRole("button", { name: "Load Power Cell" })
+    .click();
   await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
   // The successful load is muted, never an alert.
   await expect(equipment.getByRole("alert")).toHaveCount(0);

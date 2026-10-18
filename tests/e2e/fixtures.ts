@@ -427,7 +427,7 @@ export async function openEquipmentTab(page: Page) {
 
 /** One Equipment loadout tile (#364): its label, grid button and artwork wrapper. */
 export function equipmentSlotTile(equipment: Locator, label: string) {
-  return equipment.locator("[data-equipment-slot]").filter({ hasText: label });
+  return equipment.locator(`[data-slot-label="${label}"]`);
 }
 
 /** Select a loadout slot (a no-op when already selected) and return its details panel. */
