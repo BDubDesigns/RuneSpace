@@ -9,6 +9,7 @@ import {
   inventorySlotCapacityFromContainers,
   inventorySlotsUsed,
 } from "./inventory";
+import { formatMassGrams } from "./mass";
 
 export type EquipmentAssignmentState = {
   assignmentKind: string;
@@ -185,16 +186,20 @@ export function deriveEquipmentLoadout(input: {
   };
 }
 
-function validateCandidateLoadout(loadout: EquipmentLoadout): EquipmentLoadout {
+/** Every rule the resulting loadout breaks, in the order the first is reported. */
+function candidateLoadoutViolations(loadout: EquipmentLoadout): string[] {
+  const violations: string[] = [];
   if (!loadout.assignments.some((assignment) => assignment.assignmentKind === "container"))
-    throw new EquipmentRuleError("At least one compatible container must remain equipped.");
+    violations.push("At least one compatible container must remain equipped.");
   if (loadout.inventorySlotsUsed > loadout.containerSlotCapacity)
-    throw new EquipmentRuleError(
+    violations.push(
       `Cannot change containers: current inventory would not fit (${loadout.inventorySlotsUsed} slots used / ${loadout.containerSlotCapacity} capacity).`,
     );
   if (loadout.carriedMassGrams > loadout.maximumCarryCapacityGrams)
-    throw new EquipmentRuleError("Cannot change equipment: carried mass would exceed capacity.");
-  return loadout;
+    violations.push(
+      `Cannot change equipment: carried mass would exceed ${formatMassGrams(loadout.maximumCarryCapacityGrams)} by ${formatMassGrams(loadout.carriedMassGrams - loadout.maximumCarryCapacityGrams)}.`,
+    );
+  return violations;
 }
 
 /**
@@ -214,8 +219,12 @@ export function unmetEquipRequirement(
     : { requiredMiningLevel: definition.requiredMiningLevel };
 }
 
-/** Validates a requested change against the complete resulting authoritative loadout. */
-export function planEquipmentChange(input: {
+export type EquipmentChangeEvaluation =
+  | { allowed: true; loadout: EquipmentLoadout }
+  /** `reasons` lists every blocker (`reason` is the first); never empty. */
+  | { allowed: false; reason: string; reasons: readonly string[] };
+
+type EquipmentChangeInput = {
   assignments: readonly EquipmentAssignmentState[];
   instances: readonly EquipmentItemInstance[];
   stacks: readonly EquipmentInventoryStack[];
@@ -223,23 +232,39 @@ export function planEquipmentChange(input: {
   change: EquipmentChange;
   /** The character's authoritative Mining level, for a Mining tool's requirement (#233). */
   miningLevel: number;
-}): EquipmentLoadout {
-  const { assignments, instances, stacks, balance, change } = input;
-  if (!isApprovedEquipmentTarget(change.target, balance))
-    throw new EquipmentRuleError("Equipment target is not approved.");
+};
 
+/**
+ * Validates a requested change against the complete resulting authoritative
+ * loadout and returns the refusal as data. Structural problems (unapproved
+ * target, item not carried, incompatible slot) end the evaluation at once;
+ * the Mining requirement and every resulting-loadout rule are collected
+ * together, so a player sees all that apply (#364). `planEquipmentChange` and
+ * the equip projection both run this, so there is one copy of the rules.
+ */
+export function evaluateEquipmentChange(input: EquipmentChangeInput): EquipmentChangeEvaluation {
+  const { assignments, instances, stacks, balance, change } = input;
+  const refuse = (...reasons: string[]): EquipmentChangeEvaluation => ({
+    allowed: false,
+    reason: reasons[0]!,
+    reasons,
+  });
+  if (!isApprovedEquipmentTarget(change.target, balance))
+    return refuse("Equipment target is not approved.");
+
+  const reasons: string[] = [];
   let nextAssignments: EquipmentAssignmentState[];
   if (change.kind === "equip") {
     const item = instances.find((instance) => instance.id === change.itemInstanceId);
-    if (!item) throw new EquipmentRuleError("Item is not currently carried by this character.");
+    if (!item) return refuse("Item is not currently carried by this character.");
     if (!isCompatibleEquipmentAssignment(item.itemId, change.target, balance))
-      throw new EquipmentRuleError("Item is not compatible with that equipment slot.");
+      return refuse("Item is not compatible with that equipment slot.");
     const unmet = unmetEquipRequirement(item.itemId, input.miningLevel, balance);
     if (unmet)
-      throw new EquipmentRuleError(`Requires Mining ${unmet.requiredMiningLevel} to equip.`);
+      reasons.push(`Requires Mining ${unmet.requiredMiningLevel} (current ${input.miningLevel}).`);
     const source = assignments.find((assignment) => assignment.itemInstanceId === item.id);
     if (source && assignmentKey(source) === assignmentKey(change.target))
-      throw new EquipmentRuleError("Item is already equipped in that slot.");
+      return refuse("Item is already equipped in that slot.");
     nextAssignments = assignments.filter(
       (assignment) =>
         assignment.itemInstanceId !== item.id &&
@@ -250,34 +275,26 @@ export function planEquipmentChange(input: {
     const assignment = assignments.find(
       (candidate) => assignmentKey(candidate) === assignmentKey(change.target),
     );
-    if (!assignment) throw new EquipmentRuleError("That equipment slot is already empty.");
+    if (!assignment) return refuse("That equipment slot is already empty.");
     nextAssignments = assignments.filter(
       (candidate) => assignmentKey(candidate) !== assignmentKey(change.target),
     );
   }
 
-  return validateCandidateLoadout(
-    deriveEquipmentLoadout({ assignments: nextAssignments, instances, stacks, balance }),
-  );
-}
-
-export type EquipmentChangeEvaluation =
-  | { allowed: true; loadout: EquipmentLoadout }
-  | { allowed: false; reason: string };
-
-/**
- * The refusal-as-data form of `planEquipmentChange`: the same complete
- * resulting-loadout validation, returning the authoritative reason instead of
- * throwing. Projections use it to say why an Equip is blocked without a second
- * copy of the rules; the equip command still runs `planEquipmentChange` itself.
- */
-export function evaluateEquipmentChange(
-  input: Parameters<typeof planEquipmentChange>[0],
-): EquipmentChangeEvaluation {
+  let loadout: EquipmentLoadout;
   try {
-    return { allowed: true, loadout: planEquipmentChange(input) };
+    loadout = deriveEquipmentLoadout({ assignments: nextAssignments, instances, stacks, balance });
   } catch (error) {
-    if (error instanceof EquipmentRuleError) return { allowed: false, reason: error.message };
+    if (error instanceof EquipmentRuleError) return refuse(...reasons, error.message);
     throw error;
   }
+  reasons.push(...candidateLoadoutViolations(loadout));
+  return reasons.length ? refuse(...reasons) : { allowed: true, loadout };
+}
+
+/** The throwing form of `evaluateEquipmentChange`, for the equip/unequip commands. */
+export function planEquipmentChange(input: EquipmentChangeInput): EquipmentLoadout {
+  const evaluation = evaluateEquipmentChange(input);
+  if (!evaluation.allowed) throw new EquipmentRuleError(evaluation.reason);
+  return evaluation.loadout;
 }

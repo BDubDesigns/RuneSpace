@@ -394,7 +394,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
           { kind: "equip", itemInstanceId: loadsteel.id, target: toolSlot },
           at(1),
         ),
-      ).rejects.toThrow("Requires Mining 5 to equip.");
+      ).rejects.toThrow("Requires Mining 5 (current 4).");
       const after = await play.getPlayGameplayState(userId, character.id, at(2));
       expect(after.equipment.miningTool?.itemId).toBe(ITEM_IDS.salvageCutter);
     });

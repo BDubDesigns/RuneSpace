@@ -185,7 +185,7 @@ small number of critical mobile player journeys.
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
   `mining`, `character-profile`, `location-population`, `character-portraits`,
-  `cargo-hold`, `inventory-equip`, `travel`, `walk-it-off`, `cut-your-teeth`,
+  `cargo-hold`, `inventory-equip`, `equipment-loadout`, `travel`, `walk-it-off`, `cut-your-teeth`,
   `refining`, `bounded-runs`, `rusk-recovery`, `fabrication` (which also selects
   `fabrication-advanced.spec.ts`), `work-orders`, `gameplay-access`, and `account-verification`; recipe
   in `docs/development-workflow.md`). The focused runner

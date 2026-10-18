@@ -21,6 +21,7 @@ type ItemVisualProps = {
   /** Marks the tile as a current semantic mission-guidance target. */
   missionGuidance?: boolean;
   selected?: boolean;
+  selectionAccent?: string;
   onSelect?: () => void;
 };
 
@@ -38,6 +39,7 @@ export function ItemVisual({
   interactive,
   missionGuidance,
   selected,
+  selectionAccent,
   onSelect,
 }: ItemVisualProps) {
   const presentation = resolveItemPresentation(itemId, name);
@@ -66,6 +68,7 @@ export function ItemVisual({
       onSelect={onSelect}
       missionGuidance={missionGuidance}
       selected={selected}
+      selectionAccent={selectionAccent}
     />
   );
 }

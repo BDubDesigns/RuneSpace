@@ -11,7 +11,14 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
-import { expect, openEquipmentTab, openTestCharacter, openUtility, test } from "./fixtures";
+import {
+  expect,
+  openEquipmentTab,
+  openTestCharacter,
+  openUtility,
+  selectEquipmentSlot,
+  test,
+} from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -110,7 +117,14 @@ async function seedLongLoadout(characterId: string) {
 
 async function openLongEquipment(page: Page) {
   await page.reload();
-  return openEquipmentTab(page);
+  const equipment = await openEquipmentTab(page);
+  // The loadout grid is compact (#364); the Mining tool's on-demand details make it long.
+  await selectEquipmentSlot(equipment, "Mining tool");
+  // Opening details scrolls them into view; these tests start from the top.
+  await equipment.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  return equipment;
 }
 
 test.describe("panel scroll hints (#345)", () => {

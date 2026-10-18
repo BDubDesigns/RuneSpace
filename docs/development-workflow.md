@@ -457,6 +457,7 @@ simply an unclaimed port here.
   `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
   `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
+  `equipment-loadout`,
   `travel`, `walk-it-off`, `cut-your-teeth`, `refining`, `bounded-runs`,
   `rusk-recovery`, `fabrication`, `work-orders`,
   `gameplay-access`, `account-verification`, `social-shell`, `public-chat`, `whispers-safety`, `moderation`, `player-trading`, `system-notices`, `chat-social-polish`, `desktop-workspace`, `site-stash`, `curly-must-stash`, `wheel-be-right-back`, `mission-pinning`, `thrust-issues`, `oil-shale-mining`, `fuel-manufacturing`, `last-leg-trading`, `ship-first-flight`, and `scroll-affordances` (the focused runner also puts the fixed loopback test
