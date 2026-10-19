@@ -33,6 +33,7 @@ const MISSION_GUIDE_SLUGS = {
   "Out of the Weather": "mission-out-of-the-weather",
   "Cutting Costs": "mission-cutting-costs",
   "Curly Must-Stash": "mission-curly-must-stash",
+  "Not From Around Here": "mission-not-from-around-here",
 } as const;
 
 const missionGuideSlugs: readonly string[] = Object.values(MISSION_GUIDE_SLUGS);
@@ -349,8 +350,8 @@ describe("Mission guides (#339)", () => {
     expect(MISSIONS.map((mission) => mission.title).sort()).toEqual(
       Object.keys(MISSION_GUIDE_SLUGS).sort(),
     );
-    expect(missionGuideSlugs).toHaveLength(17);
-    expect(new Set(missionGuideSlugs).size).toBe(17);
+    expect(missionGuideSlugs).toHaveLength(18);
+    expect(new Set(missionGuideSlugs).size).toBe(18);
 
     for (const [title, slug] of Object.entries(MISSION_GUIDE_SLUGS)) {
       const guide = getWikiArticle(slug);
@@ -381,7 +382,7 @@ describe("Mission guides (#339)", () => {
     expect(isWikiArticleIndexed(hub())).toBe(true);
   });
 
-  it("links each of the 16 guides from the hub exactly once", () => {
+  it("links each of the 18 guides from the hub exactly once", () => {
     const hubTargets = linkSegments(hub()).map((segment) => segment.articleSlug);
 
     for (const slug of missionGuideSlugs) {

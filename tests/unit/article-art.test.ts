@@ -132,8 +132,13 @@ describe("canonical article art", () => {
     expect(index).toContain("Pin it");
     expect(index).toContain("Oil Shale at The South Cut");
     expect(index).toContain("Fuel Canisters");
+    expect(index).toContain("Holo Hollow Landing");
+    expect(index).toContain("Something Strange in the Rock");
+    // The homepage shows only the newest Update's summary (#369).
+    expect(landing).toContain("Something Strange in the Rock");
+    expect(landing).not.toContain("Holo Hollow Landing");
     for (const markup of [index, landing]) {
-      expect(markup).toContain("Holo Hollow Landing");
+      expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("empty-small-fuel-canister.webp");

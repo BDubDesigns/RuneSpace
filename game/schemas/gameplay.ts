@@ -390,6 +390,17 @@ export const AcceptMissionRequestSchema = z.object({
   missionId: ContentId,
   npcId: ContentId,
 });
+/**
+ * Accepting a Mission offered by a carried item (#369) names only the Mission and
+ * the carried stack the player inspected. That the Mission is offered by that
+ * item, that the stack is the character's own carried stack of it, and every
+ * eligibility rule are revalidated inside the server transaction.
+ */
+export const AcceptItemOfferRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  missionId: ContentId,
+  stackId: z.string().uuid(),
+});
 export const CompleteMissionRequestSchema = z.object({
   characterId: z.string().uuid(),
   missionId: ContentId,

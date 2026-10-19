@@ -2645,6 +2645,75 @@ const dialogue = {
       ),
     ],
   },
+  // Not From Around Here (#369). First-pass writing for owner review. Every line
+  // is spoken by the NPC: the player stays silent, and nothing here explains the
+  // mineral, Runeworking or RuneSpace. Wade and Tansy hold an optional hint scene
+  // that plays wherever each of them is standing for this character; Toll's is the
+  // required one. The researcher is never named and never given a pronoun.
+  [DIALOGUE_IDS.wadeNotFromAroundHereHint]: {
+    id: DIALOGUE_IDS.wadeNotFromAroundHereHint,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Let me see that."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Hm. That's not Ferrite. Not shale. Not anything that's come through my gate.",
+      ),
+      wadeLocal(EXPRESSION_IDS.concerned, "And it isn't salvage. I'd know salvage."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tolliver Kade, over at Holo Hollow Landing. Runs Last Leg Trading. He hauls the odd cargo, the kind nobody wants to explain.",
+      ),
+      wadeLocal(EXPRESSION_IDS.scowl, "Go ask him. I've got work."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyNotFromAroundHereHint]: {
+    id: DIALOGUE_IDS.tansyNotFromAroundHereHint,
+    npcId: NPC_IDS.tansyRusk,
+    presentsAtCurrentVenue: true,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "Oh, that's interesting. Hold on. Can I see it?"),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Huh. It's not Ferrite, and it's not any shale I've cut. And I've cut a lot of rock.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "I'd keep it away from the Cutter until someone knows what it is. Mystery mineral, hot end. I like my fingers where they are.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "I don't know what it is. But I've heard Tolliver Kade, who runs Last Leg Trading over at Holo Hollow Landing, has hauled some odd equipment out to Stillreach.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "Anyway. Worth asking him. Worst case, you've had a walk."),
+    ],
+  },
+  [DIALOGUE_IDS.tollNotFromAroundHere]: {
+    id: DIALOGUE_IDS.tollNotFromAroundHere,
+    npcId: NPC_IDS.tollKade,
+    beats: [
+      tollLocal(EXPRESSION_IDS.thoughtful, "Let's have a look."),
+      tollLocal(EXPRESSION_IDS.neutral, "Hm. I couldn't tell you what that is."),
+      tollLocal(
+        EXPRESSION_IDS.thoughtful,
+        "But I've hauled crates marked “mineral samples, handle with care.” Small, odd, packed like they might bite. Yours would fit right in.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.friendly,
+        "They went to a customer on Stillreach. A researcher, up a hill in a workshop. Orders strange equipment, strange supplies, and never says what any of it's for.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.skeptical,
+        "I haul it. I don't ask. Excellent business model. Terrible dinner conversation.",
+      ),
+      tollLocal(
+        EXPRESSION_IDS.neutral,
+        "Hilltop Workshop. If anyone can tell you what that is, it's whoever's up that hill.",
+      ),
+      tollLocal(EXPRESSION_IDS.friendly, "No rush. The hill isn't going anywhere. Probably."),
+    ],
+  },
 } as const satisfies Record<DialogueId, DialogueSequence>;
 
 /** Ordered authoritative dialogue catalog consumed by the RuneSpace adapter. */

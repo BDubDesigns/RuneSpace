@@ -82,6 +82,7 @@ export const FOCUSED_PHASES = [
   "fuel-manufacturing",
   "rune-materials",
   "last-leg-trading",
+  "not-from-around-here",
   "ship-first-flight",
   "scroll-affordances",
 ];

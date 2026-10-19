@@ -10,7 +10,7 @@ import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation, isActionAvailableAtLocation, LOCATIONS } from "@/game/content/locations";
-import { getNpc } from "@/game/content/npcs";
+import { getNpc, resolveNpcPlacement } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { getShipRoute } from "@/game/content/ship-routes";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -103,6 +103,13 @@ export type MissionObservation = {
    * information, which reads as an empty tank, never as fuelled.
    */
   ship?: { fuelUnits: number; flightRouteId?: string };
+  /**
+   * The Missions this character has completed (#369). Read only to resolve
+   * where a lead NPC stands for THIS character, because an authored relocation
+   * (`resolveNpcPlacement`) is itself derived from completed Missions. Absent
+   * resolves the pre-story placement.
+   */
+  completedMissionIds?: ReadonlySet<string>;
 };
 
 /** The approved fuel cost of one authored route, from balance and never a literal. */
@@ -209,6 +216,27 @@ export type MissionGuidance = {
    * `equipmentItemId`, `actionId`, `repairTargetId`).
    */
   availableNpcIds?: readonly string[];
+  /**
+   * The carried item(s) whose Item Details offer a Mission the character has
+   * not accepted yet (#369): blue "there is a new mission here", local
+   * discovery only, exactly like `availableNpcIds`.
+   */
+  availableItemIds?: readonly string[];
+  /**
+   * Several equally valid targets for the current objective (#369): a Mission
+   * with optional leads points at every contact at once until the first lead is
+   * followed. Each candidate carries the same World Location -> Local Place ->
+   * NPC handoff a single target does. Absent for an objective with one target,
+   * which uses the singular fields above instead.
+   */
+  candidates?: readonly MissionGuidanceCandidate[];
+};
+
+/** One candidate target of a multi-target objective; see `MissionGuidance.candidates`. */
+export type MissionGuidanceCandidate = {
+  npcId: string;
+  locationId?: string;
+  localPlaceId?: string;
 };
 
 /**
@@ -247,6 +275,13 @@ export type MissionRequirementStatus = {
   repairTargetId?: string;
   /** The tracked activity this requirement counts, when it counts one (#232). */
   activity?: TrackedMissionActivity;
+  /**
+   * The optional leads of a conversation requirement (#369): the NPCs whose
+   * lead conversation points at this requirement's contact, and whether one has
+   * been followed. Conversation routing reads it so a lead entry is offered only
+   * until the shared fact holds, without inspecting Mission IDs.
+   */
+  leads?: { npcIds: readonly string[]; followed: boolean };
   /**
    * Secondary context for this objective, rendered as its own subordinate
    * line. Never progress and never part of `progress` — it exists so a player
@@ -335,6 +370,13 @@ export type MissionProjection = {
   /** Projected semantic guidance targets (empty when nothing needs guidance). */
   guidance?: MissionGuidance;
   /**
+   * Present only while a carried item currently offers this Mission (#369): the
+   * Mission is not accepted, its prerequisites hold, and the character carries a
+   * stack of any authored item. `itemIds` are the authored items currently
+   * carried. The copy is content (`itemOffer`), never state.
+   */
+  itemOffer?: { itemIds: readonly string[] };
+  /**
    * The Mission-local reactive facts that currently hold (#232), by authored
    * key, for accepted incomplete Missions only. Read by conversation routing
    * to choose an authored variant; never by progression.
@@ -360,7 +402,14 @@ function renderRequirementObjective(
   if (requirement.kind === "repair_target_complete") {
     return renderRepairObjective(requirement, observation);
   }
-  if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
+  if (requirement.kind === "npc_conversation") {
+    // Once a lead has been followed the required contact is the only thing left
+    // to do, and the objective says so (#369).
+    return conversationLeadFollowed(requirement, observation)
+      ? requirement.leads!.followedObjective
+      : requirement.objective;
+  }
+  if (requirement.kind === "ship_flight" || requirement.kind === "deferred_stage") {
     return requirement.objective;
   }
   if (requirement.kind === "ship_fuel") {
@@ -379,6 +428,21 @@ function renderRequirementObjective(
     .replace("{item}", itemName)
     .replace("{carried}", String(carried))
     .replace("{required}", String(required));
+}
+
+/**
+ * Whether one lead of a conversation requirement has been followed (#369): the
+ * single shared durable fact its leads record. A requirement without leads has
+ * none to follow.
+ */
+export function conversationLeadFollowed(
+  requirement: Extract<MissionRequirement, { kind: "npc_conversation" }>,
+  observation: Pick<MissionObservation, "trackedProgress"> | undefined,
+): boolean {
+  return (
+    requirement.leads !== undefined &&
+    (observation?.trackedProgress?.get(requirement.leads.progressKey) ?? 0) >= 1
+  );
 }
 
 /**
@@ -461,6 +525,9 @@ function requirementSatisfied(
       // Only the flight's own landing can satisfy this, and it does so by
       // completing the Mission in the same transaction (#358). No observable
       // state a player can arrange stands in for the flight.
+      return false;
+    case "deferred_stage":
+      // A later slice replaces this stage; until then nothing can satisfy it.
       return false;
   }
 }
@@ -579,8 +646,21 @@ function deriveGuidance(
     const availableNpcIds = definition.offers
       .filter((offer) => offer.locationId === currentLocationId)
       .map((offer) => offer.npcId);
-    if (availableNpcIds.length === 0) return undefined;
-    return { availableNpcIds };
+    // A carried item offers its Mission wherever the player is (#369): the blue
+    // affordance sits on the item itself, so no location is involved.
+    const availableItemIds = itemOfferAvailable(
+      definition,
+      state,
+      prerequisiteSatisfied,
+      observation,
+    )
+      ? carriedOfferItemIds(definition.itemOffer!, observation)
+      : [];
+    if (availableNpcIds.length === 0 && availableItemIds.length === 0) return undefined;
+    return {
+      ...(availableNpcIds.length > 0 ? { availableNpcIds } : {}),
+      ...(availableItemIds.length > 0 ? { availableItemIds } : {}),
+    };
   }
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   if (!firstUnsatisfied) {
@@ -633,14 +713,12 @@ function deriveGuidance(
   }
   if (firstUnsatisfied.kind === "npc_conversation") {
     // The person to go and meet is the target, exactly as the turn-in NPC is
-    // once every requirement holds.
-    return npcBoundaryGuidance(
-      firstUnsatisfied.npcId,
-      firstUnsatisfied.locationId,
-      currentLocationId,
-    );
+    // once every requirement holds. With optional leads still unfollowed, every
+    // contact is a target at once (#369).
+    return conversationGuidance(firstUnsatisfied, currentLocationId, observation);
   }
-  // A carried requirement with no authored route (several legitimate
+  // A deferred stage has nothing to point at yet (#369), and a carried
+  // requirement with no authored route (several legitimate
   // sources) gets no guidance: the framework never picks one for the player.
   return undefined;
 }
@@ -700,6 +778,99 @@ function carriesUsefulRepairMaterial(
     if (outstanding <= 0) return false;
     return (observation?.carriedQuantities.get(material.itemId) ?? 0) > 0;
   });
+}
+
+/**
+ * Whether a carried item currently offers this Mission (#369): not accepted,
+ * prerequisites held, and a stack of the authored item genuinely carried. The
+ * server's item-offer acceptance revalidates the same three facts against the
+ * locked inventory, so this projection is never the authority.
+ */
+export function itemOfferAvailable(
+  definition: Pick<MissionDefinition, "itemOffer">,
+  state: MissionState,
+  prerequisiteSatisfied: boolean,
+  observation: Pick<MissionObservation, "carriedQuantities"> | undefined,
+): boolean {
+  if (!definition.itemOffer || state !== "not_accepted" || !prerequisiteSatisfied) return false;
+  return carriedOfferItemIds(definition.itemOffer, observation).length > 0;
+}
+
+/** The authored offering items the character currently carries at least one of. */
+function carriedOfferItemIds(
+  offer: NonNullable<MissionDefinition["itemOffer"]>,
+  observation: Pick<MissionObservation, "carriedQuantities"> | undefined,
+): readonly string[] {
+  return offer.itemIds.filter((itemId) => (observation?.carriedQuantities.get(itemId) ?? 0) >= 1);
+}
+
+/**
+ * Guidance toward a conversation requirement's contact (#369). The required
+ * contact is authored at its Mission location; each lead NPC stands wherever
+ * `resolveNpcPlacement` puts them for THIS character, so a relocated lead is
+ * guided to their actual hex. Once a lead has been followed only the required
+ * contact remains. Candidates that share a World Location deduplicate in the
+ * target sets, not here.
+ */
+function conversationGuidance(
+  requirement: Extract<MissionRequirement, { kind: "npc_conversation" }>,
+  currentLocationId: string,
+  observation: MissionObservation | undefined,
+): MissionGuidance {
+  const required = npcBoundaryGuidance(
+    requirement.npcId,
+    requirement.locationId,
+    currentLocationId,
+  );
+  if (!requirement.leads || conversationLeadFollowed(requirement, observation)) return required;
+  const completed = observation?.completedMissionIds ?? new Set<string>();
+  return {
+    candidates: [
+      ...requirement.leads.conversations.map((lead) =>
+        placedNpcGuidance(lead.npcId, currentLocationId, completed),
+      ),
+      toCandidate(requirement.npcId, required),
+    ],
+  };
+}
+
+function toCandidate(npcId: string, guidance: MissionGuidance): MissionGuidanceCandidate {
+  return {
+    npcId,
+    ...(guidance.locationId ? { locationId: guidance.locationId } : {}),
+    ...(guidance.localPlaceId ? { localPlaceId: guidance.localPlaceId } : {}),
+  };
+}
+
+/**
+ * The World Location where a lead NPC stands for this character right now (#369):
+ * the NPC's own derived placement, never an authored copy of it. The one answer
+ * guidance and the acknowledgement command both give.
+ */
+export function leadContactLocationId(
+  npcId: string,
+  completedMissionIds: ReadonlySet<string>,
+): string | undefined {
+  const npc = getNpc(npcId);
+  return npc ? resolveNpcPlacement(npc, completedMissionIds).locationId : undefined;
+}
+
+/** Guidance toward one NPC wherever they currently stand for this character. */
+function placedNpcGuidance(
+  npcId: string,
+  currentLocationId: string,
+  completedMissionIds: ReadonlySet<string>,
+): MissionGuidanceCandidate {
+  const npc = getNpc(npcId);
+  if (!npc) return { npcId };
+  const placement = resolveNpcPlacement(npc, completedMissionIds);
+  if (placement.locationId !== currentLocationId) {
+    return { npcId, locationId: placement.locationId };
+  }
+  const place = placement.localPlaceId
+    ? getLocalPlaceInLocation(currentLocationId, placement.localPlaceId)
+    : undefined;
+  return place ? { npcId, localPlaceId: place.id } : { npcId };
 }
 
 /**
@@ -845,6 +1016,9 @@ export function projectMission(
       observation,
       prerequisiteSatisfied,
     ),
+    ...(itemOfferAvailable(definition, state, prerequisiteSatisfied, observation)
+      ? { itemOffer: { itemIds: carriedOfferItemIds(definition.itemOffer!, observation) } }
+      : {}),
     ...(active && definition.reactiveFacts
       ? {
           facts: definition.reactiveFacts
@@ -952,12 +1126,35 @@ function projectRequirement(
     };
   }
   if (requirement.kind === "npc_conversation") {
+    const leads = requirement.leads;
+    const followed = conversationLeadFollowed(requirement, observation);
     return {
       kind: requirement.kind,
-      objective: requirement.objective,
+      // A requirement that already holds keeps its authored copy; only the open
+      // objective narrows once a lead has been followed (#369).
+      objective: satisfied
+        ? requirement.objective
+        : renderRequirementObjective(requirement, observation),
       satisfied,
       npcId: requirement.npcId,
+      ...(leads
+        ? { leads: { npcIds: leads.conversations.map((lead) => lead.npcId), followed } }
+        : {}),
+      // Until a lead is followed the Log names every possible contact.
+      ...(leads && !followed && !satisfied
+        ? {
+            detail: `Possible contacts: ${[
+              ...leads.conversations.map((lead) => lead.npcId),
+              requirement.npcId,
+            ]
+              .map((npcId) => getNpc(npcId)?.displayName ?? npcId)
+              .join(", ")}`,
+          }
+        : {}),
     };
+  }
+  if (requirement.kind === "deferred_stage") {
+    return { kind: requirement.kind, objective: requirement.objective, satisfied };
   }
   if (requirement.kind === "ship_fuel") {
     const required = shipFuelRequired(requirement.routeId);
@@ -1038,6 +1235,8 @@ function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward
 export type MissionGuidanceTargets = {
   /** NPC(s) whose authored offer is currently a mission-availability target. */
   availableNpcIds: ReadonlySet<string>;
+  /** Carried item(s) whose Item Details currently offer an unaccepted Mission (#369). */
+  availableItemIds: ReadonlySet<string>;
   /** NPC(s) whose interaction advances an accepted Mission's remaining work. */
   npcIds: ReadonlySet<string>;
   /** NPC(s) who are the final handoff of a Mission in its turn-in phase. */
@@ -1184,6 +1383,7 @@ export function deriveMissionGuidanceTargets(
   projections: readonly MissionProjection[],
 ): MissionGuidanceTargets {
   const availableNpcIds = new Set<string>();
+  const availableItemIds = new Set<string>();
   const npcIds = new Set<string>();
   const turnInNpcIds = new Set<string>();
   const localPlaceIds = new Set<string>();
@@ -1200,12 +1400,19 @@ export function deriveMissionGuidanceTargets(
     if (guidance.availableNpcIds) {
       for (const id of guidance.availableNpcIds) availableNpcIds.add(id);
     }
-    const turnIn = guidance.turnIn === true;
-    if (guidance.npcId) (turnIn ? turnInNpcIds : npcIds).add(guidance.npcId);
-    if (guidance.localPlaceId) {
-      (turnIn ? turnInLocalPlaceIds : localPlaceIds).add(guidance.localPlaceId);
+    if (guidance.availableItemIds) {
+      for (const id of guidance.availableItemIds) availableItemIds.add(id);
     }
-    if (guidance.locationId) (turnIn ? turnInLocationIds : locationIds).add(guidance.locationId);
+    const turnIn = guidance.turnIn === true;
+    // A multi-target objective (#369) contributes every candidate exactly as a
+    // single target would; the sets deduplicate shared hexes and places.
+    for (const target of [guidance, ...(guidance.candidates ?? [])]) {
+      if (target.npcId) (turnIn ? turnInNpcIds : npcIds).add(target.npcId);
+      if (target.localPlaceId) {
+        (turnIn ? turnInLocalPlaceIds : localPlaceIds).add(target.localPlaceId);
+      }
+      if (target.locationId) (turnIn ? turnInLocationIds : locationIds).add(target.locationId);
+    }
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);
     if (guidance.activity) activities.add(guidance.activity);
@@ -1213,6 +1420,7 @@ export function deriveMissionGuidanceTargets(
   }
   return {
     availableNpcIds,
+    availableItemIds,
     npcIds,
     turnInNpcIds,
     localPlaceIds,
@@ -1240,9 +1448,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
   );
   for (const definition of definitions) {
     const where = `Mission "${definition.id}"`;
-    if (definition.offers.length === 0 && !continuationTargets.has(definition.id)) {
+    if (
+      definition.offers.length === 0 &&
+      !continuationTargets.has(definition.id) &&
+      !definition.itemOffer
+    ) {
       throw new Error(`${where} must author at least one offer interaction.`);
     }
+    if (definition.itemOffer) assertItemOffer(definition, definitions);
     if (definition.prerequisiteMissionId !== undefined) {
       if (definition.prerequisiteMissionId === definition.id) {
         throw new Error(`${where} cannot be its own prerequisite.`);
@@ -1509,6 +1722,15 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
             `${where} duplicates a conversation requirement for NPC "${requirement.npcId}".`,
           );
         }
+        if (requirement.leads) {
+          assertConversationLeads(definition, requirement, requirement.leads, progressKeys);
+        }
+        continue;
+      }
+      if (requirement.kind === "deferred_stage") {
+        if (requirement.objective.trim().length === 0) {
+          throw new Error(`${where} deferred stage must author its objective copy.`);
+        }
         continue;
       }
       const itemDefinition = getItemDefinition(requirement.itemId);
@@ -1544,6 +1766,30 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           }
         }
       }
+    }
+    if (definition.requirements.some((requirement) => requirement.kind === "deferred_stage")) {
+      // A deliberately unfinished story stage (#369). It has no way to finish
+      // yet, so every completion-shaped slot is an authoring mistake: a false
+      // Turn In, an automatic completion or a reward for work that cannot happen.
+      const deferredStages = definition.requirements.filter(
+        (requirement) => requirement.kind === "deferred_stage",
+      );
+      if (deferredStages.length > 1) {
+        throw new Error(`${where} can author at most one deferred stage.`);
+      }
+      if (definition.requirements.at(-1)?.kind !== "deferred_stage") {
+        throw new Error(`${where} deferred stage must be its last requirement.`);
+      }
+      if (definition.turnIn || definition.autoCompletion || definition.reward) {
+        throw new Error(
+          `${where} has a deferred stage and cannot author a turn-in, an auto-completion or a reward.`,
+        );
+      }
+      if (definition.continuationMissionId || definition.completedNpcDialogue) {
+        throw new Error(`${where} cannot complete yet, so it cannot continue or author a finish.`);
+      }
+      assertLifecycleCoverage(definition);
+      continue;
     }
     if (definition.autoCompletion) {
       // The one other way to finish (#358): a gameplay outcome, never an NPC.
@@ -1714,6 +1960,8 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
   // The turn-in NPC never meets a Mission this requirement belongs to (#358).
   ship_fuel: undefined,
   ship_flight: undefined,
+  // A deferred stage has no turn-in NPC either (#369).
+  deferred_stage: undefined,
 };
 
 /**
@@ -1772,9 +2020,9 @@ function assertLifecycleCoverage(definition: MissionDefinition): void {
   const where = `Mission "${definition.id}"`;
   const dialogue = definition.dialogue;
   if (!definition.turnIn) {
-    // No turn-in NPC, so no lifecycle moment exists to author or omit (#358).
+    // No turn-in NPC, so no lifecycle moment exists to author or omit (#358, #369).
     if (Object.keys(dialogue).length > 0) {
-      throw new Error(`${where} completes automatically and cannot author turn-in dialogue.`);
+      throw new Error(`${where} has no turn-in and cannot author turn-in dialogue.`);
     }
     return;
   }
@@ -1964,6 +2212,105 @@ function assertContinuationGraph(definitions: readonly MissionDefinition[]): voi
       }
       current = byId.get(current.continuationMissionId);
       if (!current) break;
+    }
+  }
+}
+
+/**
+ * The item-offer contract (#369): one or more stackable items (a carried stack of
+ * any is what makes the offer), complete copy, and at most one Mission offered by any one
+ * item — two offers from one item would leave the Item Details action without a
+ * single Mission to open.
+ */
+function assertItemOffer(
+  definition: MissionDefinition,
+  definitions: readonly MissionDefinition[],
+): void {
+  const where = `Mission "${definition.id}"`;
+  const offer = definition.itemOffer!;
+  if (offer.itemIds.length === 0) {
+    throw new Error(`${where} item offer must name at least one item.`);
+  }
+  if (new Set(offer.itemIds).size !== offer.itemIds.length) {
+    throw new Error(`${where} item offer names an item more than once.`);
+  }
+  for (const itemId of offer.itemIds) {
+    const item = getItemDefinition(itemId);
+    if (!item) throw new Error(`${where} item offer references unknown item "${itemId}".`);
+    if (item.kind !== "stack") {
+      throw new Error(
+        `${where} item offer must target stackable items; a carried stack offers it.`,
+      );
+    }
+    const duplicate = definitions.find(
+      (other) => other.id !== definition.id && other.itemOffer?.itemIds.includes(itemId),
+    );
+    if (duplicate) {
+      throw new Error(
+        `${where} item offer for "${itemId}" duplicates Mission "${duplicate.id}"; one item offers one Mission.`,
+      );
+    }
+  }
+  for (const [field, copy] of Object.entries({
+    inspectLabel: offer.inspectLabel,
+    description: offer.description,
+    acceptLabel: offer.acceptLabel,
+    declineLabel: offer.declineLabel,
+  })) {
+    if (copy.trim().length === 0) throw new Error(`${where} item offer must author ${field}.`);
+  }
+}
+
+/**
+ * The lead contract (#369): lead NPCs and their scenes exist and belong together,
+ * the shared fact has its own progress key, and no lead can be the required
+ * contact, another lead, or an NPC another Mission slot already routes — a lead
+ * that doubled as an offer or turn-in NPC would fight that owner for one hub entry.
+ */
+function assertConversationLeads(
+  definition: MissionDefinition,
+  requirement: Extract<MissionRequirement, { kind: "npc_conversation" }>,
+  leads: NonNullable<Extract<MissionRequirement, { kind: "npc_conversation" }>["leads"]>,
+  progressKeys: Set<string>,
+): void {
+  const where = `Mission "${definition.id}"`;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(leads.progressKey)) {
+    throw new Error(`${where} lead progress key must be lowercase hyphenated text.`);
+  }
+  if (progressKeys.has(leads.progressKey)) {
+    throw new Error(`${where} duplicates progress key "${leads.progressKey}".`);
+  }
+  progressKeys.add(leads.progressKey);
+  if (leads.conversations.length === 0) {
+    throw new Error(`${where} conversation leads must author at least one lead.`);
+  }
+  if (leads.followedObjective.trim().length === 0) {
+    throw new Error(`${where} conversation leads must author the followed objective.`);
+  }
+  const conversationNpcIds = new Set(
+    definition.requirements.flatMap((candidate) =>
+      candidate.kind === "npc_conversation" ? [candidate.npcId] : [],
+    ),
+  );
+  const seen = new Set<string>();
+  for (const lead of leads.conversations) {
+    if (!getNpc(lead.npcId)) {
+      throw new Error(`${where} lead references unknown NPC "${lead.npcId}".`);
+    }
+    assertDialogue(definition.id, lead.dialogueId, "lead");
+    assertDialogueNpc(definition.id, lead.dialogueId, lead.npcId, "lead");
+    if (seen.has(lead.npcId)) {
+      throw new Error(`${where} authors NPC "${lead.npcId}" as a lead more than once.`);
+    }
+    seen.add(lead.npcId);
+    if (lead.npcId === requirement.npcId || conversationNpcIds.has(lead.npcId)) {
+      throw new Error(`${where} lead NPC "${lead.npcId}" is also a required contact.`);
+    }
+    if (lead.npcId === definition.turnIn?.npcId) {
+      throw new Error(`${where} lead NPC "${lead.npcId}" cannot be its turn-in NPC.`);
+    }
+    if (definition.offers.some((offer) => offer.npcId === lead.npcId)) {
+      throw new Error(`${where} lead NPC "${lead.npcId}" cannot be an offer NPC.`);
     }
   }
 }

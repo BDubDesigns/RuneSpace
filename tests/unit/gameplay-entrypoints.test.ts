@@ -101,7 +101,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 86 production player actions", () => {
+  it("enumerates exactly the 87 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -116,12 +116,13 @@ describe("player server actions (server/actions.ts)", () => {
     // Journey. #325 adds Mission pinning. #342 adds the Prioritize primary
     // resources preference. #358 adds the Rivet's refuel, launch, and landing
     // notice acknowledgment. #367 adds Break Apart for the intact Runestone.
-    expect(bodies.size).toBe(86);
+    // #369 adds accepting a Mission offered by a carried item.
+    expect(bodies.size).toBe(87);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(82);
+    expect(gameplay).toHaveLength(83);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }

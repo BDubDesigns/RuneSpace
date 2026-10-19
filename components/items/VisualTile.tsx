@@ -34,11 +34,13 @@ type VisualTileProps = {
   name: string;
   onSelect?: () => void;
   /**
-   * True when this tile is currently a semantic mission-guidance target. The
+   * True (or `"active"`) when this tile is currently a semantic mission-guidance
+   * target, `"available"` when a carried item offers a new Mission (#369). The
    * caller derives that from the projected guidance contract — the tile never
-   * inspects missions itself. Marks the tile accessibly for E2E/AT.
+   * inspects missions itself — and applies the shared `.rs-mission-*` class.
+   * Marks the tile accessibly for E2E/AT with the real semantic value.
    */
-  missionGuidance?: boolean;
+  missionGuidance?: boolean | "active" | "available";
   /** Exposed accessibly through `aria-pressed` and visually through a ring. */
   selected?: boolean;
   /** Overrides the selection ring's Mining-orange (Equipment's slot grid selects in cyan, #364). */
@@ -69,7 +71,8 @@ export function VisualTile({
   const rootProps = {
     "aria-describedby": accessibleDescription ? descriptionId : undefined,
     "aria-label": accessibleLabel,
-    "data-mission-guidance": missionGuidance ? "active" : undefined,
+    "data-mission-guidance":
+      missionGuidance === "available" ? "available" : missionGuidance ? "active" : undefined,
     className: rootClassName,
     "data-item-rarity": rarity,
     style: {
@@ -99,6 +102,7 @@ export function VisualTile({
           <Image
             alt=""
             className={`h-20 max-h-full w-20 max-w-full object-contain ${mutedArtwork ? "opacity-50 grayscale" : ""}`}
+            data-offer-hop={missionGuidance === "available" ? "" : undefined}
             data-testid="item-artwork"
             height={160}
             sizes="80px"

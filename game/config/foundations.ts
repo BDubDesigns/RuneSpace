@@ -135,6 +135,10 @@ const missionIds = {
   // Wade's first-flight job (#358): fly the repaired Rivet from the Crash Site to
   // Holo Hollow Landing. Accepted by hand, completed by the flight's own landing.
   moveAlong: asContentId("move_along"),
+  // The first item-originated Mission (#369): a carried Rune Fragment is
+  // inspected, offers the mystery, and leads through three Skatboll contacts to
+  // Toll's lead about a researcher on Stillreach. Intentionally unfinished.
+  notFromAroundHere: asContentId("not_from_around_here"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -333,6 +337,11 @@ const dialogueIds = {
   tollSkatbollTopic: asContentId("toll_kade_topic_skatboll"),
   tollStillreachTopic: asContentId("toll_kade_topic_stillreach"),
   tollFuelTopic: asContentId("toll_kade_topic_fuel"),
+  // Not From Around Here (#369): the optional hint conversations at Wade and
+  // Tansy, and Toll's required lead to the researcher on Stillreach.
+  wadeNotFromAroundHereHint: asContentId("wade_rusk_not_from_around_here_hint"),
+  tansyNotFromAroundHereHint: asContentId("tansy_rusk_not_from_around_here_hint"),
+  tollNotFromAroundHere: asContentId("toll_kade_not_from_around_here"),
 } as const satisfies Record<string, ContentId>;
 
 /**

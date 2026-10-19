@@ -71,11 +71,19 @@ export type NpcConversationProjection = {
    * reads it: a one-time authored scene stops being offered once the
    * authoritative requirement holds, so the encounter does not replay.
    */
-  requirements?: readonly { kind: MissionRequirementKind; satisfied: boolean; npcId?: string }[];
+  requirements?: readonly {
+    kind: MissionRequirementKind;
+    satisfied: boolean;
+    npcId?: string;
+    /** The optional lead NPCs of a conversation requirement and whether one was followed (#369). */
+    leads?: { npcIds: readonly string[]; followed: boolean };
+  }[];
   /** The already-derived semantic guidance targets for this mission, if any. */
   guidance?: {
     npcId?: string;
     availableNpcIds?: readonly string[];
+    /** Every equally valid target of a multi-target objective (#369). */
+    candidates?: readonly { npcId: string }[];
     turnIn?: true;
   };
   /**
@@ -304,6 +312,29 @@ function activeEntry(
     };
   }
 
+  // An optional lead (#369) is the same kind of one-time scene, offered at the
+  // lead NPC until the shared fact holds or the required contact has been met.
+  // It records the lead and nothing else; the NPC's ordinary topics are untouched.
+  const lead = leadConversationFor(definition, projection, npcId);
+  if (lead) {
+    if (!getDialogue(lead.dialogueId)) return undefined;
+    return {
+      kind: "mission",
+      id: `${definition.id}:lead`,
+      label: definition.title,
+      role: "active",
+      roleLabel: ROLE_LABELS.active,
+      dialogueId: lead.dialogueId,
+      missionId: definition.id,
+      guidance: guidanceFor(npcId, projection),
+      action: {
+        kind: "acknowledge_conversation",
+        label: lead.actionLabel ?? DEFAULT_ACKNOWLEDGE_ACTION_LABEL,
+        dialogueId: lead.dialogueId,
+      },
+    };
+  }
+
   const contextual = definition.activeNpcDialogue?.find((entry) => entry.npcId === npcId);
   const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
   const dialogueId = contextual?.dialogueId ?? offer?.activeDialogueId;
@@ -318,6 +349,32 @@ function activeEntry(
     missionId: definition.id,
     guidance: guidanceFor(npcId, projection),
   };
+}
+
+/**
+ * The lead scene this NPC currently offers for an accepted Mission, if any
+ * (#369): the NPC is an authored lead of an unsatisfied conversation requirement
+ * and no lead of it has been followed yet.
+ */
+function leadConversationFor(
+  definition: MissionDefinition,
+  projection: NpcConversationProjection,
+  npcId: string,
+): { dialogueId: DialogueId; actionLabel?: string } | undefined {
+  for (const requirement of definition.requirements) {
+    if (requirement.kind !== "npc_conversation" || !requirement.leads) continue;
+    const lead = requirement.leads.conversations.find((candidate) => candidate.npcId === npcId);
+    if (!lead) continue;
+    const status = projection.requirements?.find(
+      (candidate) => candidate.kind === "npc_conversation" && candidate.npcId === requirement.npcId,
+    );
+    if (!status || status.satisfied || status.leads?.followed) continue;
+    return {
+      dialogueId: lead.dialogueId,
+      ...(lead.actionLabel ? { actionLabel: lead.actionLabel } : {}),
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -417,7 +474,10 @@ function guidanceFor(
   npcId: string,
   projection: NpcConversationProjection,
 ): "available" | "active" | "turn_in" | undefined {
-  if (projection.guidance?.npcId === npcId) {
+  if (
+    projection.guidance?.npcId === npcId ||
+    projection.guidance?.candidates?.some((candidate) => candidate.npcId === npcId)
+  ) {
     return projection.guidance.turnIn ? "turn_in" : "active";
   }
   if (projection.guidance?.availableNpcIds?.includes(npcId)) return "available";
@@ -648,7 +708,10 @@ function missionOwnedDialogueIds(definitions: readonly MissionDefinition[]): rea
         (requirement): requirement is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
           requirement.kind === "npc_conversation",
       )
-      .map((requirement) => requirement.dialogueId),
+      .flatMap((requirement) => [
+        requirement.dialogueId,
+        ...(requirement.leads?.conversations.map((lead) => lead.dialogueId) ?? []),
+      ]),
     ...definition.offers.flatMap((offer) => [
       offer.dialogueId,
       ...(offer.acceptedContinuation ? [offer.acceptedContinuation.dialogueId] : []),

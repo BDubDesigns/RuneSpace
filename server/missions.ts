@@ -21,6 +21,7 @@ import { getLocation } from "@/game/content/locations";
 import {
   getMission,
   MISSIONS,
+  type MissionConversationLead,
   type MissionDefinition,
   type MissionRequirement,
 } from "@/game/content/missions";
@@ -37,6 +38,7 @@ import {
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
 import {
+  leadContactLocationId,
   uniqueItemRequirementHolds,
   unmetMissionSkillPrerequisite,
   type MissionObservation,
@@ -289,6 +291,54 @@ async function planAcceptanceItemGrant(
 }
 
 /**
+ * The shared acceptance gate: the authored Mission prerequisite and every
+ * authored skill level, rechecked inside the authoritative command (#207, #209).
+ * Returns the refusal copy, or `undefined` when the Mission may be accepted.
+ * An NPC offer and an item offer (#369) are two ways in to one gate, so neither
+ * can accept a Mission the other would refuse.
+ *
+ * A UI-only check would be bypassable and a second server-side rule would be the
+ * same rule with two homes. Every authored skill is read before any is judged,
+ * so a Mission naming several (Brace Yourself wants Mining 5 and Welding 5) is
+ * refused by the same conjunction the projection applied, and the refusal names
+ * the first one the player is actually short on.
+ */
+async function acceptancePrerequisiteRefusal(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  definition: MissionDefinition,
+  rows: MissionRows,
+): Promise<string | undefined> {
+  if (definition.prerequisiteMissionId) {
+    const prerequisite = missionRow(rows, definition.prerequisiteMissionId);
+    if (!prerequisite?.completedAt) {
+      const prerequisiteDefinition = getMission(definition.prerequisiteMissionId);
+      return `Complete ${prerequisiteDefinition?.title ?? "the prerequisite mission"} before this mission can begin.`;
+    }
+  }
+  if (definition.prerequisiteSkillLevels?.length) {
+    const levels = new Map<string, number>();
+    for (const { skillId } of definition.prerequisiteSkillLevels) {
+      levels.set(
+        skillId,
+        await characterSkillLevel(
+          transaction,
+          characterId,
+          skillId,
+          standardSkillLevelThresholds(),
+        ),
+      );
+    }
+    const unmet = unmetMissionSkillPrerequisite(definition, levels);
+    if (unmet) {
+      const skillName = getSkillPresentation(unmet.skillId)?.displayName ?? unmet.skillId;
+      return `${definition.title} needs ${skillName} level ${unmet.level}.`;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Generic mission acceptance. The browser supplies only narrow command
  * identity/intent (character, mission, NPC); every rule is revalidated
  * server-side inside the character lock from the authored definition:
@@ -323,48 +373,13 @@ export async function acceptMission(
       if (existing?.completedAt) return stateFor({ status: "already_completed" });
       if (existing?.acceptedAt) return stateFor({ status: "already_accepted" });
 
-      // Hard prerequisite, rechecked inside the authoritative command.
-      if (definition.prerequisiteMissionId) {
-        const prerequisite = missionRow(rows, definition.prerequisiteMissionId);
-        if (!prerequisite?.completedAt) {
-          const prerequisiteDefinition = getMission(definition.prerequisiteMissionId);
-          return stateFor({
-            status: "refused",
-            message: `Complete ${prerequisiteDefinition?.title ?? "the prerequisite mission"} before this mission can begin.`,
-          });
-        }
-      }
-
-      // The authored skill gate, revalidated from the same content projection
-      // reads. A UI-only check would be bypassable and a second server-side
-      // rule would be the same rule with two homes (#207).
-      //
-      // Every authored skill is read before any is judged, so a Mission naming
-      // several (Brace Yourself wants Mining 5 and Welding 5) is refused by the
-      // same conjunction the projection applied, and the refusal names the
-      // first one the player is actually short on (#209).
-      if (definition.prerequisiteSkillLevels?.length) {
-        const levels = new Map<string, number>();
-        for (const { skillId } of definition.prerequisiteSkillLevels) {
-          levels.set(
-            skillId,
-            await characterSkillLevel(
-              transaction,
-              context.character.id,
-              skillId,
-              standardSkillLevelThresholds(),
-            ),
-          );
-        }
-        const unmet = unmetMissionSkillPrerequisite(definition, levels);
-        if (unmet) {
-          const skillName = getSkillPresentation(unmet.skillId)?.displayName ?? unmet.skillId;
-          return stateFor({
-            status: "refused",
-            message: `${definition.title} needs ${skillName} level ${unmet.level}.`,
-          });
-        }
-      }
+      const refusal = await acceptancePrerequisiteRefusal(
+        transaction,
+        context.character.id,
+        definition,
+        rows,
+      );
+      if (refusal) return stateFor({ status: "refused", message: refusal });
 
       const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
       if (!offer) {
@@ -441,6 +456,95 @@ export async function acceptMission(
 }
 
 /**
+ * Accept a Mission offered by a carried item (#369), through the same generic
+ * acceptance path an NPC offer uses.
+ *
+ * The browser names only the Mission and the carried stack the player inspected.
+ * Everything else is revalidated inside the character lock: the Mission authors
+ * an item offer; the stack is a row of THIS character's carried inventory and is
+ * a stack of exactly the authored item (so a stale, foreign, Cargo Hold, stash,
+ * or wrong-item stack is refused); the Mission is not already accepted or
+ * completed; and the ordinary prerequisite gate holds. Nothing about the item
+ * changes: the Fragment is not consumed, reserved, transformed or tagged.
+ *
+ * Idempotent: a replay, a double-click or a concurrent request converges on the
+ * one accepted record (`already_accepted`) and never initialises progress twice.
+ * No stationary or location rule applies, because Inventory is available
+ * anywhere and the offer is made by the item.
+ */
+export async function acceptItemOfferMission(
+  userId: string,
+  characterId: string,
+  missionId: string,
+  stackId: string,
+  now = new Date(),
+  random?: MiningRandom,
+): Promise<MissionAcceptanceResult> {
+  return runMissionCommand<MissionAcceptance>(
+    userId,
+    characterId,
+    now,
+    random,
+    async ({ transaction, context, stateFor }) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+      const definition = getMission(missionId);
+      if (!definition?.itemOffer) {
+        return stateFor({ status: "refused", message: "That item does not offer a mission." });
+      }
+      const rows = await transaction
+        .select()
+        .from(characterMissions)
+        .where(eq(characterMissions.characterId, context.character.id))
+        .for("update");
+      const existing = missionRow(rows, definition.id);
+      if (existing?.completedAt) return stateFor({ status: "already_completed" });
+      if (existing?.acceptedAt) return stateFor({ status: "already_accepted" });
+
+      const refusal = await acceptancePrerequisiteRefusal(
+        transaction,
+        context.character.id,
+        definition,
+        rows,
+      );
+      if (refusal) return stateFor({ status: "refused", message: refusal });
+
+      // The carried stack the player inspected, filtered by BOTH character and
+      // stack identity so another character's stack is simply absent.
+      const stack = (
+        await transaction
+          .select({ itemId: inventoryStacks.itemId, quantity: inventoryStacks.quantity })
+          .from(inventoryStacks)
+          .where(
+            and(
+              eq(inventoryStacks.id, stackId),
+              eq(inventoryStacks.characterId, context.character.id),
+            ),
+          )
+          .for("update")
+          .limit(1)
+      )[0];
+      if (!stack || !definition.itemOffer.itemIds.includes(stack.itemId) || stack.quantity < 1) {
+        return stateFor({
+          status: "refused",
+          message: "Inventory changed. Review the item and try again.",
+        });
+      }
+
+      await transaction
+        .insert(characterMissions)
+        .values({
+          characterId: context.character.id,
+          missionId: definition.id,
+          acceptedAt: now,
+        })
+        .onConflictDoNothing();
+      await ensureMissionProgressRows(transaction, context.character.id, definition, now);
+      return stateFor({ status: "accepted" });
+    },
+  );
+}
+
+/**
  * Generic mandatory-conversation command.
  *
  * Some missions require the player to actually meet somebody — Keep the Change
@@ -478,18 +582,14 @@ export async function acknowledgeMissionConversation(
       if (!definition) {
         return stateFor({ status: "refused", message: "Unknown mission." });
       }
-      const requirement = definition.requirements.find(
-        (candidate): candidate is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
-          candidate.kind === "npc_conversation" &&
-          candidate.npcId === npcId &&
-          candidate.dialogueId === dialogueId,
-      );
-      if (!requirement) {
+      const acknowledgement = findConversationAcknowledgement(definition, npcId, dialogueId);
+      if (!acknowledgement) {
         return stateFor({
           status: "refused",
           message: `${definition.title} does not need that conversation.`,
         });
       }
+      const { requirement } = acknowledgement;
 
       const rows = await transaction
         .select()
@@ -502,11 +602,18 @@ export async function acknowledgeMissionConversation(
       }
       if (existing.completedAt) return stateFor({ status: "already_acknowledged" });
 
+      // Where the person has to be: a required contact is met at the Mission's
+      // authored location; a lead NPC is met wherever they stand for THIS
+      // character now, which their Mission-derived story position decides (#369).
       const locationId = await currentLocation(transaction, context.character.id);
-      if (context.action || locationId !== requirement.locationId) {
+      const meetingLocationId =
+        acknowledgement.kind === "lead"
+          ? leadMeetingLocationId(acknowledgement.lead.npcId, rows)
+          : requirement.locationId;
+      if (context.action || locationId !== meetingLocationId) {
         return stateFor({
           status: "refused",
-          message: `Meet ${getNpc(requirement.npcId)?.displayName ?? "them"} in person while you are stationary at ${locationName(requirement.locationId)}.`,
+          message: `Meet ${getNpc(npcId)?.displayName ?? "them"} in person while you are stationary at ${locationName(meetingLocationId)}.`,
         });
       }
 
@@ -517,22 +624,76 @@ export async function acknowledgeMissionConversation(
           and(
             eq(characterMissionProgress.characterId, context.character.id),
             eq(characterMissionProgress.missionId, definition.id),
-            eq(characterMissionProgress.progressKey, requirement.progressKey),
           ),
         )
         .for("update");
-      if ((progressRows[0]?.progress ?? 0) >= 1) {
+      const progressOf = (progressKey: string) =>
+        progressRows.find((row) => row.progressKey === progressKey)?.progress ?? 0;
+      // A lead only points at the required contact, so once that contact has been
+      // met there is nothing left for it to record.
+      if (progressOf(requirement.progressKey) >= 1) {
+        return stateFor({ status: "already_acknowledged" });
+      }
+      const progressKey =
+        acknowledgement.kind === "lead" ? acknowledgement.progressKey : requirement.progressKey;
+      if (progressOf(progressKey) >= 1) {
         return stateFor({ status: "already_acknowledged" });
       }
       await recordMissionConversation(transaction, {
         characterId: context.character.id,
         missionId: definition.id,
-        progressKey: requirement.progressKey,
+        progressKey,
         now,
       });
       return stateFor({ status: "acknowledged" });
     },
   );
+}
+
+/**
+ * The conversation requirement an acknowledgement is claiming credit for: the
+ * required contact's own scene, or one of its optional lead scenes (#369). The
+ * NPC and the authored sequence must both match, so credit can never be claimed
+ * for another person or another scene.
+ */
+type ConversationAcknowledgement =
+  | {
+      kind: "required";
+      requirement: Extract<MissionRequirement, { kind: "npc_conversation" }>;
+    }
+  | {
+      kind: "lead";
+      requirement: Extract<MissionRequirement, { kind: "npc_conversation" }>;
+      lead: MissionConversationLead;
+      progressKey: string;
+    };
+
+function findConversationAcknowledgement(
+  definition: MissionDefinition,
+  npcId: string,
+  dialogueId: string,
+): ConversationAcknowledgement | undefined {
+  for (const requirement of definition.requirements) {
+    if (requirement.kind !== "npc_conversation") continue;
+    if (requirement.npcId === npcId && requirement.dialogueId === dialogueId) {
+      return { kind: "required", requirement };
+    }
+    const lead = requirement.leads?.conversations.find(
+      (candidate) => candidate.npcId === npcId && candidate.dialogueId === dialogueId,
+    );
+    if (lead && requirement.leads) {
+      return { kind: "lead", requirement, lead, progressKey: requirement.leads.progressKey };
+    }
+  }
+  return undefined;
+}
+
+/** The World Location where a lead NPC currently stands for this character. */
+function leadMeetingLocationId(npcId: string, rows: MissionRows): string {
+  const completed = new Set(rows.filter((row) => row.completedAt).map((row) => row.missionId));
+  const locationId = leadContactLocationId(npcId, completed);
+  if (!locationId) throw new Error(`Lead references unknown NPC "${npcId}"`);
+  return locationId;
 }
 
 /**
@@ -780,9 +941,14 @@ async function completeMissionForDefinition(input: {
       }
       continue;
     }
-    if (requirement.kind === "ship_fuel" || requirement.kind === "ship_flight") {
+    if (
+      requirement.kind === "ship_fuel" ||
+      requirement.kind === "ship_flight" ||
+      requirement.kind === "deferred_stage"
+    ) {
       // Unreachable for a Mission with a turn-in (validation forbids the pair),
-      // but neither the tank nor a flight is something a hand-in can vouch for.
+      // but neither the tank, a flight nor a stage that does not exist yet is
+      // something a hand-in can vouch for.
       return stateFor({
         status: "refused",
         reason: "wrong_npc",
@@ -1102,7 +1268,11 @@ function renderRequirementCopy(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "repair_target_complete") return requirement.objective;
-  if (requirement.kind === "npc_conversation" || requirement.kind === "ship_flight") {
+  if (
+    requirement.kind === "npc_conversation" ||
+    requirement.kind === "ship_flight" ||
+    requirement.kind === "deferred_stage"
+  ) {
     return requirement.objective;
   }
   if (requirement.kind === "ship_fuel") {

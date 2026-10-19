@@ -555,6 +555,17 @@ Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
 apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own
 outline and shadow are not clipped.
 
+A carried item that offers a Mission (#369) uses the same shared blue, never
+per-Mission styling. Its Inventory tile (`VisualTile`, `missionGuidance="available"`)
+carries `.rs-mission-available` and `data-mission-guidance="available"` while the
+Mission is unaccepted, and the Inspect control in Item Details is a
+`MissionActionButton` with `guidance="available"`. The offer itself is the shared
+`Drawer` overlay in its default compact width, so it inherits the focus trap,
+Escape, scroll lock, safe-area padding and mobile layout. While offered, the tile's artwork alone does a short double hop with a pause
+(`[data-offer-hop]`, `rs-offer-hop`); the frame, nameplate and plates stay still,
+and `prefers-reduced-motion` turns it off. The tile leaves the blue and the hop
+the moment the Mission is accepted and keeps no permanent Mission tint.
+
 The unread-News control in `features/play/PlayScreen.tsx` predates this and uses
 its own unclipped `<form>` wrapper with the separate `--rs-glow-news-unread`
 attention token. It could adopt `.rs-control-halo` with its own `news-unread`
