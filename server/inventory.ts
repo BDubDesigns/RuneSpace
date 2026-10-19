@@ -1,8 +1,7 @@
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { planBreakApart, type BreakApartRefusalReason } from "@/game/domain/rune-materials";
 import {
-  addStackableItem,
-  applyStackRemovalPlan,
+  applyCarriedStackDiff,
   loadCarriedCapacity,
   removeFromSelectedStack,
 } from "@/server/carried-inventory";
@@ -193,12 +192,8 @@ export async function breakApartRunestoneInTransaction(
   const plan = planBreakApart({
     stacks: carry.stacks,
     selected: { stackId: request.stackId, expectedQuantity: request.expectedQuantity },
-    room: {
-      slotsUsed: carry.loadout.inventorySlotsUsed,
-      slotCapacity: carry.loadout.containerSlotCapacity,
-      carriedMassGrams: carry.loadout.carriedMassGrams,
-      maximumCarryCapacityGrams: carry.loadout.maximumCarryCapacityGrams,
-    },
+    slotsAvailable: carry.availableSlots,
+    massAvailableGrams: carry.availableMassGrams,
     balance: getEffectiveGameBalance(),
   });
   if (!plan.ok) {
@@ -211,12 +206,7 @@ export async function breakApartRunestoneInTransaction(
       },
     };
   }
-  await applyStackRemovalPlan(transaction, {
-    characterId,
-    plan: { ok: true, ...plan.removal },
-    now,
-  });
-  await addStackableItem(transaction, { characterId, plan: plan.addition, now });
+  await applyCarriedStackDiff(transaction, { characterId, diff: plan.diff, now });
   // The Fragments take slots a running Fabrication workpiece may have needed.
   await assertActiveWorkpieceResolvable(transaction, characterId);
   return {

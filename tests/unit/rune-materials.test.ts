@@ -2,12 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
 import type { StackState } from "@/game/domain/inventory";
-import {
-  breakApartFacts,
-  canBreakApart,
-  planBreakApart,
-  type BreakApartRoom,
-} from "@/game/domain/rune-materials";
+import { breakApartFacts, canBreakApart, planBreakApart } from "@/game/domain/rune-materials";
 
 /**
  * Break Apart (#367): one selected Runestone becomes exactly five Rune Fragments,
@@ -23,8 +18,15 @@ const stack = (id: string, itemId: StackState["itemId"], quantity: number): Stac
   quantity,
 });
 
+type Room = {
+  slotsUsed: number;
+  slotCapacity: number;
+  carriedMassGrams: number;
+  maximumCarryCapacityGrams: number;
+};
+
 /** A room with 8 slots, 50 kg of carry capacity and the given occupancy. */
-const room = (overrides: Partial<BreakApartRoom> = {}): BreakApartRoom => ({
+const room = (overrides: Partial<Room> = {}): Room => ({
   slotsUsed: 1,
   slotCapacity: 8,
   carriedMassGrams: 1_000,
@@ -36,16 +38,19 @@ function plan(input: {
   stacks: StackState[];
   stackId?: string;
   expectedQuantity?: number;
-  room?: Partial<BreakApartRoom>;
+  room?: Partial<Room>;
 }) {
   const selected = input.stacks.find((candidate) => candidate.id === (input.stackId ?? "stone"))!;
+  const carried = room(input.room);
   return planBreakApart({
     stacks: input.stacks,
     selected: {
       stackId: input.stackId ?? "stone",
       expectedQuantity: input.expectedQuantity ?? selected?.quantity ?? 1,
     },
-    room: room(input.room),
+    // The carried room as every carried-inventory command reads it.
+    slotsAvailable: Math.max(0, carried.slotCapacity - carried.slotsUsed),
+    massAvailableGrams: Math.max(0, carried.maximumCarryCapacityGrams - carried.carriedMassGrams),
     balance,
   });
 }
@@ -59,7 +64,8 @@ describe("the authored Break Apart conversion", () => {
       outputQuantity: 5,
     });
     expect(facts.inputMassGrams).toBe(1_000);
-    expect(facts.outputQuantity * facts.outputMassGrams).toBe(facts.inputMassGrams);
+    const fragment = getItemDefinition(FRAGMENT, balance)!;
+    expect(facts.outputQuantity * fragment.massGrams).toBe(facts.inputMassGrams);
   });
 
   it("matches the locked item definitions", () => {
@@ -89,11 +95,10 @@ describe("planBreakApart", () => {
     const result = plan({ stacks: [stack("stone", STONE, 1)] });
     expect(result).toEqual({
       ok: true,
-      removal: { updatedStacks: [], deletedStackIds: ["stone"] },
-      addition: {
-        updatedStacks: [],
+      diff: {
+        stackUpdates: [],
+        deletedStackIds: ["stone"],
         createdStacks: [{ itemId: FRAGMENT, quantity: 5 }],
-        remainingQuantity: 0,
       },
       consumedQuantity: 1,
       producedQuantity: 5,
@@ -107,8 +112,11 @@ describe("planBreakApart", () => {
     });
     expect(result).toMatchObject({
       ok: true,
-      removal: { updatedStacks: [{ id: "stone", quantity: 2 }], deletedStackIds: [] },
-      addition: { createdStacks: [{ itemId: FRAGMENT, quantity: 5 }] },
+      diff: {
+        stackUpdates: [{ id: "stone", quantity: 2 }],
+        deletedStackIds: [],
+        createdStacks: [{ itemId: FRAGMENT, quantity: 5 }],
+      },
     });
   });
 
@@ -121,8 +129,10 @@ describe("planBreakApart", () => {
     const result = plan({ stacks, room: { slotsUsed: 8 } });
     expect(result).toMatchObject({
       ok: true,
-      removal: { deletedStackIds: ["stone"] },
-      addition: { createdStacks: [{ itemId: FRAGMENT, quantity: 5 }] },
+      diff: {
+        deletedStackIds: ["stone"],
+        createdStacks: [{ itemId: FRAGMENT, quantity: 5 }],
+      },
     });
   });
 
@@ -145,11 +155,14 @@ describe("planBreakApart", () => {
     const result = plan({ stacks, room: { slotsUsed: 3, slotCapacity: 3 } });
     expect(result).toMatchObject({
       ok: true,
-      addition: {
-        updatedStacks: [
+      diff: {
+        // The stone keeps its slot at quantity 1; both Fragment stacks fill to the limit.
+        stackUpdates: expect.arrayContaining([
+          { id: "stone", quantity: 1 },
           { id: "frag-a", quantity: 10 },
           { id: "frag-b", quantity: 10 },
-        ],
+        ]),
+        deletedStackIds: [],
         createdStacks: [],
       },
     });
@@ -161,8 +174,9 @@ describe("planBreakApart", () => {
     // The stone's freed slot takes the 3 that do not fit in the partial stack.
     expect(result).toMatchObject({
       ok: true,
-      addition: {
-        updatedStacks: [{ id: "frag", quantity: 10 }],
+      diff: {
+        stackUpdates: [{ id: "frag", quantity: 10 }],
+        deletedStackIds: ["stone"],
         createdStacks: [{ itemId: FRAGMENT, quantity: 3 }],
       },
     });
@@ -172,8 +186,7 @@ describe("planBreakApart", () => {
     const stacks = [stack("stone", STONE, 2), stack("frag", FRAGMENT, 10)];
     const result = plan({ stacks, room: { slotsUsed: 2, slotCapacity: 2 } });
     expect(result).toEqual({ ok: false, reason: "slots" });
-    expect(result).not.toHaveProperty("removal");
-    expect(result).not.toHaveProperty("addition");
+    expect(result).not.toHaveProperty("diff");
   });
 
   it("counts every occupied slot, unique items included, against the room", () => {
@@ -194,20 +207,17 @@ describe("planBreakApart", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("refuses by mass when the carried load is already past the cap", () => {
-    const result = plan({
+  it("reads a carry already past its cap as zero free, as every carried command does", () => {
+    // Mass-neutral, so the conversion fits and makes nothing worse.
+    const overweight = plan({
       stacks: [stack("stone", STONE, 1)],
       room: { carriedMassGrams: 51_001, maximumCarryCapacityGrams: 50_000 },
     });
-    expect(result).toEqual({ ok: false, reason: "mass" });
-  });
-
-  it("refuses by slots when the room is already past its slot capacity", () => {
-    const result = plan({
-      stacks: [stack("stone", STONE, 2)],
-      room: { slotsUsed: 3, slotCapacity: 2 },
-    });
-    expect(result).toEqual({ ok: false, reason: "slots" });
+    expect(overweight.ok).toBe(true);
+    // A stack of stones frees no slot, so an over-full pack still has none for the Fragments.
+    expect(
+      plan({ stacks: [stack("stone", STONE, 2)], room: { slotsUsed: 3, slotCapacity: 2 } }),
+    ).toEqual({ ok: false, reason: "slots" });
   });
 
   it("rejects a stale quantity without a diff", () => {
@@ -222,7 +232,8 @@ describe("planBreakApart", () => {
       planBreakApart({
         stacks: [stack("other", STONE, 1)],
         selected: { stackId: "gone", expectedQuantity: 1 },
-        room: room(),
+        slotsAvailable: 7,
+        massAvailableGrams: 49_000,
         balance,
       }),
     ).toEqual({ ok: false, reason: "stack_not_found" });
@@ -240,8 +251,11 @@ describe("planBreakApart", () => {
     const result = plan({ stacks, stackId: "other", room: { slotsUsed: 2 } });
     expect(result).toMatchObject({
       ok: true,
-      removal: { updatedStacks: [{ id: "other", quantity: 3 }], deletedStackIds: [] },
+      diff: { stackUpdates: [{ id: "other", quantity: 3 }], deletedStackIds: [] },
     });
+    // The other stack is untouched, even though it is the smaller one.
+    if (result.ok)
+      expect(result.diff.stackUpdates.map((update) => update.id)).not.toContain("stone");
   });
 
   it("converts exactly 1 stone to 5 Fragments across many carried layouts", () => {
@@ -271,12 +285,10 @@ describe("planBreakApart", () => {
       accepted += 1;
       // Apply the diff the way the server does and check the invariants.
       const after = new Map(stacks.map((entry) => [entry.id, { ...entry }]));
-      for (const id of result.removal.deletedStackIds) after.delete(id);
-      for (const update of result.removal.updatedStacks)
+      for (const id of result.diff.deletedStackIds) after.delete(id);
+      for (const update of result.diff.stackUpdates)
         after.get(update.id)!.quantity = update.quantity;
-      for (const update of result.addition.updatedStacks)
-        after.get(update.id)!.quantity = update.quantity;
-      result.addition.createdStacks.forEach((created, index) =>
+      result.diff.createdStacks.forEach((created, index) =>
         after.set(`new-${index}`, { id: `new-${index}`, ...created }),
       );
       const total = (itemId: string) =>

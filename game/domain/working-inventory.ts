@@ -90,6 +90,42 @@ export function removeStacks(
   };
 }
 
+/**
+ * Remove from one SPECIFIC carried stack: the row a player selected, never "any
+ * stack of that item" as `removeStacks` plans (smallest first). Which row is
+ * consumed decides whether a slot frees, so an action that converts a selected
+ * stack must name it. Mass frees immediately; the slot frees only when this
+ * removal empties the stack. Refuses without change for a missing stack or more
+ * than it holds.
+ */
+export function removeFromStack(
+  inventory: WorkingInventory,
+  stackId: string,
+  quantity: number,
+  balance: EffectiveGameBalance,
+): { ok: true; inventory: WorkingInventory } | { ok: false } {
+  if (!Number.isInteger(quantity) || quantity <= 0) return { ok: false };
+  const stack = inventory.stacks.find((candidate) => candidate.id === stackId);
+  if (!stack || quantity > stack.quantity) return { ok: false };
+  const emptied = quantity === stack.quantity;
+  return {
+    ok: true,
+    inventory: {
+      ...inventory,
+      stacks: emptied
+        ? inventory.stacks.filter((candidate) => candidate.id !== stackId)
+        : inventory.stacks.map((candidate) =>
+            candidate.id === stackId
+              ? { ...candidate, quantity: stack.quantity - quantity }
+              : candidate,
+          ),
+      slotsAvailable: inventory.slotsAvailable + (emptied ? 1 : 0),
+      massAvailableGrams:
+        inventory.massAvailableGrams + quantity * stackFacts(stack.itemId, balance).massGrams,
+    },
+  };
+}
+
 function applyAddition(
   inventory: WorkingInventory,
   plan: { updatedStacks: readonly StackUpdate<string>[]; createdStacks: readonly NewStack[] },

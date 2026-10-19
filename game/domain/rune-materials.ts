@@ -1,32 +1,32 @@
 import type { EffectiveGameBalance } from "@/game/config/balance";
+import type { ItemId } from "@/game/config/foundations";
+import type { StackState } from "@/game/domain/inventory";
 import {
-  planExactStackAddition,
-  planExactStackRemoval,
-  type StackAdditionPlan,
-  type StackState,
-  type StackUpdate,
-} from "@/game/domain/inventory";
+  addStackExact,
+  removeFromStack,
+  workingInventory,
+  workingInventoryDiff,
+  type WorkingInventoryDiff,
+} from "@/game/domain/working-inventory";
 
 /**
  * Pure rules for breaking an intact Runestone apart (#367).
  *
  * Break Apart destroys exactly one Runestone from the stack the player selected
  * and grants the authored number of Rune Fragments, all-or-nothing, in carried
- * Inventory. Server commands load locked rows and apply the returned diff; every
- * decision about whether the conversion fits is made here, against the
- * HYPOTHETICAL Inventory that exists once the stone has been consumed, so no
- * client value is ever trusted and the rules are unit-testable without a
- * database.
+ * Inventory. The hypothetical-inventory mechanics are the shared ones
+ * (`game/domain/working-inventory.ts`, also behind Fabrication, Tinkering and
+ * player-trade settlement): this module owns only what is specific to the
+ * conversion — the authored ratio and the selected-stack precondition — and
+ * returns the same `WorkingInventoryDiff` the carried-stack adapter applies.
  */
 
 /** The authored conversion's item facts, joined from the item definitions. */
 export type BreakApartFacts = {
-  inputItemId: string;
+  inputItemId: ItemId;
   inputMassGrams: number;
-  outputItemId: string;
+  outputItemId: ItemId;
   outputQuantity: number;
-  outputStackLimit: number;
-  outputMassGrams: number;
 };
 
 /** The Break Apart conversion, or why the balance cannot express one. */
@@ -39,12 +39,10 @@ export function breakApartFacts(balance: EffectiveGameBalance): BreakApartFacts 
     throw new Error("Break Apart authors an item that is not a shipped stackable item");
   }
   return {
-    inputItemId: input.itemId,
+    inputItemId: breakApart.inputItemId,
     inputMassGrams: input.massGrams,
-    outputItemId: output.itemId,
+    outputItemId: breakApart.outputItemId,
     outputQuantity: breakApart.outputQuantity,
-    outputStackLimit: output.stackLimit,
-    outputMassGrams: output.massGrams,
   };
 }
 
@@ -53,14 +51,6 @@ export function canBreakApart(itemId: string, balance: EffectiveGameBalance): bo
   return balance.runeMaterials.breakApart.inputItemId === itemId;
 }
 
-/** The carried room the conversion is planned against, before the stone is consumed. */
-export type BreakApartRoom = {
-  slotsUsed: number;
-  slotCapacity: number;
-  carriedMassGrams: number;
-  maximumCarryCapacityGrams: number;
-};
-
 export type BreakApartRefusalReason =
   /** The selected stack is no longer carried. */
   | "stack_not_found"
@@ -68,18 +58,16 @@ export type BreakApartRefusalReason =
   | "not_breakable"
   /** The stack's quantity is not the one the player confirmed. */
   | "stack_changed"
-  /** The five Fragments would not fit in the free slots. */
+  /** The Fragments would not fit in the free slots. */
   | "slots"
-  /** The five Fragments would not fit in the free carry mass. */
+  /** The Fragments would not fit in the free carry mass. */
   | "mass";
 
-export type BreakApartPlan<Id> =
+export type BreakApartPlan =
   | {
       ok: true;
-      /** The selected stack after one stone is consumed: resized, or deleted when it was the last. */
-      removal: { updatedStacks: readonly StackUpdate<Id>[]; deletedStackIds: readonly Id[] };
-      /** Where the Fragments land: partial Fragment stacks first, then new stacks. */
-      addition: StackAdditionPlan<Id>;
+      /** The whole change to the carried rows: the stone consumed, every Fragment placed. */
+      diff: WorkingInventoryDiff;
       consumedQuantity: 1;
       producedQuantity: number;
     }
@@ -95,49 +83,45 @@ export type BreakApartPlan<Id> =
  * its slot), its mass is freed either way, and the Fragments merge into partial
  * Fragment stacks before any new slot is taken. Nothing is partially applied: a
  * refusal carries no diff.
+ *
+ * `slotsAvailable` and `massAvailableGrams` are the carried room before the
+ * conversion, as every carried-inventory command reads it.
  */
-export function planBreakApart<Id>(input: {
-  stacks: readonly StackState<Id>[];
-  selected: { stackId: Id; expectedQuantity: number };
-  room: BreakApartRoom;
+export function planBreakApart(input: {
+  stacks: readonly StackState<string>[];
+  selected: { stackId: string; expectedQuantity: number };
+  slotsAvailable: number;
+  massAvailableGrams: number;
   balance: EffectiveGameBalance;
-}): BreakApartPlan<Id> {
-  const { stacks, selected, room, balance } = input;
+}): BreakApartPlan {
+  const { stacks, selected, balance } = input;
   const facts = breakApartFacts(balance);
   const stack = stacks.find((candidate) => candidate.id === selected.stackId);
   if (!stack) return { ok: false, reason: "stack_not_found" };
   if (stack.itemId !== facts.inputItemId) return { ok: false, reason: "not_breakable" };
   if (stack.quantity !== selected.expectedQuantity) return { ok: false, reason: "stack_changed" };
 
-  const removal = planExactStackRemoval([stack], stack.itemId, 1);
-  if (!removal.ok) return { ok: false, reason: "stack_changed" };
-
-  const remainingStacks = stacks.flatMap((candidate) => {
-    if (removal.deletedStackIds.includes(candidate.id)) return [];
-    const update = removal.updatedStacks.find((entry) => entry.id === candidate.id);
-    return [update ? { ...candidate, quantity: update.quantity } : candidate];
-  });
-  // Signed on purpose: a room already past its capacity is refused rather than
-  // clamped to "zero free", which would let a conversion look like it fits.
-  const slotsFree = room.slotCapacity - (room.slotsUsed - removal.deletedStackIds.length);
-  const massFree = room.maximumCarryCapacityGrams - (room.carriedMassGrams - facts.inputMassGrams);
-  if (slotsFree < 0) return { ok: false, reason: "slots" };
-  if (massFree < 0) return { ok: false, reason: "mass" };
-
-  const addition = planExactStackAddition(
-    remainingStacks,
-    facts.outputItemId as StackState<Id>["itemId"],
-    facts.outputQuantity,
-    facts.outputStackLimit,
-    slotsFree,
-    massFree,
-    facts.outputMassGrams,
+  const consumed = removeFromStack(
+    workingInventory({
+      stacks,
+      slotsAvailable: input.slotsAvailable,
+      massAvailableGrams: input.massAvailableGrams,
+    }),
+    stack.id,
+    1,
+    balance,
   );
-  if (!addition.ok) return { ok: false, reason: addition.reason };
+  if (!consumed.ok) return { ok: false, reason: "stack_changed" };
+  const produced = addStackExact(
+    consumed.inventory,
+    facts.outputItemId,
+    facts.outputQuantity,
+    balance,
+  );
+  if (!produced.ok) return { ok: false, reason: produced.reason };
   return {
     ok: true,
-    removal: { updatedStacks: removal.updatedStacks, deletedStackIds: removal.deletedStackIds },
-    addition: addition.plan,
+    diff: workingInventoryDiff(stacks, produced.inventory),
     consumedQuantity: 1,
     producedQuantity: facts.outputQuantity,
   };

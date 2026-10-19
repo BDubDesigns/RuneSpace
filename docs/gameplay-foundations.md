@@ -295,18 +295,23 @@ are `public/item-art/rune-fragment.webp` and `runestone.webp`.
   stone from the selected stack, never the whole stack, and nothing reassembles
   Fragments into a Runestone.
 - **Authority.** `breakApartRunestone` (`server/inventory.ts`) runs under the
-  shared character lock after due Mining resolves. It re-reads the selected
-  stack row, verifies the confirmed quantity, and plans the whole conversion
-  with `planBreakApart` (`game/domain/rune-materials.ts`) against the Inventory
-  that exists **after** the stone is consumed: the stone's slot is freed only if
-  it was the stack's last stone, its mass is freed either way, and the five
-  Fragments merge into partial Fragment stacks before taking a new slot. One
-  transaction then removes the stone and adds every Fragment. Any shortfall
-  (slots, mass, a stale or missing selection, a stack that is not a Runestone)
-  refuses with no write, and a failure while writing rolls the whole transaction
-  back. A double click, replay or concurrent request is serialized by the
-  character lock and re-validated against the confirmed quantity, so a stone can
-  be consumed only once.
+  shared character lock after due Mining resolves. It loads the carried stacks
+  and room, and plans with `planBreakApart` (`game/domain/rune-materials.ts`),
+  which owns only the authored ratio and the selected-stack precondition (the
+  row exists, is a Runestone, and still holds the confirmed quantity). The
+  capacity mechanics are the shared hypothetical inventory in
+  `game/domain/working-inventory.ts`, as Fabrication, Tinkering and player-trade
+  settlement use it: `removeFromStack` consumes the **selected** row (the stone's
+  slot frees only if it was the last stone; its mass frees either way),
+  `addStackExact` merges the Fragments into partial stacks before taking a slot,
+  and `workingInventoryDiff` yields one carried-stack diff that
+  `applyCarriedStackDiff` applies in the one transaction. Any shortfall (slots,
+  mass, a stale or missing selection, a stack that is not a Runestone) refuses
+  with no write, and a failure while writing rolls the whole transaction back. A
+  double click, replay or concurrent request is serialized by the character lock
+  and re-validated against the confirmed quantity, so a stone can be consumed
+  only once. A later Inventory transformation composes the same primitives
+  rather than adding another planner.
 
 ## Bounded runs (issue #229)
 
