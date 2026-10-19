@@ -605,6 +605,16 @@ Current production conventions:
   square, never stretched. The silver cylinder family is told apart by physical
   hardware (the Full one's red cap and red side locking bar), never by a baked
   label, so it still reads at the 80 px inventory size
+- the Rune materials slice's two items (#367): the approved Rune Fragment (small
+  pointed triangular shard) and intact Runestone (larger irregular stone with a
+  ring-like engraving) masters (1024x1024 transparent RGBA PNG, kept unaltered in
+  `assets/item-art/`) and their derivatives in `public/item-art/`, prepared by the
+  same recipe as the Oil Shale and the canisters (alpha under 4 cleared, near-opaque
+  alpha snapped to 255, trimmed, scaled to a 576 px long edge, centred on a 640x640
+  transparent canvas, lossless WebP). Both carry violet and cyan seams on grey
+  stone, so the Fragment is told from the Runestone by silhouette and scale (a
+  pointed shard against a whole stone with its engraving), and both were checked
+  at the 80 px inventory tile
 - Holo Hollow Landing and Last Leg Trading (#357): the empty Landing panorama
   (`holo-hollow-landing.webp`, 1536x384 lossy WebP q80, from the approved
   1536x384 master), the Last Leg Trading exterior (2508x627) and interior (1717x916)

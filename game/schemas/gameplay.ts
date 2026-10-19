@@ -143,6 +143,17 @@ export const DiscardInventoryStackRequestSchema = z.object({
 });
 
 /**
+ * Break Apart (#367) identifies only the selected stack and the quantity the
+ * player confirmed against. The consumed item, the output, the ratio and every
+ * capacity decision are server-resolved; the action always converts exactly one.
+ */
+export const BreakApartRunestoneRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  stackId: z.string().uuid(),
+  expectedQuantity: z.number().int().positive(),
+});
+
+/**
  * The confirmed, exact useful quantities for one irreversible repair commit,
  * plus which repair target is being worked on. The target's recipe, its
  * location, and the Mission that authorizes it are all revalidated server-side.

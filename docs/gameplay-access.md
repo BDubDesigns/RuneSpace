@@ -96,7 +96,7 @@ actions and their seams:
 | Work Orders | `acceptWorkOrderAction`, `startWorkOrderWeldingAction`, `stopWorkOrderWeldingAction`, `refreshWorkOrderBoardAction` | lock + reconcile |
 | Cargo Hold | `depositCargoStackAction`, `withdrawCargoStackAction`, `depositCargoUniqueItemAction`, `withdrawCargoUniqueItemAction` | lock + reconcile |
 | Site stashes | `depositSiteStashStackAction`, `withdrawSiteStashStackAction`, `depositSiteStashUniqueItemAction`, `withdrawSiteStashUniqueItemAction`, `installSiteStashContainerAction`, `swapSiteStashContainerAction`, `removeSiteStashContainerAction` | lock + reconcile |
-| Inventory / Equipment | `discardInventoryStackAction`, `equipEquipmentAction`, `unequipEquipmentAction` | lock + reconcile |
+| Inventory / Equipment | `discardInventoryStackAction`, `breakApartRunestoneAction`, `equipEquipmentAction`, `unequipEquipmentAction` | lock + reconcile |
 | Travel / Scavenge | `beginTravelAction`, `beginTransportTravelAction`, `turnBackTravelAction`, `claimScavengeAction` | lock + reconcile |
 | Instant interactions | `acknowledgeScavengeRevealAction`, `claimPowerCellsAction`, `tradeWithMerchantAction` | lock only (deliberately no reconcile) |
 

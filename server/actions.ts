@@ -50,7 +50,12 @@ import {
   stopTinkering,
 } from "@/server/tinkering-commands";
 import { changeEquipment } from "@/server/equipment";
-import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
+import {
+  breakApartRunestone,
+  discardInventoryStack,
+  type BreakApartRunestoneResult,
+  type DiscardInventoryStackResult,
+} from "@/server/inventory";
 import {
   depositCargoStack,
   depositCargoUniqueItem,
@@ -186,6 +191,7 @@ import {
   TradeRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
+  BreakApartRunestoneRequestSchema,
   RepairMaterialContributionRequestSchema,
   StartRefiningRequestSchema,
   StartFabricationRequestSchema,
@@ -988,6 +994,27 @@ export async function discardInventoryStackAction(
     return await discardInventoryStack(user.id, request.data.characterId, {
       stackId: request.data.stackId,
       mode: request.data.mode,
+      expectedQuantity: request.data.expectedQuantity,
+    });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError || error instanceof FabricationReservationError)
+      return { error: error.message };
+    throw error;
+  }
+}
+
+export type BreakApartRunestoneActionResult = BreakApartRunestoneResult | { error: string };
+
+export async function breakApartRunestoneAction(
+  input: unknown,
+): Promise<BreakApartRunestoneActionResult> {
+  const request = BreakApartRunestoneRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid inventory command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await breakApartRunestone(user.id, request.data.characterId, {
+      stackId: request.data.stackId,
       expectedQuantity: request.data.expectedQuantity,
     });
   } catch (error) {

@@ -60,6 +60,12 @@ const balanceSchema = z.object({
             oneIn: z.literal(60),
             announce: z.literal(true),
           }),
+          // Rune Fragment (#367): appended, so the gems' absolute chances are untouched.
+          z.object({
+            itemId: z.literal(ITEM_IDS.runeFragment),
+            oneIn: z.literal(12),
+            announce: z.literal(false),
+          }),
         ]),
       }),
       /**
@@ -91,6 +97,11 @@ const balanceSchema = z.object({
             itemId: z.literal(ITEM_IDS.uncutSapphire),
             oneIn: z.literal(55),
             announce: z.literal(true),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.runeFragment),
+            oneIn: z.literal(8),
+            announce: z.literal(false),
           }),
         ]),
       }),
@@ -1063,6 +1074,36 @@ const balanceSchema = z.object({
       stackLimit: z.literal(2),
       fuelUnits: z.literal(50),
     }),
+    /**
+     * Rune materials (#367). A Rune Fragment is a 200 g Mining Secondary Find that
+     * owns its +20 Mining XP like every other find. The intact Runestone is
+     * exactly five Fragments' mass (1,000 g) and breaks apart into them, so the
+     * conversion conserves mass (`runeMaterials.breakApart`).
+     */
+    runeFragment: z.object({
+      itemId: z.literal(ITEM_IDS.runeFragment),
+      massGrams: z.literal(200),
+      stackLimit: z.literal(10),
+      secondaryFindMiningXp: z.literal(20),
+    }),
+    runestone: z.object({
+      itemId: z.literal(ITEM_IDS.runestone),
+      massGrams: z.literal(1_000),
+      stackLimit: z.literal(5),
+    }),
+  }),
+  /**
+   * Rune materials (#367). Break Apart is the one Inventory conversion: one intact
+   * Runestone becomes exactly five Rune Fragments (1,000 g either way), with no
+   * tool, location, timer or XP. The same item IDs author the Mining finds and
+   * stack facts, so the conversion owns only the ratio.
+   */
+  runeMaterials: z.object({
+    breakApart: z.object({
+      inputItemId: z.literal(ITEM_IDS.runestone),
+      outputItemId: z.literal(ITEM_IDS.runeFragment),
+      outputQuantity: z.literal(5),
+    }),
   }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
@@ -1124,6 +1165,7 @@ const defaults = balanceSchema.parse({
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutQuartz, oneIn: 40, announce: false },
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 60, announce: true },
+          { itemId: ITEM_IDS.runeFragment, oneIn: 12, announce: false },
         ],
       },
       galvanite: {
@@ -1141,6 +1183,7 @@ const defaults = balanceSchema.parse({
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 35, announce: false },
           { itemId: ITEM_IDS.uncutSapphire, oneIn: 55, announce: true },
+          { itemId: ITEM_IDS.runeFragment, oneIn: 8, announce: false },
         ],
       },
       oilShale: {
@@ -1683,6 +1726,20 @@ const defaults = balanceSchema.parse({
       massGrams: 6_000,
       stackLimit: 2,
       fuelUnits: 50,
+    },
+    runeFragment: {
+      itemId: ITEM_IDS.runeFragment,
+      massGrams: 200,
+      stackLimit: 10,
+      secondaryFindMiningXp: 20,
+    },
+    runestone: { itemId: ITEM_IDS.runestone, massGrams: 1_000, stackLimit: 5 },
+  },
+  runeMaterials: {
+    breakApart: {
+      inputItemId: ITEM_IDS.runestone,
+      outputItemId: ITEM_IDS.runeFragment,
+      outputQuantity: 5,
     },
   },
   carrying: {

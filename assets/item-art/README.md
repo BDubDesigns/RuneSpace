@@ -43,6 +43,15 @@ clients.
   stretched. The art carries no stamped word and no fuel chamber; the red
   hardware is the fill-state cue. Nothing was regenerated, recomposed or
   recoloured.
+- `rune-fragment.png` and `runestone.png` are the approved 1024×1024 transparent
+  RGBA renders of the Rune Fragment (the small pointed triangular shard) and the
+  intact Runestone (the larger irregular stone with a ring-like engraving)
+  (#367), byte-identical to the owner-supplied masters. The committed derivatives
+  follow the Wheel Assembly convention — alpha noise below 4 cleared, near-opaque
+  alpha (252 and above) snapped to 255, trimmed to content (583×765 and 757×880),
+  scaled to a 576 px long edge (439×576 and 495×576), centred on a 640×640
+  transparent canvas and saved as lossless WebP. Both read at the 80 px
+  Inventory tile size. Nothing was regenerated, recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

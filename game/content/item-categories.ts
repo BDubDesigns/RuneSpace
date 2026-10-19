@@ -54,6 +54,8 @@ const itemCategoryByItemId = {
   [ITEM_IDS.uncutQuartz]: "ores-and-gemstones",
   [ITEM_IDS.uncutTopaz]: "ores-and-gemstones",
   [ITEM_IDS.uncutSapphire]: "ores-and-gemstones",
+  [ITEM_IDS.runeFragment]: "ores-and-gemstones",
+  [ITEM_IDS.runestone]: "ores-and-gemstones",
   [ITEM_IDS.refinedFerrite]: "processed-materials",
   [ITEM_IDS.galvanicStock]: "processed-materials",
   [ITEM_IDS.galvaferrite]: "processed-materials",

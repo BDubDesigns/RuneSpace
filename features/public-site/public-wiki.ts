@@ -229,10 +229,11 @@ const authoredWikiArticles = [
       {
         heading: "Rare finds",
         paragraphs: [
-          "Now and then a successful attempt turns up something extra in the rock: a rough, uncut gemstone. It comes in addition to your ore, never instead of it, and a failed attempt never finds one. A find is rare — you can mine for a long while without seeing one — and an attempt turns up at most one.",
+          "Now and then a successful attempt turns up something extra in the rock: a rough, uncut gemstone. It comes in addition to your ore, never instead of it, and a failed attempt never finds one. A gem is rare — you can mine for a long while without seeing one — and an attempt turns up at most one find of any kind.",
           "The Jag can give Uncut Quartz or Uncut Topaz. Deep Jag can give Uncut Topaz or Uncut Sapphire. The South Cut can give Uncut Sapphire or, far more rarely, a Motherlode Slab. A find shows on the attempt's result as a purple-framed tile beside your ore — the gems keep that purple frame in your Inventory too — and the Mining experience on that result is one total: the ore's usual amount plus a bonus for the gem. Quartz adds 10, Topaz 20 and Sapphire 30, wherever you find them.",
-          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems, and a low-yield attempt never finds one.",
-          "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
+          "The Jag and Deep Jag can also turn up a Rune Fragment: about one success in twelve at The Jag and one in eight at Deep Jag. It is one of the same single find an attempt can turn up, so an attempt never gives both a Rune Fragment and a gem, and it comes on top of your ore and its experience. A Rune Fragment adds 20 Mining experience wherever it is found. It is an ordinary 200g material that stacks ten to a tile — no purple frame — and finding one is not announced in General.",
+          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
+          "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find — a Rune Fragment is 200g, so that includes room for its weight. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
           "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
         ],
       },
@@ -324,6 +325,13 @@ const authoredWikiArticles = [
             { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
             ". The Loadsteel Cutter needs Mining 5; below that, Equipment lists it but will not equip it, and says why.",
           ],
+        ],
+      },
+      {
+        heading: "Breaking a Runestone apart",
+        paragraphs: [
+          "Select a Runestone and Item details shows Break Apart. After you confirm, it destroys one Runestone and gives you exactly five Rune Fragments, with nothing else needed — no tool, no place and no timer. It cannot be undone, and Rune Fragments cannot be put back together. It works on one stone at a time, even from a stack of several.",
+          "The five Fragments have to fit in your Inventory once the stone is gone. They top up any partly filled Rune Fragment stacks first; the Runestone's own tile only frees up when it was your last stone. If they would not fit, nothing happens: the Runestone stays exactly as it was, and the message says whether you were short of slots or weight. The same 1 kg is carried either way.",
         ],
       },
       {

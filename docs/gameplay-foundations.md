@@ -208,12 +208,15 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 | Deep Jag | Uncut Sapphire | 1 / 55 | +30 | **yes** |
 | The South Cut (#342) | Uncut Sapphire | 1 / 20 | +30 | no |
 | The South Cut (#342) | Motherlode Slab | 1 / 100 | +150 | **yes**, as ULTRA RARE FIND |
+| The Jag (#367) | Rune Fragment | 1 / 12 | +20 | no |
+| Deep Jag (#367) | Rune Fragment | 1 / 8 | +20 | no |
 
 - **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
   over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
   is an integer drawn from the least common multiple of the table's
-  denominators (120 at The Jag, 385 at Deep Jag, 100 at The South Cut), and each entry owns a
-  consecutive span of it. One roll can therefore never award two finds, and no
+  denominators (120 at The Jag, 3,080 at Deep Jag, 100 at The South Cut), and each entry owns a
+  consecutive span of it. The Rune Fragment is appended last to each table, so
+  every existing gem keeps the span, and therefore the absolute chance, it had. One roll can therefore never award two finds, and no
   authored chance is rounded to basis points. Current content awards at most one
   find per success; the resolver does not encode that limit.
 - **XP.** The source still owns its primary XP. Each find *item* owns one
@@ -224,11 +227,16 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 - **Items.** Uncut Quartz, Topaz and Sapphire are 100 g, stack to **2**, and Bix
   buys them at **8 / 18 / 35** Credits. Wade does not. Their flavour text is
   authored in `game/content/item-presentation.ts` and shown in Inventory details.
+  The Rune Fragment (#367) is a 200 g item that stacks to **10**, with its own
+  `secondaryFindMiningXp: 20`, no rarity, no announcement and no merchant price;
+  see "Rune materials" below.
 - **Capacity.** Before an attempt begins, the inventory must be able to keep the
   source's *minimum* primary yield **plus any one possible find**. Finds are
   mutually exclusive, so each candidate is planned independently against the
   same snapshot: one free slot can serve whichever find turns up (no slot per
-  possible item), and an existing partial stack satisfies either side. A rolled
+  possible item), and an existing partial stack satisfies either side. The 200 g
+  Rune Fragment is the heaviest candidate, so the Off-setting mass check at The
+  Jag is 100 g of Shale plus 200 g (300 g), and at Deep Jag 400 g plus 200 g. A rolled
   find is **never rolled and then discarded**: on a hit with tight capacity the
   find and the minimum ore are kept, and only the optional ore above the minimum
   (and a charged tool's extra ore) is reduced.
@@ -254,6 +262,51 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
   the primary is placed first, and a rolled find that no longer fits is
   forfeited without XP, history or announcement — see "Prioritize primary
   resources". A find is announced only when it was actually committed.
+
+### Rune materials (#367)
+
+The first, self-contained slice of the Beginner Runeworking work: two ordinary
+physical materials and one Inventory action. There is **no** Runeworking skill,
+recipe, Echo Seeker, Mission, merchant price or new location here.
+
+| Item | Unit mass | Stack limit | Where from |
+| --- | ---: | ---: | --- |
+| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 12 at The Jag, 1 / 8 at Deep Jag; Break Apart |
+| Runestone (intact) | 1,000 g | 5 | **No natural source yet.** An authorized admin grant, until a later source is authored |
+
+Both are ordinary stackable, tradable, carriable materials classified under
+*Ores & Gemstones*, authored once in `game/config/balance.ts` (`items`, with the
+Fragment's `secondaryFindMiningXp: 20`) and presented in
+`game/content/item-presentation.ts`. Their approved art masters are
+`assets/item-art/rune-fragment.png` and `runestone.png`; the runtime derivatives
+are `public/item-art/rune-fragment.webp` and `runestone.webp`.
+
+- **Mining.** The Fragment is one more entry in the existing single, mutually
+  exclusive Secondary Find table of each source (see "Secondary Finds"): a
+  success finds at most one of Quartz / Topaz / Fragment, in addition to the
+  ordinary ore, and a failed extraction rolls nothing. A charged Loadsteel
+  Cutter's +1 stays primary ore only. A Fragment the character's
+  *Prioritize primary resources* setting forfeits (no room, setting On) earns
+  no item and no +20 XP.
+- **Break Apart** is the one conversion (`balance.runeMaterials.breakApart`:
+  1 Runestone → 5 Rune Fragments, 1,000 g either way). It is offered in the
+  Runestone stack's ordinary Item Details, with an irreversible confirmation;
+  there is no tool, location, timer, XP or Inspect screen. It converts **one**
+  stone from the selected stack, never the whole stack, and nothing reassembles
+  Fragments into a Runestone.
+- **Authority.** `breakApartRunestone` (`server/inventory.ts`) runs under the
+  shared character lock after due Mining resolves. It re-reads the selected
+  stack row, verifies the confirmed quantity, and plans the whole conversion
+  with `planBreakApart` (`game/domain/rune-materials.ts`) against the Inventory
+  that exists **after** the stone is consumed: the stone's slot is freed only if
+  it was the stack's last stone, its mass is freed either way, and the five
+  Fragments merge into partial Fragment stacks before taking a new slot. One
+  transaction then removes the stone and adds every Fragment. Any shortfall
+  (slots, mass, a stale or missing selection, a stack that is not a Runestone)
+  refuses with no write, and a failure while writing rolls the whole transaction
+  back. A double click, replay or concurrent request is serialized by the
+  character lock and re-validated against the confirmed quantity, so a stone can
+  be consumed only once.
 
 ## Bounded runs (issue #229)
 
@@ -1520,6 +1573,15 @@ Mining as no usable tool.
   depleted Cutter, and no conflicting command in flight, and it explains the
   reason whenever it is unavailable. Equipment remains the full Cutter
   charge/status surface.
+
+- **Break Apart (#367)** is offered for the item the balance names as the Break
+  Apart input (the intact Runestone), as a sibling of Drop in a stack's Item
+  Details. It requires its own confirmation (destroy 1 Runestone, receive exactly
+  5 Rune Fragments, irreversible), is disabled only while another command is in
+  flight, and shows the server's refusal as-is (not enough slots or weight, or
+  "Inventory changed"). On success the returned authoritative state replaces the
+  Inventory; a selected stack that no longer exists clears the selection through
+  the shared selectable-details contract. See "Rune materials".
 
 ## Credits and merchant transactions (issue #159)
 

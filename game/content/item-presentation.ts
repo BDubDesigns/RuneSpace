@@ -184,6 +184,27 @@ const itemPresentations = {
     description:
       "A single unbroken specimen of layered Oil Shale with an amber, oil-rich seam through it. Twelve kilograms of the real thing.",
   },
+  // Rune materials (#367). Ordinary physical materials: no rarity or special treatment.
+  [ITEM_IDS.runeFragment]: {
+    displayName: "Rune Fragment",
+    pluralName: "Rune Fragments",
+    accessibleDescription:
+      "A small, pointed, triangular shard of dark grey stone with glowing violet and cyan crystalline seams",
+    textFallback: "FR",
+    artworkSrc: "/item-art/rune-fragment.webp",
+    description:
+      "A broken piece of an unusual mineral that seems to resonate with something just beyond ordinary space. Useful for basic Runeworking.",
+  },
+  [ITEM_IDS.runestone]: {
+    displayName: "Runestone",
+    pluralName: "Runestones",
+    accessibleDescription:
+      "A large, irregular, intact grey stone with prismatic violet, blue and teal seams and a circular, angled rune engraved into its face",
+    textFallback: "RS",
+    artworkSrc: "/item-art/runestone.webp",
+    description:
+      "An intact stone with an unusually strong resonance. Valuable for advanced Runeworking, but can be broken into five Rune Fragments.",
+  },
   // Fuel manufacturing (#343). The two canisters are one silver cylinder family;
   // the fill state is the physical red cap and red side locking bar, so the art
   // has no baked label and the Full one's contents are said in words.
