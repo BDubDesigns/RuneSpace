@@ -619,11 +619,12 @@ Current production conventions:
   (`holo-hollow-landing.webp`, 1536x384 lossy WebP q80, from the approved
   1536x384 master), the Last Leg Trading exterior (2508x627) and interior (1717x916)
   WebPs, and Toll Kade's four transparent 400x500 portraits (`toll-kade-{neutral,
-  friendly,thoughtful,skeptical}.png`, the thoughtful pose letterboxed horizontally
-  only because its master is taller and narrower). The scenes and portraits were
-  delivered as approved production derivatives and are committed as delivered; all
-  masters are kept unaltered in `assets/location-scenes/` and
-  `assets/npc-art/toll-kade/`. The H.H. map identifier
+  friendly,thoughtful,skeptical}.png`). The scenes and portraits were delivered as
+  approved production derivatives and are committed as delivered; all masters are
+  kept unaltered in `assets/location-scenes/` and `assets/npc-art/toll-kade/`. The
+  thoughtful portrait was replaced under #371 with the approved 1122x1402 master,
+  the same size as the other three, so it is scaled uniformly to fit the 500 px
+  height (about 400 px wide) with no letterboxing and no stretching. The H.H. map identifier
   (`assets/map-icons/holo-hollow-landing.png`, 1254x1254 direct-alpha) went through
   the direct-alpha recipe in `scripts/prepare-holo-hollow-landing-art.mjs` to a
   512x428 grayscale lossless WebP
