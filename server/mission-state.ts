@@ -162,6 +162,9 @@ export async function loadMissionProjections(
     progressByMissionId.set(row.missionId, progress);
   }
   const stationary = input.activeActionId === undefined;
+  const completedMissionIds = new Set(
+    rows.filter((row) => row.completedAt != null).map((row) => row.missionId),
+  );
   const observation = buildObservation(
     assignmentRows,
     itemState.carriedInstances,
@@ -172,6 +175,7 @@ export async function loadMissionProjections(
       fuelUnits: getEffectiveGameBalance().ship.startingFuelUnits,
       flightRouteId: null,
     },
+    completedMissionIds,
   );
   return MISSIONS.map((mission) => {
     const trackedProgress = progressByMissionId.get(mission.id);
@@ -304,6 +308,7 @@ function buildObservation(
   repairStates: ReadonlyMap<string, RepairTargetState>,
   skillLevels: ReadonlyMap<string, number>,
   ship: { fuelUnits: number; flightRouteId: string | null },
+  completedMissionIds: ReadonlySet<string>,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedById = new Map(carriedInstances.map((instance) => [instance.id, instance.itemId]));
@@ -357,6 +362,7 @@ function buildObservation(
     repairTargets,
     skillLevels,
     ship: { fuelUnits: ship.fuelUnits, flightRouteId: ship.flightRouteId ?? undefined },
+    completedMissionIds,
   };
 }
 

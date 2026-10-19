@@ -12,6 +12,9 @@ import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/bal
 import { getItemPresentation, itemQuantityLabel } from "@/game/content/item-presentation";
 import { breakApartFacts, canBreakApart } from "@/game/domain/rune-materials";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
+import { ItemOfferModal } from "@/features/missions/ItemOfferModal";
+import { itemOfferForItem } from "@/features/missions/item-offers";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { breakApartRunestoneAction, discardInventoryStackAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
@@ -76,6 +79,9 @@ export function InventoryPanel({
   const [, startTransition] = useTransition();
   const [confirming, setConfirming] = useState<InventoryConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
+  // The carried-item Mission offer opened from Item Details (#369).
+  const [offerOpen, setOfferOpen] = useState(false);
+  const inspectRef = useRef<HTMLButtonElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   // Selection, authoritative reconciliation, the explicit-selection reveal, and
   // post-command focus restoration all come from the shared selectable-details
@@ -118,6 +124,13 @@ export function InventoryPanel({
   // item's tile receives the treatment so the player finds the equip path.
   // No mission-ID branching here.
   const missionGuidanceTargets = derivePinnedGuidanceTargets(state);
+  // A carried stack can offer an unaccepted Mission through its Item Details
+  // (#369). The offer comes from content and the projection, never from an item
+  // or Mission literal here.
+  const selectedItemOffer =
+    resolvedSelection?.kind === "stack"
+      ? itemOfferForItem(state, resolvedSelection.entry.itemId)
+      : undefined;
   const loadAvailability = derivePowerCellLoadAvailability(
     state,
     resolvedSelection,
@@ -173,6 +186,7 @@ export function InventoryPanel({
   function toggleSelect(next: InventorySelection) {
     setMessage(undefined);
     setConfirming(undefined);
+    setOfferOpen(false);
     select(next);
   }
 
@@ -181,6 +195,7 @@ export function InventoryPanel({
   // authoritative feedback already shown to the player.
   function clearSelection() {
     setConfirming(undefined);
+    setOfferOpen(false);
     clearSelected();
   }
 
@@ -320,8 +335,16 @@ export function InventoryPanel({
         resolvedSelection !== undefined && selected?.kind === "stack" && selected.id === stack.id,
       node: (
         <StackItemVisual
+          className={
+            missionGuidanceTargets.availableItemIds.has(stack.itemId)
+              ? "rs-mission-available"
+              : undefined
+          }
           interactive
           itemId={stack.itemId}
+          missionGuidance={
+            missionGuidanceTargets.availableItemIds.has(stack.itemId) ? "available" : undefined
+          }
           name={stack.name}
           onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
           quantity={stack.quantity}
@@ -454,6 +477,19 @@ export function InventoryPanel({
                 >
                   {getItemPresentation(resolvedSelection.entry.itemId)?.description}
                 </p>
+              ) : null}
+              {selectedItemOffer ? (
+                <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+                  <MissionActionButton
+                    data-item-offer-inspect
+                    disabled={foregroundBusy}
+                    guidance="available"
+                    onClick={() => setOfferOpen(true)}
+                    ref={inspectRef}
+                  >
+                    {selectedItemOffer.offer.inspectLabel}
+                  </MissionActionButton>
+                </div>
               ) : null}
               {selectedIsPowerCell ? (
                 <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
@@ -608,6 +644,24 @@ export function InventoryPanel({
         selectedIndex={tiles.findIndex((tile) => tile.selected)}
         tiles={tiles}
       />
+      {offerOpen && selectedItemOffer && resolvedSelection?.kind === "stack" ? (
+        <ItemOfferModal
+          offer={selectedItemOffer}
+          onAccepted={(accepted) => {
+            setOfferOpen(false);
+            setMessage({
+              tone: "muted",
+              message: `Mission accepted: ${accepted.missionTitle}. Your ${resolvedSelection.entry.name} stays in your Inventory.`,
+            });
+            // The Inspect control is gone once the Mission is accepted, so
+            // focus returns to the item's details instead of the page.
+            requestAnimationFrame(() => detailsHeadingRef.current?.focus({ preventScroll: true }));
+          }}
+          onClose={() => setOfferOpen(false)}
+          stack={resolvedSelection.entry}
+          triggerRef={inspectRef}
+        />
+      ) : null}
       {confirming?.kind === "break_apart" ? (
         <div
           role="alert"

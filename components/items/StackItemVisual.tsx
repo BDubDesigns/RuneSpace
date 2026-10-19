@@ -11,8 +11,8 @@ type StackItemVisualProps = {
   accessibleLabel?: string;
   className?: string;
   interactive?: boolean;
-  /** Marks the tile as a current semantic mission-guidance target. */
-  missionGuidance?: boolean;
+  /** Marks the tile as a current semantic mission-guidance target (or an item offer, #369). */
+  missionGuidance?: boolean | "active" | "available";
   selected?: boolean;
   onSelect?: () => void;
 };

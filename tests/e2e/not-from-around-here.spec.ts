@@ -1,0 +1,364 @@
+import type { Locator, Page } from "@playwright/test";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  characterMissionProgress,
+  characterMissions,
+  characters,
+  inventoryStacks,
+} from "@/db/rune-space";
+import {
+  ITEM_IDS,
+  LOCAL_PLACE_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+} from "@/game/config/foundations";
+import { playDialogueToText } from "./dialogue-steps";
+import {
+  expect,
+  openConversationEntry,
+  openMapSurface,
+  openNpcConversation,
+  openTestCharacter,
+  test,
+} from "./fixtures";
+
+/**
+ * Not From Around Here (#369) at the 390 px portrait width the Inventory and the
+ * conversation hub are designed for: the Rune Fragment's Inspect offer, the three
+ * guided contacts, an optional hint that narrows to Toll, and the deliberately
+ * unfinished end. Unit and PostgreSQL coverage own the rules; this proves what
+ * needs the running app — the blue tile, the modal's keyboard and focus
+ * behavior, the Map hexes, and that nothing fabricates a target or a Turn In.
+ */
+
+const MISSION = MISSION_IDS.notFromAroundHere;
+const { runeFragment: FRAGMENT, runestone: STONE } = ITEM_IDS;
+
+test.beforeEach(async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "sets its own phone viewport; runs once");
+  await page.setViewportSize({ width: 390, height: 844 });
+});
+
+async function seed(characterId: string, stacks: { itemId: string; quantity: number }[]) {
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  if (stacks.length > 0) {
+    await db.insert(inventoryStacks).values(stacks.map((stack) => ({ characterId, ...stack })));
+  }
+}
+
+async function accepted(characterId: string, progress: Record<string, number> = {}) {
+  const now = new Date();
+  await db.insert(characterMissions).values({ characterId, missionId: MISSION, acceptedAt: now });
+  await db.insert(characterMissionProgress).values(
+    Object.entries({ "toll-lead": 0, "toll-hint": 0, ...progress }).map(([progressKey, value]) => ({
+      characterId,
+      missionId: MISSION,
+      progressKey,
+      progress: value,
+    })),
+  );
+}
+
+async function standAt(characterId: string, locationId: string) {
+  await db
+    .update(characters)
+    .set({ currentLocationId: locationId })
+    .where(eq(characters.id, characterId));
+}
+
+const missionRows = (characterId: string) =>
+  db
+    .select()
+    .from(characterMissions)
+    .where(
+      and(eq(characterMissions.characterId, characterId), eq(characterMissions.missionId, MISSION)),
+    );
+
+async function progressOf(characterId: string) {
+  const rows = await db
+    .select()
+    .from(characterMissionProgress)
+    .where(
+      and(
+        eq(characterMissionProgress.characterId, characterId),
+        eq(characterMissionProgress.missionId, MISSION),
+      ),
+    );
+  return Object.fromEntries(rows.map((row) => [row.progressKey, row.progress]));
+}
+
+async function openInventory(page: Page) {
+  await page.getByRole("button", { name: "Inventory" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  await expect(inventory).toBeVisible();
+  return inventory;
+}
+
+const tile = (inventory: Locator, name: string) =>
+  inventory.getByRole("button", { name: new RegExp(`^\\d+ ${name}`) });
+
+const litHexes = (page: Page) => page.locator("[data-map-location][data-mission-guidance]");
+
+test.describe("the Rune Fragment offer", () => {
+  test("a carried Fragment glows blue and offers the Mission through Inspect, without using it up", async ({
+    page,
+    testCharacter,
+  }) => {
+    await seed(testCharacter.id, [
+      { itemId: FRAGMENT, quantity: 4 },
+      { itemId: STONE, quantity: 1 },
+    ]);
+    await openTestCharacter(page, testCharacter.id);
+    const inventory = await openInventory(page);
+
+    // Blue "Mission available" on the Fragment only; an intact Runestone is plain.
+    await expect(tile(inventory, "Rune Fragment")).toHaveAttribute(
+      "data-mission-guidance",
+      "available",
+    );
+    await expect(tile(inventory, "Runestone")).not.toHaveAttribute("data-mission-guidance", /.+/);
+
+    // The ordinary Item Details, with Break Apart unchanged on a Runestone.
+    await tile(inventory, "Runestone").click();
+    const details = inventory.locator("[data-details-panel]");
+    await expect(details.getByRole("button", { name: "Break Apart" })).toBeVisible();
+    await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
+
+    await tile(inventory, "Rune Fragment").click();
+    const inspect = details.locator("[data-item-offer-inspect]");
+    await expect(inspect).toHaveText("Inspect");
+    await expect(inspect).toHaveAttribute("data-mission-guidance", "available");
+    await expect(details.locator("[data-item-description]")).toContainText(
+      "A broken piece of an unusual mineral",
+    );
+
+    // Inspect opens the compact offer, in front of Inventory, with the real art.
+    await inspect.click();
+    const offer = page.getByRole("dialog", { name: "An Unusual Fragment mission offer" });
+    await expect(offer).toBeVisible();
+    await expect(offer.locator("[data-item-offer-description]")).toContainText(
+      "resonate beyond ordinary space",
+    );
+    await expect(offer.getByText("Not From Around Here")).toBeVisible();
+    const art = offer.locator('[data-testid="item-artwork"]');
+    await expect(art).toBeVisible();
+    await expect
+      .poll(() => art.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
+    // It fits the phone: nothing spills past the viewport on either axis.
+    const box = (await offer.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    expect(box.y + box.height).toBeLessThanOrEqual(844);
+
+    // Not now changes nothing and returns focus to Inspect.
+    await offer.getByRole("button", { name: "Not now" }).click();
+    await expect(offer).toHaveCount(0);
+    await expect(inspect).toBeFocused();
+    expect(await missionRows(testCharacter.id)).toHaveLength(0);
+
+    // So does Escape.
+    await inspect.click();
+    await expect(offer).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(offer).toHaveCount(0);
+    await expect(inspect).toBeFocused();
+    expect(await missionRows(testCharacter.id)).toHaveLength(0);
+
+    // The keyboard reaches Ask around, and accepting is atomic.
+    await inspect.click();
+    await expect(offer).toBeVisible();
+    const accept = offer.locator("[data-item-offer-accept]");
+    await accept.focus();
+    await page.keyboard.press("Enter");
+    await expect(offer).toHaveCount(0);
+    await expect(inventory.getByText(/Mission accepted: Not From Around Here/)).toBeVisible();
+
+    const [row] = await missionRows(testCharacter.id);
+    expect(row?.acceptedAt).not.toBeNull();
+    expect(row?.completedAt).toBeNull();
+    // Nothing was consumed, and the blue and the Inspect action are gone.
+    const fragments = await db
+      .select()
+      .from(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, testCharacter.id),
+          eq(inventoryStacks.itemId, FRAGMENT),
+        ),
+      );
+    expect(fragments.reduce((sum, stack) => sum + stack.quantity, 0)).toBe(4);
+    await expect(tile(inventory, "Rune Fragment")).not.toHaveAttribute(
+      "data-mission-guidance",
+      /.+/,
+    );
+    await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
+  });
+});
+
+test.describe("the investigation", () => {
+  test("lights all three contacts, then one hint narrows the Map to Toll", async ({
+    page,
+    testCharacter,
+  }) => {
+    await accepted(testCharacter.id);
+    await standAt(testCharacter.id, LOCATION_IDS.holoHollow);
+    await openTestCharacter(page, testCharacter.id);
+
+    await expect(page.locator(`[data-mission-strip="${MISSION}"]`)).toContainText(
+      "Find someone who might recognize the unusual fragment",
+    );
+    await openMapSurface(page);
+    // Wade (Crash Site), Tansy (The Jag) and Toll (the Landing): three green hexes.
+    await expect(litHexes(page)).toHaveCount(3);
+    for (const locationId of [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.theJag,
+      LOCATION_IDS.holoHollowLanding,
+    ]) {
+      await expect(page.locator(`[data-map-location="${locationId}"]`)).toHaveAttribute(
+        "data-mission-guidance",
+        "active",
+      );
+    }
+
+    // Wade, at the Crash Site, offers the optional hint with green guidance.
+    await standAt(testCharacter.id, LOCATION_IDS.crashSite);
+    await openTestCharacter(page, testCharacter.id);
+    const conversation = await openNpcConversation(page, "Wade Rusk");
+    const entry = conversation.locator(`[data-conversation-entry="${MISSION}:lead"]`);
+    await expect(entry).toHaveAttribute("data-mission-guidance", "active");
+    await openConversationEntry(conversation, /Not From Around Here/);
+    await playDialogueToText(conversation, /Go ask him/);
+    // Opening and reading the scene records nothing until its control is used.
+    expect((await progressOf(testCharacter.id))["toll-hint"]).toBe(0);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    await expect(conversation.locator(`[data-conversation-entry="${MISSION}:lead"]`)).toHaveCount(
+      0,
+    );
+    expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 0, "toll-hint": 1 });
+    await page.keyboard.press("Escape");
+
+    // Everything narrows to Toll alone, and the Mission stays Active.
+    await expect(page.locator(`[data-mission-strip="${MISSION}"]`)).toContainText(
+      "Ask Tolliver Kade at Last Leg Trading about the fragment",
+    );
+    await openMapSurface(page);
+    await expect(litHexes(page)).toHaveCount(1);
+    await expect(
+      page.locator(`[data-map-location="${LOCATION_IDS.holoHollowLanding}"]`),
+    ).toHaveAttribute("data-mission-guidance", "active");
+  });
+
+  test("Toll alone advances the Mission, which then waits honestly at Stillreach", async ({
+    page,
+    testCharacter,
+  }) => {
+    await accepted(testCharacter.id);
+    // Straight to Toll, before Thrust Issues and with Trade still shut.
+    await standAt(testCharacter.id, LOCATION_IDS.holoHollowLanding);
+    await openTestCharacter(page, testCharacter.id);
+
+    const directory = page.locator("[data-local-place-directory]");
+    const shop = directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.lastLegTrading}"]`);
+    await expect(shop.locator("[data-local-place-enter]")).toHaveAttribute(
+      "data-mission-guidance",
+      "active",
+    );
+    await shop.click();
+    const conversation = await openNpcConversation(page, "Tolliver “Toll” Kade");
+    const entry = conversation.locator(`[data-conversation-entry="${MISSION}:conversation"]`);
+    await expect(entry).toHaveAttribute("data-mission-guidance", "active");
+    await openConversationEntry(conversation, /Not From Around Here/);
+    await playDialogueToText(conversation, /Hilltop Workshop/);
+    expect((await progressOf(testCharacter.id))["toll-lead"]).toBe(0);
+    await playDialogueToText(conversation, /The hill isn't going anywhere/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });
+
+    // His ordinary topics are untouched, and the Mission scene is gone.
+    for (const topic of ["Skatboll", "Stillreach", "Fuel"]) {
+      await expect(conversation.getByRole("button", { name: new RegExp(topic) })).toBeVisible();
+    }
+    await expect(
+      conversation.locator(`[data-conversation-entry="${MISSION}:conversation"]`),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    const expectUnfinished = async () => {
+      const strip = page.locator(`[data-mission-strip="${MISSION}"]`);
+      await expect(strip).toContainText("Find the researcher at Hilltop Workshop on Stillreach");
+      await expect(strip).toHaveAttribute("data-mission-phase", "work");
+      await expect(strip).not.toContainText("Turn in");
+      // No fabricated target anywhere on the Map.
+      await openMapSurface(page);
+      await expect(litHexes(page)).toHaveCount(0);
+      const [row] = await missionRows(testCharacter.id);
+      expect(row?.completedAt).toBeNull();
+    };
+    await expectUnfinished();
+
+    // Refreshing, or signing back in, changes nothing.
+    await page.reload();
+    await expectUnfinished();
+  });
+
+  test("an unpinned Mission goes quiet on the Map but is never blocked", async ({
+    page,
+    testCharacter,
+  }) => {
+    await accepted(testCharacter.id);
+    await standAt(testCharacter.id, LOCATION_IDS.holoHollow);
+    await openTestCharacter(page, testCharacter.id);
+    await page.getByRole("button", { name: /Unpin Not From Around Here/ }).click();
+    await expect(page.locator(`[data-mission-strip="${MISSION}"]`)).toHaveCount(0);
+    await openMapSurface(page);
+    await expect(litHexes(page)).toHaveCount(0);
+
+    // The conversation is still there and still advances the Mission.
+    await standAt(testCharacter.id, LOCATION_IDS.theJag);
+    await openTestCharacter(page, testCharacter.id);
+    const conversation = await openNpcConversation(page, "Tansy Rusk");
+    await openConversationEntry(conversation, /Not From Around Here/);
+    await playDialogueToText(conversation, /Worst case, you've had a walk/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    expect((await progressOf(testCharacter.id))["toll-hint"]).toBe(1);
+  });
+});
+
+test.describe("NPC placement", () => {
+  test("a hint plays where Wade and Tansy actually stand for this character", async ({
+    page,
+    testCharacter,
+  }) => {
+    await accepted(testCharacter.id);
+    const now = new Date();
+    await db.insert(characterMissions).values(
+      [MISSION_IDS.keepTheChange, MISSION_IDS.tenThousandHours].map((missionId) => ({
+        characterId: testCharacter.id,
+        missionId,
+        acceptedAt: now,
+        completedAt: now,
+      })),
+    );
+    await standAt(testCharacter.id, LOCATION_IDS.holoHollow);
+    await openTestCharacter(page, testCharacter.id);
+    await openMapSurface(page);
+    // Both teachers share Wade's yard: one hex for the pair, plus Toll's.
+    await expect(litHexes(page)).toHaveCount(2);
+    await expect(
+      page.locator(`[data-map-location="${LOCATION_IDS.ruskRecovery}"]`),
+    ).toHaveAttribute("data-mission-guidance", "active");
+
+    await standAt(testCharacter.id, LOCATION_IDS.ruskRecovery);
+    await openTestCharacter(page, testCharacter.id);
+    for (const npc of [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]) {
+      await expect(page.locator(`[data-npc-interaction="${npc}"]`)).toBeVisible();
+    }
+  });
+});

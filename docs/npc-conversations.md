@@ -246,6 +246,25 @@ Satisfaction is read from the projection's own requirement statuses, so this
 needs no conversation history (§6). The authored sequence keeps its stable
 content ID for identity even once ordinary play can no longer reach it.
 
+### 4.2 Optional lead conversations (#369)
+
+A conversation requirement may author optional **leads** (`docs/missions.md`
+§5.2): scenes at other NPCs that point the player to the required contact. A
+lead scene is the same kind of one-time story event as §4.1, and its rules are
+the same except for when it stops being offered:
+
+- it appears in the lead NPC's hub only while the requirement is unsatisfied
+  **and** no lead has yet been followed, then disappears for good;
+- it carries `acknowledge_conversation`, the only thing that records the lead;
+  leaving a scene early records nothing;
+- it plays where that NPC stands for this character: its sequence is authored
+  `presentsAtCurrentVenue`, so Wade and Tansy speak against their current venue
+  after a Mission-derived relocation, with no background of their own to drift;
+- the NPC's ordinary topics and other Missions are unaffected.
+
+Not From Around Here is the production example: Wade or Tansy points to Toll, and
+visiting Toll directly needs neither.
+
 ## 5. Replayable topics
 
 ```ts

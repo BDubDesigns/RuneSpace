@@ -118,15 +118,33 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the first-flight cinematic Update as the newest (#359)", () => {
+  it("publishes the Rune Fragment mystery Update as the newest (#369)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("watch-the-rivet-fly");
+    expect(latest.slug).toBe("something-strange-in-the-rock");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
-      Date.parse(getPublicUpdate("the-rivet-takes-off")!.publishedAt),
+      Date.parse(getPublicUpdate("watch-the-rivet-fly")!.publishedAt),
     );
     expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const links = latest.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({
+      text: "Not From Around Here",
+      articleSlug: "mission-not-from-around-here",
+    });
+    // It announces exactly what ships: no reward, and no Stillreach content yet.
     const text = JSON.stringify(latest);
+    expect(text).toContain("pays nothing");
+    expect(text).toContain("not in the game yet");
+  });
+
+  it("keeps the first-flight cinematic Update published beneath it (#359)", () => {
+    const cinematic = getPublicUpdate("watch-the-rivet-fly")!;
+    expect(Date.parse(cinematic.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("the-rivet-takes-off")!.publishedAt),
+    );
+    const text = JSON.stringify(cinematic);
     // A presentation change: the flight itself is announced as unchanged and local.
     expect(text).toContain("10 Fuel Units and 15 seconds");
     expect(text).toContain("Skatboll");

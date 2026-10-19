@@ -292,6 +292,16 @@ are `public/item-art/rune-fragment.webp` and `runestone.webp`.
   Cutter's +1 stays primary ore only. A Fragment the character's
   *Prioritize primary resources* setting forfeits (no room, setting On) earns
   no item and no +20 XP.
+- **Inspect and the Mission offer (#369).** A carried Rune Fragment stack
+  offers the Mission *Not From Around Here* through its ordinary Item Details.
+  While the Mission is unaccepted the tile carries the shared blue
+  Mission-available treatment, and the content-authored **Inspect** action opens a
+  compact offer modal with the Fragment's own art and the authored copy. Closing
+  it changes nothing; accepting stamps the Mission without consuming, reserving or
+  transforming the Fragment, and an intact Runestone, a Cargo Hold stack or a
+  stash stack offers nothing. This is a generic item-offer mechanism
+  (`MissionDefinition.itemOffer`, `docs/missions.md` §4.1), so no Inventory code
+  names the Fragment. Break Apart and Drop on a Runestone are unchanged.
 - **Break Apart** is the one conversion (`balance.runeMaterials.breakApart`:
   1 Runestone → 5 Rune Fragments, 1,000 g either way). It is offered in the
   Runestone stack's ordinary Item Details, with an irreversible confirmation;

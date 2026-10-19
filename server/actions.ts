@@ -170,6 +170,7 @@ import {
   type ChatSendResult,
 } from "@/game/schemas/chat";
 import {
+  acceptItemOfferMission,
   acceptMission,
   acknowledgeMissionConversation,
   completeMission,
@@ -225,6 +226,7 @@ import {
   ChangeCharacterPortraitRequestSchema,
   AcceptMissionRequestSchema,
   CompleteMissionRequestSchema,
+  AcceptItemOfferRequestSchema,
   AcknowledgeMissionConversationRequestSchema,
 } from "@/game/schemas/gameplay";
 
@@ -391,6 +393,29 @@ export async function acceptMissionAction(input: unknown): Promise<MissionAction
       request.data.characterId,
       request.data.missionId,
       request.data.npcId,
+    );
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Accept a Mission offered by a carried item (#369). The browser submits only
+ * the owned character, the authored Mission and the carried stack it inspected;
+ * the server revalidates the offer, the stack and every eligibility rule.
+ */
+export async function acceptItemOfferAction(input: unknown): Promise<MissionActionResult> {
+  const request = AcceptItemOfferRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid mission offer command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acceptItemOfferMission(
+      user.id,
+      request.data.characterId,
+      request.data.missionId,
+      request.data.stackId,
     );
   } catch (error) {
     redirectOnGameplayRefusal(error);

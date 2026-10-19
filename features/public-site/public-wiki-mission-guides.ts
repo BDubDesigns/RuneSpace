@@ -1133,4 +1133,75 @@ export const missionGuideArticles = [
       { paragraphs: [["Back to all ", missions, "."]] },
     ],
   },
+  {
+    slug: "mission-not-from-around-here",
+    title: "Not From Around Here",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "A Rune Fragment in your Inventory offers it: ask around about the unusual mineral. Wade or Tansy can point you to Tolliver Kade, and Tolliver points you toward a researcher on Stillreach. It pays nothing, and it does not finish yet.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "A mystery Mission that starts from an item instead of a person. Nothing has to be finished before you can take it.",
+          ],
+        ],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "You need to be carrying a Rune Fragment, which ",
+            miningAndRefining("Mining"),
+            " can turn up as a find. Its tile glows blue in your ",
+            inventory("Inventory"),
+            ". Select the stack, choose Inspect in Item details, and then Ask around. Choosing Not now, or closing the offer, changes nothing. An intact Runestone does not offer it, and a Rune Fragment you keep in the Cargo Hold or a stash does not either, because the offer comes from a stack you are carrying.",
+          ],
+          "Accepting does not use up the Fragment. It stays in your Inventory.",
+        ],
+      },
+      {
+        heading: "What you need",
+        paragraphs: [
+          "To talk to Tolliver Kade at Last Leg Trading in Holo Hollow Landing. He is the only person the Mission needs, and you can go straight to him: Talk is open before you have repaired your ship, and Trade is a separate thing that does not matter here.",
+          [
+            "Until you have spoken to anyone, the Mission Log names three possible contacts: ",
+            wade,
+            ", ",
+            tansy,
+            " and Tolliver Kade, and all three of their places glow green on the Map.",
+          ],
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          [
+            "Optionally, show the Fragment to ",
+            wade,
+            " or ",
+            tansy,
+            ", wherever each of them is standing for you right now, and choose Worth asking at the end. Either of them is enough: once one has pointed you toward Tolliver, the Map and the Mission Log narrow to him alone, and the other adds nothing.",
+          ],
+          "Talk to Tolliver Kade at Last Leg Trading and choose Noted at the end of the conversation. Backing out of a conversation early, or just opening it, records nothing.",
+          "The Mission now reads Find the researcher at Hilltop Workshop on Stillreach.",
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "Nothing yet: no Credits, no XP and no item for inspecting the Fragment, for a hint, or for Tolliver's lead.",
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "The Mission stays accepted and Active at the end of Tolliver's lead. There is nowhere to hand it in and nothing to complete yet, and the Map points to nothing, because the researcher's workshop is not in the game yet. Your progress is kept for when it is.",
+          "You can unpin the Mission and the Map's highlights go quiet; you can still talk to anyone you like. Talking to Wade or Tansy about anything else works as it always did.",
+        ],
+      },
+      { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
 ];

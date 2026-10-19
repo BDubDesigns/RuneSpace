@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #369 — the first item-originated Mission.
+    slug: "something-strange-in-the-rock",
+    title: "Something Strange in the Rock",
+    publishedAt: "2026-10-18T21:00:00-07:00",
+    summary:
+      "A Rune Fragment in your Inventory now offers a Mission of its own. Ask around about the unusual mineral, and Tolliver Kade has a lead on a researcher on Stillreach.",
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.runeFragment }, side: "right" },
+      [
+        "If you have been carrying a Rune Fragment, take another look at it. The tile now glows blue, and selecting it shows a new Inspect action in Item details. Inspect opens a short offer for ",
+        { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+        ": the mineral seems to resonate beyond ordinary space, and someone might recognize it. Accepting uses nothing up. The Fragment stays in your Inventory, and so does the rest of the stack.",
+      ],
+      [
+        "Three people might know something. ",
+        { text: "Wade Rusk", articleSlug: "wade-rusk" },
+        " and ",
+        { text: "Tansy Rusk", articleSlug: "tansy-rusk" },
+        " do not recognize it, and either of them will tell you who to ask next: Tolliver Kade, who runs Last Leg Trading at Holo Hollow Landing. You can skip them and go straight to him. Tolliver has not identified the mineral, but he knows where some very similar cargo went, and the Mission now sends you looking for a researcher at Hilltop Workshop on Stillreach.",
+      ],
+      "That is as far as the Mission goes for now. The researcher and the route to Stillreach are not in the game yet, so the Mission stays accepted and Active with nothing to hand in, and the Map points nowhere. It pays nothing. Your progress is kept.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Not From Around Here, a Mission offered by a carried Rune Fragment through Item details, with a blue highlight on the tile and an Inspect action.",
+          "Optional leads from Wade Rusk and Tansy Rusk, and Tolliver Kade's lead about a researcher on Stillreach.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #359 — the first-flight cinematic.
     slug: "watch-the-rivet-fly",
     title: "Watch the Rivet Fly",

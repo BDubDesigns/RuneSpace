@@ -235,6 +235,30 @@ export type MissionRequirement =
        * to a generic label when omitted.
        */
       actionLabel?: string;
+      /**
+       * Optional conversations elsewhere that point the player to THIS required
+       * contact (#369). They are never required: only this requirement's own
+       * conversation satisfies it, so a player who goes straight to the contact
+       * skips every lead.
+       */
+      leads?: MissionConversationLeads;
+    }
+  | {
+      /**
+       * A legitimately unfinished story stage (#369): the Mission is accepted and
+       * stays Active, with this objective, until a later slice replaces the
+       * stage with its real requirements and completion.
+       *
+       * Nothing observes it. It is never satisfied, projects no guidance (there
+       * is no location, NPC or route to point at yet), and the Mission that
+       * authors it has no turn-in, no automatic completion and no reward — so it
+       * can never present a Turn In or Completed state. It must be the last
+       * requirement. Progress already persisted by the earlier requirements is
+       * keyed by their own stable keys and survives the later replacement.
+       */
+      kind: "deferred_stage";
+      /** Player-facing copy; no substitutions. */
+      objective: string;
     }
   | {
       /**
@@ -270,6 +294,32 @@ export type MissionRequirement =
       /** Player-facing copy; `{required}` receives the route's approved cost. */
       objective: string;
     };
+
+/**
+ * Optional conversations that point the player toward a required conversation
+ * contact (#369). Any ONE of them records the single durable `progressKey` fact,
+ * which narrows the Mission's guidance and objective to the required contact
+ * alone; none is ever required, and visiting several changes nothing more.
+ *
+ * Where each lead NPC stands is never authored here: it is resolved per
+ * character from the NPC's own placement (`resolveNpcPlacement`), so an authored
+ * relocation moves the lead with them.
+ */
+export type MissionConversationLeads = {
+  /** Stable key of the one shared fact any lead records, in the Mission's progress-key space. */
+  progressKey: string;
+  conversations: readonly MissionConversationLead[];
+  /** The objective once a lead has been followed: the required contact alone remains. */
+  followedObjective: string;
+};
+
+/** One optional lead conversation. Its sequence is the scene that records the fact. */
+export type MissionConversationLead = {
+  npcId: NpcId;
+  dialogueId: DialogueId;
+  /** Authored copy for the terminal control; a generic label when omitted. */
+  actionLabel?: string;
+};
 
 /** The kinds a requirement may take, used for semantic stage routing. */
 export type MissionRequirementKind = MissionRequirement["kind"];
@@ -493,6 +543,35 @@ export type MissionDialogue = {
   omitted?: readonly MissionDialogueOmission[];
 };
 
+/**
+ * A Mission offered by a carried item rather than by an NPC (#369).
+ *
+ * While the Mission is not accepted and its prerequisites hold, a character who
+ * genuinely carries a stack of `itemId` sees the ordinary Inventory Item Details
+ * grow one more action, `inspectLabel`. It opens a compact offer showing the
+ * item's own art and this copy, with explicit accept and decline controls.
+ *
+ * Accepting is the generic acceptance transaction: it validates the carried
+ * stack, never consumes, reserves or transforms the item, and is idempotent.
+ * There is no quest-only item and no acquisition provenance; any carried stack
+ * of the item qualifies. All the copy is content, so no client or server code
+ * names a particular item or Mission.
+ */
+export type MissionItemOffer = {
+  /** The stackable item whose carried stack makes the offer. */
+  itemId: ItemId;
+  /** Label of the Item Details action that opens the offer. */
+  inspectLabel: string;
+  /** Heading of the offer. */
+  title: string;
+  /** The compact offer premise shown beside the item's art. */
+  description: string;
+  /** Label of the control that accepts the Mission. */
+  acceptLabel: string;
+  /** Label of the control that closes the offer without any change. */
+  declineLabel: string;
+};
+
 /** One authored minimum skill level a mission requires before it is offered. */
 export type MissionSkillPrerequisite = {
   skillId: SkillId;
@@ -537,8 +616,13 @@ export type MissionDefinition = {
    * the story.
    */
   continuationMissionId?: MissionId;
-  /** Authored offer interactions; continuation-only missions may have none. */
+  /** Authored offer interactions; continuation-only and item-offered missions may have none. */
   offers: readonly MissionOffer[];
+  /**
+   * The carried item that offers this Mission instead of an NPC (#369). A
+   * Mission with an item offer may author no NPC offer at all.
+   */
+  itemOffer?: MissionItemOffer;
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
   /**
@@ -1647,6 +1731,78 @@ export const CURLY_MUST_STASH: MissionDefinition = {
   ],
 };
 
+/**
+ * Not From Around Here — the first item-originated Mission and the opening Rune
+ * Fragment investigation (#369).
+ *
+ * A carried Rune Fragment offers it through the ordinary Inventory Item Details
+ * (`itemOffer`), not an NPC. Accepting consumes nothing: the Fragment stays the
+ * player's, and no quest-only Fragment exists.
+ *
+ * The investigation has three honest contacts — Wade, Tansy and Toll — expressed
+ * as ONE conversation requirement. Toll is the only contact the Mission needs;
+ * Wade and Tansy are optional leads that each record the same single durable
+ * fact, which narrows guidance and the objective to Toll alone. Visiting Toll
+ * directly is always enough.
+ *
+ * It ends, deliberately, at a `deferred_stage`: the Stillreach researcher, their
+ * Hilltop Workshop and the route there are a later slice, so the Mission stays
+ * accepted and Active with an honest objective instead of a fabricated target, a
+ * false Turn In or an artificial completion. The slice that ships them replaces
+ * that stage with real requirements and a completion; see docs/missions.md.
+ *
+ * It pays nothing: no Credits, XP or item for inspecting, for a hint, or for
+ * Toll's lead.
+ */
+export const NOT_FROM_AROUND_HERE: MissionDefinition = {
+  id: MISSION_IDS.notFromAroundHere,
+  title: "Not From Around Here",
+  summary:
+    "Something unusual turned up in the rock. Find out whether anyone around Holo Hollow recognizes it.",
+  offers: [],
+  itemOffer: {
+    itemId: ITEM_IDS.runeFragment,
+    inspectLabel: "Inspect",
+    title: "An Unusual Fragment",
+    description:
+      "The unusual mineral seems to resonate beyond ordinary space. Ask around to learn whether anyone recognizes it.",
+    acceptLabel: "Ask around",
+    declineLabel: "Not now",
+  },
+  requirements: [
+    {
+      kind: "npc_conversation",
+      npcId: NPC_IDS.tollKade,
+      locationId: LOCATION_IDS.holoHollowLanding,
+      dialogueId: DIALOGUE_IDS.tollNotFromAroundHere,
+      progressKey: "toll-lead",
+      objective: "Find someone who might recognize the unusual fragment",
+      actionLabel: "NOTED",
+      leads: {
+        progressKey: "toll-hint",
+        conversations: [
+          {
+            npcId: NPC_IDS.wadeRusk,
+            dialogueId: DIALOGUE_IDS.wadeNotFromAroundHereHint,
+            actionLabel: "WORTH ASKING",
+          },
+          {
+            npcId: NPC_IDS.tansyRusk,
+            dialogueId: DIALOGUE_IDS.tansyNotFromAroundHereHint,
+            actionLabel: "WORTH ASKING",
+          },
+        ],
+        followedObjective: "Ask Tolliver Kade at Last Leg Trading about the fragment",
+      },
+    },
+    {
+      kind: "deferred_stage",
+      objective: "Find the researcher at Hilltop Workshop on Stillreach",
+    },
+  ],
+  dialogue: {},
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -1681,6 +1837,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   CUTTING_COSTS,
   // Curly's optional commission at HH B&B (#292), after Keep the Change.
   CURLY_MUST_STASH,
+  // The first Mission offered by a carried item (#369): standalone, no
+  // prerequisite, and it ends at an intentionally unfinished deferred stage.
+  NOT_FROM_AROUND_HERE,
 ];
 
 const missions = new Map<string, MissionDefinition>(

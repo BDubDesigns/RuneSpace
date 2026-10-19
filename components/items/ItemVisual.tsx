@@ -18,8 +18,8 @@ type ItemVisualProps = {
   className?: string;
   /** Render as a selectable native button (occupied Inventory tiles). */
   interactive?: boolean;
-  /** Marks the tile as a current semantic mission-guidance target. */
-  missionGuidance?: boolean;
+  /** Marks the tile as a current semantic mission-guidance target (or an item offer, #369). */
+  missionGuidance?: boolean | "active" | "available";
   selected?: boolean;
   selectionAccent?: string;
   onSelect?: () => void;

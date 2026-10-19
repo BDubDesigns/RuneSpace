@@ -335,6 +335,16 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Items that offer a Mission",
+        paragraphs: [
+          [
+            "A carried Rune Fragment tile glows blue while you have not taken up the Mission it offers. Select the stack and Item details shows an Inspect action; it opens a short offer with the Fragment's art, and you can accept it or choose Not now, which changes nothing. Accepting starts ",
+            { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+            ". Your Rune Fragments stay in your Inventory: nothing is used up, and they remain yours to carry, trade or break down for any other purpose. An intact Runestone does not offer it.",
+          ],
+        ],
+      },
+      {
         heading: "Dropping items",
         paragraphs: [
           "Dropping a stack asks you to confirm the exact quantity first. In the current build, dropped items are permanently destroyed — there's no ground pickup yet, so only drop what you're sure you don't need.",
@@ -1124,12 +1134,22 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "A Mystery in the Rock",
+        list: [
+          [
+            { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+            " — offered by a Rune Fragment in your Inventory, not by a person. Ask around about it; Tolliver Kade points you toward a researcher on Stillreach. Nothing is needed first, and it pays nothing yet.",
+          ],
+        ],
+      },
+      {
         heading: "How Missions Connect",
         list: [
           "The starter chain runs from Walk It Off to Hold It Together, then through Keep the Change to 10,000 Hours.",
           "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
           "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
+          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it.",
         ],
       },
       {

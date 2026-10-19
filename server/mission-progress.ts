@@ -47,7 +47,14 @@ export function conversationRequirements(
 function progressKeyedRequirements(
   definition: MissionDefinition,
 ): readonly { progressKey: string }[] {
-  return [...trackedActivityRequirements(definition), ...conversationRequirements(definition)];
+  return [
+    ...trackedActivityRequirements(definition),
+    ...conversationRequirements(definition),
+    // The one shared fact an optional lead conversation records (#369).
+    ...conversationRequirements(definition).flatMap((requirement) =>
+      requirement.leads ? [{ progressKey: requirement.leads.progressKey }] : [],
+    ),
+  ];
 }
 
 /**
