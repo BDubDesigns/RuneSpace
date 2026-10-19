@@ -37,6 +37,7 @@ const loadsteel = getMiningToolDefinition(ITEM_IDS.loadsteelCutter, balance)!;
 const OIL = ITEM_IDS.oilShale;
 const SLAB = ITEM_IDS.motherlodeSlab;
 const SAPPHIRE = ITEM_IDS.uncutSapphire;
+const FRAGMENT = ITEM_IDS.runeFragment;
 
 type Draws = { basisPoints?: number[]; integers?: number[] };
 
@@ -150,23 +151,37 @@ describe("the Oil Shale source's locked values", () => {
 describe("the secondary table", () => {
   const finds = miningAwardFacts(balance, oil).secondaryFinds;
 
-  it("is exactly 5% Sapphire, 1% Motherlode Slab and 94% nothing, in one exclusive roll", () => {
+  it("is exactly 1/20 Sapphire, 1/100 Motherlode Slab, 1/6 Rune Fragment and the rest nothing, in one exclusive roll", () => {
     const size = secondaryFindRollSize(finds);
-    expect(size).toBe(100);
+    // lcm(20, 100, 6): the Fragment's 1 / 6 widens the roll from 100.
+    expect(size).toBe(300);
     const counts = new Map<string, number>();
     for (let roll = 0; roll < size; roll += 1) {
       const find = selectSecondaryFind(finds, roll);
       counts.set(find?.itemId ?? "none", (counts.get(find?.itemId ?? "none") ?? 0) + 1);
     }
-    expect(counts.get(SAPPHIRE)).toBe(5);
-    expect(counts.get(SLAB)).toBe(1);
-    expect(counts.get("none")).toBe(94);
+    expect(counts.get(SAPPHIRE)).toBe(15);
+    expect(counts.get(SLAB)).toBe(3);
+    expect(counts.get(FRAGMENT)).toBe(50);
+    expect(counts.get("none")).toBe(232);
+    // Spans keep their order, so the existing finds are where they always were.
+    expect([0, 14].map((roll) => selectSecondaryFind(finds, roll)?.itemId)).toEqual([
+      SAPPHIRE,
+      SAPPHIRE,
+    ]);
+    expect([15, 17].map((roll) => selectSecondaryFind(finds, roll)?.itemId)).toEqual([SLAB, SLAB]);
+    expect([18, 67].map((roll) => selectSecondaryFind(finds, roll)?.itemId)).toEqual([
+      FRAGMENT,
+      FRAGMENT,
+    ]);
+    expect(selectSecondaryFind(finds, 68)).toBeUndefined();
   });
 
   it("announces only the Motherlode Slab, never a Sapphire from this mine", () => {
     expect(oil.secondaryFinds.map((find) => [find.itemId, find.announce])).toEqual([
       [SAPPHIRE, false],
       [SLAB, true],
+      [FRAGMENT, false],
     ]);
     // Deep Jag's own Sapphire announcement is unchanged.
     expect(
@@ -206,11 +221,36 @@ describe("a full success", () => {
     expect(sapphire.attempts[0]!.secondaryFinds).toEqual([{ itemId: SAPPHIRE, quantity: 1 }]);
     expect(sapphire.awardedXp).toBe(130);
 
-    const slab = mine({}, { integers: [0, 5] }).outcome;
+    const slab = mine({}, { integers: [0, 15] }).outcome;
     expect(slab.attempts[0]!.secondaryFinds).toEqual([{ itemId: SLAB, quantity: 1 }]);
     expect(slab.awardedXp).toBe(250);
     // Never both on one attempt.
     expect(slab.attempts[0]!.secondaryFinds).toHaveLength(1);
+  });
+
+  it("awards a Rune Fragment beside the ordinary Oil Shale with its own +20 XP", () => {
+    const { outcome } = mine({}, { integers: [0, 18] });
+    expect(outcome.attempts[0]).toMatchObject({
+      success: true,
+      quantityAwarded: 2,
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 120,
+    });
+    expect(outcome.awardedXp).toBe(120);
+    expect(total(outcome, OIL)).toBe(2);
+    expect(total(outcome, FRAGMENT)).toBe(1);
+    // The last Fragment roll still awards it; the first roll past it awards nothing.
+    expect(mine({}, { integers: [0, 67] }).outcome.attempts[0]!.secondaryFinds).toHaveLength(1);
+    expect(mine({}, { integers: [0, 68] }).outcome.attempts[0]!.secondaryFinds).toEqual([]);
+  });
+
+  it("keeps a charged Loadsteel's extra ore off the Fragment", () => {
+    const { outcome } = mine({ tool: loadsteel, cutterCharge: 3 }, { integers: [1, 18] });
+    expect(outcome.attempts[0]).toMatchObject({
+      quantityAwarded: 4,
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 120,
+    });
   });
 
   it("adds the charged Loadsteel Cutter's one ore to a true success only", () => {
@@ -306,7 +346,7 @@ describe("Prioritize primary resources: Off, the protective default", () => {
     // Two slots, mass for the Slab beside two shale only: a rolled 4 becomes 2.
     const { outcome } = mine(
       { slotsAvailable: 2, massAvailableGrams: 1_200 + 12_000 },
-      { integers: [2, 5] },
+      { integers: [2, 15] },
     );
     expect(outcome.attempts[0]).toMatchObject({
       quantityAwarded: 2,
@@ -321,7 +361,7 @@ describe("Prioritize primary resources: Off, the protective default", () => {
     // Mass for the Slab beside exactly three shale: a rolled 4 keeps 3, not just 2.
     const { outcome } = mine(
       { slotsAvailable: 2, massAvailableGrams: 12_000 + 1_800 },
-      { integers: [2, 5] },
+      { integers: [2, 15] },
     );
     expect(outcome.attempts[0]!.quantityAwarded).toBe(3);
     expect(outcome.attempts[0]!.secondaryFinds).toEqual([{ itemId: SLAB, quantity: 1 }]);
@@ -372,7 +412,7 @@ describe("Prioritize primary resources: On", () => {
     // One slot: the ore fills it, so the Slab that rolled has nowhere to go.
     const { outcome, nextInteger } = mine(
       { ...prioritized, slotsAvailable: 1, massAvailableGrams: 60_000 },
-      { integers: [0, 5] },
+      { integers: [0, 15] },
     );
     expect(outcome.attempts[0]).toMatchObject({
       success: true,
@@ -386,7 +426,7 @@ describe("Prioritize primary resources: On", () => {
   });
 
   it("keeps a rolled find that does fit after the ore", () => {
-    const { outcome } = mine({ ...prioritized, slotsAvailable: 2 }, { integers: [0, 5] });
+    const { outcome } = mine({ ...prioritized, slotsAvailable: 2 }, { integers: [0, 15] });
     expect(outcome.attempts[0]).toMatchObject({
       secondaryFinds: [{ itemId: SLAB, quantity: 1 }],
       xpAwarded: 250,
@@ -397,10 +437,25 @@ describe("Prioritize primary resources: On", () => {
     // The Slab is 12 kg and does not fit; a Sapphire would, but it never rolled.
     const { outcome } = mine(
       { ...prioritized, slotsAvailable: 2, massAvailableGrams: 1_200 + 500 },
-      { integers: [0, 5] },
+      { integers: [0, 15] },
     );
     expect(outcome.attempts[0]!.secondaryFinds).toEqual([]);
     expect(total(outcome, SAPPHIRE)).toBe(0);
+  });
+
+  it("forfeits a Rune Fragment with no room, with no item and no bonus XP", () => {
+    // 1,300 g keeps two shale (1,200 g) but not the 200 g Fragment beside them.
+    const { outcome } = mine(
+      { ...prioritized, slotsAvailable: 2, massAvailableGrams: 1_300 },
+      { integers: [2, 18] },
+    );
+    expect(outcome.attempts[0]).toMatchObject({
+      success: true,
+      secondaryFinds: [],
+      xpAwarded: 100,
+    });
+    expect(total(outcome, FRAGMENT)).toBe(0);
+    expect(outcome.awardedXp).toBe(100);
   });
 
   it("still pays exactly one shale and 20 XP for a low yield", () => {
@@ -514,7 +569,7 @@ describe("a charged Loadsteel Cutter's bonus ore on any attempt that yields ore"
   const NEEDS_LOW_YIELD = 9_999;
   const NO_FIND = 99;
   const SAPPHIRE_ROLL = 0;
-  const SLAB_ROLL = 5;
+  const SLAB_ROLL = 15;
   const galvanite = balance.mining.sources.galvanite as MiningSourceBalance;
   const lowYield = () => ({ basisPoints: [NEEDS_LOW_YIELD] });
   const charged = (cutterCharge = 3) => ({ tool: loadsteel, cutterCharge });

@@ -153,6 +153,14 @@ const INVENTORY_EQUIP_REQUIRED = [
   "inventory-equip-mobile-equipped.png",
 ];
 
+// Issue #367: the Runestone's Item Details, its Break Apart confirmation and the
+// reconciled Inventory, at the 390 px portrait width.
+const RUNE_MATERIALS_REQUIRED = [
+  "rune-materials-mobile-runestone-details.png",
+  "rune-materials-mobile-confirm-break-apart.png",
+  "rune-materials-mobile-after-break-apart.png",
+];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   mkdirSync(destDir, { recursive: true });
@@ -224,6 +232,7 @@ async function runCanonical() {
         ...REFINING_REQUIRED,
         ...CARGO_HOLD_REQUIRED,
         ...GAMEPLAY_ACCESS_REQUIRED,
+        ...RUNE_MATERIALS_REQUIRED,
       ],
       resolve(ROOT, "artifacts/e2e-review"),
     );

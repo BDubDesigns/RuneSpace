@@ -33,7 +33,12 @@ const deepJag = balance.mining.sources.galvanite as MiningSourceBalance;
 const salvage = getMiningToolDefinition(ITEM_IDS.salvageCutter, balance)!;
 const loadsteel = getMiningToolDefinition(ITEM_IDS.loadsteelCutter, balance)!;
 
-const { uncutQuartz: QUARTZ, uncutTopaz: TOPAZ, uncutSapphire: SAPPHIRE } = ITEM_IDS;
+const {
+  uncutQuartz: QUARTZ,
+  uncutTopaz: TOPAZ,
+  uncutSapphire: SAPPHIRE,
+  runeFragment: FRAGMENT,
+} = ITEM_IDS;
 const SHALE = ITEM_IDS.ferriteShale;
 const GALVANITE = ITEM_IDS.galvanite;
 
@@ -90,17 +95,19 @@ function resolveOne(input: {
 }
 
 describe("the authored Secondary Find content", () => {
-  it("gives The Jag Quartz at 1 / 40 and Topaz at 1 / 60, announcing only the Topaz", () => {
+  it("gives The Jag Quartz at 1 / 40 and Topaz at 1 / 60 (announcing only the Topaz), then Rune Fragments at 1 / 25", () => {
     expect(jag.secondaryFinds).toEqual([
       { itemId: QUARTZ, oneIn: 40, announce: false },
       { itemId: TOPAZ, oneIn: 60, announce: true },
+      { itemId: FRAGMENT, oneIn: 25, announce: false },
     ]);
   });
 
-  it("gives Deep Jag Topaz at 1 / 35 and Sapphire at 1 / 55, announcing only the Sapphire", () => {
+  it("gives Deep Jag Topaz at 1 / 35 and Sapphire at 1 / 55 (announcing only the Sapphire), then Rune Fragments at 1 / 8", () => {
     expect(deepJag.secondaryFinds).toEqual([
       { itemId: TOPAZ, oneIn: 35, announce: false },
       { itemId: SAPPHIRE, oneIn: 55, announce: true },
+      { itemId: FRAGMENT, oneIn: 8, announce: false },
     ]);
   });
 
@@ -171,14 +178,15 @@ describe("the authored Secondary Find content", () => {
 
 describe("the one mutually exclusive Secondary Find roll", () => {
   it("draws from a roll of the least common multiple of the denominators", () => {
-    expect(secondaryFindRollSize(miningAwardFacts(balance, jag).secondaryFinds)).toBe(120);
-    expect(secondaryFindRollSize(miningAwardFacts(balance, deepJag).secondaryFinds)).toBe(385);
+    // lcm(40, 60, 25) and lcm(35, 55, 8): the Fragment widens both rolls.
+    expect(secondaryFindRollSize(miningAwardFacts(balance, jag).secondaryFinds)).toBe(600);
+    expect(secondaryFindRollSize(miningAwardFacts(balance, deepJag).secondaryFinds)).toBe(3_080);
     expect(secondaryFindRollSize([])).toBe(1);
   });
 
   it.each([
-    ["The Jag", jag, 120, { [QUARTZ]: 3, [TOPAZ]: 2 }],
-    ["Deep Jag", deepJag, 385, { [TOPAZ]: 11, [SAPPHIRE]: 7 }],
+    ["The Jag", jag, 600, { [QUARTZ]: 15, [TOPAZ]: 10, [FRAGMENT]: 24 }],
+    ["Deep Jag", deepJag, 3_080, { [TOPAZ]: 88, [SAPPHIRE]: 56, [FRAGMENT]: 385 }],
   ] as const)(
     "%s selects exactly the authored odds across every outcome",
     (_name, source, size, counts) => {
@@ -190,7 +198,7 @@ describe("the one mutually exclusive Secondary Find roll", () => {
         if (find) tally[find.itemId] = (tally[find.itemId] ?? 0) + 1;
       }
       expect(tally).toEqual(counts);
-      // 1 / 40 of 120 is 3, 1 / 60 is 2, 1 / 35 of 385 is 11, 1 / 55 is 7.
+      // 1 / 40 of 600 is 15, 1 / 60 is 10, 1 / 25 is 24; 1 / 35 of 3,080 is 88, 1 / 55 is 56, 1 / 8 is 385.
       for (const entry of facts) expect(tally[entry.itemId]! * entry.oneIn).toBe(size);
     },
   );
@@ -198,7 +206,7 @@ describe("the one mutually exclusive Secondary Find roll", () => {
   it("refuses a roll outside the table", () => {
     const facts = miningAwardFacts(balance, jag).secondaryFinds;
     expect(() => selectSecondaryFind(facts, -1)).toThrow(RangeError);
-    expect(() => selectSecondaryFind(facts, 120)).toThrow(RangeError);
+    expect(() => selectSecondaryFind(facts, 600)).toThrow(RangeError);
     expect(() => selectSecondaryFind(facts, 1.5)).toThrow(RangeError);
   });
 });
@@ -263,11 +271,12 @@ describe("resolving a Secondary Find", () => {
     expect(miss.nextInteger).not.toHaveBeenCalled();
     const hit = resolveOne({ source: jag });
     expect(hit.nextInteger).toHaveBeenCalledTimes(1);
-    expect(hit.nextInteger).toHaveBeenCalledWith(120);
+    expect(hit.nextInteger).toHaveBeenCalledWith(600);
   });
 
   it("finds nothing when a roll falls outside every span, or the random cannot roll integers", () => {
-    expect(resolveOne({ source: jag, draws: { integers: [5] } }).attempt!.secondaryFinds).toEqual(
+    // 49 is the first roll past The Jag's three spans (15 + 10 + 24 of 600).
+    expect(resolveOne({ source: jag, draws: { integers: [49] } }).attempt!.secondaryFinds).toEqual(
       [],
     );
     const withoutIntegers = resolveMining({
@@ -327,28 +336,35 @@ describe("capacity for a Secondary Find", () => {
     expect(preflight({ slotsAvailable: 1, existingStacks: [stack(SHALE, 5)] })).toBeUndefined();
   });
 
-  it("lets existing partial stacks satisfy either side of the check", () => {
+  it("lets existing partial stacks satisfy every side of the check", () => {
+    expect(
+      preflight({
+        slotsAvailable: 0,
+        existingStacks: [stack(SHALE, 5), stack(QUARTZ, 1), stack(TOPAZ, 1), stack(FRAGMENT, 1)],
+      }),
+    ).toBeUndefined();
+    // A partial stack for only some of the finds leaves the others with nowhere to go.
     expect(
       preflight({
         slotsAvailable: 0,
         existingStacks: [stack(SHALE, 5), stack(QUARTZ, 1), stack(TOPAZ, 1)],
       }),
-    ).toBeUndefined();
-    // A partial stack for only one of the two finds leaves the other with nowhere to go.
+    ).toBe("inventory_slots_full");
     expect(
       preflight({
         slotsAvailable: 0,
-        existingStacks: [stack(SHALE, 5), stack(QUARTZ, 1)],
+        existingStacks: [stack(SHALE, 5), stack(FRAGMENT, 1)],
       }),
     ).toBe("inventory_slots_full");
   });
 
-  it("stops by mass unless the ore and a 100 g find both fit", () => {
-    expect(preflight({ massAvailableGrams: 199 })).toBe("carried_mass_capacity_reached");
-    expect(preflight({ massAvailableGrams: 200 })).toBeUndefined();
+  it("stops by mass unless the ore and the heaviest possible find both fit", () => {
+    // The Rune Fragment's 200 g is the heaviest find: 100 g of Shale plus 200 g.
+    expect(preflight({ massAvailableGrams: 299 })).toBe("carried_mass_capacity_reached");
+    expect(preflight({ massAvailableGrams: 300 })).toBeUndefined();
     // Deep Jag's ore is 400 g.
-    expect(preflight({ massAvailableGrams: 499 }, deepJag)).toBe("carried_mass_capacity_reached");
-    expect(preflight({ massAvailableGrams: 500 }, deepJag)).toBeUndefined();
+    expect(preflight({ massAvailableGrams: 599 }, deepJag)).toBe("carried_mass_capacity_reached");
+    expect(preflight({ massAvailableGrams: 600 }, deepJag)).toBeUndefined();
   });
 
   it("keeps the find and shrinks only the ore when slots are tight", () => {
@@ -378,25 +394,27 @@ describe("capacity for a Secondary Find", () => {
       quantityAwarded: 2,
       secondaryFinds: [{ itemId: QUARTZ, quantity: 1 }],
     });
-    // Room for 200 g: the rolled 2 ore leaves nothing for the find, so the ore
-    // drops to its minimum and the find is kept.
+    // Room for 300 g, the least the preflight admits: the rolled 2 ore (200 g)
+    // beside a 200 g Rune Fragment would not fit, so the ore drops to its
+    // minimum and the find is kept.
     const tighter = resolveOne({
       source: jag,
-      snapshot: { massAvailableGrams: 200 },
-      draws: { units: [0.5], integers: [rollFor(jag, QUARTZ)] },
+      snapshot: { massAvailableGrams: 300 },
+      draws: { units: [0.5], integers: [rollFor(jag, FRAGMENT)] },
     });
     expect(tighter.attempt).toMatchObject({
       quantityAwarded: 1,
-      secondaryFinds: [{ itemId: QUARTZ, quantity: 1 }],
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
     });
   });
 
   it("stops the run once a further attempt could not keep ore plus a possible find", () => {
-    // 200 g left: the first attempt is admitted, after which only the ore's 100 g... plus nothing.
+    // 399 g left: the first attempt (100 g of ore plus a possible 200 g Fragment) is
+    // admitted and takes 100 g, after which 299 g can no longer cover both.
     const { random } = scripted({ integers: [119, 119] });
     const resolution = resolveMining({
       elapsedTicks: jag.attemptDurationTicks * 2,
-      snapshot: { ...roomy, massAvailableGrams: 200 },
+      snapshot: { ...roomy, massAvailableGrams: 399 },
       balance,
       source: jag,
       random,
@@ -419,6 +437,7 @@ describe("capacity for a Secondary Find", () => {
         ...(next(2) ? [stack(oreId, 1 + next(9), "ore")] : []),
         ...(next(2) ? [stack(TOPAZ, 1, "topaz")] : []),
         ...(next(2) ? [stack(QUARTZ, 1, "quartz")] : []),
+        ...(next(2) ? [stack(FRAGMENT, 1 + next(9), "fragment")] : []),
       ];
       const attempts = 1 + next(6);
       const random: MiningRandom = {
@@ -546,5 +565,191 @@ describe("a stackable reward's stack fill", () => {
     expect(xp.kind).toBe("xp");
     expect(stackFill(xp)).toBeUndefined();
     expect(xp).not.toHaveProperty("stackLimit");
+  });
+});
+
+describe("Rune Fragments as a Secondary Find (#367)", () => {
+  const stack = (itemId: string, quantity: number, id = `${itemId}-${quantity}`) => ({
+    id,
+    itemId,
+    quantity,
+  });
+  const find = (source: MiningSourceBalance, roll: number) =>
+    selectSecondaryFind(miningAwardFacts(balance, source).secondaryFinds, roll)?.itemId;
+
+  it("defines the Fragment as a 200 g, ten-to-a-stack item that owns its +20 Mining XP", () => {
+    expect(getItemDefinition(FRAGMENT, balance)).toEqual({
+      itemId: FRAGMENT,
+      kind: "stack",
+      stackLimit: 10,
+      massGrams: 200,
+    });
+    const bonus = (source: MiningSourceBalance) =>
+      miningAwardFacts(balance, source).secondaryFinds.find((entry) => entry.itemId === FRAGMENT)
+        ?.bonusXp;
+    expect(bonus(jag)).toBe(20);
+    expect(bonus(deepJag)).toBe(20);
+    expect(balance.items.runeFragment.secondaryFindMiningXp).toBe(20);
+    // The sources never restate the XP, and the Fragment is never announced.
+    for (const source of [jag, deepJag]) {
+      const entry = source.secondaryFinds.find((candidate) => candidate.itemId === FRAGMENT)!;
+      expect(Object.keys(entry).sort()).toEqual(["announce", "itemId", "oneIn"]);
+      expect(entry.announce).toBe(false);
+    }
+  });
+
+  it("keeps the Fragment at the end of each table, so every gem span is where it was", () => {
+    // The Jag (600 rolls): Quartz 0-14, Topaz 15-24 (1 / 40 and 1 / 60), then the Fragment's 24.
+    expect([0, 14].map((roll) => find(jag, roll))).toEqual([QUARTZ, QUARTZ]);
+    expect([15, 24].map((roll) => find(jag, roll))).toEqual([TOPAZ, TOPAZ]);
+    expect(find(jag, 25)).toBe(FRAGMENT);
+    expect(find(jag, 48)).toBe(FRAGMENT);
+    expect(find(jag, 49)).toBeUndefined();
+    expect(find(jag, 599)).toBeUndefined();
+    // Deep Jag (3,080 rolls): Topaz 0-87, Sapphire 88-143, then the Fragment's 385.
+    expect([0, 87].map((roll) => find(deepJag, roll))).toEqual([TOPAZ, TOPAZ]);
+    expect([88, 143].map((roll) => find(deepJag, roll))).toEqual([SAPPHIRE, SAPPHIRE]);
+    expect(find(deepJag, 144)).toBe(FRAGMENT);
+    expect(find(deepJag, 528)).toBe(FRAGMENT);
+    expect(find(deepJag, 529)).toBeUndefined();
+    expect(find(deepJag, 3_079)).toBeUndefined();
+  });
+
+  it("is exactly 1 / 25 at The Jag and 1 / 8 at Deep Jag, with the gems' absolute chances untouched", () => {
+    const share = (source: MiningSourceBalance) => {
+      const facts = miningAwardFacts(balance, source).secondaryFinds;
+      const size = secondaryFindRollSize(facts);
+      const counts = new Map<string, number>();
+      for (let roll = 0; roll < size; roll += 1) {
+        const itemId = selectSecondaryFind(facts, roll)?.itemId;
+        if (itemId) counts.set(itemId, (counts.get(itemId) ?? 0) + 1);
+      }
+      return { size, counts };
+    };
+    const jagShare = share(jag);
+    expect(jagShare.counts.get(FRAGMENT)! / jagShare.size).toBe(1 / 25);
+    expect(jagShare.counts.get(QUARTZ)! / jagShare.size).toBe(1 / 40);
+    expect(jagShare.counts.get(TOPAZ)! / jagShare.size).toBe(1 / 60);
+    const deepShare = share(deepJag);
+    expect(deepShare.counts.get(FRAGMENT)! / deepShare.size).toBe(1 / 8);
+    expect(deepShare.counts.get(TOPAZ)! / deepShare.size).toBe(1 / 35);
+    expect(deepShare.counts.get(SAPPHIRE)! / deepShare.size).toBe(1 / 55);
+  });
+
+  it("awards one Fragment beside the ordinary ore, with +20 Mining XP on the source's own", () => {
+    const atJag = resolveOne({ source: jag, draws: { integers: [rollFor(jag, FRAGMENT)] } });
+    expect(atJag.attempt).toMatchObject({
+      success: true,
+      itemId: SHALE,
+      quantityAwarded: 1,
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 35,
+    });
+    expect(atJag.resolution.awardedXp).toBe(35);
+    expect(atJag.resolution.createdStacks).toEqual([
+      { itemId: SHALE, quantity: 1 },
+      { itemId: FRAGMENT, quantity: 1 },
+    ]);
+    const atDeepJag = resolveOne({
+      source: deepJag,
+      draws: { integers: [rollFor(deepJag, FRAGMENT)] },
+    });
+    expect(atDeepJag.attempt).toMatchObject({
+      itemId: GALVANITE,
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 45,
+    });
+  });
+
+  it("never pairs a Fragment with a gem: one roll selects one find", () => {
+    for (const source of [jag, deepJag]) {
+      const { nextInteger, attempt } = resolveOne({
+        source,
+        draws: { integers: [rollFor(source, FRAGMENT)] },
+      });
+      expect(nextInteger).toHaveBeenCalledTimes(1);
+      expect(attempt!.secondaryFinds).toHaveLength(1);
+    }
+  });
+
+  it("rolls no Fragment on a failed extraction", () => {
+    const miss = resolveOne({ source: jag, draws: { basisPoints: [9_999] } });
+    expect(miss.attempt).toMatchObject({ success: false, secondaryFinds: [], xpAwarded: 0 });
+    expect(miss.nextInteger).not.toHaveBeenCalled();
+    expect(miss.resolution.createdStacks).toEqual([]);
+  });
+
+  it("gives a charged Loadsteel Cutter's extra ore to the ore only, never a second Fragment", () => {
+    const { attempt, resolution } = resolveOne({
+      source: deepJag,
+      snapshot: { tool: loadsteel, cutterCharge: 3 },
+      draws: { units: [0.5], integers: [rollFor(deepJag, FRAGMENT)] },
+    });
+    expect(attempt).toMatchObject({
+      boosted: true,
+      quantityAwarded: 3,
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 45,
+    });
+    expect(resolution.createdStacks).toContainEqual({ itemId: FRAGMENT, quantity: 1 });
+  });
+
+  it("protects the potential Fragment when Prioritize primary resources is Off", () => {
+    // 100 g of Shale and a 200 g Fragment both have to fit, in the slots and in the mass.
+    const off = (snapshot: Partial<MiningSnapshot>) =>
+      miningPreflightStopReason({ ...roomy, ...snapshot }, balance, jag);
+    expect(off({ massAvailableGrams: 299 })).toBe("carried_mass_capacity_reached");
+    expect(off({ massAvailableGrams: 300 })).toBeUndefined();
+    expect(
+      off({
+        slotsAvailable: 0,
+        existingStacks: [stack(SHALE, 5), stack(QUARTZ, 1), stack(TOPAZ, 1)],
+      }),
+    ).toBe("inventory_slots_full");
+    expect(
+      off({
+        slotsAvailable: 0,
+        existingStacks: [stack(SHALE, 5), stack(QUARTZ, 1), stack(TOPAZ, 1), stack(FRAGMENT, 9)],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("forfeits a Fragment that has no room when Prioritize primary resources is On, awarding no bonus XP", () => {
+    // 100 g left: the one Shale fits, a 200 g Fragment does not.
+    const { attempt, resolution } = resolveOne({
+      source: jag,
+      snapshot: { prioritizePrimaryResources: true, massAvailableGrams: 100 },
+      draws: { integers: [rollFor(jag, FRAGMENT)] },
+    });
+    expect(attempt).toMatchObject({
+      success: true,
+      quantityAwarded: 1,
+      secondaryFinds: [],
+      xpAwarded: 15,
+    });
+    expect(resolution.createdStacks).toEqual([{ itemId: SHALE, quantity: 1 }]);
+    expect(resolution.awardedXp).toBe(15);
+  });
+
+  it("keeps a Fragment that fits when Prioritize primary resources is On, awarding +20", () => {
+    const { attempt } = resolveOne({
+      source: jag,
+      snapshot: { prioritizePrimaryResources: true },
+      draws: { integers: [rollFor(jag, FRAGMENT)] },
+    });
+    expect(attempt).toMatchObject({
+      secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
+      xpAwarded: 35,
+    });
+  });
+
+  it("is ordinary: no rarity, no merchant price and no announcement", () => {
+    expect(getItemPresentation(FRAGMENT)?.rarity).toBeUndefined();
+    expect(getItemPresentation(ITEM_IDS.runestone)?.rarity).toBeUndefined();
+    for (const merchantId of Object.values(MERCHANT_IDS)) {
+      const merchant = getMerchant(merchantId);
+      for (const itemId of [FRAGMENT, ITEM_IDS.runestone])
+        expect(merchant?.prices.find((line) => line.itemId === itemId)).toBeUndefined();
+    }
   });
 });

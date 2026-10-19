@@ -43,6 +43,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let miningCommands: typeof import("@/server/mining-commands");
   let chat: typeof import("@/server/chat");
+  let preferences: typeof import("@/server/character-preference-commands");
   let reports: typeof import("@/server/player-reports");
   let realtime: typeof import("@/server/realtime");
   const createdUsers: string[] = [];
@@ -63,6 +64,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     play = await import("@/server/play");
     miningCommands = await import("@/server/mining-commands");
     chat = await import("@/server/chat");
+    preferences = await import("@/server/character-preference-commands");
     reports = await import("@/server/player-reports");
     realtime = await import("@/server/realtime");
   });
@@ -83,12 +85,14 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     nextUnit: () => 0,
     nextInteger: () => roll,
   });
-  // The Jag's table over 120 outcomes: Quartz [0, 3), Topaz [3, 5).
+  // The Jag's table over 600 outcomes: Quartz [0, 15), Topaz [15, 25), Rune Fragment [25, 49).
   const JAG_QUARTZ = 0;
-  const JAG_TOPAZ = 3;
-  // Deep Jag's over 385: Topaz [0, 11), Sapphire [11, 18).
+  const JAG_TOPAZ = 15;
+  const JAG_FRAGMENT = 25;
+  // Deep Jag's over 3,080: Topaz [0, 88), Sapphire [88, 144), Rune Fragment [144, 529).
   const DEEP_TOPAZ = 0;
-  const DEEP_SAPPHIRE = 11;
+  const DEEP_SAPPHIRE = 88;
+  const DEEP_FRAGMENT = 144;
 
   async function makeCharacter(at: string = LOCATION_IDS.theJag) {
     const userId = await createTestUser(db, authSchema, "Finder");
@@ -177,6 +181,134 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     expect(state.carriedByItemId[ITEM_IDS.galvanite]).toBe(1);
     expect(state.carriedByItemId[ITEM_IDS.uncutTopaz]).toBe(1);
     expect(await miningXp(character.id)).toBe(45);
+  });
+
+  describe("Rune Fragments (#367)", () => {
+    it("stores a Fragment beside the ordinary ore with +20 Mining XP and run history", async () => {
+      const { userId, character } = await makeCharacter();
+      const state = await mineOnce(userId, character.id, finding(JAG_FRAGMENT));
+
+      expect(state.carriedByItemId[ITEM_IDS.ferriteShale]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment]).toBe(1);
+      // 15 Shale XP + 20 Fragment XP, one combined total.
+      expect(await miningXp(character.id)).toBe(35);
+      expect(state.run).toMatchObject({
+        attempts: 1,
+        successes: 1,
+        xpGained: 35,
+        itemsGained: { [ITEM_IDS.ferriteShale]: 1, [ITEM_IDS.runeFragment]: 1 },
+      });
+      expect(state.run.recentAttempts[0]).toMatchObject({
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
+        xpAwarded: 35,
+        secondaryFinds: [{ itemId: ITEM_IDS.runeFragment, quantity: 1 }],
+      });
+    });
+
+    it("awards the same +20 at Deep Jag on top of Galvanite's 25, and a gem is not also awarded", async () => {
+      const { userId, character } = await makeCharacter(LOCATION_IDS.deepJag);
+      const state = await mineOnce(userId, character.id, finding(DEEP_FRAGMENT), "galvanite");
+      expect(state.carriedByItemId[ITEM_IDS.galvanite]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.uncutTopaz] ?? 0).toBe(0);
+      expect(state.carriedByItemId[ITEM_IDS.uncutSapphire] ?? 0).toBe(0);
+      expect(await miningXp(character.id)).toBe(45);
+    });
+
+    it("keeps every existing gem exactly where it was, and announces none of the Fragments", async () => {
+      const jag = await makeCharacter();
+      const quartz = await mineOnce(jag.userId, jag.character.id, finding(JAG_QUARTZ));
+      expect(quartz.carriedByItemId[ITEM_IDS.uncutQuartz]).toBe(1);
+      expect(quartz.carriedByItemId[ITEM_IDS.runeFragment] ?? 0).toBe(0);
+      const deep = await makeCharacter(LOCATION_IDS.deepJag);
+      const sapphire = await mineOnce(
+        deep.userId,
+        deep.character.id,
+        finding(DEEP_SAPPHIRE),
+        "galvanite",
+      );
+      expect(sapphire.carriedByItemId[ITEM_IDS.uncutSapphire]).toBe(1);
+      expect(sapphire.carriedByItemId[ITEM_IDS.runeFragment] ?? 0).toBe(0);
+
+      const fragmentAtJag = await makeCharacter();
+      await mineOnce(fragmentAtJag.userId, fragmentAtJag.character.id, finding(JAG_FRAGMENT));
+      const fragmentAtDeep = await makeCharacter(LOCATION_IDS.deepJag);
+      await mineOnce(
+        fragmentAtDeep.userId,
+        fragmentAtDeep.character.id,
+        finding(DEEP_FRAGMENT),
+        "galvanite",
+      );
+      // Only the earlier gems' own announcements exist: the Sapphire's, never a Fragment's.
+      const rows = await announcements();
+      expect(rows.map((row) => row.body)).toEqual([
+        `${deep.character.displayName} just found Uncut Sapphire at Deep Jag!`,
+      ]);
+    });
+
+    it("rolls no Fragment on a failed extraction", async () => {
+      const { userId, character } = await makeCharacter();
+      const miss: MiningRandom = {
+        nextBasisPoints: () => 9_999,
+        nextUnit: () => 0,
+        nextInteger: () => JAG_FRAGMENT,
+      };
+      const state = await mineOnce(userId, character.id, miss);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment] ?? 0).toBe(0);
+      expect(state.run).toMatchObject({ attempts: 1, successes: 0 });
+      expect(await miningXp(character.id)).toBe(0);
+    });
+
+    /** Seven full Galvanite stacks leave exactly one of the eight slots free. */
+    async function fillAllButOneSlot(characterId: string) {
+      await db.insert(rune.inventoryStacks).values(
+        Array.from({ length: 7 }, () => ({
+          characterId,
+          itemId: ITEM_IDS.galvanite,
+          quantity: 10,
+        })),
+      );
+    }
+
+    it("is protected by the preflight with Prioritize primary resources Off", async () => {
+      const { userId, character } = await makeCharacter();
+      await fillAllButOneSlot(character.id);
+      // One free slot holds the ore OR a Fragment, never both, so Mining will not start.
+      const state = await miningCommands.startMining(
+        userId,
+        character.id,
+        now,
+        finding(JAG_FRAGMENT),
+      );
+      expect(state.stop).toEqual({ activity: "mining", reason: "inventory_slots_full" });
+      expect(state.activeAction).toBeUndefined();
+      expect(await miningXp(character.id)).toBe(0);
+    });
+
+    it("is forfeited with no item and no bonus XP when Prioritize primary resources is On and it has no room", async () => {
+      const { userId, character } = await makeCharacter();
+      await fillAllButOneSlot(character.id);
+      await preferences.setPrioritizePrimaryResourcesPreference(
+        userId,
+        character.id,
+        true,
+        now,
+        finding(JAG_FRAGMENT),
+      );
+      const state = await mineOnce(userId, character.id, finding(JAG_FRAGMENT));
+      expect(state.carriedByItemId[ITEM_IDS.ferriteShale]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment] ?? 0).toBe(0);
+      // The success and its ordinary XP stand; the forfeited Fragment earned nothing.
+      expect(await miningXp(character.id)).toBe(15);
+      expect(state.run).toMatchObject({
+        successes: 1,
+        xpGained: 15,
+        itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      });
+      expect(state.run.recentAttempts[0]!.secondaryFinds).toEqual([]);
+      expect(await announcements()).toEqual([]);
+    });
   });
 
   it("finds nothing — and announces nothing — when the roll misses every span", async () => {

@@ -132,8 +132,9 @@ function greatestCommonDivisor(a: number, b: number): number {
 /**
  * The size of the one roll a Secondary Find table is drawn from: the least
  * common multiple of its entries' denominators, so every entry's 1 / oneIn is
- * a whole number of equally likely outcomes (#308). The Jag's 1 / 40 and 1 / 60
- * share a roll of 120; Deep Jag's 1 / 35 and 1 / 55 share one of 385. Exact
+ * a whole number of equally likely outcomes (#308). The Jag's 1 / 40, 1 / 60 and
+ * 1 / 25 share a roll of 600; Deep Jag's 1 / 35, 1 / 55 and 1 / 8 share 3,080;
+ * The South Cut's 1 / 20, 1 / 100 and 1 / 6 share 300. Exact
  * integers, so the authored odds are the real odds — no rounding to basis points.
  */
 export function secondaryFindRollSize(entries: readonly Pick<MiningSecondaryFindFacts, "oneIn">[]) {

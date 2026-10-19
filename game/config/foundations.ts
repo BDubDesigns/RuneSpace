@@ -77,6 +77,10 @@ const itemIds = {
   // Refining attempt returns; the full canister carries the 50 Fuel Units.
   emptySmallFuelCanister: asContentId("empty_small_fuel_canister"),
   fullSmallFuelCanister: asContentId("full_small_fuel_canister"),
+  // Rune materials (#367). The Fragment is an ordinary Mining Secondary Find;
+  // the intact Runestone breaks apart into Fragments from Inventory Item Details.
+  runeFragment: asContentId("rune_fragment"),
+  runestone: asContentId("runestone"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {

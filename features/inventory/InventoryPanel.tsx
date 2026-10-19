@@ -8,11 +8,12 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { getItemMaximumCharge } from "@/game/config/balance";
-import { getItemPresentation } from "@/game/content/item-presentation";
+import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
+import { getItemPresentation, itemQuantityLabel } from "@/game/content/item-presentation";
+import { breakApartFacts, canBreakApart } from "@/game/domain/rune-materials";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
-import { discardInventoryStackAction } from "@/server/actions";
+import { breakApartRunestoneAction, discardInventoryStackAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import {
   deriveInventoryEquipAvailability,
@@ -36,12 +37,22 @@ import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/
 import { usePlay } from "@/features/play/PlayContext";
 
 type DropConfirmation = {
+  kind: "drop";
   stackId: string;
   mode: "one" | "stack";
   expectedQuantity: number;
   itemName: string;
   confirmLabel: string;
 };
+
+/** The irreversible Break Apart confirmation (#367): exactly one stone, the selected stack. */
+type BreakApartConfirmation = {
+  kind: "break_apart";
+  stackId: string;
+  expectedQuantity: number;
+};
+
+type InventoryConfirmation = DropConfirmation | BreakApartConfirmation;
 
 export function InventoryPanel({
   state,
@@ -63,7 +74,7 @@ export function InventoryPanel({
     releaseCommand,
   } = usePlay();
   const [, startTransition] = useTransition();
-  const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
+  const [confirming, setConfirming] = useState<InventoryConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
   const gridRef = useRef<HTMLDivElement>(null);
   // Selection, authoritative reconciliation, the explicit-selection reveal, and
@@ -99,6 +110,7 @@ export function InventoryPanel({
   const confirmTriggerRef = useRef<HTMLButtonElement>(null);
   const hasConfirmedRef = useRef(false);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
+  const breakApart = breakApartFacts(getEffectiveGameBalance());
   // The equipped Mining tool a loose Power Cell would go into (#233).
   const loadTool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
@@ -184,6 +196,7 @@ export function InventoryPanel({
   ) {
     confirmTriggerRef.current = trigger;
     setConfirming({
+      kind: "drop",
       stackId: entry.id,
       mode: action.mode,
       expectedQuantity: entry.quantity,
@@ -206,8 +219,58 @@ export function InventoryPanel({
     );
   }
 
+  function openBreakApartConfirmation(entry: InventoryStackEntry, trigger: HTMLButtonElement) {
+    confirmTriggerRef.current = trigger;
+    setConfirming({ kind: "break_apart", stackId: entry.id, expectedQuantity: entry.quantity });
+  }
+
+  function runBreakApart() {
+    if (confirming?.kind !== "break_apart") return;
+    const request = { stackId: confirming.stackId, expectedQuantity: confirming.expectedQuantity };
+    const execute = () => {
+      startTransition(async () => {
+        try {
+          const result = await breakApartRunestoneAction({
+            characterId: state.characterId,
+            ...request,
+          });
+          if ("error" in result) {
+            setMessage({ tone: "danger", message: result.error });
+          } else {
+            acceptState(result.state);
+            setMessage(
+              result.breakApart.status === "broken"
+                ? {
+                    tone: "muted",
+                    message: `Broke apart ${itemQuantityLabel(
+                      breakApart.inputItemId,
+                      result.breakApart.consumedQuantity,
+                      "Runestone",
+                    )} into ${itemQuantityLabel(
+                      breakApart.outputItemId,
+                      result.breakApart.producedQuantity,
+                      "Rune Fragment",
+                    )}.`,
+                  }
+                : { tone: "danger", message: result.breakApart.message },
+            );
+          }
+        } catch {
+          setMessage({
+            tone: "danger",
+            message: "Comms interruption. Inventory could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
+          setConfirming(undefined);
+        }
+      });
+    };
+    enqueueForeground(execute);
+  }
+
   function runDiscard() {
-    if (!confirming) return;
+    if (confirming?.kind !== "drop") return;
     const request = {
       stackId: confirming.stackId,
       mode: confirming.mode,
@@ -503,6 +566,21 @@ export function InventoryPanel({
                   ) : null}
                 </div>
               ) : null}
+              {resolvedSelection.kind === "stack" &&
+              canBreakApart(resolvedSelection.entry.itemId, getEffectiveGameBalance()) ? (
+                <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+                  <ActionButton
+                    data-break-apart
+                    disabled={foregroundBusy}
+                    intent="mining"
+                    onClick={(event) =>
+                      openBreakApartConfirmation(resolvedSelection.entry, event.currentTarget)
+                    }
+                  >
+                    Break Apart
+                  </ActionButton>
+                </div>
+              ) : null}
               {resolvedSelection.kind === "stack" ? (
                 <div className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3">
                   <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
@@ -530,7 +608,48 @@ export function InventoryPanel({
         selectedIndex={tiles.findIndex((tile) => tile.selected)}
         tiles={tiles}
       />
-      {confirming ? (
+      {confirming?.kind === "break_apart" ? (
+        <div
+          role="alert"
+          className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"
+          data-break-apart-confirmation
+        >
+          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
+            Confirm Break Apart
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            Destroy {itemQuantityLabel(breakApart.inputItemId, 1, "Runestone")} and receive exactly{" "}
+            {itemQuantityLabel(breakApart.outputItemId, breakApart.outputQuantity, "Rune Fragment")}
+            ?
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            This cannot be undone: Rune Fragments cannot be put back together. Only one stone is
+            broken, even from a larger stack.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <ActionButton
+              disabled={foregroundBusy}
+              intent="secondary"
+              onClick={() => {
+                confirmTriggerRef.current?.focus();
+                setConfirming(undefined);
+              }}
+              ref={cancelButtonRef}
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              disabled={foregroundBusy}
+              intent="danger"
+              loading={foregroundBusy}
+              onClick={runBreakApart}
+            >
+              Break Apart
+            </ActionButton>
+          </div>
+        </div>
+      ) : null}
+      {confirming?.kind === "drop" ? (
         <div
           role="alert"
           className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"

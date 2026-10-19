@@ -93,6 +93,8 @@ describe("Wiki item catalog", () => {
         "Galvanite",
         "Motherlode Slab",
         "Oil Shale",
+        "Rune Fragment",
+        "Runestone",
         "Uncut Quartz",
         "Uncut Sapphire",
         "Uncut Topaz",

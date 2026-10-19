@@ -92,7 +92,7 @@ small number of critical mobile player journeys.
   (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
   setting and Ultra Rare shimmer (`oil-shale-mining`, #342), and fuel manufacturing's
   Empty and Full Small Fuel Canister recipes, art and failure shape
-  (`fuel-manufacturing`, #343), Holo Hollow Landing's Last Leg Trading shop, Toll's
+  (`fuel-manufacturing`, #343), Break Apart for the intact Runestone from Inventory Item Details at the 390 px portrait width (`rune-materials`, #367), Holo Hollow Landing's Last Leg Trading shop, Toll's
   topics and the completed-Thrust-Issues trade gate (`last-leg-trading`, #357), the Rivet's Ship panel, refueling, first flight, landing and durable arrival notice (`ship-first-flight`, #358) with the in-phase flight cinematic (#359), and panel scroll hints plus the Play page preview
   arrows (`scroll-affordances`, #345). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
