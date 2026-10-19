@@ -1520,23 +1520,23 @@ body {
    is accepted, and it never runs under reduced motion. */
 @keyframes rs-offer-hop {
   0%,
-  22%,
+  37%,
   100% {
     transform: translateY(0);
   }
-  7% {
+  12% {
     transform: translateY(-9px);
   }
-  14% {
+  24% {
     transform: translateY(0);
   }
-  18% {
+  30% {
     transform: translateY(-5px);
   }
 }
 
 [data-offer-hop] {
-  animation: rs-offer-hop 3.2s ease-in-out infinite;
+  animation: rs-offer-hop 1.9s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

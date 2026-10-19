@@ -68,6 +68,12 @@ async function standAt(characterId: string, locationId: string) {
     .where(eq(characters.id, characterId));
 }
 
+const rows = (characterId: string) =>
+  db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+
+const total = (stacks: { itemId: string; quantity: number }[], itemId: string) =>
+  stacks.filter((row) => row.itemId === itemId).reduce((sum, row) => sum + row.quantity, 0);
+
 const missionRows = (characterId: string) =>
   db
     .select()
@@ -107,8 +113,8 @@ test.describe("the Rune Fragment offer", () => {
     testCharacter,
   }) => {
     await seed(testCharacter.id, [
-      { itemId: FRAGMENT, quantity: 4 },
-      { itemId: STONE, quantity: 1 },
+      { itemId: FRAGMENT, quantity: 8 },
+      { itemId: STONE, quantity: 2 },
     ]);
     await openTestCharacter(page, testCharacter.id);
     const inventory = await openInventory(page);
@@ -145,6 +151,8 @@ test.describe("the Rune Fragment offer", () => {
       "Your Rune Fragment stays in your Inventory.",
     );
     await expect(offer.locator("[data-item-offer-accept]")).toHaveText("Start mission");
+    // The offer shows the item type, not this stack: no quantity badge.
+    await expect(offer.getByText(/^x\d+$/)).toHaveCount(0);
     await expect(offer.locator("[data-item-offer-description]")).toContainText(
       "resonate beyond ordinary space",
     );
@@ -195,12 +203,46 @@ test.describe("the Rune Fragment offer", () => {
           eq(inventoryStacks.itemId, FRAGMENT),
         ),
       );
-    expect(fragments.reduce((sum, stack) => sum + stack.quantity, 0)).toBe(4);
+    expect(fragments.reduce((sum, stack) => sum + stack.quantity, 0)).toBe(8);
     for (const name of ["Rune Fragment", "Runestone"]) {
       await expect(tile(inventory, name)).not.toHaveAttribute("data-mission-guidance", /.+/);
     }
     await expect(inventory.locator("[data-offer-hop]")).toHaveCount(0);
     await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
+  });
+});
+
+test.describe("the offer across stacks", () => {
+  test("offers from the stack the player inspects, with no quantity on the offer", async ({
+    page,
+    testCharacter,
+  }) => {
+    // Two Rune Fragment stacks of different sizes: the offer must not depend on either.
+    await seed(testCharacter.id, [
+      { itemId: FRAGMENT, quantity: 7 },
+      { itemId: FRAGMENT, quantity: 3 },
+    ]);
+    await openTestCharacter(page, testCharacter.id);
+    const inventory = await openInventory(page);
+    const fragmentTiles = inventory.getByRole("button", { name: /^\d+ Rune Fragment/ });
+    await expect(fragmentTiles).toHaveCount(2);
+    await expect(fragmentTiles.nth(0)).toHaveAttribute("data-mission-guidance", "available");
+    await expect(fragmentTiles.nth(1)).toHaveAttribute("data-mission-guidance", "available");
+
+    await fragmentTiles.nth(1).click();
+    const inspect = inventory.locator("[data-details-panel] [data-item-offer-inspect]");
+    await inspect.click();
+    const offer = page.getByRole("dialog", { name: "Not From Around Here mission offer" });
+    await expect(offer).toBeVisible();
+    await expect(offer.getByText(/^x\d+$/)).toHaveCount(0);
+    await offer.locator("[data-item-offer-accept]").click();
+    await expect(offer).toHaveCount(0);
+    await expect(inventory.getByText(/Mission accepted: Not From Around Here/)).toBeVisible();
+
+    // Accepting consumed neither stack.
+    const after = await rows(testCharacter.id);
+    expect(total(after, FRAGMENT)).toBe(10);
+    await expect(inventory.locator("[data-offer-hop]")).toHaveCount(0);
   });
 });
 

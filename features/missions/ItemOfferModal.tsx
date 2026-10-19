@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type RefObject } from "react";
-import { StackItemVisual } from "@/components/items/StackItemVisual";
+import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
@@ -31,7 +31,7 @@ export function ItemOfferModal({
   triggerRef,
 }: {
   offer: ItemOfferView;
-  stack: { id: string; itemId: string; name: string; quantity: number; stackLimit: number };
+  stack: { id: string; itemId: string; name: string };
   /** Called once the server has accepted the Mission and its state was applied. */
   onAccepted: (offer: ItemOfferView) => void;
   onClose: () => void;
@@ -100,12 +100,14 @@ export function ItemOfferModal({
         className="mt-4 grid items-start gap-4 sm:grid-cols-[7rem_minmax(0,1fr)]"
         data-item-offer
       >
-        <StackItemVisual
+        {/* The offer is about the item type, not this stack: no quantity badge or
+            fill, so inspecting any stack shows the same offer art. The accept
+            still submits the selected stack ID for authoritative validation. */}
+        <ItemVisual
+          accessibleLabel={stack.name}
           className="h-28 w-28 self-start"
           itemId={stack.itemId}
           name={stack.name}
-          quantity={stack.quantity}
-          stackLimit={stack.stackLimit}
         />
         <div className="min-w-0">
           <p className="text-sm text-[color:var(--rs-text-secondary)]" data-item-offer-description>
