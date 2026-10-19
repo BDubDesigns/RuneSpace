@@ -188,7 +188,32 @@ test.describe("the Rune Fragment offer", () => {
     await accept.focus();
     await page.keyboard.press("Enter");
     await expect(offer).toHaveCount(0);
+
+    // The same overlay becomes Mission Started: the real title and the objective
+    // the authoritative projection returned (the strip behind it shows the same).
+    const started = page.getByRole("dialog", { name: "Not From Around Here mission started" });
+    await expect(started).toBeVisible();
+    await expect(started.getByRole("heading", { name: "Not From Around Here" })).toBeVisible();
+    await expect(started.getByText("Mission started", { exact: true }).first()).toBeVisible();
+    const objective = started.locator("[data-mission-started-objective]");
+    await expect(objective).toHaveText("Find someone who might recognize the unusual fragment");
+    await expect(
+      page.locator(`[data-mission-strip="${MISSION}"] [data-mission-strip-objective]`),
+    ).toHaveText((await objective.textContent()) ?? "");
+    // No second acceptance control, and the box fits the phone.
+    await expect(started.locator("[data-item-offer-accept]")).toHaveCount(0);
+    const startedBox = (await started.boundingBox())!;
+    expect(startedBox.x).toBeGreaterThanOrEqual(0);
+    expect(startedBox.x + startedBox.width).toBeLessThanOrEqual(390);
+    expect(startedBox.y + startedBox.height).toBeLessThanOrEqual(844);
+
+    // Return to Inventory is a normal Inventory, not an open details pane.
+    await started.locator("[data-mission-started-return]").click();
+    await expect(started).toHaveCount(0);
+    await expect(inventory.locator("[data-details-panel]")).toHaveCount(0);
     await expect(inventory.getByText(/Mission accepted: Not From Around Here/)).toBeVisible();
+    await expect(tile(inventory, "Rune Fragment")).toBeVisible();
+    expect(await missionRows(testCharacter.id)).toHaveLength(1);
 
     const [row] = await missionRows(testCharacter.id);
     expect(row?.acceptedAt).not.toBeNull();
@@ -209,6 +234,57 @@ test.describe("the Rune Fragment offer", () => {
     }
     await expect(inventory.locator("[data-offer-hop]")).toHaveCount(0);
     await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
+  });
+
+  test("Show on Map opens the existing Map with the Mission's own guidance, without reaccepting", async ({
+    page,
+    testCharacter,
+  }) => {
+    await seed(testCharacter.id, [{ itemId: FRAGMENT, quantity: 3 }]);
+    await openTestCharacter(page, testCharacter.id);
+    const inventory = await openInventory(page);
+    await tile(inventory, "Rune Fragment").click();
+    await inventory.locator("[data-item-offer-inspect]").click();
+    await page
+      .getByRole("dialog", { name: "Not From Around Here mission offer" })
+      .locator("[data-item-offer-accept]")
+      .click();
+    const started = page.getByRole("dialog", { name: "Not From Around Here mission started" });
+    await expect(started).toBeVisible();
+    const acceptedAt = (await missionRows(testCharacter.id))[0]?.acceptedAt;
+
+    await started.locator("[data-mission-started-map]").click();
+    await page.waitForURL(/\/play\/[^/?]+\?surface=map$/);
+    await expect(page.getByRole("dialog", { name: "Inventory" })).toHaveCount(0);
+    await expect(started).toHaveCount(0);
+    await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+    // The ordinary pinned guidance, not a parallel targeting system.
+    await expect(litHexes(page).first()).toBeVisible();
+
+    const rows = await missionRows(testCharacter.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.acceptedAt).toEqual(acceptedAt);
+  });
+
+  test("a refused acceptance stays on the offer with the error and never shows Mission Started", async ({
+    page,
+    testCharacter,
+  }) => {
+    await seed(testCharacter.id, [{ itemId: FRAGMENT, quantity: 3 }]);
+    await openTestCharacter(page, testCharacter.id);
+    const inventory = await openInventory(page);
+    await tile(inventory, "Rune Fragment").click();
+    await inventory.locator("[data-item-offer-inspect]").click();
+    const offer = page.getByRole("dialog", { name: "Not From Around Here mission offer" });
+    await expect(offer).toBeVisible();
+
+    // The stack is gone by the time the player confirms.
+    await seed(testCharacter.id, []);
+    await offer.locator("[data-item-offer-accept]").click();
+    await expect(offer.getByRole("alert")).toContainText("Inventory changed");
+    await expect(offer).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /mission started/ })).toHaveCount(0);
+    expect(await missionRows(testCharacter.id)).toHaveLength(0);
   });
 });
 
@@ -237,6 +313,9 @@ test.describe("the offer across stacks", () => {
     await expect(offer.getByText(/^x\d+$/)).toHaveCount(0);
     await offer.locator("[data-item-offer-accept]").click();
     await expect(offer).toHaveCount(0);
+    const started = page.getByRole("dialog", { name: "Not From Around Here mission started" });
+    await expect(started).toBeVisible();
+    await started.locator("[data-mission-started-return]").click();
     await expect(inventory.getByText(/Mission accepted: Not From Around Here/)).toBeVisible();
 
     // Accepting consumed neither stack.

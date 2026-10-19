@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -152,5 +153,16 @@ describe("the offering tiles", () => {
   it("is not affected by pinning, since the Mission is not accepted yet", () => {
     const markup = render(undefined, [FRAGMENT], [NOT_FROM_AROUND_HERE.id]);
     expect(tile(markup, "Rune Fragment")).toContain('data-mission-guidance="available"');
+  });
+});
+
+describe("the offer overlay stays content-driven", () => {
+  it("names no NPC, Mission or offering item, and reads its objective from the projection", () => {
+    const source = readFileSync("features/missions/ItemOfferModal.tsx", "utf8");
+    expect(source).not.toMatch(
+      /Wade|Tansy|Toll|Rune|Runestone|Fragment|ITEM_IDS|MISSION_IDS|NPC_IDS/,
+    );
+    expect(source).toContain("currentObjective");
+    expect(source).toContain("?surface=map");
   });
 });

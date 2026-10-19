@@ -14,7 +14,7 @@ import { breakApartFacts, canBreakApart } from "@/game/domain/rune-materials";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { ItemOfferModal } from "@/features/missions/ItemOfferModal";
-import { itemOfferForItem } from "@/features/missions/item-offers";
+import { itemOfferForItem, type ItemOfferView } from "@/features/missions/item-offers";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
 import { breakApartRunestoneAction, discardInventoryStackAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
@@ -80,7 +80,11 @@ export function InventoryPanel({
   const [confirming, setConfirming] = useState<InventoryConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
   // The carried-item Mission offer opened from Item Details (#369).
-  const [offerOpen, setOfferOpen] = useState(false);
+  // Held for the whole offer, including its Mission Started view, so the overlay
+  // survives the authoritative state update that ends the offer itself.
+  const [offerSession, setOfferSession] = useState<
+    { offer: ItemOfferView; stack: { id: string; itemId: string; name: string } } | undefined
+  >();
   const inspectRef = useRef<HTMLButtonElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   // Selection, authoritative reconciliation, the explicit-selection reveal, and
@@ -186,7 +190,7 @@ export function InventoryPanel({
   function toggleSelect(next: InventorySelection) {
     setMessage(undefined);
     setConfirming(undefined);
-    setOfferOpen(false);
+    setOfferSession(undefined);
     select(next);
   }
 
@@ -195,7 +199,7 @@ export function InventoryPanel({
   // authoritative feedback already shown to the player.
   function clearSelection() {
     setConfirming(undefined);
-    setOfferOpen(false);
+    setOfferSession(undefined);
     clearSelected();
   }
 
@@ -484,7 +488,11 @@ export function InventoryPanel({
                     data-item-offer-inspect
                     disabled={foregroundBusy}
                     guidance="available"
-                    onClick={() => setOfferOpen(true)}
+                    onClick={() => {
+                      if (resolvedSelection.kind !== "stack") return;
+                      const { id, itemId, name } = resolvedSelection.entry;
+                      setOfferSession({ offer: selectedItemOffer, stack: { id, itemId, name } });
+                    }}
                     ref={inspectRef}
                   >
                     {selectedItemOffer.offer.inspectLabel}
@@ -644,21 +652,25 @@ export function InventoryPanel({
         selectedIndex={tiles.findIndex((tile) => tile.selected)}
         tiles={tiles}
       />
-      {offerOpen && selectedItemOffer && resolvedSelection?.kind === "stack" ? (
+      {offerSession ? (
         <ItemOfferModal
-          offer={selectedItemOffer}
-          onAccepted={(accepted) => {
-            setOfferOpen(false);
+          offer={offerSession.offer}
+          onAccepted={(accepted) =>
             setMessage({
               tone: "muted",
-              message: `Mission accepted: ${accepted.missionTitle}. Your ${resolvedSelection.entry.name} stays in your Inventory.`,
-            });
-            // The Inspect control is gone once the Mission is accepted, so
-            // focus returns to the item's details instead of the page.
-            requestAnimationFrame(() => detailsHeadingRef.current?.focus({ preventScroll: true }));
+              message: `Mission accepted: ${accepted.missionTitle}. Your ${offerSession.stack.name} stays in your Inventory.`,
+            })
+          }
+          onClose={() => setOfferSession(undefined)}
+          onFinished={() => {
+            // Back to a normal Inventory, not a still-open details pane.
+            setOfferSession(undefined);
+            clearSelected();
+            requestAnimationFrame(() =>
+              gridRef.current?.querySelector<HTMLButtonElement>("button[aria-pressed]")?.focus(),
+            );
           }}
-          onClose={() => setOfferOpen(false)}
-          stack={resolvedSelection.entry}
+          stack={offerSession.stack}
           triggerRef={inspectRef}
         />
       ) : null}
