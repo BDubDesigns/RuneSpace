@@ -155,11 +155,14 @@ resolution all apply unchanged.
   yield is **2** shale when that fits, otherwise the ordinary 1), the XP stays
   exactly 20, and the attempt consumes exactly one charge. Both capacity modes
   apply to the bonus the same way: it is retained only if it fits.
-- **Secondary finds** (true successes only, one mutually exclusive roll of 100):
+- **Secondary finds** (true successes only, one mutually exclusive roll of 300):
   **Uncut Sapphire 1/20** (the existing item and its intrinsic +30 XP, **no**
   public announcement from this mine; Deep Jag's own announcement is unchanged),
-  **Motherlode Slab 1/100** (+150 XP, **ULTRA RARE FIND**), and **nothing 94%**.
-  A full success with a slab is 250 Mining XP (100 + 150), with a Sapphire 130.
+  **Motherlode Slab 1/100** (+150 XP, **ULTRA RARE FIND**), **Rune Fragment 1/6**
+  (+20 XP, not announced; #367), and **nothing** otherwise (232 of 300).
+  A full success with a slab is 250 Mining XP (100 + 150), with a Sapphire 130,
+  with a Rune Fragment 120. A low yield never rolls any of them. The Fragment
+  was appended last, so the Sapphire and Slab spans and chances are unchanged.
 - **Motherlode Slab.** One unbroken specimen, **12,000 g, stack limit 1**,
   `ultra_rare` presentation. It is not a new Mining primary. **Not** implemented
   here, by decision: breaking a slab into Oil Shale, housing or display use,
@@ -208,13 +211,14 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 | Deep Jag | Uncut Sapphire | 1 / 55 | +30 | **yes** |
 | The South Cut (#342) | Uncut Sapphire | 1 / 20 | +30 | no |
 | The South Cut (#342) | Motherlode Slab | 1 / 100 | +150 | **yes**, as ULTRA RARE FIND |
-| The Jag (#367) | Rune Fragment | 1 / 12 | +20 | no |
+| The Jag (#367) | Rune Fragment | 1 / 25 | +20 | no |
 | Deep Jag (#367) | Rune Fragment | 1 / 8 | +20 | no |
+| The South Cut (#367) | Rune Fragment | 1 / 6 | +20 | no |
 
 - **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
   over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
   is an integer drawn from the least common multiple of the table's
-  denominators (120 at The Jag, 3,080 at Deep Jag, 100 at The South Cut), and each entry owns a
+  denominators (600 at The Jag, 3,080 at Deep Jag, 300 at The South Cut), and each entry owns a
   consecutive span of it. The Rune Fragment is appended last to each table, so
   every existing gem keeps the span, and therefore the absolute chance, it had. One roll can therefore never award two finds, and no
   authored chance is rounded to basis points. Current content awards at most one
@@ -271,7 +275,7 @@ recipe, Echo Seeker, Mission, merchant price or new location here.
 
 | Item | Unit mass | Stack limit | Where from |
 | --- | ---: | ---: | --- |
-| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 12 at The Jag, 1 / 8 at Deep Jag; Break Apart |
+| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 25 at The Jag, 1 / 8 at Deep Jag, 1 / 6 at The South Cut; Break Apart |
 | Runestone (intact) | 1,000 g | 5 | **No natural source yet.** An authorized admin grant, until a later source is authored |
 
 Both are ordinary stackable, tradable, carriable materials classified under
@@ -283,7 +287,7 @@ are `public/item-art/rune-fragment.webp` and `runestone.webp`.
 
 - **Mining.** The Fragment is one more entry in the existing single, mutually
   exclusive Secondary Find table of each source (see "Secondary Finds"): a
-  success finds at most one of Quartz / Topaz / Fragment, in addition to the
+  success finds at most one of the source's gems, Slab or Fragment, in addition to the
   ordinary ore, and a failed extraction rolls nothing. A charged Loadsteel
   Cutter's +1 stays primary ore only. A Fragment the character's
   *Prioritize primary resources* setting forfeits (no room, setting On) earns

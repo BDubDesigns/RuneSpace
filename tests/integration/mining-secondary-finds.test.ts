@@ -85,10 +85,10 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     nextUnit: () => 0,
     nextInteger: () => roll,
   });
-  // The Jag's table over 120 outcomes: Quartz [0, 3), Topaz [3, 5), Rune Fragment [5, 15).
+  // The Jag's table over 600 outcomes: Quartz [0, 15), Topaz [15, 25), Rune Fragment [25, 49).
   const JAG_QUARTZ = 0;
-  const JAG_TOPAZ = 3;
-  const JAG_FRAGMENT = 5;
+  const JAG_TOPAZ = 15;
+  const JAG_FRAGMENT = 25;
   // Deep Jag's over 3,080: Topaz [0, 88), Sapphire [88, 144), Rune Fragment [144, 529).
   const DEEP_TOPAZ = 0;
   const DEEP_SAPPHIRE = 88;

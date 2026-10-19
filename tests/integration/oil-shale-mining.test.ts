@@ -111,7 +111,8 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
   /**
    * Scripted draws, consumed in the resolver's order: basis points per attempt,
    * then per full success the yield draw (0, 1, 2 -> 2, 3, 4 shale) and the
-   * secondary-table draw (0-4 Sapphire, 5 Motherlode Slab, 6-99 nothing).
+   * secondary-table draw over 300 (0-14 Sapphire, 15-17 Motherlode Slab,
+   * 18-67 Rune Fragment, 68-299 nothing).
    */
   function script(draws: { basisPoints?: number[]; integers?: number[] } = {}) {
     const basisPoints = [...(draws.basisPoints ?? [])];
@@ -124,7 +125,8 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
     return random;
   }
   const SAPPHIRE_ROLL = 0;
-  const SLAB_ROLL = 5;
+  const SLAB_ROLL = 15;
+  const FRAGMENT_ROLL = 18;
   const NO_FIND = 99;
   const NEEDS_LOW_YIELD = 9_999;
 
@@ -277,14 +279,37 @@ suite("issue #342 Oil Shale Mining (real PostgreSQL)", () => {
       expect(await announcements("ultra_rare_find")).toEqual([]);
     });
 
+    it("stores a Rune Fragment beside the ordinary shale with +20 XP and no announcement", async () => {
+      const { userId, character } = await makeCharacter();
+      const state = await mineOnce(userId, character.id, script({ integers: [1, FRAGMENT_ROLL] }));
+      expect(state.carriedByItemId[ITEM_IDS.oilShale]).toBe(3);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.uncutSapphire] ?? 0).toBe(0);
+      // 100 for the success, 20 for the Fragment.
+      expect(await miningXp(character.id)).toBe(baseXp(5) + 120);
+      expect(state.run).toMatchObject({
+        successes: 1,
+        xpGained: 120,
+        itemsGained: { [ITEM_IDS.oilShale]: 3, [ITEM_IDS.runeFragment]: 1 },
+      });
+      expect(state.run.recentAttempts[0]).toMatchObject({
+        quantityAwarded: 3,
+        xpAwarded: 120,
+        secondaryFinds: [{ itemId: ITEM_IDS.runeFragment, quantity: 1 }],
+      });
+      expect(await announcements("rare_find")).toEqual([]);
+      expect(await announcements("ultra_rare_find")).toEqual([]);
+    });
+
     it("pays a low yield exactly one shale and 20 XP, with no secondary and no announcement", async () => {
       const { userId, character } = await makeCharacter();
       const state = await mineOnce(
         userId,
         character.id,
-        script({ basisPoints: [NEEDS_LOW_YIELD], integers: [SLAB_ROLL] }),
+        script({ basisPoints: [NEEDS_LOW_YIELD], integers: [FRAGMENT_ROLL] }),
       );
       expect(state.carriedByItemId[ITEM_IDS.oilShale]).toBe(1);
+      expect(state.carriedByItemId[ITEM_IDS.runeFragment] ?? 0).toBe(0);
       expect(state.carriedByItemId[ITEM_IDS.motherlodeSlab] ?? 0).toBe(0);
       expect(await miningXp(character.id)).toBe(baseXp(5) + 20);
       expect(state.run).toMatchObject({ attempts: 1, successes: 0, failures: 1, xpGained: 20 });

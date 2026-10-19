@@ -325,11 +325,11 @@ suite("Issue #367 Runestone Break Apart (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-10-02T00:00:00.000Z");
     const dueAt = new Date("2026-10-02T00:00:06.000Z");
-    // Every attempt succeeds at minimum yield and finds a Rune Fragment (The Jag's roll 5).
+    // Every attempt succeeds at minimum yield and finds a Rune Fragment (The Jag's roll 25).
     const findsFragment: MiningRandom = {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
-      nextInteger: () => 5,
+      nextInteger: () => 25,
     };
     await miningCommands.startMining(userId, character.id, startedAt, findsFragment);
     const stackId = await addStack(character.id, STONE, 1);

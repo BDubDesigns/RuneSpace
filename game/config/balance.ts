@@ -63,7 +63,7 @@ const balanceSchema = z.object({
           // Rune Fragment (#367): appended, so the gems' absolute chances are untouched.
           z.object({
             itemId: z.literal(ITEM_IDS.runeFragment),
-            oneIn: z.literal(12),
+            oneIn: z.literal(25),
             announce: z.literal(false),
           }),
         ]),
@@ -140,6 +140,11 @@ const balanceSchema = z.object({
             itemId: z.literal(ITEM_IDS.motherlodeSlab),
             oneIn: z.literal(100),
             announce: z.literal(true),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.runeFragment),
+            oneIn: z.literal(6),
+            announce: z.literal(false),
           }),
         ]),
       }),
@@ -1165,7 +1170,7 @@ const defaults = balanceSchema.parse({
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutQuartz, oneIn: 40, announce: false },
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 60, announce: true },
-          { itemId: ITEM_IDS.runeFragment, oneIn: 12, announce: false },
+          { itemId: ITEM_IDS.runeFragment, oneIn: 25, announce: false },
         ],
       },
       galvanite: {
@@ -1201,6 +1206,7 @@ const defaults = balanceSchema.parse({
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutSapphire, oneIn: 20, announce: false },
           { itemId: ITEM_IDS.motherlodeSlab, oneIn: 100, announce: true },
+          { itemId: ITEM_IDS.runeFragment, oneIn: 6, announce: false },
         ],
       },
     },

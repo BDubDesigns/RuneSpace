@@ -95,11 +95,11 @@ function resolveOne(input: {
 }
 
 describe("the authored Secondary Find content", () => {
-  it("gives The Jag Quartz at 1 / 40 and Topaz at 1 / 60 (announcing only the Topaz), then Rune Fragments at 1 / 12", () => {
+  it("gives The Jag Quartz at 1 / 40 and Topaz at 1 / 60 (announcing only the Topaz), then Rune Fragments at 1 / 25", () => {
     expect(jag.secondaryFinds).toEqual([
       { itemId: QUARTZ, oneIn: 40, announce: false },
       { itemId: TOPAZ, oneIn: 60, announce: true },
-      { itemId: FRAGMENT, oneIn: 12, announce: false },
+      { itemId: FRAGMENT, oneIn: 25, announce: false },
     ]);
   });
 
@@ -178,14 +178,14 @@ describe("the authored Secondary Find content", () => {
 
 describe("the one mutually exclusive Secondary Find roll", () => {
   it("draws from a roll of the least common multiple of the denominators", () => {
-    // lcm(40, 60, 12) and lcm(35, 55, 8): the Fragment's 1 / 8 widens Deep Jag's roll.
-    expect(secondaryFindRollSize(miningAwardFacts(balance, jag).secondaryFinds)).toBe(120);
+    // lcm(40, 60, 25) and lcm(35, 55, 8): the Fragment widens both rolls.
+    expect(secondaryFindRollSize(miningAwardFacts(balance, jag).secondaryFinds)).toBe(600);
     expect(secondaryFindRollSize(miningAwardFacts(balance, deepJag).secondaryFinds)).toBe(3_080);
     expect(secondaryFindRollSize([])).toBe(1);
   });
 
   it.each([
-    ["The Jag", jag, 120, { [QUARTZ]: 3, [TOPAZ]: 2, [FRAGMENT]: 10 }],
+    ["The Jag", jag, 600, { [QUARTZ]: 15, [TOPAZ]: 10, [FRAGMENT]: 24 }],
     ["Deep Jag", deepJag, 3_080, { [TOPAZ]: 88, [SAPPHIRE]: 56, [FRAGMENT]: 385 }],
   ] as const)(
     "%s selects exactly the authored odds across every outcome",
@@ -198,7 +198,7 @@ describe("the one mutually exclusive Secondary Find roll", () => {
         if (find) tally[find.itemId] = (tally[find.itemId] ?? 0) + 1;
       }
       expect(tally).toEqual(counts);
-      // 1 / 40 of 120 is 3, 1 / 60 is 2, 1 / 12 is 10; 1 / 35 of 3,080 is 88, 1 / 55 is 56, 1 / 8 is 385.
+      // 1 / 40 of 600 is 15, 1 / 60 is 10, 1 / 25 is 24; 1 / 35 of 3,080 is 88, 1 / 55 is 56, 1 / 8 is 385.
       for (const entry of facts) expect(tally[entry.itemId]! * entry.oneIn).toBe(size);
     },
   );
@@ -206,7 +206,7 @@ describe("the one mutually exclusive Secondary Find roll", () => {
   it("refuses a roll outside the table", () => {
     const facts = miningAwardFacts(balance, jag).secondaryFinds;
     expect(() => selectSecondaryFind(facts, -1)).toThrow(RangeError);
-    expect(() => selectSecondaryFind(facts, 120)).toThrow(RangeError);
+    expect(() => selectSecondaryFind(facts, 600)).toThrow(RangeError);
     expect(() => selectSecondaryFind(facts, 1.5)).toThrow(RangeError);
   });
 });
@@ -271,12 +271,12 @@ describe("resolving a Secondary Find", () => {
     expect(miss.nextInteger).not.toHaveBeenCalled();
     const hit = resolveOne({ source: jag });
     expect(hit.nextInteger).toHaveBeenCalledTimes(1);
-    expect(hit.nextInteger).toHaveBeenCalledWith(120);
+    expect(hit.nextInteger).toHaveBeenCalledWith(600);
   });
 
   it("finds nothing when a roll falls outside every span, or the random cannot roll integers", () => {
-    // 15 is the first roll past The Jag's three spans (3 + 2 + 10 of 120).
-    expect(resolveOne({ source: jag, draws: { integers: [15] } }).attempt!.secondaryFinds).toEqual(
+    // 49 is the first roll past The Jag's three spans (15 + 10 + 24 of 600).
+    expect(resolveOne({ source: jag, draws: { integers: [49] } }).attempt!.secondaryFinds).toEqual(
       [],
     );
     const withoutIntegers = resolveMining({
@@ -599,13 +599,13 @@ describe("Rune Fragments as a Secondary Find (#367)", () => {
   });
 
   it("keeps the Fragment at the end of each table, so every gem span is where it was", () => {
-    // The Jag: Quartz 0-2, Topaz 3-4 (1 / 40 and 1 / 60 of 120), then the Fragment's 10 rolls.
-    expect([0, 1, 2].map((roll) => find(jag, roll))).toEqual([QUARTZ, QUARTZ, QUARTZ]);
-    expect([3, 4].map((roll) => find(jag, roll))).toEqual([TOPAZ, TOPAZ]);
-    expect(find(jag, 5)).toBe(FRAGMENT);
-    expect(find(jag, 14)).toBe(FRAGMENT);
-    expect(find(jag, 15)).toBeUndefined();
-    expect(find(jag, 119)).toBeUndefined();
+    // The Jag (600 rolls): Quartz 0-14, Topaz 15-24 (1 / 40 and 1 / 60), then the Fragment's 24.
+    expect([0, 14].map((roll) => find(jag, roll))).toEqual([QUARTZ, QUARTZ]);
+    expect([15, 24].map((roll) => find(jag, roll))).toEqual([TOPAZ, TOPAZ]);
+    expect(find(jag, 25)).toBe(FRAGMENT);
+    expect(find(jag, 48)).toBe(FRAGMENT);
+    expect(find(jag, 49)).toBeUndefined();
+    expect(find(jag, 599)).toBeUndefined();
     // Deep Jag (3,080 rolls): Topaz 0-87, Sapphire 88-143, then the Fragment's 385.
     expect([0, 87].map((roll) => find(deepJag, roll))).toEqual([TOPAZ, TOPAZ]);
     expect([88, 143].map((roll) => find(deepJag, roll))).toEqual([SAPPHIRE, SAPPHIRE]);
@@ -615,7 +615,7 @@ describe("Rune Fragments as a Secondary Find (#367)", () => {
     expect(find(deepJag, 3_079)).toBeUndefined();
   });
 
-  it("is exactly 1 / 12 at The Jag and 1 / 8 at Deep Jag, with the gems' absolute chances untouched", () => {
+  it("is exactly 1 / 25 at The Jag and 1 / 8 at Deep Jag, with the gems' absolute chances untouched", () => {
     const share = (source: MiningSourceBalance) => {
       const facts = miningAwardFacts(balance, source).secondaryFinds;
       const size = secondaryFindRollSize(facts);
@@ -627,7 +627,7 @@ describe("Rune Fragments as a Secondary Find (#367)", () => {
       return { size, counts };
     };
     const jagShare = share(jag);
-    expect(jagShare.counts.get(FRAGMENT)! / jagShare.size).toBe(1 / 12);
+    expect(jagShare.counts.get(FRAGMENT)! / jagShare.size).toBe(1 / 25);
     expect(jagShare.counts.get(QUARTZ)! / jagShare.size).toBe(1 / 40);
     expect(jagShare.counts.get(TOPAZ)! / jagShare.size).toBe(1 / 60);
     const deepShare = share(deepJag);
