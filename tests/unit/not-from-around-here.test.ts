@@ -89,7 +89,7 @@ const targets = (projection: MissionProjection) => deriveMissionGuidanceTargets(
 describe("the item offer", () => {
   it("is content, naming the Rune Fragment and carrying all its copy", () => {
     const offer = NOT_FROM_AROUND_HERE.itemOffer!;
-    expect(offer.itemId).toBe(ITEM_IDS.runeFragment);
+    expect(offer.itemIds).toEqual([ITEM_IDS.runeFragment, ITEM_IDS.runestone]);
     expect(offer.inspectLabel).toBe("Inspect");
     expect(offer.description).toContain("resonate beyond ordinary space");
     expect(NOT_FROM_AROUND_HERE.offers).toEqual([]);
@@ -102,15 +102,28 @@ describe("the item offer", () => {
       LOCATION_IDS.holoHollow,
     ]) {
       const projection = project(undefined, locationId, { fragments: 1 });
-      expect(projection.itemOffer).toEqual({ itemId: ITEM_IDS.runeFragment });
+      expect(projection.itemOffer).toEqual({ itemIds: [ITEM_IDS.runeFragment] });
       expect([...targets(projection).availableItemIds]).toEqual([ITEM_IDS.runeFragment]);
     }
   });
 
-  it("is not made by an intact Runestone, or without a carried Fragment", () => {
-    expect(project(undefined, LOCATION_IDS.crashSite, { runestones: 3 }).itemOffer).toBeUndefined();
-    expect(project(undefined, LOCATION_IDS.crashSite, {}).itemOffer).toBeUndefined();
-    const none = project(undefined, LOCATION_IDS.crashSite, { runestones: 3 });
+  it("is made by an intact Runestone too, and by both together, for the same Mission", () => {
+    const stone = project(undefined, LOCATION_IDS.crashSite, { runestones: 1 });
+    expect(stone.itemOffer).toEqual({ itemIds: [ITEM_IDS.runestone] });
+    expect([...targets(stone).availableItemIds]).toEqual([ITEM_IDS.runestone]);
+    const both = project(undefined, LOCATION_IDS.crashSite, { fragments: 2, runestones: 1 });
+    expect(both.itemOffer?.itemIds).toEqual([ITEM_IDS.runeFragment, ITEM_IDS.runestone]);
+    expect(targets(both).availableItemIds.size).toBe(2);
+    for (const itemId of [ITEM_IDS.runeFragment, ITEM_IDS.runestone]) {
+      expect(itemOfferForItem({ missions: [both] }, itemId)?.missionId).toBe(
+        MISSION_IDS.notFromAroundHere,
+      );
+    }
+  });
+
+  it("is not made without a carried Fragment or Runestone", () => {
+    const none = project(undefined, LOCATION_IDS.crashSite, {});
+    expect(none.itemOffer).toBeUndefined();
     expect(none.guidance).toBeUndefined();
     expect(targets(none).availableItemIds.size).toBe(0);
   });
@@ -126,7 +139,7 @@ describe("the item offer", () => {
   });
 
   it("disappears once accepted and never comes back, with no permanent tint", () => {
-    const active = project(accepted(), LOCATION_IDS.crashSite, { fragments: 1 });
+    const active = project(accepted(), LOCATION_IDS.crashSite, { fragments: 1, runestones: 1 });
     expect(active.itemOffer).toBeUndefined();
     expect(targets(active).availableItemIds.size).toBe(0);
     const done = project(completedAt(), LOCATION_IDS.crashSite, { fragments: 1 });
@@ -150,7 +163,7 @@ describe("the item offer", () => {
     const view = itemOfferForItem(withOffer, ITEM_IDS.runeFragment);
     expect(view?.missionId).toBe(MISSION_IDS.notFromAroundHere);
     expect(view?.missionTitle).toBe("Not From Around Here");
-    expect(itemOfferForItem(withOffer, ITEM_IDS.runestone)).toBeUndefined();
+    expect(itemOfferForItem(withOffer, ITEM_IDS.ferriteShale)).toBeUndefined();
     const accepted_ = { missions: [project(accepted(), LOCATION_IDS.crashSite, { fragments: 1 })] };
     expect(itemOfferForItem(accepted_, ITEM_IDS.runeFragment)).toBeUndefined();
   });
@@ -524,18 +537,27 @@ describe("registry validation", () => {
     expect(
       validate({
         ...NOT_FROM_AROUND_HERE,
-        itemOffer: { ...offer, itemId: ITEM_IDS.salvageCutter },
+        itemOffer: { ...offer, itemIds: [ITEM_IDS.salvageCutter] },
       }),
     ).toThrow(/stackable item/);
     expect(
       validate({
         ...NOT_FROM_AROUND_HERE,
-        itemOffer: { ...offer, itemId: "no_such_item" as never },
+        itemOffer: { ...offer, itemIds: ["no_such_item" as never] },
       }),
     ).toThrow(/unknown item/);
     expect(
       validate({ ...NOT_FROM_AROUND_HERE, itemOffer: { ...offer, acceptLabel: " " } }),
     ).toThrow(/acceptLabel/);
+    expect(validate({ ...NOT_FROM_AROUND_HERE, itemOffer: { ...offer, itemIds: [] } })).toThrow(
+      /at least one item/,
+    );
+    expect(
+      validate({
+        ...NOT_FROM_AROUND_HERE,
+        itemOffer: { ...offer, itemIds: [ITEM_IDS.runeFragment, ITEM_IDS.runeFragment] },
+      }),
+    ).toThrow(/more than once/);
   });
 
   it("rejects two Missions offered by one item", () => {

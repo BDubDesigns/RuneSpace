@@ -544,7 +544,7 @@ export type MissionDialogue = {
 };
 
 /**
- * A Mission offered by a carried item rather than by an NPC (#369).
+ * A Mission offered by carried items rather than by an NPC (#369).
  *
  * While the Mission is not accepted and its prerequisites hold, a character who
  * genuinely carries a stack of `itemId` sees the ordinary Inventory Item Details
@@ -558,15 +558,21 @@ export type MissionDialogue = {
  * names a particular item or Mission.
  */
 export type MissionItemOffer = {
-  /** The stackable item whose carried stack makes the offer. */
-  itemId: ItemId;
+  /**
+   * The stackable items that can each offer this Mission: a carried stack of
+   * ANY of them makes the same offer, and accepting through one marks the one
+   * Mission accepted, which clears the offer from all of them.
+   */
+  itemIds: readonly ItemId[];
   /** Label of the Item Details action that opens the offer. */
   inspectLabel: string;
-  /** Heading of the offer. */
-  title: string;
-  /** The compact offer premise shown beside the item's art. */
+  /**
+   * The offer premise. It must read correctly whichever listed item was
+   * inspected, so it describes the mystery, not the item. The modal adds the
+   * New Mission label, the Mission title and the no-consumption line itself.
+   */
   description: string;
-  /** Label of the control that accepts the Mission. */
+  /** Label of the control that starts the Mission. */
   acceptLabel: string;
   /** Label of the control that closes the offer without any change. */
   declineLabel: string;
@@ -1735,8 +1741,8 @@ export const CURLY_MUST_STASH: MissionDefinition = {
  * Not From Around Here — the first item-originated Mission and the opening Rune
  * Fragment investigation (#369).
  *
- * A carried Rune Fragment offers it through the ordinary Inventory Item Details
- * (`itemOffer`), not an NPC. Accepting consumes nothing: the Fragment stays the
+ * A carried Rune Fragment or intact Runestone offers it through the ordinary
+ * Inventory Item Details (`itemOffer`), not an NPC. Accepting consumes nothing: the item stays the
  * player's, and no quest-only Fragment exists.
  *
  * The investigation has three honest contacts — Wade, Tansy and Toll — expressed
@@ -1761,12 +1767,13 @@ export const NOT_FROM_AROUND_HERE: MissionDefinition = {
     "Something unusual turned up in the rock. Find out whether anyone around Holo Hollow recognizes it.",
   offers: [],
   itemOffer: {
-    itemId: ITEM_IDS.runeFragment,
+    // A Fragment or an intact Runestone: a player who has moved on to Runestones
+    // can still start the same mystery.
+    itemIds: [ITEM_IDS.runeFragment, ITEM_IDS.runestone],
     inspectLabel: "Inspect",
-    title: "An Unusual Fragment",
     description:
-      "The unusual mineral seems to resonate beyond ordinary space. Ask around to learn whether anyone recognizes it.",
-    acceptLabel: "Ask around",
+      "The unusual mineral seems to resonate beyond ordinary space. Start this mission to investigate it and ask around.",
+    acceptLabel: "Start mission",
     declineLabel: "Not now",
   },
   requirements: [

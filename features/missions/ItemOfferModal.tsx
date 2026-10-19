@@ -90,10 +90,10 @@ export function ItemOfferModal({
 
   return (
     <Drawer
-      eyebrow="Mission available"
-      label={`${offer.offer.title} mission offer`}
+      eyebrow="New mission"
+      label={`${offer.missionTitle} mission offer`}
       onClose={onClose}
-      title={offer.offer.title}
+      title={offer.missionTitle}
       triggerRef={triggerRef}
     >
       <div
@@ -111,8 +111,8 @@ export function ItemOfferModal({
           <p className="text-sm text-[color:var(--rs-text-secondary)]" data-item-offer-description>
             {offer.offer.description}
           </p>
-          <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-            Mission: {offer.missionTitle}. Your {stack.name} stays in your Inventory.
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]" data-item-offer-keeps>
+            Your {stack.name} stays in your Inventory.
           </p>
         </div>
       </div>

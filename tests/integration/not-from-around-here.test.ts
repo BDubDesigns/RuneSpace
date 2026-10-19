@@ -167,15 +167,39 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
   }
 
   describe("accepting from a carried Fragment", () => {
-    it("offers the Mission only while a Fragment is carried", async () => {
+    it("offers the Mission while a Fragment or an intact Runestone is carried", async () => {
       const { userId, character } = await makeCharacter();
       expect((await projection(userId, character.id)).itemOffer).toBeUndefined();
-      await giveStack(character.id, ITEM_IDS.runestone);
+      await giveStack(character.id, ITEM_IDS.ferriteShale);
       expect((await projection(userId, character.id)).itemOffer).toBeUndefined();
+      await giveStack(character.id, ITEM_IDS.runestone);
+      expect((await projection(userId, character.id)).itemOffer).toEqual({
+        itemIds: [ITEM_IDS.runestone],
+      });
       await giveStack(character.id, ITEM_IDS.runeFragment);
       expect((await projection(userId, character.id)).itemOffer).toEqual({
-        itemId: ITEM_IDS.runeFragment,
+        itemIds: [ITEM_IDS.runeFragment, ITEM_IDS.runestone],
       });
+    });
+
+    it("accepts through an intact Runestone, consuming neither, and clears the offer from both", async () => {
+      const { userId, character } = await makeCharacter();
+      const stone = await giveStack(character.id, ITEM_IDS.runestone, 2);
+      await giveStack(character.id, ITEM_IDS.runeFragment, 3);
+      const before = await snapshot(character.id);
+      expect((await acceptOffer(userId, character.id, stone)).mission.status).toBe("accepted");
+      expect(await snapshot(character.id)).toEqual(before);
+      expect((await missionRows(character.id)).length).toBe(1);
+      const projected = await projection(userId, character.id);
+      expect(projected.state).toBe("active");
+      expect(projected.itemOffer).toBeUndefined();
+      expect(projected.guidance?.availableItemIds).toBeUndefined();
+      // The other item route now only converges on the same accepted record.
+      const fragment = await giveStack(character.id, ITEM_IDS.runeFragment);
+      expect((await acceptOffer(userId, character.id, fragment)).mission.status).toBe(
+        "already_accepted",
+      );
+      expect(await progress(character.id)).toEqual({ "toll-lead": 0, "toll-hint": 0 });
     });
 
     it("accepts atomically, consumes nothing, and pays nothing", async () => {
@@ -249,9 +273,9 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
       expect(await snapshot(character.id)).toEqual(before);
     });
 
-    it("refuses a stack of the wrong item, such as an intact Runestone", async () => {
+    it("refuses a stack of an item that does not offer it", async () => {
       const { userId, character } = await makeCharacter();
-      const stackId = await giveStack(character.id, ITEM_IDS.runestone);
+      const stackId = await giveStack(character.id, ITEM_IDS.ferriteShale);
       const refused = await acceptOffer(userId, character.id, stackId);
       expect(refused.mission).toMatchObject({ status: "refused" });
       expect(await missionRows(character.id)).toHaveLength(0);

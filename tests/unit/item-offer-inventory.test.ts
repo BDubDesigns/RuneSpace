@@ -41,10 +41,13 @@ const stack = (id: string, itemId: string, name: string) => ({
   stackLimit: 10,
 });
 
-function observation(fragments: number): MissionObservation {
+function observation(fragments: number, stones: number): MissionObservation {
   return {
     equippedItemIds: new Set<string>(),
-    carriedQuantities: new Map([[ITEM_IDS.runeFragment, fragments]]),
+    carriedQuantities: new Map([
+      [ITEM_IDS.runeFragment, fragments],
+      [ITEM_IDS.runestone, stones],
+    ]),
     stackLimits: new Map(),
     itemNames: new Map(),
   };
@@ -58,13 +61,16 @@ function render(
   const fragments = stacks
     .filter((entry) => entry.itemId === ITEM_IDS.runeFragment)
     .reduce((sum, entry) => sum + entry.quantity, 0);
+  const stones = stacks
+    .filter((entry) => entry.itemId === ITEM_IDS.runestone)
+    .reduce((sum, entry) => sum + entry.quantity, 0);
   const missions = [
     projectMission(
       NOT_FROM_AROUND_HERE,
       record,
       LOCATION_IDS.crashSite,
       true,
-      observation(fragments),
+      observation(fragments, stones),
       true,
     ),
   ];
@@ -98,30 +104,49 @@ const RUNESTONE = stack("s2", ITEM_IDS.runestone, "Runestone");
 const tile = (markup: string, name: string) =>
   new RegExp(`<button[^>]*aria-label="[^"]*${name}[^"]*"[^>]*>`).exec(markup)?.[0] ?? "";
 
-describe("the Rune Fragment tile", () => {
-  it("shows the blue Mission-available affordance only while the offer is open", () => {
+const hop = (markup: string, name: string) => {
+  const tileStart = new RegExp(`<button[^>]*aria-label="[^"]*${name}[^"]*"`).exec(markup);
+  if (!tileStart) return false;
+  const rest = markup.slice(tileStart.index);
+  const end = rest.indexOf("</button>");
+  return rest.slice(0, end).includes("data-offer-hop");
+};
+
+describe("the offering tiles", () => {
+  it("shows the blue Mission-available affordance and the hop only while the offer is open", () => {
     const offered = tile(render(undefined, [FRAGMENT]), "Rune Fragment");
     expect(offered).toContain('data-mission-guidance="available"');
     expect(offered).toContain("rs-mission-available");
     // Not green: this is a new Mission, not accepted progression.
     expect(offered).not.toContain("rs-mission-guidance");
+    expect(hop(render(undefined, [FRAGMENT]), "Rune Fragment")).toBe(true);
   });
 
-  it("drops the affordance once the Mission is accepted, leaving an ordinary tile", () => {
-    const after = tile(render({ acceptedAt: new Date() }, [FRAGMENT]), "Rune Fragment");
-    expect(after).not.toContain("data-mission-guidance");
-    expect(after).not.toContain("rs-mission-");
+  it("drops the affordance and the hop once accepted, leaving an ordinary tile", () => {
+    const markup = render({ acceptedAt: new Date() }, [FRAGMENT, RUNESTONE]);
+    for (const name of ["Rune Fragment", "Runestone"]) {
+      expect(tile(markup, name)).not.toContain("data-mission-guidance");
+      expect(tile(markup, name)).not.toContain("rs-mission-");
+      expect(hop(markup, name)).toBe(false);
+    }
   });
 
-  it("never marks an intact Runestone", () => {
+  it("marks an intact Runestone too, for the same Mission", () => {
     const markup = render(undefined, [RUNESTONE]);
-    expect(tile(markup, "Runestone")).not.toContain("data-mission-guidance");
+    expect(tile(markup, "Runestone")).toContain('data-mission-guidance="available"');
+    expect(hop(markup, "Runestone")).toBe(true);
   });
 
-  it("marks only the Fragment when both are carried", () => {
-    const markup = render(undefined, [FRAGMENT, RUNESTONE]);
-    expect(tile(markup, "Rune Fragment")).toContain('data-mission-guidance="available"');
-    expect(tile(markup, "Runestone")).not.toContain("data-mission-guidance");
+  it("marks both tiles when both are carried, and no other item", () => {
+    const markup = render(undefined, [
+      FRAGMENT,
+      RUNESTONE,
+      stack("s3", ITEM_IDS.ferriteShale, "Ferrite Shale"),
+    ]);
+    expect(hop(markup, "Rune Fragment")).toBe(true);
+    expect(hop(markup, "Runestone")).toBe(true);
+    expect(hop(markup, "Ferrite Shale")).toBe(false);
+    expect(tile(markup, "Ferrite Shale")).not.toContain("data-mission-guidance");
   });
 
   it("is not affected by pinning, since the Mission is not accepted yet", () => {

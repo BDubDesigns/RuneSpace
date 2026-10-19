@@ -18,9 +18,9 @@ const authoredUpdates = [
     body: [
       { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.runeFragment }, side: "right" },
       [
-        "If you have been carrying a Rune Fragment, take another look at it. The tile now glows blue, and selecting it shows a new Inspect action in Item details. Inspect opens a short offer for ",
+        "If you have been carrying a Rune Fragment or an intact Runestone, take another look. The tile now glows blue and its picture gives a little hop now and then, and selecting it shows a new Inspect action in Item details. Inspect opens a short New mission offer for ",
         { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
-        ": the mineral seems to resonate beyond ordinary space, and someone might recognize it. Accepting uses nothing up. The Fragment stays in your Inventory, and so does the rest of the stack.",
+        ": the mineral seems to resonate beyond ordinary space, and someone might recognize it. Starting it uses nothing up: whichever you inspected stays in your Inventory, and once the Mission is started neither glows any more.",
       ],
       [
         "Three people might know something. ",

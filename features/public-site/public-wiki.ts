@@ -338,9 +338,9 @@ const authoredWikiArticles = [
         heading: "Items that offer a Mission",
         paragraphs: [
           [
-            "A carried Rune Fragment tile glows blue while you have not taken up the Mission it offers. Select the stack and Item details shows an Inspect action; it opens a short offer with the Fragment's art, and you can accept it or choose Not now, which changes nothing. Accepting starts ",
+            "A carried Rune Fragment or intact Runestone glows blue, and its picture hops now and then, while you have not started the Mission it offers. Select the stack and Item details shows an Inspect action; it opens a short New mission offer, and you can choose Start mission or Not now, which changes nothing. Starting it begins ",
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
-            ". Your Rune Fragments stay in your Inventory: nothing is used up, and they remain yours to carry, trade or break down for any other purpose. An intact Runestone does not offer it.",
+            ". Starting it is the same from either item, and it uses nothing up: your Fragments and Runestones stay in your Inventory, yours to carry, trade or break down for any other purpose. Once it is started, both stop glowing.",
           ],
         ],
       },

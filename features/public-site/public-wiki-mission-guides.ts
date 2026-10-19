@@ -1139,7 +1139,7 @@ export const missionGuideArticles = [
     category: "getting-started",
     showInIndex: false,
     summary:
-      "A Rune Fragment in your Inventory offers it: ask around about the unusual mineral. Wade or Tansy can point you to Tolliver Kade, and Tolliver points you toward a researcher on Stillreach. It pays nothing, and it does not finish yet.",
+      "A Rune Fragment or intact Runestone in your Inventory offers it: ask around about the unusual mineral. Wade or Tansy can point you to Tolliver Kade, and Tolliver points you toward a researcher on Stillreach. It pays nothing, and it does not finish yet.",
     sections: [
       {
         paragraphs: [
@@ -1152,13 +1152,13 @@ export const missionGuideArticles = [
         heading: "Where it begins",
         paragraphs: [
           [
-            "You need to be carrying a Rune Fragment, which ",
+            "You need to be carrying a Rune Fragment or an intact Runestone, both of which ",
             miningAndRefining("Mining"),
-            " can turn up as a find. Its tile glows blue in your ",
+            " can turn up. The tile glows blue, and its picture hops now and then, in your ",
             inventory("Inventory"),
-            ". Select the stack, choose Inspect in Item details, and then Ask around. Choosing Not now, or closing the offer, changes nothing. An intact Runestone does not offer it, and a Rune Fragment you keep in the Cargo Hold or a stash does not either, because the offer comes from a stack you are carrying.",
+            ". Select the stack, choose Inspect in Item details, and then Start mission. Choosing Not now, or closing the offer, changes nothing. Either item starts the same Mission, and one you keep in the Cargo Hold or a stash does not offer it, because the offer comes from a stack you are carrying.",
           ],
-          "Accepting does not use up the Fragment. It stays in your Inventory.",
+          "Starting the Mission does not use up the Fragment or the Runestone. It stays in your Inventory, and once the Mission is started both stop glowing.",
         ],
       },
       {

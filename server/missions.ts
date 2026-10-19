@@ -523,7 +523,7 @@ export async function acceptItemOfferMission(
           .for("update")
           .limit(1)
       )[0];
-      if (!stack || stack.itemId !== definition.itemOffer.itemId || stack.quantity < 1) {
+      if (!stack || !definition.itemOffer.itemIds.includes(stack.itemId) || stack.quantity < 1) {
         return stateFor({
           status: "refused",
           message: "Inventory changed. Review the item and try again.",

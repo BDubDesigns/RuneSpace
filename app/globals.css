@@ -1513,3 +1513,34 @@ body {
     margin: 0 0 1rem 1.5rem;
   }
 }
+
+/* An unaccepted item-offered Mission (#369): only the artwork inside the tile
+   does a small double hop, then rests. The frame, nameplate and plates stay put.
+   Driven by the semantic available guidance, so it stops the moment the Mission
+   is accepted, and it never runs under reduced motion. */
+@keyframes rs-offer-hop {
+  0%,
+  22%,
+  100% {
+    transform: translateY(0);
+  }
+  7% {
+    transform: translateY(-9px);
+  }
+  14% {
+    transform: translateY(0);
+  }
+  18% {
+    transform: translateY(-5px);
+  }
+}
+
+[data-offer-hop] {
+  animation: rs-offer-hop 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-offer-hop] {
+    animation: none;
+  }
+}

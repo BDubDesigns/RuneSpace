@@ -293,13 +293,15 @@ are `public/item-art/rune-fragment.webp` and `runestone.webp`.
   *Prioritize primary resources* setting forfeits (no room, setting On) earns
   no item and no +20 XP.
 - **Inspect and the Mission offer (#369).** A carried Rune Fragment stack
-  offers the Mission *Not From Around Here* through its ordinary Item Details.
-  While the Mission is unaccepted the tile carries the shared blue
-  Mission-available treatment, and the content-authored **Inspect** action opens a
-  compact offer modal with the Fragment's own art and the authored copy. Closing
-  it changes nothing; accepting stamps the Mission without consuming, reserving or
-  transforming the Fragment, and an intact Runestone, a Cargo Hold stack or a
-  stash stack offers nothing. This is a generic item-offer mechanism
+  and an intact Runestone stack each offer the Mission *Not From Around Here*
+  through their ordinary Item Details. While the Mission is unaccepted the tile
+  carries the shared blue Mission-available treatment (with the artwork alone
+  doing a small intermittent hop, off under reduced motion), and the
+  content-authored **Inspect** action opens a compact **New mission** modal with
+  the item's own art and the authored copy. Closing it changes nothing; **Start
+  mission** stamps the one Mission without consuming, reserving or transforming
+  either item and clears the offer from both. A Cargo Hold or stash stack offers
+  nothing. This is a generic item-offer mechanism
   (`MissionDefinition.itemOffer`, `docs/missions.md` §4.1), so no Inventory code
   names the Fragment. Break Apart and Drop on a Runestone are unchanged.
 - **Break Apart** is the one conversion (`balance.runeMaterials.breakApart`:

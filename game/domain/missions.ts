@@ -372,9 +372,10 @@ export type MissionProjection = {
   /**
    * Present only while a carried item currently offers this Mission (#369): the
    * Mission is not accepted, its prerequisites hold, and the character carries a
-   * stack of the authored item. The copy is content (`itemOffer`), never state.
+   * stack of any authored item. `itemIds` are the authored items currently
+   * carried. The copy is content (`itemOffer`), never state.
    */
-  itemOffer?: { itemId: string };
+  itemOffer?: { itemIds: readonly string[] };
   /**
    * The Mission-local reactive facts that currently hold (#232), by authored
    * key, for accepted incomplete Missions only. Read by conversation routing
@@ -653,7 +654,7 @@ function deriveGuidance(
       prerequisiteSatisfied,
       observation,
     )
-      ? [definition.itemOffer!.itemId]
+      ? carriedOfferItemIds(definition.itemOffer!, observation)
       : [];
     if (availableNpcIds.length === 0 && availableItemIds.length === 0) return undefined;
     return {
@@ -792,7 +793,15 @@ export function itemOfferAvailable(
   observation: Pick<MissionObservation, "carriedQuantities"> | undefined,
 ): boolean {
   if (!definition.itemOffer || state !== "not_accepted" || !prerequisiteSatisfied) return false;
-  return (observation?.carriedQuantities.get(definition.itemOffer.itemId) ?? 0) >= 1;
+  return carriedOfferItemIds(definition.itemOffer, observation).length > 0;
+}
+
+/** The authored offering items the character currently carries at least one of. */
+function carriedOfferItemIds(
+  offer: NonNullable<MissionDefinition["itemOffer"]>,
+  observation: Pick<MissionObservation, "carriedQuantities"> | undefined,
+): readonly string[] {
+  return offer.itemIds.filter((itemId) => (observation?.carriedQuantities.get(itemId) ?? 0) >= 1);
 }
 
 /**
@@ -1008,7 +1017,7 @@ export function projectMission(
       prerequisiteSatisfied,
     ),
     ...(itemOfferAvailable(definition, state, prerequisiteSatisfied, observation)
-      ? { itemOffer: { itemId: definition.itemOffer!.itemId } }
+      ? { itemOffer: { itemIds: carriedOfferItemIds(definition.itemOffer!, observation) } }
       : {}),
     ...(active && definition.reactiveFacts
       ? {
@@ -2208,8 +2217,8 @@ function assertContinuationGraph(definitions: readonly MissionDefinition[]): voi
 }
 
 /**
- * The item-offer contract (#369): a stackable item (a carried stack is what
- * makes the offer), complete copy, and at most one Mission offered by any one
+ * The item-offer contract (#369): one or more stackable items (a carried stack of
+ * any is what makes the offer), complete copy, and at most one Mission offered by any one
  * item — two offers from one item would leave the Item Details action without a
  * single Mission to open.
  */
@@ -2219,27 +2228,36 @@ function assertItemOffer(
 ): void {
   const where = `Mission "${definition.id}"`;
   const offer = definition.itemOffer!;
-  const item = getItemDefinition(offer.itemId);
-  if (!item) throw new Error(`${where} item offer references unknown item "${offer.itemId}".`);
-  if (item.kind !== "stack") {
-    throw new Error(`${where} item offer must target a stackable item; a carried stack offers it.`);
+  if (offer.itemIds.length === 0) {
+    throw new Error(`${where} item offer must name at least one item.`);
+  }
+  if (new Set(offer.itemIds).size !== offer.itemIds.length) {
+    throw new Error(`${where} item offer names an item more than once.`);
+  }
+  for (const itemId of offer.itemIds) {
+    const item = getItemDefinition(itemId);
+    if (!item) throw new Error(`${where} item offer references unknown item "${itemId}".`);
+    if (item.kind !== "stack") {
+      throw new Error(
+        `${where} item offer must target stackable items; a carried stack offers it.`,
+      );
+    }
+    const duplicate = definitions.find(
+      (other) => other.id !== definition.id && other.itemOffer?.itemIds.includes(itemId),
+    );
+    if (duplicate) {
+      throw new Error(
+        `${where} item offer for "${itemId}" duplicates Mission "${duplicate.id}"; one item offers one Mission.`,
+      );
+    }
   }
   for (const [field, copy] of Object.entries({
     inspectLabel: offer.inspectLabel,
-    title: offer.title,
     description: offer.description,
     acceptLabel: offer.acceptLabel,
     declineLabel: offer.declineLabel,
   })) {
     if (copy.trim().length === 0) throw new Error(`${where} item offer must author ${field}.`);
-  }
-  const duplicate = definitions.find(
-    (other) => other.id !== definition.id && other.itemOffer?.itemId === offer.itemId,
-  );
-  if (duplicate) {
-    throw new Error(
-      `${where} item offer for "${offer.itemId}" duplicates Mission "${duplicate.id}"; one item offers one Mission.`,
-    );
   }
 }
 

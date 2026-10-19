@@ -113,18 +113,19 @@ test.describe("the Rune Fragment offer", () => {
     await openTestCharacter(page, testCharacter.id);
     const inventory = await openInventory(page);
 
-    // Blue "Mission available" on the Fragment only; an intact Runestone is plain.
-    await expect(tile(inventory, "Rune Fragment")).toHaveAttribute(
-      "data-mission-guidance",
-      "available",
-    );
-    await expect(tile(inventory, "Runestone")).not.toHaveAttribute("data-mission-guidance", /.+/);
+    // Blue "Mission available" on both offering items, with the artwork hopping.
+    for (const name of ["Rune Fragment", "Runestone"]) {
+      await expect(tile(inventory, name)).toHaveAttribute("data-mission-guidance", "available");
+      await expect(tile(inventory, name).locator("[data-offer-hop]")).toHaveCount(1);
+    }
+    await expect(inventory.locator("[data-offer-hop]")).toHaveCount(2);
 
-    // The ordinary Item Details, with Break Apart unchanged on a Runestone.
+    // The ordinary Item Details, with Break Apart unchanged on a Runestone,
+    // which also offers the same Mission.
     await tile(inventory, "Runestone").click();
     const details = inventory.locator("[data-details-panel]");
     await expect(details.getByRole("button", { name: "Break Apart" })).toBeVisible();
-    await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
+    await expect(details.locator("[data-item-offer-inspect]")).toBeVisible();
 
     await tile(inventory, "Rune Fragment").click();
     const inspect = details.locator("[data-item-offer-inspect]");
@@ -136,12 +137,17 @@ test.describe("the Rune Fragment offer", () => {
 
     // Inspect opens the compact offer, in front of Inventory, with the real art.
     await inspect.click();
-    const offer = page.getByRole("dialog", { name: "An Unusual Fragment mission offer" });
+    const offer = page.getByRole("dialog", { name: "Not From Around Here mission offer" });
     await expect(offer).toBeVisible();
+    await expect(offer.getByText("New mission", { exact: true })).toBeVisible();
+    await expect(offer.getByRole("heading", { name: "Not From Around Here" })).toBeVisible();
+    await expect(offer.locator("[data-item-offer-keeps]")).toHaveText(
+      "Your Rune Fragment stays in your Inventory.",
+    );
+    await expect(offer.locator("[data-item-offer-accept]")).toHaveText("Start mission");
     await expect(offer.locator("[data-item-offer-description]")).toContainText(
       "resonate beyond ordinary space",
     );
-    await expect(offer.getByText("Not From Around Here")).toBeVisible();
     const art = offer.locator('[data-testid="item-artwork"]');
     await expect(art).toBeVisible();
     await expect
@@ -167,7 +173,7 @@ test.describe("the Rune Fragment offer", () => {
     await expect(inspect).toBeFocused();
     expect(await missionRows(testCharacter.id)).toHaveLength(0);
 
-    // The keyboard reaches Ask around, and accepting is atomic.
+    // The keyboard reaches Start mission, and accepting is atomic.
     await inspect.click();
     await expect(offer).toBeVisible();
     const accept = offer.locator("[data-item-offer-accept]");
@@ -190,10 +196,10 @@ test.describe("the Rune Fragment offer", () => {
         ),
       );
     expect(fragments.reduce((sum, stack) => sum + stack.quantity, 0)).toBe(4);
-    await expect(tile(inventory, "Rune Fragment")).not.toHaveAttribute(
-      "data-mission-guidance",
-      /.+/,
-    );
+    for (const name of ["Rune Fragment", "Runestone"]) {
+      await expect(tile(inventory, name)).not.toHaveAttribute("data-mission-guidance", /.+/);
+    }
+    await expect(inventory.locator("[data-offer-hop]")).toHaveCount(0);
     await expect(details.locator("[data-item-offer-inspect]")).toHaveCount(0);
   });
 });

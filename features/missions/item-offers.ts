@@ -22,7 +22,7 @@ export function itemOfferForItem(
   state: { missions: readonly Pick<MissionProjection, "missionId" | "itemOffer">[] },
   itemId: string,
 ): ItemOfferView | undefined {
-  const projection = state.missions.find((mission) => mission.itemOffer?.itemId === itemId);
+  const projection = state.missions.find((mission) => mission.itemOffer?.itemIds.includes(itemId));
   const definition = projection ? getMission(projection.missionId) : undefined;
   if (!projection || !definition?.itemOffer) return undefined;
   return {

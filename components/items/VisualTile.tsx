@@ -102,6 +102,7 @@ export function VisualTile({
           <Image
             alt=""
             className={`h-20 max-h-full w-20 max-w-full object-contain ${mutedArtwork ? "opacity-50 grayscale" : ""}`}
+            data-offer-hop={missionGuidance === "available" ? "" : undefined}
             data-testid="item-artwork"
             height={160}
             sizes="80px"
