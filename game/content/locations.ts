@@ -622,7 +622,7 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Hilltop Workshop",
     description:
-      "A small metal workshop stands on a rounded hilltop under a canvas awning, its windows lit and a stovepipe on the roof, a path of glowing mushrooms climbing to its door.",
+      "A patched metal workshop sits above the misty highlands, warm light spilling from its windows. A worn path climbs through exposed stone and low alien scrub beneath the aurora.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theLowHum],
     availableActionIds: [],
     dormantActivities: [],
@@ -736,7 +736,7 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Harmonic Workings",
     description:
-      "A steep rock face veined with crystals that shimmer violet and teal, above a wooden headframe, a cable bucket and ore carts on a short rail.",
+      "An old lifting frame and suspended ore bucket stand against a fractured rock face threaded with iridescent mineral seams, with battered ore carts waiting on short rails below.",
     adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
     availableActionIds: [],
     dormantActivities: [],
