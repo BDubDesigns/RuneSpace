@@ -628,6 +628,19 @@ Current production conventions:
   (`assets/map-icons/holo-hollow-landing.png`, 1254x1254 direct-alpha) went through
   the direct-alpha recipe in `scripts/prepare-holo-hollow-landing-art.mjs` to a
   512x428 grayscale lossless WebP
+- Stillreach Slice A (#373): eight approved empty 4:1 panoramas and eight transparent
+  map identifiers, one pair per location. The panorama masters (seven 2508x627, The
+  Survey Line 2048x512 PNG, kept unaltered as `assets/location-scenes/<slug>-master.png`)
+  were downsampled to 1536x384 lossy WebP q80 and the 1254x1254 direct-alpha identifier
+  masters (`assets/map-icons/<slug>.png`) went through the direct-alpha recipe to
+  512-long-edge grayscale lossless WebPs, all by `scripts/prepare-stillreach-art.mjs`. The
+  Landing Station panorama stays empty (the fungal ring is the landing pad, and the Rivet
+  is a later overlay). Master SHA-256 (first 12 hex): scenes `68262341c150`
+  (Landing Station), `0afbf4863837` (Windward Track), `a3ea023c3f87` (Hilltop Workshop),
+  `27d06f9cf6fa` (Prospecting Quarry), `eb80ed284cf8` (The Low Hum), `9cdc82f3a601`
+  (The Survey Line), `0764c48935cf` (The Dry Seam), `428f36776f69` (Harmonic Workings);
+  identifiers `a7816f2669b8`, `d92f7acdcfcf`, `74ebffa72732` and the rest of the
+  owner's manifest. See `docs/travel-map-design.md` and `docs/location-scenes.md`
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

@@ -22,12 +22,7 @@ import { usePlay } from "@/features/play/PlayContext";
 import { isPlayInTransit } from "@/features/ship/flight";
 import type { MissionGuidanceTargets } from "@/game/domain/missions";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
-import {
-  buildLocalMapGeometry,
-  LOCAL_MAP_GEOMETRY,
-  LOCAL_MAP_HEX_WIDTH,
-  type LocalMapGeometry,
-} from "./local-map-layout";
+import { getLocalMapGeometryForLocation, type LocalMapGeometry } from "./local-map-layout";
 import {
   useLocalMapScrollAffordances,
   type LocalMapMissionEdgeCues,
@@ -520,11 +515,13 @@ export function LocalMapPanel({
   const [message, setMessage] = useState<string | undefined>();
   const mapCanvasRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(Date.now());
-  const [mapGeometry, setMapGeometry] = useState<LocalMapGeometry>(LOCAL_MAP_GEOMETRY);
   const [, startTransition] = useTransition();
   const [transitioning, setTransitioning] = useState(false);
 
   const currentLocationId = state.location.currentLocationId;
+  // The map is the character's own planet's: derived from the authoritative
+  // current location, so a Journey (which never changes planet) keeps its map.
+  const mapGeometry = getLocalMapGeometryForLocation(currentLocationId);
   // Accepted Missions only: available offers never reach the map.
   const missionTargets = derivePinnedGuidanceTargets(state);
   const travel = state.travelState;
@@ -547,15 +544,6 @@ export function LocalMapPanel({
     affordances: localMapAffordances,
     missionCues: localMapMissionCues,
   } = useLocalMapScrollAffordances(true, missionEdgeTargets);
-
-  useEffect(() => {
-    function updateMapGeometry() {
-      setMapGeometry(buildLocalMapGeometry(undefined, LOCAL_MAP_HEX_WIDTH));
-    }
-    updateMapGeometry();
-    window.addEventListener("resize", updateMapGeometry);
-    return () => window.removeEventListener("resize", updateMapGeometry);
-  }, []);
 
   useEffect(() => {
     if (!inTransit) return;

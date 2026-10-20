@@ -10,6 +10,7 @@ import {
   LOCATION_IDS,
   MERCHANT_IDS,
   MISSION_IDS,
+  PLANET_IDS,
   NPC_IDS,
 } from "@/game/config/foundations";
 import {
@@ -114,7 +115,7 @@ describe("issue #357 Holo Hollow Landing", () => {
   });
 
   it("puts each walking edge at the one established 24-second leg", () => {
-    const geometry = buildLocalMapGeometry();
+    const geometry = buildLocalMapGeometry(PLANET_IDS.skatboll);
     const edges = geometry.undirectedRoutes.filter(
       (route) => route.originLocationId === landing || route.destinationLocationId === landing,
     );

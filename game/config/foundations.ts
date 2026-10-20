@@ -535,7 +535,31 @@ export const LOCATION_IDS = {
   // Skatboll's walkable landing pad (#357): an ordinary World Location, not a
   // separate planet. Its Local Place is Last Leg Trading.
   holoHollowLanding: asContentId("holo_hollow_landing"),
+  // Stillreach Slice A (#373): the eight World Locations of Stillreach's local map.
+  // Every one is scenery-only in this slice; see game/content/locations.
+  stillreachLandingStation: asContentId("stillreach_landing_station"),
+  windwardTrack: asContentId("windward_track"),
+  hilltopWorkshop: asContentId("hilltop_workshop"),
+  prospectingQuarry: asContentId("prospecting_quarry"),
+  theLowHum: asContentId("the_low_hum"),
+  theSurveyLine: asContentId("the_survey_line"),
+  theDrySeam: asContentId("the_dry_seam"),
+  harmonicWorkings: asContentId("harmonic_workings"),
 } as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for the planets a World Location can belong to (#373). A
+ * planet is the scope of one local map: coordinates, adjacency and walking are
+ * all planet-local, and the player's active map is derived from the planet of
+ * their authoritative current location. It is deliberately not the same thing as
+ * a Region (`holo_hollow` is Skatboll's starter region, never its name).
+ */
+export const PLANET_IDS = {
+  skatboll: "skatboll",
+  stillreach: "stillreach",
+} as const satisfies Record<string, ContentId>;
+
+export type PlanetId = (typeof PLANET_IDS)[keyof typeof PLANET_IDS];
 
 /**
  * Stable identities for Local Places (#159): interior/adjacent town places

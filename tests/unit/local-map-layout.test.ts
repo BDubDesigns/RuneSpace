@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS, PLANET_IDS } from "@/game/config/foundations";
 import { LOCATIONS, areLocationsAdjacent } from "@/game/content/locations";
 import {
-  LOCAL_MAP_GEOMETRY,
+  LOCAL_MAP_GEOMETRY_BY_PLANET,
   LOCAL_MAP_HEX_HEIGHT,
   LOCAL_MAP_ROUTE_GAP,
   axialToPixel,
@@ -11,7 +11,7 @@ import {
 import { routeProgressSegment } from "@/features/travel/route-progress";
 
 function layoutFor(locationId: string) {
-  const layout = LOCAL_MAP_GEOMETRY.layouts.find(
+  const layout = LOCAL_MAP_GEOMETRY_BY_PLANET.skatboll.layouts.find(
     (candidate) => candidate.locationId === locationId,
   );
   if (!layout) throw new Error(`Missing layout for ${locationId}`);
@@ -54,7 +54,7 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
   });
 
   it("derives one route per undirected registry edge and animates both directions", () => {
-    const geometry = buildLocalMapGeometry();
+    const geometry = buildLocalMapGeometry(PLANET_IDS.skatboll);
     // Holo Hollow (#159) adds three edges: Crash Site, Power Annex, Long Scramble.
     // Rusk Recovery (#190) adds exactly one more: the reciprocal Holo Hollow
     // walk. The authored Crew Hauler route (#172) contributes in-transit

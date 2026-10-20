@@ -311,6 +311,35 @@ never lands, refuels or completes anything.
 A later route adds its own entry to `FLIGHT_CINEMATICS` (typed over every
 `ShipRouteId`); there is no generic cinematic engine.
 
+## Stillreach Slice A scenes (issue #373)
+
+Stillreach's eight World Locations are ordinary single-scene locations: native-ratio 4:1
+opaque lossy WebPs at 1536×384 (q80), one per location, with no overlay and no state
+variant. The approved masters are kept unaltered in `assets/location-scenes/<slug>-master.png`
+(seven 2508×627, The Survey Line 2048×512) and `scripts/prepare-stillreach-art.mjs` derives
+the WebPs by downsampling, never upscaling. No scene carries a baked ship, person, text or
+UI.
+
+| Location | `public/location-scenes/` file | Source master | Bytes |
+|---|---|---|---|
+| Stillreach Landing Station | `stillreach-landing-station.webp` | 2508×627 | 158,664 |
+| Windward Track | `windward-track.webp` | 2508×627 | 173,658 |
+| Hilltop Workshop | `hilltop-workshop.webp` | 2508×627 | 148,474 |
+| Prospecting Quarry | `prospecting-quarry.webp` | 2508×627 | 174,700 |
+| The Low Hum | `the-low-hum.webp` | 2508×627 | 119,182 |
+| The Survey Line | `the-survey-line.webp` | 2048×512 | 133,140 |
+| The Dry Seam | `the-dry-seam.webp` | 2508×627 | 222,474 |
+| Harmonic Workings | `harmonic-workings.webp` | 2508×627 | 167,298 |
+
+The Landing Station's panorama is **empty on purpose**: the bioluminescent fungal ring is
+the physical landing pad. The repaired Rivet is a separately rendered overlay for the later
+flight slice (it would compose through the existing `overlay` / `shipBerth` seam, like Holo
+Hollow Landing), so no ship is baked in and no docked or berthed state is invented here. The
+other seven are scenery only: their buildings, rigs and mine works are environmental
+illustration, not an operable Rig, merchant or mine, and the locations author no action.
+Each `alt` is distinct and grounded in what the panorama shows; every `focal` keeps the
+subject inside the 390 px strip's 2.9:1 crop.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's

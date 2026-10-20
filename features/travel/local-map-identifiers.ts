@@ -14,6 +14,14 @@ export const MAP_IDENTIFIER_ASSET_BY_KEY = {
   south_access_track: "/map-icons/south-access-track.webp",
   the_south_cut: "/map-icons/the-south-cut.webp",
   holo_hollow_landing: "/map-icons/holo-hollow-landing.webp",
+  stillreach_landing_station: "/map-icons/stillreach-landing-station.webp",
+  windward_track: "/map-icons/windward-track.webp",
+  hilltop_workshop: "/map-icons/hilltop-workshop.webp",
+  prospecting_quarry: "/map-icons/prospecting-quarry.webp",
+  the_low_hum: "/map-icons/the-low-hum.webp",
+  the_survey_line: "/map-icons/the-survey-line.webp",
+  the_dry_seam: "/map-icons/the-dry-seam.webp",
+  harmonic_workings: "/map-icons/harmonic-workings.webp",
 } as const satisfies Record<MapIconKey, string>;
 
 /**

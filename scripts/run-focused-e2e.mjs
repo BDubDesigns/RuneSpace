@@ -85,6 +85,7 @@ export const FOCUSED_PHASES = [
   "not-from-around-here",
   "ship-first-flight",
   "scroll-affordances",
+  "stillreach",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a
