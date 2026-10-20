@@ -21,7 +21,7 @@ import {
   inventoryStacks,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
-import { LOCAL_MAP_LOCATION_IDS } from "@/game/content/locations";
+import { LOCAL_MAP_LOCATION_IDS_BY_PLANET } from "@/game/content/locations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { expectElementsInsideHexes } from "./map-geometry";
@@ -174,7 +174,7 @@ const IN_TRANSIT_STATE_LABELS = [
 ] as const;
 
 /** Six chassis rivets per rendered hex; derived so a new location can't stale this. */
-const MAP_RIVET_COUNT = LOCAL_MAP_LOCATION_IDS.length * 6;
+const MAP_RIVET_COUNT = LOCAL_MAP_LOCATION_IDS_BY_PLANET.skatboll.length * 6;
 
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,

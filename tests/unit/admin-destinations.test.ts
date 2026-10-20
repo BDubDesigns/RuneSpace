@@ -25,6 +25,15 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "south_access_track",
         "the_south_cut",
         "holo_hollow_landing",
+        // Stillreach Slice A (#373): reachable for playtest only through this teleport.
+        "stillreach_landing_station",
+        "windward_track",
+        "hilltop_workshop",
+        "prospecting_quarry",
+        "the_low_hum",
+        "the_survey_line",
+        "the_dry_seam",
+        "harmonic_workings",
       ].sort(),
     );
   });

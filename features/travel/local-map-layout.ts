@@ -1,4 +1,9 @@
-import { LOCATIONS, LOCAL_MAP_LOCATION_IDS } from "@/game/content/locations";
+import { PLANET_IDS, type PlanetId } from "@/game/config/foundations";
+import {
+  getLocationPlanetId,
+  LOCATIONS,
+  LOCAL_MAP_LOCATION_IDS_BY_PLANET,
+} from "@/game/content/locations";
 import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import { routeSegmentKey, type RoutePoint, type RouteSegmentEndpoints } from "./route-progress";
@@ -75,22 +80,27 @@ function undirectedRouteKey(first: string, second: string): string {
 }
 
 /**
- * Build the small local presentation geometry from content-provided axial
- * coordinates and registry adjacency. Travel legality never reads this data.
+ * Build one planet's local presentation geometry from content-provided axial
+ * coordinates and registry adjacency (#373). Only that planet's locations are
+ * laid out, so another planet may reuse the same coordinate without a collision
+ * or a leaked hex. Travel legality never reads this data.
  */
 export function buildLocalMapGeometry(
+  planetId: PlanetId,
   locations: readonly LocationDefinition[] = LOCATIONS,
   hexWidth = LOCAL_MAP_HEX_WIDTH,
 ): LocalMapGeometry {
   const hexHeight = Math.sqrt(3) * (hexWidth / 2);
-  const localIds = new Set<string>(LOCAL_MAP_LOCATION_IDS);
-  const localLocations = locations.filter((location) => localIds.has(location.id));
+  const localIds = new Set<string>(LOCAL_MAP_LOCATION_IDS_BY_PLANET[planetId]);
+  const localLocations = locations.filter(
+    (location) => location.planetId === planetId && localIds.has(location.id),
+  );
   const rawLayouts = localLocations.map((location) => ({
     location,
     coordinate: location.presentation.localMap.axial,
     rawCenter: axialToPixel(location.presentation.localMap.axial, hexWidth),
   }));
-  if (rawLayouts.length === 0) throw new Error("The local map requires at least one location");
+  if (rawLayouts.length === 0) throw new Error(`The ${planetId} local map has no locations`);
 
   const coordinates = new Set<string>();
   for (const layout of rawLayouts) {
@@ -179,4 +189,18 @@ export function buildLocalMapGeometry(
   };
 }
 
-export const LOCAL_MAP_GEOMETRY = buildLocalMapGeometry();
+/** One geometry per planet, built once; the active map is chosen by the character's planet. */
+export const LOCAL_MAP_GEOMETRY_BY_PLANET: Readonly<Record<PlanetId, LocalMapGeometry>> = {
+  [PLANET_IDS.skatboll]: buildLocalMapGeometry(PLANET_IDS.skatboll),
+  [PLANET_IDS.stillreach]: buildLocalMapGeometry(PLANET_IDS.stillreach),
+};
+
+/**
+ * The geometry of the map the character is standing on. The planet is derived
+ * from the authoritative current location, never supplied by the client.
+ */
+export function getLocalMapGeometryForLocation(locationId: string): LocalMapGeometry {
+  const planetId = getLocationPlanetId(locationId);
+  if (!planetId) throw new Error(`Cannot resolve a local map for unknown location ${locationId}`);
+  return LOCAL_MAP_GEOMETRY_BY_PLANET[planetId];
+}

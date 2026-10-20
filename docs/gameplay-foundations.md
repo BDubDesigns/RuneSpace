@@ -1976,6 +1976,9 @@ or pathfinding, and nothing computes "the best way to get somewhere".
   Whammy!; 2,000/1,250/750 for Ferrite Shale x1/x2/x3; 750/500 for Power Cell
   x1/x2; and 1,000/750 for Refined Ferrite x1/x2. No-find outcomes award no
   item, XP, or Slag.
+  The table is location-agnostic, so a walking leg on Stillreach (#373, reachable only by
+  admin teleport) offers the same window and table as one on Skatboll; Slice A adds no
+  Stillreach drop rule or balance, and whether it should is an open product question.
 - The committed result and the presentation of it are separate. A narrow,
   Scavenge-specific pending-reveal row keeps the committed outcome available
   through refresh, reconnect, navigation, and Travel arrival. The reveal is a

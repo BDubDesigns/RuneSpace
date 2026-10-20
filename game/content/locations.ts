@@ -3,10 +3,13 @@ import {
   LOCATION_IDS,
   MERCHANT_IDS,
   MISSION_IDS,
+  PLANET_IDS,
   REPAIR_TARGET_IDS,
+  type PlanetId,
 } from "@/game/config/foundations";
 import {
   assertBidirectionalAdjacency,
+  assertPlanetMembership,
   LocationDefinitionSchema,
   type LocationDefinition,
   type LocationDefinitionInput,
@@ -41,6 +44,9 @@ import {
  *   World Location at (1,1) with three walking edges. Its one Local Place is
  *   Last Leg Trading. The pad is empty until the character's own Rivet lands
  *   there (#358); only then does its scene carry the ship overlay.
+ * - Stillreach (#373): a second planet with its own eight-location local map. Every
+ *   location is scenery-only in Slice A and nothing in ordinary play leads there;
+ *   each location belongs to one planet, and a walking edge never joins two.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -118,6 +124,7 @@ const locationDefinitions = [
     displayName: "Crash Site",
     description:
       "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.abandonedProcessingYard,
@@ -181,6 +188,7 @@ const locationDefinitions = [
     displayName: "Abandoned Processing Yard",
     description:
       "Rusted conveyors and a refurbished hopper stand ready — Ferrite Shale can be refined here into Refined Ferrite and Slag.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,
@@ -208,6 +216,7 @@ const locationDefinitions = [
     displayName: "DeWhat? Emergency Power Annex",
     description:
       "An automated DeWhat? depot, installed back when Settled Systems still required a public emergency power supply for Holo Hollow's visitors. The tourists left; the contract did not. It still issues its daily allotment of Power Cells to anyone who walks up.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,
@@ -235,6 +244,7 @@ const locationDefinitions = [
     displayName: "The Long Scramble",
     description:
       "A steep run of fractured stone and loose hardpan climbing toward the high ridge. Nothing worth stopping for, which is unfortunate given how long it takes to cross.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theJag, LOCATION_IDS.holoHollow],
     availableActionIds: [],
@@ -260,6 +270,7 @@ const locationDefinitions = [
     displayName: "The Jag",
     description:
       "An exposed ferrite seam carved into the hardpan by whoever got here first. Calling it a mine would be generous, but the shale cuts just fine.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.theLongScramble, LOCATION_IDS.deepJag],
     availableActionIds: [ACTION_IDS.ferriteShaleMining],
@@ -286,6 +297,7 @@ const locationDefinitions = [
     displayName: "Holo Hollow",
     description:
       "A declining Ferrite-mining settlement built on the remains of a holo-tourism economy. Faded attraction signage still hangs over shopfronts that now serve miners and haulers.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,
@@ -322,6 +334,7 @@ const locationDefinitions = [
     displayName: "Rusk Recovery",
     description:
       "Wade's recovery yard: salvaged machinery and stripped components racked in rows, damaged speeders waiting their turn, and a welding bench somebody actually works at. Messy, and organized by somebody who knows exactly where everything is.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.holoHollow],
     // Both kinds of Welding the yard's one bench does. Listing the customer one
@@ -387,6 +400,7 @@ const locationDefinitions = [
     displayName: "Deep Jag",
     description:
       "The Jag's lower workings, closed since the roof came down. Broken rock fills the passage from floor to back, and the cold draught that should be coming out of it is not.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.theJag],
     availableActionIds: [],
@@ -443,6 +457,7 @@ const locationDefinitions = [
     displayName: "South Access Track",
     description:
       "A muddy, rutted service road running south out of the Crash Site past sagging poles, old pipe runs and broken fence. Nothing is made or sold here; it only goes somewhere.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,
@@ -474,6 +489,7 @@ const locationDefinitions = [
     displayName: "The South Cut",
     description:
       "A battered steel-framed entrance cut straight into black, thinly layered oil shale, its lamps burning on wet ground. Cutting here takes Mining 5.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.southAccessTrack],
     availableActionIds: [ACTION_IDS.oilShaleMining],
@@ -503,6 +519,7 @@ const locationDefinitions = [
     displayName: "Holo Hollow Landing",
     description:
       "A worn industrial landing pad on Skatboll with a weathered H.H. painted across it, lit by edge lamps and fenced with crumbling barriers. Last Leg Trading keeps a counter on the far side.",
+    planetId: PLANET_IDS.skatboll,
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,
@@ -546,6 +563,196 @@ const locationDefinitions = [
       },
     },
   },
+  // Stillreach Slice A (#373): eight scenery-only World Locations on a second
+  // planet. Each authors no activity, status or merchant, and the seven walking
+  // edges below are the whole graph; none is inferred from axial adjacency. No
+  // ship route and no transport route reaches Stillreach, so ordinary play has no
+  // way here until the flight slice. A starter region name is not yet approved, so
+  // these locations author none.
+  {
+    id: LOCATION_IDS.stillreachLandingStation,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Stillreach Landing Station",
+    description:
+      "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge.",
+    adjacentLocationIds: [LOCATION_IDS.windwardTrack],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "stillreach_landing_station" as const,
+      layout: "stillreach_landing_station" as const,
+      localMap: { axial: { q: 0, r: 0 }, label: "Landing Station" },
+      scene: {
+        asset: "/location-scenes/stillreach-landing-station.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "An empty ring of glowing violet, blue and amber mushrooms around a flat open clearing on a frosted highland plain, a few weathered station buildings and antenna masts at its left edge, aurora overhead at twilight",
+        focal: { x: 45, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.windwardTrack,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Windward Track",
+    description:
+      "A rutted dirt track winding away across open highland, edged with weathered rock and low, colorful scrub. It does not stop anywhere; it only goes somewhere.",
+    adjacentLocationIds: [
+      LOCATION_IDS.stillreachLandingStation,
+      LOCATION_IDS.hilltopWorkshop,
+      LOCATION_IDS.prospectingQuarry,
+    ],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "windward_track" as const,
+      layout: "windward_track" as const,
+      localMap: { axial: { q: 1, r: 0 }, label: "Windward Track" },
+      scene: {
+        asset: "/location-scenes/windward-track.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A rutted dirt track curving up through rocky highland dotted with violet and blue scrub, small lakes in the distance and a low sun under a sweep of aurora",
+        focal: { x: 45, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.hilltopWorkshop,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Hilltop Workshop",
+    description:
+      "A small metal workshop stands on a rounded hilltop under a canvas awning, its windows lit and a stovepipe on the roof, a path of glowing mushrooms climbing to its door.",
+    adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theLowHum],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "hilltop_workshop" as const,
+      layout: "hilltop_workshop" as const,
+      localMap: { axial: { q: 2, r: -1 }, label: "Hilltop Workshop" },
+      scene: {
+        asset: "/location-scenes/hilltop-workshop.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A small metal-roofed workshop with lit windows and a canvas awning on a rocky hilltop covered in violet and teal scrub and tiny glowing mushrooms, misty valleys and an aurora sky beyond",
+        focal: { x: 55, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.prospectingQuarry,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Prospecting Quarry",
+    description:
+      "A shallow quarry of pale, layered rock cut into the hillside in terraces, lit timber and metal rigs standing on its floor.",
+    adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theSurveyLine],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "prospecting_quarry" as const,
+      layout: "prospecting_quarry" as const,
+      localMap: { axial: { q: 1, r: 1 }, label: "Prospecting Quarry" },
+      scene: {
+        asset: "/location-scenes/prospecting-quarry.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A terraced pale-stone quarry cut into a hillside at dusk, lamp-lit timber and metal extraction rigs, a ramp and storage tanks on its floor, ringed by violet and teal scrub under an aurora sky",
+        focal: { x: 55, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.theLowHum,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "The Low Hum",
+    description:
+      "A wide, open plain of weathered stone and frosted scrub, a great spiral of faintly glowing lines laid across the ground.",
+    adjacentLocationIds: [LOCATION_IDS.hilltopWorkshop],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_low_hum" as const,
+      layout: "the_low_hum" as const,
+      localMap: { axial: { q: 3, r: -2 }, label: "The Low Hum" },
+      scene: {
+        asset: "/location-scenes/the-low-hum.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A vast frosted plain with a great spiral of faintly glowing lines on the ground, weathered rock slabs in the foreground and a sky of swirling blue, pink and gold aurora",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.theSurveyLine,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "The Survey Line",
+    description:
+      "A faint trail crossing rolling highland past a line of weathered survey poles tied with orange tape, a pair of worn crates at the verge.",
+    adjacentLocationIds: [
+      LOCATION_IDS.prospectingQuarry,
+      LOCATION_IDS.theDrySeam,
+      LOCATION_IDS.harmonicWorkings,
+    ],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_survey_line" as const,
+      layout: "the_survey_line" as const,
+      localMap: { axial: { q: 2, r: 1 }, label: "The Survey Line" },
+      scene: {
+        asset: "/location-scenes/the-survey-line.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A faint dirt trail running across rolling highland past weathered survey poles tied with orange tape and two worn crates, a long lake reflecting a low orange sun under vivid aurora",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.theDrySeam,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "The Dry Seam",
+    description:
+      "A pale quarry wall opened to expose a dark, glossy seam, with conveyors, tanks and lit steel frames standing on the cut floor in front of it.",
+    adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_dry_seam" as const,
+      layout: "the_dry_seam" as const,
+      localMap: { axial: { q: 3, r: 0 }, label: "The Dry Seam" },
+      scene: {
+        asset: "/location-scenes/the-dry-seam.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A pale quarry wall split by a dark glossy seam, with conveyors, cylindrical tanks and lamp-lit steel processing frames on the floor in front of it, aurora and a low sun overhead",
+        focal: { x: 55, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.harmonicWorkings,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Harmonic Workings",
+    description:
+      "A steep rock face veined with crystals that shimmer violet and teal, above a wooden headframe, a cable bucket and ore carts on a short rail.",
+    adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "harmonic_workings" as const,
+      layout: "harmonic_workings" as const,
+      localMap: { axial: { q: 2, r: 2 }, label: "Harmonic Workings" },
+      scene: {
+        asset: "/location-scenes/harmonic-workings.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A steep fractured rock face with shimmering violet and teal crystals set in it, a wooden mine headframe with a cable bucket and loaded ore carts on a short rail, and distant aurora-lit mesas",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocationDefinitionInput[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
@@ -553,6 +760,7 @@ export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map(
 );
 
 assertBidirectionalAdjacency(LOCATIONS);
+assertPlanetMembership(LOCATIONS);
 
 const locationById = new Map<string, LocationDefinition>(
   LOCATIONS.map((location) => [location.id, location]),
@@ -573,17 +781,51 @@ export function areLocationsAdjacent(originId: string, destinationId: string): b
   return getLocation(originId)?.adjacentLocationIds.includes(destinationId as never) ?? false;
 }
 
-/** The ordered local map (issues #83 and #159). */
-export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
-  LOCATION_IDS.crashSite,
-  LOCATION_IDS.abandonedProcessingYard,
-  LOCATION_IDS.emergencyPowerAnnex,
-  LOCATION_IDS.theLongScramble,
-  LOCATION_IDS.theJag,
-  LOCATION_IDS.holoHollow,
-  LOCATION_IDS.ruskRecovery,
-  LOCATION_IDS.deepJag,
-  LOCATION_IDS.southAccessTrack,
-  LOCATION_IDS.theSouthCut,
-  LOCATION_IDS.holoHollowLanding,
-];
+/** Resolve the planet a World Location belongs to, or undefined for an unknown ID. */
+export function getLocationPlanetId(locationId: string): PlanetId | undefined {
+  return getLocation(locationId)?.planetId;
+}
+
+/**
+ * The ordered local map of each planet (issues #83, #159 and #373). A planet's map
+ * holds exactly its own locations, so the same axial coordinate may appear on two
+ * planets and no hex ever leaks from one map into another.
+ */
+export const LOCAL_MAP_LOCATION_IDS_BY_PLANET: Readonly<
+  Record<PlanetId, readonly LocationDefinition["id"][]>
+> = {
+  [PLANET_IDS.skatboll]: [
+    LOCATION_IDS.crashSite,
+    LOCATION_IDS.abandonedProcessingYard,
+    LOCATION_IDS.emergencyPowerAnnex,
+    LOCATION_IDS.theLongScramble,
+    LOCATION_IDS.theJag,
+    LOCATION_IDS.holoHollow,
+    LOCATION_IDS.ruskRecovery,
+    LOCATION_IDS.deepJag,
+    LOCATION_IDS.southAccessTrack,
+    LOCATION_IDS.theSouthCut,
+    LOCATION_IDS.holoHollowLanding,
+  ],
+  [PLANET_IDS.stillreach]: [
+    LOCATION_IDS.stillreachLandingStation,
+    LOCATION_IDS.windwardTrack,
+    LOCATION_IDS.hilltopWorkshop,
+    LOCATION_IDS.prospectingQuarry,
+    LOCATION_IDS.theLowHum,
+    LOCATION_IDS.theSurveyLine,
+    LOCATION_IDS.theDrySeam,
+    LOCATION_IDS.harmonicWorkings,
+  ],
+};
+
+// Each planet's map list must be exactly that planet's locations, so the list
+// and the registry's own `planetId` can never disagree.
+for (const [planetId, ids] of Object.entries(LOCAL_MAP_LOCATION_IDS_BY_PLANET)) {
+  const owned = LOCATIONS.filter((location) => location.planetId === planetId).map(
+    (location) => location.id,
+  );
+  if (ids.length !== owned.length || !ids.every((id) => owned.includes(id))) {
+    throw new Error(`The ${planetId} local map must list exactly the locations on ${planetId}`);
+  }
+}

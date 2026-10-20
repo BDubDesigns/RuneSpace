@@ -33,6 +33,13 @@ served to clients.
   (512×428), inspected on dark and light backgrounds. Nothing was regenerated or
   recoloured.
 
+- The eight Stillreach identifiers (#373) — `stillreach-landing-station.png`,
+  `windward-track.png`, `hilltop-workshop.png`, `prospecting-quarry.png`,
+  `the-low-hum.png`, `the-survey-line.png`, `the-dry-seam.png` and
+  `harmonic-workings.png` — are the owner-approved 1254×1254 direct-alpha RGBA masters,
+  kept unaltered. `scripts/prepare-stillreach-art.mjs` records their derivation: the same
+  direct-alpha recipe as above, to 512 px long-edge grayscale lossless WebPs.
+
 The other four identifiers keep no master here: their pre-key colour sources
 live in working-art storage rather than the repository, which
 `docs/art-cookbook.md` explicitly allows.

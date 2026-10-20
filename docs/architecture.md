@@ -98,6 +98,10 @@ below.
   resolves while the URL remains on Map, the same surface immediately clears
   transit treatment, enables ordinary stationary interaction, and changes Back
   to Location; there is no client latch for how Map was opened.
+  The map shown is the planet of the authoritative current location (#373): each
+  World Location authors one `planetId`, each planet has its own geometry, and a
+  walking edge never joins two planets (`docs/travel-map-design.md`, "Planet-scoped
+  maps"). No client-supplied planet and no persisted planet field exist.
 - **Journey** is the in-transit primary surface, composed by
   `features/travel/JourneyPanel.tsx`. Its status and feed are presentation only.
   The existing server-authoritative Travel state and `ScavengeControl` command

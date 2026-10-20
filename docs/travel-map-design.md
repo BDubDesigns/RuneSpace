@@ -22,6 +22,15 @@ lossless WebP (`public/map-icons/south-access-track.webp`, `the-south-cut.webp`;
 in `assets/map-icons/`). The panel's job is fast readable navigation and
 gameplay-state communication on a phone; hexes are **not** miniature scene paintings.
 
+Those eleven are **Skatboll's** map. Stillreach (`stillreach`, #373) is a second
+planet with its own eight-location map — Stillreach Landing Station (0,0), Windward Track
+(1,0), Hilltop Workshop (2,-1), Prospecting Quarry (1,1), The Low Hum (3,-2), The Survey
+Line (2,1), The Dry Seam (3,0) and Harmonic Workings (2,2) — joined by exactly seven
+authored walking edges (Landing–Track, Track–Workshop, Track–Quarry, Workshop–Low Hum,
+Quarry–Survey Line, Survey Line–Dry Seam, Survey Line–Harmonic Workings), each an ordinary
+24-second leg. See "Planet-scoped maps" below; Stillreach is **not reachable in ordinary
+play**.
+
 Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
 map hexes: they own no coordinate, no adjacency, and never appear on this panel.
 
@@ -31,9 +40,9 @@ section on Location.
 
 ## Canonical paths
 - Panel: `features/travel/LocalMapPanel.tsx`
-- Geometry: `features/travel/local-map-layout.ts` (`hexPoints`, `buildLocalMapGeometry`, responsive widths)
+- Geometry: `features/travel/local-map-layout.ts` (`hexPoints`, `buildLocalMapGeometry(planetId)`, `LOCAL_MAP_GEOMETRY_BY_PLANET`, `getLocalMapGeometryForLocation`, responsive widths)
 - Registry boundary: `features/travel/local-map-identifiers.ts` (`MAP_IDENTIFIER_ASSET_BY_KEY`, `resolveMapIdentifierAsset`)
-- Registry SSOT: `game/content/locations.ts` (`LOCATIONS`, `LOCAL_MAP_LOCATION_IDS`, `presentation.localMap`)
+- Registry SSOT: `game/content/locations.ts` (`LOCATIONS`, `LOCAL_MAP_LOCATION_IDS_BY_PLANET`, `getLocationPlanetId`, `planetId`, `presentation.localMap`)
 - Schema: `game/schemas/locations.ts` (`presentation.mapIconKey`)
 
 ## Hex information zones (top → bottom, per hex)
@@ -171,7 +180,7 @@ than duplicating it in map tiles.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag","holo_hollow"])`.
-  …plus `rusk_recovery` and `deep_jag`. No second identifier field was added.
+  …plus `rusk_recovery`, `deep_jag`, the South Access Track / South Cut / Holo Hollow Landing keys, and Stillreach's eight (#373). No second identifier field was added.
   **CAVE-IN and MINING are gameplay status, not identifiers**: Deep Jag has exactly one
   `mapIconKey` and one committed asset across both of its states. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
@@ -222,6 +231,70 @@ painted art no longer ships 1536² sources. Art is contained (`meet`) in a dedic
 state label and lower nameplate cluster, not full-bleed; nameplate sits toward the lower portion of the hex to
 minimize overlap (HexButton is `justify-between` with a `data-map-artwork-spacer`). Opacity `0.58` is plainly
 recognizable yet subordinate to gameplay state.
+
+## Planet-scoped maps (issue #373)
+
+A planet is the scope of one local map. Every World Location authors one `planetId`
+(`PLANET_IDS.skatboll` | `PLANET_IDS.stillreach`, `game/config/foundations.ts`), and
+`LOCAL_MAP_LOCATION_IDS_BY_PLANET` lists each planet's hexes in order. Registry load
+throws unless each list is exactly that planet's locations.
+
+- **The map is derived, never supplied.** `LocalMapPanel` takes the planet of the
+  authoritative `state.location.currentLocationId` (`getLocalMapGeometryForLocation`). No
+  client planet ID, no duplicated session state, no database column or migration: planet
+  membership is content. A Journey never changes planet, so the origin's map holds while
+  in transit.
+- **One geometry per planet.** `buildLocalMapGeometry(planetId)` lays out only that
+  planet's hexes, bounds and routes, so two planets can both use (0,0) with no overlap or
+  leaked hex; the duplicate-coordinate check is per planet
+  (`assertPlanetMembership`). Skatboll's geometry is byte-identical to before (11 hexes,
+  15 routes). The panel no longer rebuilds geometry on window resize: the hex width is
+  constant, so the rebuild changed nothing.
+- **Walking cannot cross planets.** `assertBidirectionalAdjacency` rejects any edge joining
+  two planets at load, so `areLocationsAdjacent`, `planTravel` and the persisted-journey
+  check all refuse a forged cross-planet walk (`not_adjacent`) with no second rule.
+  Stillreach is in no `SHIP_ROUTES` or `TRANSPORT_ROUTES` entry (`unknown_route` for a
+  ride), so no walk, ride, flight or map control moves a character between worlds until the
+  flight slice.
+- **Same map, same components.** Stillreach renders through the one `?surface=map` panel
+  with the existing identifiers, selection, Walk confirmation, scroll affordances and
+  Journey/Turn Back; there is no planet selector. Its hexes show state plates but no
+  status plate and no mission guidance, because none of its locations hosts an activity.
+- **Regions stay Skatboll's.** `region` is optional: `holo_hollow` remains Skatboll's
+  region (it is not renamed to the planet) and Stillreach's starter region name is not
+  approved, so its locations author none. Travel flavor therefore uses only the general
+  pool there (`HOLO_HOLLOW_TRAVEL_FLAVOR` needs both ends in `holo_hollow`).
+- **Scavenging is unchanged.** The walking Scavenge window and its universal weighted table
+  are location-agnostic, so they apply on Stillreach legs exactly as on Skatboll's; this
+  slice adds no Stillreach drop rule and no Stillreach balance, and the table's items are
+  Skatboll's. Whether Stillreach should keep that table is an open product question.
+- **Reaching it.** Only Admin → Teleport / Set Location (`ADMIN_DESTINATIONS`, derived from
+  `LOCATIONS`) can place a character on Stillreach, and teleport back returns them to
+  Skatboll's map.
+
+### Stillreach map identifiers (issue #373)
+
+Eight owner-approved 1254×1254 direct-alpha masters (`assets/map-icons/<slug>.png`) went
+through the direct-alpha recipe in `scripts/prepare-stillreach-art.mjs` — alpha under 4
+cleared, near-opaque alpha snapped to 255, trimmed, scaled to a 512 px long edge,
+grayscaled, lossless WebP — with nothing regenerated or recoloured. Each is bound through
+its own `mapIconKey` in `MAP_IDENTIFIER_ASSET_BY_KEY`. Painted width is at the unified 140
+hex, in the 100.8×82.4 artwork viewport.
+
+| `public/map-icons/` file | Delivered | Bytes | Painted width |
+|---|---|---|---|
+| `stillreach-landing-station.webp` | 512×490 | 157,358 | 61.5% |
+| `windward-track.webp` | 512×470 | 166,698 | 64.2% |
+| `hilltop-workshop.webp` | 512×482 | 157,362 | 62.6% |
+| `prospecting-quarry.webp` | 512×457 | 164,688 | 66.0% |
+| `the-low-hum.webp` | 512×311 | 113,490 | 72.0% |
+| `the-survey-line.webp` | 512×346 | 108,390 | 72.0% |
+| `the-dry-seam.webp` | 512×364 | 127,750 | 72.0% |
+| `harmonic-workings.webp` | 512×459 | 162,406 | 65.7% |
+
+All eight are pure grayscale and were inspected on dark and light backgrounds and in the
+real map at 390 px and 1440 px. The Landing Station's identifier is the natural fungal
+ring, and the two travel-only sites (Windward Track, The Survey Line) show no machinery.
 
 ## Accessibility
 - Decorative `image` + wrapper `g` are `aria-hidden="true"`; no extra focus target; no role/label on art.

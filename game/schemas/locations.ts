@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LOCATION_IDS, type LocationId } from "@/game/config/foundations";
+import { LOCATION_IDS, PLANET_IDS, type LocationId } from "@/game/config/foundations";
 import { ContentId } from "./ids";
 
 /** A location's stable identifier is a normal content ID (see game/schemas/ids). */
@@ -127,7 +127,18 @@ export const LocationDefinitionSchema = z
     id: LocationIdSchema,
     displayName: z.string(),
     description: z.string(),
-    region: z.enum(["holo_hollow"]),
+    /**
+     * The planet this World Location belongs to (#373): the scope of its local map.
+     * Walking adjacency and axial coordinates are planet-local, so two planets may
+     * both author (0,0), and an edge can never join two worlds.
+     */
+    planetId: z.enum([PLANET_IDS.skatboll, PLANET_IDS.stillreach]),
+    /**
+     * The starter region, when the planet's region has an approved name. Skatboll's
+     * is `holo_hollow`; Stillreach's has not been approved, so its locations author
+     * none rather than an invented one.
+     */
+    region: z.enum(["holo_hollow"]).optional(),
     adjacentLocationIds: z.array(LocationIdSchema),
     availableActionIds: z.array(z.string()),
     /**
@@ -168,6 +179,14 @@ export const LocationDefinitionSchema = z
         "south_access_track",
         "the_south_cut",
         "holo_hollow_landing",
+        "stillreach_landing_station",
+        "windward_track",
+        "hilltop_workshop",
+        "prospecting_quarry",
+        "the_low_hum",
+        "the_survey_line",
+        "the_dry_seam",
+        "harmonic_workings",
       ]),
       layout: z.enum([
         "crash_site",
@@ -181,6 +200,14 @@ export const LocationDefinitionSchema = z
         "south_access_track",
         "the_south_cut",
         "holo_hollow_landing",
+        "stillreach_landing_station",
+        "windward_track",
+        "hilltop_workshop",
+        "prospecting_quarry",
+        "the_low_hum",
+        "the_survey_line",
+        "the_dry_seam",
+        "harmonic_workings",
       ]),
       /** Local Place directory heading for this World Location, when it has venues. */
       localPlacesEyebrow: z.string().trim().min(1).optional(),
@@ -204,18 +231,46 @@ export type LocationDefinition = z.infer<typeof LocationDefinitionSchema>;
  */
 export type LocationDefinitionInput = z.input<typeof LocationDefinitionSchema>;
 
-/** Validate that every adjacency relation is reciprocal (no silent one-way edges). */
+/**
+ * Validate that every adjacency relation is reciprocal (no silent one-way edges)
+ * and stays on one planet (#373): a walking edge never joins two worlds.
+ */
 export function assertBidirectionalAdjacency(locations: readonly LocationDefinition[]): void {
-  const ids = new Set(locations.map((location) => location.id));
+  const byId = new Map(locations.map((location) => [location.id, location]));
   for (const location of locations) {
     for (const neighbor of location.adjacentLocationIds) {
-      if (!ids.has(neighbor)) {
+      const reciprocal = byId.get(neighbor);
+      if (!reciprocal) {
         throw new Error(`Location ${location.id} references unknown neighbor ${neighbor}`);
       }
-      const reciprocal = locations.find((candidate) => candidate.id === neighbor);
-      if (!reciprocal?.adjacentLocationIds.includes(location.id)) {
+      if (!reciprocal.adjacentLocationIds.includes(location.id)) {
         throw new Error(`Location adjacency is not bidirectional: ${location.id} -> ${neighbor}`);
       }
+      if (reciprocal.planetId !== location.planetId) {
+        throw new Error(
+          `Location adjacency crosses planets: ${location.id} (${location.planetId}) -> ${neighbor} (${reciprocal.planetId})`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Validate planet-scoped local maps (#373): within one planet every axial
+ * coordinate is unique (two planets may both use the same one), and a region
+ * may only belong to the planet it names.
+ */
+export function assertPlanetMembership(locations: readonly LocationDefinition[]): void {
+  const coordinates = new Set<string>();
+  for (const location of locations) {
+    const { q, r } = location.presentation.localMap.axial;
+    const key = `${location.planetId}:${q},${r}`;
+    if (coordinates.has(key)) {
+      throw new Error(`Duplicate local map coordinate on ${location.planetId}: ${q},${r}`);
+    }
+    coordinates.add(key);
+    if (location.region === "holo_hollow" && location.planetId !== PLANET_IDS.skatboll) {
+      throw new Error(`Region holo_hollow belongs to Skatboll, not ${location.planetId}`);
     }
   }
 }
