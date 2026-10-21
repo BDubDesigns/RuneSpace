@@ -155,6 +155,48 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBeLessThanOrEqual(0);
 }
 
+/** The Rivet marker's chart position, read from its own transform (chart units). */
+async function markerPoint(page: Page) {
+  return page.locator("[data-flight-chart-marker]").evaluate((marker) => {
+    const match = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(marker.style.transform);
+    return { x: Number(match?.[1]), y: Number(match?.[2]) };
+  });
+}
+
+/** One planet's station marker, in chart units and on screen. */
+async function stationPoint(page: Page, planetId: string) {
+  const station = page.locator(`[data-flight-chart-station="${planetId}"]`);
+  const chart = {
+    x: Number(await station.getAttribute("cx")),
+    y: Number(await station.getAttribute("cy")),
+  };
+  const box = (await station.boundingBox())!;
+  return { chart, screen: { x: box.x + box.width / 2, y: box.y + box.height / 2 } };
+}
+
+/** The Rivet sits on a station marker, in chart units and visibly on screen. */
+async function expectMarkerOnStation(page: Page, planetId: string) {
+  const station = await stationPoint(page, planetId);
+  await expect
+    .poll(async () => {
+      const marker = await markerPoint(page);
+      return Math.hypot(marker.x - station.chart.x, marker.y - station.chart.y);
+    })
+    // The marker keeps flying while the page settles; a few chart units is the
+    // span of the station dot itself (radius 4).
+    .toBeLessThan(6);
+  // On screen too: the miniature's centre is over the dot drawn on the disc.
+  await expect
+    .poll(async () => {
+      const box = (await page.locator("[data-flight-chart-marker] image").boundingBox())!;
+      return Math.hypot(
+        box.x + box.width / 2 - station.screen.x,
+        box.y + box.height / 2 - station.screen.y,
+      );
+    })
+    .toBeLessThan(8);
+}
+
 async function markerX(page: Page) {
   return page
     .locator("[data-flight-chart-marker]")
@@ -210,6 +252,9 @@ test("flies Holo Hollow Landing to Stillreach: warning, takeoff, interplanetary 
   await expect(chart).toContainText("SKATBOLL TO STILLREACH");
   await expect(chart).not.toContainText("CRASH SITE");
   await expectPlanetIdentities(page);
+  // The Rivet sets off from the station marker on Skatboll's disc.
+  await expectMarkerOnStation(page, "skatboll");
+  await expectNoHorizontalOverflow(page);
   expect(await markerX(page)).toBeLessThan(300);
   await captureReviewScreenshot(page, "stillreach-flight-chart-outbound-mobile.png");
 
@@ -227,6 +272,12 @@ test("flies Holo Hollow Landing to Stillreach: warning, takeoff, interplanetary 
   await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
   await expect.poll(() => markerX(page)).toBeGreaterThan(280);
   await expect(page.locator("[data-flight-progress]")).toContainText(/1[23]\d seconds remaining/);
+
+  // In the chart's last seconds the Rivet arrives on Stillreach's marker.
+  await ageFlight(characterId, 254_000);
+  await page.reload();
+  await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
+  await expectMarkerOnStation(page, "stillreach");
 
   // Touchdown over the approved empty 15:8 Stillreach scene. Under reduced motion
   // the Rivet rests exactly on its approved Option B mark, with no fade or effects.
@@ -317,18 +368,36 @@ test("flies home from Stillreach: Stillreach takeoff, the chart right to left, H
 
   // The same leg, flown the other way: the marker heads from right to left.
   await ageFlight(characterId, 100_000);
+  await page.setViewportSize(PHONE);
   await page.reload();
   await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
   await expect(page.locator("[data-flight-chart]")).toContainText("STILLREACH TO SKATBOLL");
   await expectPlanetIdentities(page);
   await expect.poll(() => markerX(page)).toBeGreaterThan(300);
-  await captureReviewScreenshot(page, "stillreach-flight-chart-home-desktop.png");
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "stillreach-flight-chart-home-mobile.png");
 
   // Reduced motion: a static chart, the countdown carries the flight. The worlds
   // are static art and keep their identities.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("[data-flight-chart-marker]")).toHaveCount(0);
   await expectPlanetIdentities(page);
+  // Static, the two stations still mark where the leg begins and ends.
+  await expect(page.locator("[data-flight-chart-station]")).toHaveCount(2);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  // The same two points reversed: set off from Stillreach's marker...
+  await ageFlight(characterId, 2_600);
+  await page.reload();
+  await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
+  await expectMarkerOnStation(page, "stillreach");
+  // ...and reach Skatboll's.
+  await ageFlight(characterId, 254_000);
+  await page.reload();
+  await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
+  await expectMarkerOnStation(page, "skatboll");
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("[data-flight-progress]")).toContainText(/seconds? remaining/);
   await page.emulateMedia({ reducedMotion: "no-preference" });
 

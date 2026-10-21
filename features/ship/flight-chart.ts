@@ -2,6 +2,7 @@ import { PLANET_IDS, type PlanetId } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import {
   getPlanetPresentation,
+  planetAnchorPoint,
   planetHorizontalReach,
   planetVerticalReach,
 } from "@/game/content/planets";
@@ -48,13 +49,21 @@ export const INTERPLANETARY_CHART_PLANETS: Readonly<
   [PLANET_IDS.stillreach]: { center: { x: 478, y: 160 }, radius: 40 },
 };
 
-/** Clearance between a world's drawing (ring or halo included) and the route end. */
-const PLANET_ROUTE_GAP = 10;
+/**
+ * Where a flight leaves or lands on one charted world: its authored station
+ * anchor (`game/content/planets`) resolved onto this chart's layout. The route
+ * ends here, the station marker is drawn here, and the Rivet marker starts and
+ * finishes here, so the three can never disagree.
+ */
+export function chartPlanetAnchor(planetId: PlanetId): ChartPoint {
+  const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  return planetAnchorPoint(getPlanetPresentation(planetId), center, radius);
+}
 
 /**
  * How far one charted world's drawing reaches from its centre, horizontally and
  * vertically, in chart units: its ring or halo from `game/content/planets`, or
- * its disc. The route and the labels keep clear of it.
+ * its disc. The labels keep clear of it; the route does not, it lands on the disc.
  */
 export function chartPlanetReach(planetId: PlanetId): { x: number; y: number } {
   const { radius } = INTERPLANETARY_CHART_PLANETS[planetId];
@@ -82,22 +91,10 @@ export function interplanetaryChartGeometry(
   originPlanetId: PlanetId,
   destinationPlanetId: PlanetId,
 ): FlightChartGeometry {
-  const from = INTERPLANETARY_CHART_PLANETS[originPlanetId];
-  const to = INTERPLANETARY_CHART_PLANETS[destinationPlanetId];
-  const length = Math.hypot(to.center.x - from.center.x, to.center.y - from.center.y) || 1;
-  const ux = (to.center.x - from.center.x) / length;
-  const uy = (to.center.y - from.center.y) / length;
-  // The two worlds sit level, so the route leaves each along its horizontal reach.
-  const fromReach = chartPlanetReach(originPlanetId).x + PLANET_ROUTE_GAP;
-  const toReach = chartPlanetReach(destinationPlanetId).x + PLANET_ROUTE_GAP;
-  const origin = {
-    x: from.center.x + ux * fromReach,
-    y: from.center.y + uy * fromReach,
-  };
-  const destination = {
-    x: to.center.x - ux * toReach,
-    y: to.center.y - uy * toReach,
-  };
+  // Station anchor to station anchor, on the discs. The control point depends
+  // only on the unordered pair, so the flight home is the same curve reversed.
+  const origin = chartPlanetAnchor(originPlanetId);
+  const destination = chartPlanetAnchor(destinationPlanetId);
   // The same upward bow as the local chart, so a transfer arc reads as a flight.
   const control = { x: (origin.x + destination.x) / 2, y: Math.min(origin.y, destination.y) - 96 };
   return {

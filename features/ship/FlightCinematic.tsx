@@ -13,6 +13,7 @@ import {
   clampChartLabelX,
   FLIGHT_CHART_VIEWBOX,
   flightChartGeometry,
+  chartPlanetAnchor,
   chartPlanetLabelReach,
   INTERPLANETARY_CHART_PLANETS,
   interplanetaryChartGeometry,
@@ -366,8 +367,12 @@ function FlightChart({
         )}
         {chart.kind === "interplanetary" ? (
           <>
+            {/* The route passes under the worlds; the station markers sit on top
+                of them, at the route's own ends, and the Rivet above everything. */}
             <ChartPlanet planetId={chart.originPlanetId} stationName={originName} />
             <ChartPlanet planetId={chart.destinationPlanetId} stationName={destinationName} />
+            <ChartStation planetId={chart.originPlanetId} />
+            <ChartStation planetId={chart.destinationPlanetId} />
           </>
         ) : (
           <>
@@ -400,8 +405,8 @@ function FlightChart({
 /**
  * One world on the interplanetary chart (#375): the planet drawn from its
  * authored presentation (`PlanetBody`), its name above and the landing station
- * the leg uses below, both clear of its ring or halo, with the station marked on
- * the body.
+ * the leg uses below, both clear of its ring or halo. The station's marker is
+ * `ChartStation`, drawn above both worlds.
  */
 function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationName: string }) {
   const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
@@ -411,7 +416,6 @@ function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationNam
   return (
     <g data-flight-chart-planet={planetId} data-flight-chart-place={stationName}>
       <PlanetBody cx={center.x} cy={center.y} planetId={planetId} r={radius} />
-      <circle className="rs-flight-chart__place" cx={center.x} cy={center.y} r="4" />
       <text
         className="rs-flight-chart__label"
         textAnchor="middle"
@@ -429,6 +433,24 @@ function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationNam
         {station}
       </text>
     </g>
+  );
+}
+
+/**
+ * A world's landing-station marker at its authored flight anchor: exactly where
+ * the route begins or ends and where the Rivet marker sets off or arrives. It is
+ * static, so it stays under reduced motion and marks both ends of the leg.
+ */
+function ChartStation({ planetId }: { planetId: PlanetId }) {
+  const anchor = chartPlanetAnchor(planetId);
+  return (
+    <circle
+      className="rs-flight-chart__place"
+      cx={anchor.x}
+      cy={anchor.y}
+      data-flight-chart-station={planetId}
+      r="4"
+    />
   );
 }
 

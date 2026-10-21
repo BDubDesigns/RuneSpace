@@ -376,9 +376,15 @@ approved pixels. The composites themselves are review references only and are no
   bands, an optional tilted ring (far half behind the body, near half in front) and an
   optional atmospheric halo. Skatboll is slate blue and steel grey with banding, a thin ring
   and a cold rim; Stillreach is deep violet with teal accents and a soft aurora halo, no
-  ring. No per-planet CSS or ID branches: a new world is a new entry. The route ends and
-  labels keep clear of each world's ring or halo (`chartPlanetReach`), with labels aligned
-  across the chart. Static art, so reduced motion changes nothing about them.
+  ring. No per-planet CSS or ID branches: a new world is a new entry. Labels keep clear of
+  each world's ring or halo (`chartPlanetReach`), aligned across the chart. Static art, so
+  reduced motion changes nothing about them.
+- **Station anchors.** Each presentation authors a `flightAnchor` inside its disc, in body
+  radii from the centre (Skatboll upper right `{0.45, -0.35}`, Stillreach centre left
+  `{-0.55, 0}`). `planetAnchorPoint` resolves it for any drawn size, and `chartPlanetAnchor`
+  for the chart: the route's two ends, the station dot on each world and the Rivet marker's
+  start and finish are that one point, so the flight home is the same two points reversed.
+  Draw order: route, worlds, station dots, Rivet. The dots stay under reduced motion.
 - **Timing.** The same `flightCinematicFrame`: 2.5 s takeoff and 3 s touchdown inside the
   recorded 260 s, so the chart holds the other 254.5 s. Resume, reduced motion, minimize,
   arrival-pending and no-replay-after-landing behave exactly as for the first flight.

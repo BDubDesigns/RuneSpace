@@ -59,6 +59,13 @@ export type PlanetHalo = {
 export type PlanetPresentation = {
   displayName: string;
   palette: PlanetPalette;
+  /**
+   * Where a flight leaves and lands on the drawn body: the landing station's
+   * marker, in body radii from the disc centre (+x right, +y down), inside the
+   * disc (not the ring or halo). A presentation anchor only: not a latitude,
+   * an orbit, a navigation fact or a gameplay location.
+   */
+  flightAnchor: { x: number; y: number };
   banding?: PlanetBanding;
   ring?: PlanetRing;
   halo?: PlanetHalo;
@@ -69,6 +76,8 @@ export const PLANET_PRESENTATIONS: Readonly<Record<PlanetId, PlanetPresentation>
   // ring and a restrained cold rim light.
   [PLANET_IDS.skatboll]: {
     displayName: "Skatboll",
+    // Upper right of the disc (owner-approved placement).
+    flightAnchor: { x: 0.45, y: -0.35 },
     palette: {
       surface: "#5d6f82",
       shadow: "#151c26",
@@ -98,6 +107,8 @@ export const PLANET_PRESENTATIONS: Readonly<Record<PlanetId, PlanetPresentation>
   // soft aurora-like atmospheric halo. No ring.
   [PLANET_IDS.stillreach]: {
     displayName: "Stillreach",
+    // Centre left of the disc (owner-approved placement).
+    flightAnchor: { x: -0.55, y: 0 },
     palette: {
       surface: "#563191",
       shadow: "#140a2a",
@@ -123,6 +134,22 @@ export const PLANET_PRESENTATIONS: Readonly<Record<PlanetId, PlanetPresentation>
 
 export function getPlanetPresentation(planetId: PlanetId): PlanetPresentation {
   return PLANET_PRESENTATIONS[planetId];
+}
+
+/**
+ * A body's flight anchor in the drawing's own coordinates, for a body drawn at
+ * `center` with `radius`. The one resolver every view uses, so the anchor keeps
+ * its proportional place on the disc at any size.
+ */
+export function planetAnchorPoint(
+  presentation: PlanetPresentation,
+  center: { x: number; y: number },
+  radius: number,
+): { x: number; y: number } {
+  return {
+    x: center.x + presentation.flightAnchor.x * radius,
+    y: center.y + presentation.flightAnchor.y * radius,
+  };
 }
 
 /**

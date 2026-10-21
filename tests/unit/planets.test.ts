@@ -5,10 +5,12 @@ import { PLANET_IDS } from "@/game/config/foundations";
 import {
   getPlanetPresentation,
   PLANET_PRESENTATIONS,
+  planetAnchorPoint,
   planetHorizontalReach,
 } from "@/game/content/planets";
 import { PlanetBody } from "@/features/ship/PlanetBody";
 import {
+  chartPlanetAnchor,
   chartPlanetLabelReach,
   chartPlanetReach,
   clampChartLabelX,
@@ -95,22 +97,51 @@ describe("PlanetBody renders only what the data authors", () => {
 });
 
 describe("the interplanetary chart around the drawn worlds", () => {
-  it("starts and ends the route clear of each world's ring or halo, in both directions", () => {
-    for (const [from, to] of [
-      [PLANET_IDS.skatboll, PLANET_IDS.stillreach],
-      [PLANET_IDS.stillreach, PLANET_IDS.skatboll],
-    ] as const) {
-      const geometry = interplanetaryChartGeometry(from, to);
-      const origin = INTERPLANETARY_CHART_PLANETS[from].center;
-      const destination = INTERPLANETARY_CHART_PLANETS[to].center;
-      expect(Math.abs(geometry.origin.x - origin.x)).toBeGreaterThan(chartPlanetReach(from).x);
-      expect(Math.abs(geometry.destination.x - destination.x)).toBeGreaterThan(
-        chartPlanetReach(to).x,
-      );
-      // The marker moves toward the destination as the flight progresses.
+  it("authors each station anchor inside its disc, at the owner-approved placement", () => {
+    expect(getPlanetPresentation(PLANET_IDS.skatboll).flightAnchor).toEqual({ x: 0.45, y: -0.35 });
+    expect(getPlanetPresentation(PLANET_IDS.stillreach).flightAnchor).toEqual({ x: -0.55, y: 0 });
+    for (const planetId of Object.values(PLANET_IDS)) {
+      const { x, y } = getPlanetPresentation(planetId).flightAnchor;
+      expect(Math.hypot(x, y)).toBeLessThan(1);
+      const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+      const anchor = chartPlanetAnchor(planetId);
+      expect(Math.hypot(anchor.x - center.x, anchor.y - center.y)).toBeLessThan(radius);
+    }
+  });
+
+  it("keeps an anchor's proportional place on the disc at any drawn size", () => {
+    const presentation = getPlanetPresentation(PLANET_IDS.skatboll);
+    const small = planetAnchorPoint(presentation, { x: 0, y: 0 }, 10);
+    const large = planetAnchorPoint(presentation, { x: 0, y: 0 }, 100);
+    expect(large.x / small.x).toBeCloseTo(10);
+    expect(large.y / small.y).toBeCloseTo(10);
+    expect(planetAnchorPoint(presentation, { x: 50, y: 60 }, 20)).toEqual({ x: 59, y: 53 });
+  });
+
+  it("flies anchor to anchor, the flight home the same two points reversed", () => {
+    const out = interplanetaryChartGeometry(PLANET_IDS.skatboll, PLANET_IDS.stillreach);
+    const back = interplanetaryChartGeometry(PLANET_IDS.stillreach, PLANET_IDS.skatboll);
+    expect(out.origin).toEqual(chartPlanetAnchor(PLANET_IDS.skatboll));
+    expect(out.destination).toEqual(chartPlanetAnchor(PLANET_IDS.stillreach));
+    expect(back.origin.x).toBeCloseTo(out.destination.x, 6);
+    expect(back.origin.y).toBeCloseTo(out.destination.y, 6);
+    expect(back.destination.x).toBeCloseTo(out.origin.x, 6);
+    expect(back.destination.y).toBeCloseTo(out.origin.y, 6);
+    expect(back.control).toEqual(out.control);
+    for (const geometry of [out, back]) {
+      // The Rivet marker starts and finishes exactly on the station markers.
+      const start = pointOnFlightChart(geometry, 0);
+      const end = pointOnFlightChart(geometry, 1);
+      expect(start.x).toBeCloseTo(geometry.origin.x, 6);
+      expect(start.y).toBeCloseTo(geometry.origin.y, 6);
+      expect(end.x).toBeCloseTo(geometry.destination.x, 6);
+      expect(end.y).toBeCloseTo(geometry.destination.y, 6);
+      // ...and travels toward the destination.
       const early = pointOnFlightChart(geometry, 0.1).x;
       const late = pointOnFlightChart(geometry, 0.9).x;
-      expect(Math.sign(late - early)).toBe(Math.sign(destination.x - origin.x));
+      expect(Math.sign(late - early)).toBe(Math.sign(geometry.destination.x - geometry.origin.x));
+      // The arc stays inside the chart.
+      expect(geometry.control.y).toBeGreaterThan(0);
     }
   });
 
