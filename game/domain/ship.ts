@@ -31,7 +31,8 @@ export function shipReturnRoute(route: ShipRouteDefinition): ShipRouteDefinition
 }
 
 /**
- * The candid return-fuel warning shown before an outbound launch (#375). It is
+ * The candid return-fuel warning shown before a launch on a route that has a
+ * route straight back (#375): either direction of the Stillreach leg. It is
  * nonblocking: a launch that would land with less fuel than the flight back
  * costs is still allowed, and nothing refuels the tank for free on arrival.
  * Undefined when there is no route back or the projected tank covers it.

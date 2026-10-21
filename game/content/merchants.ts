@@ -43,9 +43,9 @@ const merchantDefinitions = [
     ],
   },
   {
-    // Last Leg Trading (#357): the business, so a future affiliated Stillreach
-    // outlet names this same merchant and shares the per-character daily
-    // allowances the ledger keys on its ID. That outlet is not built here.
+    // Last Leg Trading (#357): the business. Its affiliated Stillreach terminal
+    // (#375) is this same merchant, hosted by Stillreach Landing Station, so it
+    // shares the per-character daily allowances the ledger keys on its ID.
     id: MERCHANT_IDS.lastLegTrading,
     npcId: NPC_IDS.tollKade,
     // Open only to a character who has reported Thrust Issues to Wade (#357). The

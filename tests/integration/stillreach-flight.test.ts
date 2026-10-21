@@ -259,6 +259,24 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
       const full = await makePilot({ fuel: 300 });
       const fullRoute = (await stateAt(full.userId, full.characterId)).ship.routes[0]!;
       expect(fullRoute.returnFuelWarning).toBeUndefined();
+
+      // A launch already refused for fuel shows the refusal, not the warning.
+      const dry = await makePilot({ fuel: 50 });
+      const dryRoute = (await stateAt(dry.userId, dry.characterId)).ship.routes[0]!;
+      expect(dryRoute.launchRefusal?.reason).toBe("insufficient_fuel");
+      expect(dryRoute.returnFuelWarning).toBeUndefined();
+
+      // The homeward leg warns the same way about the flight back out.
+      const away = await makePilot({
+        berth: LOCATION_IDS.stillreachLandingStation,
+        fuel: 200,
+      });
+      const home = (await stateAt(away.userId, away.characterId)).ship.routes[0]!;
+      expect(home.routeId).toBe(BACK);
+      expect(home.returnFuelWarning).toEqual({
+        fuelAfterArrival: 80,
+        returnFuelCostFuelUnits: 120,
+      });
     });
 
     it("charges exactly once under concurrent taps", async () => {
@@ -389,6 +407,11 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
       expect(back.location.currentLocationId).toBe(LOCATION_IDS.holoHollowLanding);
       expect(back.ship.berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
       expect(back.ship.fuelUnits).toBe(60);
+      // The card shows this landing, never the undismissed one before it.
+      expect(back.ship.arrivalNotice).toMatchObject({
+        routeId: BACK,
+        destinationLocationId: LOCATION_IDS.holoHollowLanding,
+      });
       expect(300 - back.ship.fuelUnits).toBe(240);
       expect(
         (await cargoRows(characterId)).sort((a, b) => a.itemId.localeCompare(b.itemId)),
@@ -397,6 +420,9 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
       const receipts = await notices(characterId);
       expect(receipts.map((notice) => notice.routeId).sort()).toEqual([BACK, OUT].sort());
       expect(receipts.every((notice) => notice.completedMissionId === null)).toBe(true);
+      // The undismissed outbound receipt was superseded by the homeward landing.
+      const outbound = receipts.find((notice) => notice.routeId === OUT)!;
+      expect(outbound.acknowledgedAt?.toISOString()).toBe(after(home, LEG_MS).toISOString());
       const moveAlong = await db
         .select()
         .from(rune.characterMissions)

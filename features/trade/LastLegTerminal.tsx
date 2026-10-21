@@ -273,6 +273,7 @@ function TerminalCounter({
                   </button>
                 </div>
                 <button
+                  aria-label={`${mode === "buy" ? "Dispense" : "Sell"} ${quantity} ${name}`}
                   className="rs-terminal__key rs-terminal__key--commit"
                   data-terminal-commit={itemId}
                   disabled={keysDisabled || !allowed}

@@ -765,7 +765,9 @@ presentation receipt written in the landing transaction (unique per character,
 route and scheduled arrival instant) and projected until dismissed. Dismissal
 (`acknowledgeShipArrival`) is idempotent, presentation only, allowed during a
 trade or flight, and changes neither the arrival nor the Mission. It is not a
-notification inbox.
+notification inbox: since flights repeat (#375), a new landing supersedes any
+receipt still undismissed (stamping it acknowledged at the new arrival instant),
+so the card always describes the latest landing.
 
 **Scenes** read the ship's own berth, not the character's position
 (`LocationStateFacts.shipBerthLocationId`, `requires.shipBerth` on a location

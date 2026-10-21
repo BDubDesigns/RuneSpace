@@ -272,6 +272,20 @@ async function commitShipArrival(
     if (stamped.length > 0) completedMissionId ??= mission.id;
   }
 
+  // A newer landing supersedes any receipt the player never dismissed (#375):
+  // with repeatable flights, an old "Arrived at Holo Hollow Landing" must never
+  // greet a player who has just landed somewhere else. Superseding stamps the
+  // older receipt dismissed at this arrival's instant; the arrival and any
+  // Mission it completed are untouched, as for any dismissal.
+  await transaction
+    .update(shipArrivalNotices)
+    .set({ acknowledgedAt: arrivedAt })
+    .where(
+      and(
+        eq(shipArrivalNotices.characterId, character.id),
+        isNull(shipArrivalNotices.acknowledgedAt),
+      ),
+    );
   await transaction
     .insert(shipArrivalNotices)
     .values({
@@ -388,7 +402,12 @@ export async function projectShip(
             completedMissionIds: input.completedMissionIds,
             acceptedMissionIds: input.acceptedMissionIds,
           });
-          const shortfall = shipReturnFuelShortfall(route, fuelUnits);
+          // A launch already refused for fuel says so; the warning is only for
+          // a launch that would go ahead.
+          const shortfall =
+            !plan.ok && plan.reason === "insufficient_fuel"
+              ? undefined
+              : shipReturnFuelShortfall(route, fuelUnits);
           return {
             routeId: route.id,
             destinationLocationId: route.destinationLocationId,
