@@ -1,3 +1,4 @@
+import { PLANET_IDS, type PlanetId } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { axialToPixel } from "@/features/travel/local-map-layout";
 
@@ -27,6 +28,50 @@ export type FlightChartGeometry = {
   /** The route as an SVG path. */
   path: string;
 };
+
+/**
+ * Where each world sits on the interplanetary chart (#375). A fixed presentation
+ * convention, not astronomy: Skatboll always on the left and Stillreach on the
+ * right, so the outbound leg reads left to right and the flight home right to
+ * left, and the two directions are visibly the same leg. No distance, scale,
+ * orbit or third body is drawn.
+ */
+export const INTERPLANETARY_CHART_PLANETS: Readonly<
+  Record<PlanetId, { center: ChartPoint; radius: number }>
+> = {
+  [PLANET_IDS.skatboll]: { center: { x: 118, y: 168 }, radius: 46 },
+  [PLANET_IDS.stillreach]: { center: { x: 482, y: 168 }, radius: 46 },
+};
+
+/** Clearance between a world's disc and the end of the route drawn from it. */
+const PLANET_ROUTE_GAP = 10;
+
+export function interplanetaryChartGeometry(
+  originPlanetId: PlanetId,
+  destinationPlanetId: PlanetId,
+): FlightChartGeometry {
+  const from = INTERPLANETARY_CHART_PLANETS[originPlanetId];
+  const to = INTERPLANETARY_CHART_PLANETS[destinationPlanetId];
+  const length = Math.hypot(to.center.x - from.center.x, to.center.y - from.center.y) || 1;
+  const ux = (to.center.x - from.center.x) / length;
+  const uy = (to.center.y - from.center.y) / length;
+  const origin = {
+    x: from.center.x + ux * (from.radius + PLANET_ROUTE_GAP),
+    y: from.center.y + uy * (from.radius + PLANET_ROUTE_GAP),
+  };
+  const destination = {
+    x: to.center.x - ux * (to.radius + PLANET_ROUTE_GAP),
+    y: to.center.y - uy * (to.radius + PLANET_ROUTE_GAP),
+  };
+  // The same upward bow as the local chart, so a transfer arc reads as a flight.
+  const control = { x: (origin.x + destination.x) / 2, y: Math.min(origin.y, destination.y) - 96 };
+  return {
+    origin,
+    destination,
+    control,
+    path: `M ${round(origin.x)} ${round(origin.y)} Q ${round(control.x)} ${round(control.y)} ${round(destination.x)} ${round(destination.y)}`,
+  };
+}
 
 export function flightChartGeometry(
   originLocationId: string,

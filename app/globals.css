@@ -1275,6 +1275,31 @@ body {
   transition: transform 250ms linear;
 }
 
+/* The interplanetary chart's two worlds (#375): chart symbols, faintly tinted
+   after each world's approved scenery (Skatboll's overcast stone, Stillreach's
+   violet aurora), never planet illustrations. */
+.rs-flight-chart__planet {
+  fill: var(--rs-surface-panel);
+  stroke: var(--rs-border-structural);
+  stroke-width: 2;
+}
+
+.rs-flight-chart__planet[data-planet="skatboll"] {
+  fill: rgb(120 128 136 / 0.32);
+}
+
+.rs-flight-chart__planet[data-planet="stillreach"] {
+  fill: rgb(196 140 255 / 0.22);
+  stroke: rgb(196 140 255 / 0.55);
+}
+
+.rs-flight-chart__station {
+  fill: var(--rs-text-secondary);
+  font-family: var(--rs-font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
 /* Reduced motion: the ship rests on its mark with no thrust, glow or dust, and
    the panel's countdown and progress meter carry the flight. The chart's moving
    marker and trail are not rendered at all (FlightCinematic). Phases still
@@ -1542,5 +1567,312 @@ body {
 @media (prefers-reduced-motion: reduce) {
   [data-offer-hop] {
     animation: none;
+  }
+}
+
+/* Last Leg Trading's automated Stillreach terminal (#375): an industrial vending
+   front end over the ordinary merchant counter. Brushed steel bezel with corner
+   bolts, a hazard strip, a dim amber-on-black screen and chunky hardware keys.
+   Text stays at the shared token contrast; the screen tint is decoration only. */
+.rs-terminal {
+  --rs-terminal-steel-top: #2b3540;
+  --rs-terminal-steel-bottom: #161d24;
+  --rs-terminal-screen: #0a0f0c;
+  --rs-terminal-glow: #f5c451;
+  --rs-terminal-dim: #c9b27a;
+  position: relative;
+  border: 1px solid #44525f;
+  border-radius: 6px;
+  padding: 1rem;
+  background: radial-gradient(circle at 10px 10px, #6b7783 0 3px, #11171d 3.5px, transparent 4.5px),
+    radial-gradient(
+      circle at calc(100% - 10px) 10px,
+      #6b7783 0 3px,
+      #11171d 3.5px,
+      transparent 4.5px
+    ),
+    radial-gradient(
+      circle at 10px calc(100% - 10px),
+      #6b7783 0 3px,
+      #11171d 3.5px,
+      transparent 4.5px
+    ),
+    radial-gradient(
+      circle at calc(100% - 10px) calc(100% - 10px),
+      #6b7783 0 3px,
+      #11171d 3.5px,
+      transparent 4.5px
+    ),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.018) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--rs-terminal-steel-top), var(--rs-terminal-steel-bottom));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    inset 0 -2px 0 rgb(0 0 0 / 0.45),
+    0 6px 18px rgb(0 0 0 / 0.45);
+}
+
+.rs-terminal__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.rs-terminal__mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+}
+
+.rs-terminal__mark-plate {
+  fill: #0f1418;
+  stroke: var(--rs-terminal-glow);
+  stroke-width: 1.5;
+}
+
+.rs-terminal__mark-glyph {
+  stroke: var(--rs-terminal-glow);
+  stroke-width: 2;
+}
+
+.rs-terminal__brand {
+  font-family: var(--rs-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--rs-text-primary);
+}
+
+.rs-terminal__model {
+  font-family: var(--rs-font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rs-text-secondary);
+}
+
+.rs-terminal__status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  border: 1px solid #44525f;
+  background: #0f1418;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--rs-font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rs-text-primary);
+}
+
+.rs-terminal__lamp {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--rs-accent-success);
+  box-shadow: 0 0 6px var(--rs-accent-success);
+  animation: rs-terminal-lamp 2.4s ease-in-out infinite;
+}
+
+.rs-terminal[data-terminal-state="locked"] .rs-terminal__lamp {
+  background: var(--rs-accent-danger);
+  box-shadow: 0 0 6px var(--rs-accent-danger);
+}
+
+@keyframes rs-terminal-lamp {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.rs-terminal__hazard {
+  height: 6px;
+  margin: 0.75rem 0;
+  background: repeating-linear-gradient(-45deg, #e0a72e 0 8px, #1a1a1a 8px 16px);
+  opacity: 0.8;
+}
+
+.rs-terminal__screen {
+  border: 2px solid #050708;
+  border-radius: 4px;
+  padding: 0.875rem;
+  background: repeating-linear-gradient(0deg, rgb(245 196 81 / 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 0%, rgb(245 196 81 / 0.08), transparent 70%),
+    var(--rs-terminal-screen);
+  box-shadow: inset 0 0 18px rgb(0 0 0 / 0.8);
+}
+
+.rs-terminal__readout,
+.rs-terminal__line,
+.rs-terminal__feedback,
+.rs-terminal__fineprint,
+.rs-terminal__item,
+.rs-terminal__qty {
+  font-family: var(--rs-font-display);
+}
+
+.rs-terminal__readout {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rs-terminal-dim);
+}
+
+.rs-terminal__readout--alert {
+  color: var(--rs-accent-danger);
+  font-weight: 700;
+}
+
+.rs-terminal__value {
+  color: var(--rs-terminal-glow);
+  font-weight: 700;
+}
+
+.rs-terminal__slot {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  border: 1px solid rgb(245 196 81 / 0.22);
+  background: rgb(245 196 81 / 0.03);
+  padding: 0.625rem;
+}
+
+.rs-terminal__tray {
+  border: 1px solid #2a3137;
+  background: #050708;
+  padding: 0.25rem;
+}
+
+.rs-terminal__item {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--rs-text-primary);
+}
+
+.rs-terminal__line {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  color: var(--rs-terminal-dim);
+}
+
+.rs-terminal__controls {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .rs-terminal__tray {
+    grid-row: span 2;
+    align-self: center;
+  }
+
+  .rs-terminal__controls {
+    grid-column: 2;
+  }
+}
+
+.rs-terminal__qty {
+  min-width: 2.5rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--rs-terminal-glow);
+}
+
+.rs-terminal__key {
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid #56636f;
+  border-bottom-width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3a4651, #252e36);
+  padding: 0 0.875rem;
+  font-family: var(--rs-font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rs-text-primary);
+}
+
+.rs-terminal__key--small {
+  padding: 0 0.6rem;
+}
+
+.rs-terminal__key:hover:not(:disabled) {
+  background: linear-gradient(180deg, #45535f, #2c363f);
+}
+
+.rs-terminal__key:active:not(:disabled) {
+  border-bottom-width: 1px;
+  transform: translateY(2px);
+}
+
+.rs-terminal__key:focus-visible {
+  outline: 2px solid var(--rs-focus-ring);
+  outline-offset: 2px;
+}
+
+.rs-terminal__key[aria-pressed="true"] {
+  border-color: var(--rs-terminal-glow);
+  color: var(--rs-terminal-glow);
+  box-shadow: inset 0 0 8px rgb(245 196 81 / 0.25);
+}
+
+.rs-terminal__key--commit:not(:disabled) {
+  border-color: #b58a2a;
+  background: linear-gradient(180deg, #e0a72e, #a8761a);
+  color: #120d02;
+}
+
+.rs-terminal__key--commit:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f0b93e, #b8862a);
+}
+
+.rs-terminal__key:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.rs-terminal__feedback {
+  margin-top: 0.875rem;
+  border-top: 1px dashed rgb(245 196 81 / 0.3);
+  padding-top: 0.625rem;
+  font-size: 0.8rem;
+  color: var(--rs-terminal-glow);
+}
+
+.rs-terminal__feedback--alert {
+  color: var(--rs-accent-danger);
+}
+
+.rs-terminal__fineprint {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--rs-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-terminal__lamp {
+    animation: none;
+  }
+
+  .rs-terminal__key:active:not(:disabled) {
+    transform: none;
   }
 }

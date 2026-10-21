@@ -881,7 +881,11 @@ export const missionGuideArticles = [
         heading: "What you get",
         list: [
           "Nothing in the way of a reward: no XP, no Credits, no item and no free fuel. You do not report back to Wade.",
-          "Your ship and its Cargo Hold are now at Holo Hollow Landing, and so are you. The Crash Site shows empty ground. The ship does not fly back.",
+          [
+            "Your ship and its Cargo Hold are now at Holo Hollow Landing, and so are you. The Crash Site shows empty ground, and the ship never flies back there. From the Landing it can fly on to Stillreach; see ",
+            { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+            ". Later flights complete nothing and do not replay this Mission.",
+          ],
         ],
       },
       {
@@ -1197,7 +1201,7 @@ export const missionGuideArticles = [
       {
         heading: "Good to know",
         list: [
-          "The Mission stays accepted and Active at the end of Tolliver's lead. There is nowhere to hand it in and nothing to complete yet, and the Map points to nothing, because the researcher's workshop is not in the game yet. Your progress is kept for when it is.",
+          "The Mission stays accepted and Active at the end of Tolliver's lead. You can now fly the Rivet to Stillreach and walk to Hilltop Workshop, but the researcher is not there yet: there is nowhere to hand the Mission in and nothing to complete, and the Map points to nothing. Your progress is kept for when the researcher arrives.",
           "You can unpin the Mission and the Map's highlights go quiet; you can still talk to anyone you like. Talking to Wade or Tansy about anything else works as it always did.",
         ],
       },

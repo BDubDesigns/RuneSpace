@@ -13,6 +13,8 @@ import {
   clampChartLabelX,
   FLIGHT_CHART_VIEWBOX,
   flightChartGeometry,
+  INTERPLANETARY_CHART_PLANETS,
+  interplanetaryChartGeometry,
   pointOnFlightChart,
   type ChartPoint,
 } from "@/features/ship/flight-chart";
@@ -28,6 +30,8 @@ import {
   type FlightCinematic as FlightCinematicContent,
   type FlightCinematicBackdrop,
 } from "@/game/content/flight-cinematics";
+import { PLANET_DISPLAY_NAMES } from "@/game/content/locations";
+import type { PlanetId } from "@/game/config/foundations";
 
 type Flight = {
   routeId: string;
@@ -302,7 +306,13 @@ function FlightChart({
   destinationName: string;
 }) {
   const reducedMotion = usePrefersReducedMotion();
-  const geometry = flightChartGeometry(flight.originLocationId, flight.destinationLocationId);
+  const { chart } = content;
+  // The local hop is drawn between the two places' map positions; the
+  // interplanetary leg between the two worlds (#375), same arc and marker.
+  const geometry =
+    chart.kind === "interplanetary"
+      ? interplanetaryChartGeometry(chart.originPlanetId, chart.destinationPlanetId)
+      : flightChartGeometry(flight.originLocationId, flight.destinationLocationId);
   const marker = pointOnFlightChart(geometry, frame.travelProgress);
   const percent = Math.round(frame.travelProgress * 100);
   // The ship art faces left. Heading right, it is mirrored first so it never flies upside down.
@@ -315,7 +325,11 @@ function FlightChart({
   return (
     <div className="rs-flight-cinematic__phase rs-flight-chart absolute inset-0" data-flight-chart>
       <svg
-        aria-label={`${content.chartTitle}: ${originName} to ${destinationName}, ${percent}% of the way.`}
+        aria-label={
+          chart.kind === "interplanetary"
+            ? `${content.chartTitle}: ${originName}, ${PLANET_DISPLAY_NAMES[chart.originPlanetId]}, to ${destinationName}, ${PLANET_DISPLAY_NAMES[chart.destinationPlanetId]}, ${percent}% of the way.`
+            : `${content.chartTitle}: ${originName} to ${destinationName}, ${percent}% of the way.`
+        }
         className="h-full w-full"
         preserveAspectRatio="xMidYMid meet"
         role="img"
@@ -348,8 +362,17 @@ function FlightChart({
             strokeDashoffset={1 - frame.travelProgress}
           />
         )}
-        <ChartPlace label={originName} point={geometry.origin} />
-        <ChartPlace label={destinationName} point={geometry.destination} />
+        {chart.kind === "interplanetary" ? (
+          <>
+            <ChartPlanet planetId={chart.originPlanetId} stationName={originName} />
+            <ChartPlanet planetId={chart.destinationPlanetId} stationName={destinationName} />
+          </>
+        ) : (
+          <>
+            <ChartPlace label={originName} point={geometry.origin} />
+            <ChartPlace label={destinationName} point={geometry.destination} />
+          </>
+        )}
         {reducedMotion ? null : (
           <g
             className="rs-flight-chart__marker"
@@ -369,6 +392,45 @@ function FlightChart({
         )}
       </svg>
     </div>
+  );
+}
+
+/**
+ * One world on the interplanetary chart (#375): a plain native-SVG disc, the
+ * planet's name above it and the landing station the leg uses below it. The
+ * disc is a chart symbol, not a portrait of the planet.
+ */
+function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationName: string }) {
+  const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  const name = PLANET_DISPLAY_NAMES[planetId].toUpperCase();
+  const station = stationName.toUpperCase();
+  return (
+    <g data-flight-chart-planet={planetId} data-flight-chart-place={stationName}>
+      <circle
+        className="rs-flight-chart__planet"
+        cx={center.x}
+        cy={center.y}
+        data-planet={planetId}
+        r={radius}
+      />
+      <circle className="rs-flight-chart__place" cx={center.x} cy={center.y} r="6" />
+      <text
+        className="rs-flight-chart__label"
+        textAnchor="middle"
+        x={clampChartLabelX(center.x, name, 18)}
+        y={center.y - radius - 14}
+      >
+        {name}
+      </text>
+      <text
+        className="rs-flight-chart__station"
+        textAnchor="middle"
+        x={clampChartLabelX(center.x, station, 13)}
+        y={center.y + radius + 26}
+      >
+        {station}
+      </text>
+    </g>
   );
 }
 

@@ -274,11 +274,20 @@ describe("no route between planets (#373)", () => {
     }
   });
 
-  it("puts Stillreach in no ship route and no transport route", () => {
-    for (const route of [...SHIP_ROUTES, ...TRANSPORT_ROUTES]) {
+  it("reaches Stillreach only by the Rivet's two authored Landing-to-Landing legs (#375)", () => {
+    for (const route of TRANSPORT_ROUTES) {
       expect(stillreachIds).not.toContain(route.originLocationId);
       expect(stillreachIds).not.toContain(route.destinationLocationId);
     }
+    const crossing = SHIP_ROUTES.filter(
+      (route) =>
+        getLocationPlanetId(route.originLocationId) !==
+        getLocationPlanetId(route.destinationLocationId),
+    ).map((route) => [route.originLocationId, route.destinationLocationId]);
+    expect(crossing).toEqual([
+      [LOCATION_IDS.holoHollowLanding, LOCATION_IDS.stillreachLandingStation],
+      [LOCATION_IDS.stillreachLandingStation, LOCATION_IDS.holoHollowLanding],
+    ]);
     for (const entry of STILLREACH) {
       for (const origin of LOCATIONS) {
         const refused = planTransportTravel({
@@ -406,11 +415,19 @@ describe("planet-scoped local map geometry (#373)", () => {
 });
 
 describe("Stillreach is scenery-only (#373)", () => {
-  it("authors no activity, status, merchant or state variant", () => {
+  it("authors no activity, status, merchant or state variant beyond the Landing Station's (#375)", () => {
     for (const location of stillreachLocations) {
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();
+      if (location.id === LOCATION_IDS.stillreachLandingStation) {
+        // Last Leg Trading's terminal and the berthed-ship scene (#375).
+        expect(location.merchantId).toBe("last_leg_trading");
+        expect(location.stateVariants.map((variant) => variant.requires)).toEqual([
+          { shipBerth: "here" },
+        ]);
+        continue;
+      }
       expect(location.merchantId).toBeUndefined();
       expect(location.stateVariants).toEqual([]);
       expect(location.travelable).toBe(true);

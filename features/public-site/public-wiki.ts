@@ -140,6 +140,19 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Flying the Rivet to Stillreach",
+        paragraphs: [
+          [
+            "Once your repaired Rivet has made its first hop to Holo Hollow Landing (see ",
+            { text: "Move Along", articleSlug: "mission-move-along" },
+            "), its Ship panel there offers a second flight: to Stillreach Landing Station, on the planet Stillreach. It costs 120 Fuel Units and takes 4 minutes 20 seconds, and the flight back costs and takes exactly the same. You launch standing beside the ship where it is parked, with nothing else on the go, and you need to have reported Thrust Issues to Wade.",
+          ],
+          "Before you launch, the Flight Controls show the cost, your tank now and your tank after landing. If you would land with less than the 120 FU the flight back needs, they warn you. You can still go: nothing refuels the ship for free on the other side and there is no automatic return, so plan to load fuel you have bought, traded or made before you fly home.",
+          "Once launched, the flight cannot be cancelled and the fuel is spent. You watch the Rivet lift off, cross a chart from Skatboll to Stillreach for most of the trip, and touch down. You can minimize the flight and still browse your Inventory, Equipment and Missions, but you cannot walk, mine, refine, trade or move anything until you land. The flight keeps going if you close the game; come back early and it picks up where it is, come back late and you have already landed.",
+          "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of eight locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
+        ],
+      },
+      {
         heading: "Scavenging while you walk",
         paragraphs: [
           "Every ordinary walk gives you one chance to scavenge along the way — unless you recently turned back from one (see Turning back, below). The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg. Riding the Crew Hauler gives you none at all.",
@@ -508,6 +521,17 @@ const authoredWikiArticles = [
           ],
           "Toll sells Full Small Fuel Canisters at 225 Credits and Empty Small Fuel Canisters at 40 Credits. He buys a Full one back at 160, an Empty one at 25, and Oil Shale at 6 Credits a piece. He does not sell Oil Shale.",
           "He sells each character at most 5 Full and 5 Empty canisters a day, counted separately and reset at midnight Pacific time. Selling a canister back to him does not give you more for the day. A purchase has to fit your Credits and your Inventory, or nothing is bought and nothing is charged.",
+        ],
+      },
+      {
+        heading: "Last Leg Trading's terminal on Stillreach",
+        paragraphs: [
+          [
+            "At Stillreach Landing Station, Last Leg Trading runs an automated fuel terminal (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). It is the same business as Toll's counter, with the same prices, the same Thrust Issues requirement for both buying and selling, and the same daily limits: canisters you buy at either place count toward one shared allowance of 5 Full and 5 Empty a day, so buying at one leaves less for the other.",
+          ],
+          "You have to be standing at the Landing Station to use it; it cannot be reached from anywhere else on Stillreach, from Skatboll, or while you are in flight.",
         ],
       },
     ],

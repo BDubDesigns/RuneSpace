@@ -10,6 +10,7 @@ import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWor
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
+import { LastLegTerminal } from "@/features/trade/LastLegTerminal";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import type { RepairProjection } from "@/server/play";
@@ -121,6 +122,10 @@ function primaryActivity(
       return <RefiningConsole />;
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
+    case LOCATION_IDS.stillreachLandingStation:
+      // Last Leg Trading's automated terminal (#375): the station's own merchant,
+      // presented as a machine because nobody stands here to front it.
+      return <LastLegTerminal />;
     case LOCATION_IDS.ruskRecovery:
       // Wade's Welding Workshop — one bench, one component, following the
       // authoritative Workbench occupancy (#207) — and, once Tansy opens it,

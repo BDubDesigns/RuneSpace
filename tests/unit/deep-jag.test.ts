@@ -217,11 +217,13 @@ describe("Deep Jag's three world states", () => {
   it("opens no other location's state, so the boundary stays narrow", () => {
     const stateful = LOCATIONS.filter((location) => location.stateVariants.length > 0);
     // The Crash Site joined Deep Jag with its repaired-ship scene (#330), and
-    // Holo Hollow Landing joined them once a ship could berth there (#358).
+    // Holo Hollow Landing joined them once a ship could berth there (#358), and
+    // Stillreach Landing Station once the Rivet could fly there (#375).
     expect(stateful.map((location) => location.id)).toEqual([
       LOCATION_IDS.crashSite,
       LOCATION_IDS.deepJag,
       LOCATION_IDS.holoHollowLanding,
+      LOCATION_IDS.stillreachLandingStation,
     ]);
   });
 });

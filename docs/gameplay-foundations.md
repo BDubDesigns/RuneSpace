@@ -701,11 +701,14 @@ the tank is filled or the ship launches. The berth moves only when a flight's
 landing commits — never when the character walks, so walking to Holo Hollow
 Landing neither moves the ship nor completes a Mission.
 
-**Numbers** (`game/config/balance.ts`, `ship`): 300 FU tank, starting at 0; the
-one route, `crash_site_to_holo_hollow_landing` (`game/content/ship-routes.ts`),
-costs 10 FU and takes 25 ticks (15 real seconds). The route is one-way: there is
-no flight back to the Crash Site and no interplanetary route. A Full Small Fuel
-Canister's 50 FU is the item's own `fuelUnits` (#343).
+**Numbers** (`game/config/balance.ts`, `ship`): 300 FU tank, starting at 0. Each
+route's cost and duration is balance, its duration in real seconds
+(`durationSeconds`) because a flight is scheduled by its recorded absolute arrival
+instant, not by counting ticks. The first route, `crash_site_to_holo_hollow_landing`
+(`game/content/ship-routes.ts`), costs 10 FU and takes 15 seconds, and is one-way:
+nothing ever flies back to the Crash Site. The interplanetary leg (#375, below) is
+two more routes. A Full Small Fuel Canister's 50 FU is the item's own `fuelUnits`
+(#343).
 
 **Refueling** (`refuelShip`, `server/ship-commands.ts`) has exactly two source
 actions: Load from Inventory and Load from Cargo Hold. Each consumes exactly one
@@ -722,7 +725,7 @@ which button needs a confirmation.
 **Launch** (`launchShip`) validates, in one transaction, an authored route that
 departs from the ship's actual berth, a character who is at that berth and
 idle, the route's required repairs (all three ship systems), a completed Thrust
-Issues, an **accepted** Move Along (started by the Thrust Issues report), and at least 10 FU (`planLaunch`). It then
+Issues, an **accepted** Move Along (started by the Thrust Issues report), and at least the route's fuel cost (`planLaunch`). It then
 deducts the fuel once, records immutable start and arrival instants on the ship
 row, and inserts an `active_actions` row for `ship_flight`. There is no cancel,
 abort, refund or second launch, and an operator force-idle fails closed rather
@@ -775,6 +778,58 @@ there. No new art.
 ship's actual berth: the three systems with their repair work, the Cargo Hold's
 storage once repaired, and — once Propulsion is restored — a Board Ship control
 for fuel and flight. It renders nowhere else.
+
+### The interplanetary leg: Holo Hollow Landing ↔ Stillreach (issue #375)
+
+Two more authored routes in the same registry, one per direction:
+`holo_hollow_landing_to_stillreach_landing_station` and
+`stillreach_landing_station_to_holo_hollow_landing`. Each costs **120 FU** and
+takes **260 seconds** (4 min 20 s), with no other fee, and requires the three ship
+repairs and a completed Thrust Issues, the same authorization as the first flight
+without its one-time Move Along gate. There is no Rune Fragment, Toll or
+conversation gate. Launch, the in-flight gate, lazy landing, the cargo-follows-berth
+rule and the arrival receipt are exactly the machinery above; no second transport
+engine, table or migration was added (`route_id` and the location columns are free
+text, and the berth already moved with each landing).
+
+- **Who and what flies.** One character, their one ship row and its Cargo Hold,
+  whose access already follows the berth. Arrival moves the character and the berth
+  together; nothing is copied or reset. A route's origin and destination come from
+  the authored route and the ship's actual berth, never from the client.
+- **Launch.** 119 FU is refused without a write; 120 FU launches and lands with 0. The
+  existing character lock serializes concurrent taps, so only one launch charges.
+- **Return-fuel warning.** `shipReturnFuelShortfall` (`game/domain/ship.ts`) compares
+  the projected tank after landing with the cost of the authored route straight back
+  (`shipReturnRoute`) and is projected as `returnFuelWarning` on the route. It is
+  **nonblocking**: Launch stays enabled, and nothing refuels or returns the ship for
+  free. The first flight has no route back, so it never warns.
+- **Landing timing.** A flight lands on the first resolution whose whole-tick window
+  reaches the recorded arrival instant. 260 s is not a whole number of 600 ms ticks,
+  so a read made in the last tick before arrival does not yet land it and the next
+  read (at most 0.6 s later) does; the receipt and berth still carry the exact
+  scheduled instant. It never lands early, and an offline return lands at once.
+- **No Mission.** Only Move Along authors `autoCompletion` on a flight, keyed on the
+  first route's ID, so these landings complete nothing and never replay it. Each real
+  landing writes its own receipt (unique on character, route and arrival instant).
+- **Planets.** Landing on Stillreach Landing Station puts the character on
+  Stillreach's eight-location map (#373), derived from the current location as before.
+  Walking away leaves the ship in the ring; walking edges never cross planets.
+- **Not From Around Here** is untouched: its deferred stage still has no target.
+
+### Last Leg Trading's Stillreach terminal (issue #375)
+
+Stillreach Landing Station hosts **the same merchant** as Toll's counter:
+`merchantId: last_leg_trading` on the World Location itself, the venue pattern
+Wade's yard already uses (#190). Prices, the completed-Thrust-Issues gate
+(both directions) and the per-character Pacific-day ledger are therefore the
+existing ones, and because the ledger keys on the merchant ID, Full and Empty
+canister purchases at either venue spend one shared allowance. `tradeWithMerchant`
+resolves it from the character's authoritative position with no `localPlaceId`,
+so it is refused from any other location and in flight. Nobody stands at the
+station to front the merchant, so `NpcInteractionPanel` presents no Trade there;
+the station's activity (`LocationActivity`) renders `features/trade/LastLegTerminal`,
+a distinct CSS/SVG vending-terminal front end over `useMerchantCounter`, the hook
+`TradePanel` now also uses. No stock, rotation, extra catalog or second allowance.
 
 ### The Crash Site's two scenes (issue #330)
 
@@ -1718,9 +1773,9 @@ balance, all read from the merchant registry:
 The two canister limits are separate lines in the ordinary merchant daily
 ledger (#230): selling back never restores an allowance, and another character
 has their own. The ledger keys on the **merchant ID**, which names the Last
-Leg Trading *business*, so the later affiliated Stillreach outlet is meant to
-reference the same merchant and share these allowances. That outlet, its
-terminal, a multi-merchant stock platform, rotation and new stock are not built.
+Leg Trading *business*, so the affiliated Stillreach terminal (#375, above)
+references the same merchant and shares these allowances. A multi-merchant stock
+platform, rotation and new stock are not built.
 
 ## Local Places (issue #159)
 
@@ -1976,9 +2031,10 @@ or pathfinding, and nothing computes "the best way to get somewhere".
   Whammy!; 2,000/1,250/750 for Ferrite Shale x1/x2/x3; 750/500 for Power Cell
   x1/x2; and 1,000/750 for Refined Ferrite x1/x2. No-find outcomes award no
   item, XP, or Slag.
-  The table is location-agnostic, so a walking leg on Stillreach (#373, reachable only by
-  admin teleport) offers the same window and table as one on Skatboll; Slice A adds no
-  Stillreach drop rule or balance, and whether it should is an open product question.
+  The table is location-agnostic, so a walking leg on Stillreach (#373, reached by the
+  Rivet since #375) offers the same window and table as one on Skatboll; neither slice
+  adds a Stillreach drop rule or balance, and whether it should is an open product
+  question.
 - The committed result and the presentation of it are separate. A narrow,
   Scavenge-specific pending-reveal row keeps the committed outcome available
   through refresh, reconnect, navigation, and Travel arrival. The reveal is a

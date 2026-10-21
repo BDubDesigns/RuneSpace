@@ -309,7 +309,8 @@ never lands, refuels or completes anything.
   only after mount; server markup is a stable empty frame.
 
 A later route adds its own entry to `FLIGHT_CINEMATICS` (typed over every
-`ShipRouteId`); there is no generic cinematic engine.
+`ShipRouteId`); there is no generic cinematic engine. The interplanetary leg (#375) is two
+such entries, below.
 
 ## Stillreach Slice A scenes (issue #373)
 
@@ -332,13 +333,46 @@ UI.
 | Harmonic Workings | `harmonic-workings.webp` | 2508×627 | 167,298 |
 
 The Landing Station's panorama is **empty on purpose**: the bioluminescent fungal ring is
-the physical landing pad. The repaired Rivet is a separately rendered overlay for the later
-flight slice (it would compose through the existing `overlay` / `shipBerth` seam, like Holo
-Hollow Landing), so no ship is baked in and no docked or berthed state is invented here. The
-other seven are scenery only: their buildings, rigs and mine works are environmental
+the physical landing pad, and no ship is baked in. Since #375 the repaired Rivet composes onto
+it through the existing `overlay` / `shipBerth` seam, like Holo Hollow Landing (see "Stillreach
+Slice B" below). The other seven are scenery only: their buildings, rigs and mine works are environmental
 illustration, not an operable Rig, merchant or mine, and the locations author no action.
 Each `alt` is distinct and grounded in what the panorama shows; every `focal` keeps the
 subject inside the 390 px strip's 2.9:1 crop.
+
+## Stillreach Slice B: berth and interplanetary cinematic (issue #375)
+
+Two owner-approved placements of the one canonical `rivet-repaired.webp`, each measured on a
+true Pillow composite of the untrimmed 1774×887 master and converted to the trimmed overlay's
+box (alpha bounds 16, 43, 1742×816) at the same scale, so the runtime ship lands on exactly the
+approved pixels. The composites themselves are review references only and are not committed.
+
+| View | Canvas | Approved composite | Runtime `placement` (% of canvas) |
+|---|---|---|---|
+| 4:1 World Location, berthed (`stillreach_landing_station_ship_berthed`) | `stillreach-landing-station.webp` 1536×384 | "Option 2 — balanced": scale 0.205, top-left (585, 84) | left 38.3, top 24.171, width 23.249 |
+| 15:8 cinematic (takeoff from / touchdown at Stillreach) | `stillreach-landing-station-cinematic.webp` 1717×916 | "Option B — Balanced": 515 px wide, top-left (680, 268) | left 39.874, top 30.62, width 29.453 |
+
+- **Berth.** The Landing Station authors one state variant, `requires: { shipBerth: "here" }`,
+  that adds the overlay and a description naming the ship; its base scene stays the empty
+  panorama. Walking away never removes the ship and walking there never adds it. QA'd at
+  390 px and desktop: the ship sits centred in the ring, as in the reference.
+- **Cinematic art.** The new approved empty 15:8 scene (1717×916, master
+  `assets/location-scenes/stillreach-landing-station-cinematic-master.png`, SHA-256
+  `7cee91fe78f9…`) is encoded at its native size, q80, by
+  `scripts/prepare-stillreach-cinematic-art.mjs`, which refuses any other file. It is not a
+  crop of the 4:1 panorama.
+- **Both directions.** Holo Hollow Landing → Stillreach takes off from Holo Hollow Landing's
+  existing approved 15:8 pad backdrop (`holo-hollow-landing-arrival.webp`, same mark as the
+  first flight's touchdown) and touches down on the Stillreach scene; the return takes off
+  from the Stillreach scene and touches down on the same Holo Hollow pad. The Crash Site is
+  never an interplanetary backdrop, and no new Skatboll art was needed.
+- **Chart.** `chart: { kind: "interplanetary" }` draws two native-SVG world discs (Skatboll
+  always left, Stillreach always right), each labelled with its landing station, and the same
+  bowed route and Rivet marker as the local chart (`interplanetaryChartGeometry`). Outbound
+  the marker crosses left to right, home right to left. It states no distance or scale.
+- **Timing.** The same `flightCinematicFrame`: 2.5 s takeoff and 3 s touchdown inside the
+  recorded 260 s, so the chart holds the other 254.5 s. Resume, reduced motion, minimize,
+  arrival-pending and no-replay-after-landing behave exactly as for the first flight.
 
 ## Transit truthfulness
 

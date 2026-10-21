@@ -627,9 +627,9 @@ topics (Skatboll, Stillreach, Fuel) from the first visit. He is also the
 merchant for Full and Empty Small Fuel Canisters and for buying Oil Shale; that
 counter opens only after this character has reported the completed Thrust
 Issues repair to Wade. Mechanics: `docs/gameplay-foundations.md`; art:
-`docs/location-scenes.md`. The Stillreach terminal Toll mentions is
-**not built**: when it is, it belongs to the same Last Leg Trading merchant so
-both share one set of per-character daily allowances.
+`docs/location-scenes.md`. The Stillreach terminal Toll mentions is built
+(#375): it is the same Last Leg Trading merchant, so both share one set of
+per-character daily allowances (`docs/gameplay-foundations.md`).
 
 ## Contracts and economic progression
 

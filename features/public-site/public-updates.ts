@@ -9,6 +9,52 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #375 — Stillreach Slice B: the interplanetary flight and the terminal.
+    slug: "next-stop-stillreach",
+    title: "Next Stop: Stillreach",
+    publishedAt: "2026-10-20T19:00:00-07:00",
+    summary:
+      "Your Rivet can now fly from Holo Hollow Landing to Stillreach and back: 120 Fuel Units and 4 minutes 20 seconds each way, with a full takeoff, chart and touchdown. Last Leg Trading has a fuel terminal waiting at the other end.",
+    hero: {
+      src: "/location-scenes/stillreach-landing-station-cinematic.webp",
+      alt: "Stillreach Landing Station at twilight: a wide ring of glowing violet, blue and amber mushrooms around an open clearing, weathered station buildings to the left, rolling highlands and prismatic aurora across the sky",
+      width: 1717,
+      height: 916,
+    },
+    body: [
+      [
+        "Once your repaired Rivet has made its first hop to Holo Hollow Landing, the Ship panel there offers somewhere new: Stillreach Landing Station, on the planet Stillreach. The flight costs 120 Fuel Units and takes 4 minutes 20 seconds, and the way back costs and takes the same. You fly your own ship, with everything in its Cargo Hold coming along. See ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        " for the details.",
+      ],
+      "The trip gets the same ceremony as your first flight. The Rivet lifts off the pad, a chart from Skatboll to Stillreach carries you through most of the flight with your ship crossing it, and you settle into the open middle of a ring of glowing mushrooms: that ring is the landing pad. Flying home plays it all in reverse. The flight cannot be cancelled once you launch, and it keeps going if you close the game. Come back early and it picks up where it is; come back late and you have already landed.",
+      "Before you launch, the Flight Controls warn you if you would land with less fuel than the trip home needs. Take that seriously: nothing refuels the ship for free on Stillreach, and nothing flies it back for you.",
+      [
+        "Which is why Last Leg Trading has an automated fuel terminal at the Landing Station. It is the same business as Toll's counter, with the same canister prices and the same daily limits, shared between the two: buy at one and there is less for the day at the other. See ",
+        { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+        ".",
+      ],
+      "Stillreach's eight locations are all there to walk, but this is the arrival, not the whole planet: the rest of what lives there comes later.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A repeatable Rivet flight between Holo Hollow Landing and Stillreach Landing Station, 120 Fuel Units and 4 minutes 20 seconds each way.",
+          "A takeoff, interplanetary chart and touchdown for both directions of the flight.",
+          "Your Rivet parked in the mushroom ring at Stillreach Landing Station whenever it is there.",
+          "Last Leg Trading's automated fuel terminal at Stillreach Landing Station, sharing prices, the Thrust Issues requirement and daily limits with Toll's counter.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Flight Controls show flight time in minutes and seconds, and warn when you would land without enough fuel to fly back.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #369 — the first item-originated Mission.
     slug: "something-strange-in-the-rock",
     title: "Something Strange in the Rock",

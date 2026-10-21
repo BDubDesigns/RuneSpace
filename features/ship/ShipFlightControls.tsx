@@ -114,7 +114,7 @@ export function ShipFlightControls() {
               <dt className="text-[color:var(--rs-text-muted)]">Fuel cost</dt>
               <dd data-ship-route-cost>{route.fuelCostFuelUnits} FU</dd>
               <dt className="text-[color:var(--rs-text-muted)]">Flight time</dt>
-              <dd>{Math.round(route.durationMs / 1_000)} seconds</dd>
+              <dd data-ship-route-duration>{flightDurationLabel(route.durationMs)}</dd>
               <dt className="text-[color:var(--rs-text-muted)]">Tank now</dt>
               <dd data-ship-route-tank-now>
                 {ship.fuelUnits} / {ship.tankCapacityFuelUnits} FU
@@ -128,6 +128,18 @@ export function ShipFlightControls() {
             <p className="text-sm text-[color:var(--rs-text-secondary)]" data-ship-route-notice>
               {route.launchNotice}
             </p>
+            {route.returnFuelWarning ? (
+              // The server's own projection (#375): a warning, never a gate.
+              <p
+                className="border-l-2 border-[color:var(--rs-accent-mining)] pl-3 text-sm text-[color:var(--rs-text-primary)]"
+                data-ship-return-fuel-warning
+              >
+                You will land with {route.returnFuelWarning.fuelAfterArrival} FU, less than the{" "}
+                {route.returnFuelWarning.returnFuelCostFuelUnits} FU the flight back needs. Nothing
+                refuels the Rivet for free and there is no automatic return: you will need to load
+                fuel bought, traded or made there before you can fly back.
+              </p>
+            ) : null}
             <ActionButton
               data-ship-launch={route.routeId}
               disabled={
@@ -166,4 +178,13 @@ export function ShipFlightControls() {
       ) : null}
     </section>
   );
+}
+
+/** "15 seconds", "4 min 20 s": the route's authored duration, never rounded up. */
+export function flightDurationLabel(durationMs: number): string {
+  const totalSeconds = Math.round(durationMs / 1_000);
+  if (totalSeconds < 60) return `${totalSeconds} seconds`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `${minutes} min` : `${minutes} min ${seconds} s`;
 }

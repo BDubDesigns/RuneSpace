@@ -444,6 +444,15 @@ canvas in `game/content/flight-cinematics.ts`; QA it in the real frame at 390px
 and desktop width with the wheels on the ground (about 80% down) and the contact
 shadow under them. The route chart is native SVG, never a generated map.
 
+Stillreach's 15:8 cinematic scene (#375) is the owner-approved empty 1717×916 PNG, kept
+unaltered as `assets/location-scenes/stillreach-landing-station-cinematic-master.png` and
+encoded at native size to `stillreach-landing-station-cinematic.webp` (q80) by
+`scripts/prepare-stillreach-cinematic-art.mjs`, which checks the approved SHA-256. Its Rivet
+mark, and the berthed mark on the 4:1 Landing Station panorama, come from the owner's true
+Pillow composites; `docs/location-scenes.md` ("Stillreach Slice B") records the coordinates
+and the trimmed-overlay conversion. Composite previews are review references and are never
+committed or used as runtime art.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.

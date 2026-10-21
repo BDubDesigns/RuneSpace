@@ -2,8 +2,7 @@ import { getShipFlightBalance } from "@/game/config/balance";
 import { LOCATION_IDS, type ShipRouteId } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { getMission } from "@/game/content/missions";
-import { getShipRoute, type ShipRouteDefinition } from "@/game/content/ship-routes";
-import { ticksToMilliseconds } from "@/game/domain/timing";
+import { getShipRoute, SHIP_ROUTES, type ShipRouteDefinition } from "@/game/content/ship-routes";
 
 /**
  * Pure Rivet Utility Shuttle rules (#358). Server-authoritative: the browser
@@ -13,9 +12,44 @@ import { ticksToMilliseconds } from "@/game/domain/timing";
 /** The berth of a character whose ship has never been touched. */
 export const INITIAL_SHIP_BERTH_LOCATION_ID = LOCATION_IDS.crashSite;
 
-/** A flight's duration in milliseconds, from the route's approved tick count. */
+/** A flight's duration in milliseconds, from the route's approved real seconds. */
 export function shipFlightDurationMs(routeId: ShipRouteId): number {
-  return ticksToMilliseconds(getShipFlightBalance(routeId).durationTicks);
+  return getShipFlightBalance(routeId).durationSeconds * 1_000;
+}
+
+/**
+ * The authored route that flies straight back from a route's destination to its
+ * origin, when one exists (#375). The first flight has none: there is no way
+ * back to the Crash Site.
+ */
+export function shipReturnRoute(route: ShipRouteDefinition): ShipRouteDefinition | undefined {
+  return SHIP_ROUTES.find(
+    (candidate) =>
+      candidate.originLocationId === route.destinationLocationId &&
+      candidate.destinationLocationId === route.originLocationId,
+  );
+}
+
+/**
+ * The candid return-fuel warning shown before an outbound launch (#375). It is
+ * nonblocking: a launch that would land with less fuel than the flight back
+ * costs is still allowed, and nothing refuels the tank for free on arrival.
+ * Undefined when there is no route back or the projected tank covers it.
+ */
+export function shipReturnFuelShortfall(
+  route: ShipRouteDefinition,
+  fuelUnits: number,
+): { fuelAfterArrival: number; returnFuelCostFuelUnits: number } | undefined {
+  const back = shipReturnRoute(route);
+  if (!back) return undefined;
+  const fuelAfterArrival = Math.max(
+    0,
+    fuelUnits - getShipFlightBalance(route.id).fuelCostFuelUnits,
+  );
+  const returnFuelCostFuelUnits = getShipFlightBalance(back.id).fuelCostFuelUnits;
+  return fuelAfterArrival < returnFuelCostFuelUnits
+    ? { fuelAfterArrival, returnFuelCostFuelUnits }
+    : undefined;
 }
 
 export type RefuelSource = "inventory" | "cargo_hold";

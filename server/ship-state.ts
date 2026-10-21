@@ -17,6 +17,7 @@ import {
   launchRefusalMessage,
   planLaunch,
   shipFlightDurationMs,
+  shipReturnFuelShortfall,
   validateShipRoutes,
   type LaunchRefusalReason,
 } from "@/game/domain/ship";
@@ -63,6 +64,12 @@ export type ShipProjection = {
     fuelCostFuelUnits: number;
     durationMs: number;
     launchNotice: string;
+    /**
+     * Present when the tank would land holding less than the authored flight
+     * back costs (#375). A warning only: it never blocks the launch, and nothing
+     * refuels the ship for free at the other end.
+     */
+    returnFuelWarning?: { fuelAfterArrival: number; returnFuelCostFuelUnits: number };
     /** Why a launch would be refused right now, when it would be. */
     launchRefusal?: { reason: LaunchRefusalReason; message: string };
   }[];
@@ -381,6 +388,7 @@ export async function projectShip(
             completedMissionIds: input.completedMissionIds,
             acceptedMissionIds: input.acceptedMissionIds,
           });
+          const shortfall = shipReturnFuelShortfall(route, fuelUnits);
           return {
             routeId: route.id,
             destinationLocationId: route.destinationLocationId,
@@ -389,6 +397,7 @@ export async function projectShip(
             fuelCostFuelUnits: flight.fuelCostFuelUnits,
             durationMs: shipFlightDurationMs(route.id),
             launchNotice: route.launchNotice,
+            ...(shortfall ? { returnFuelWarning: shortfall } : {}),
             ...(plan.ok
               ? {}
               : {

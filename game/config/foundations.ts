@@ -507,11 +507,19 @@ export const ACTION_IDS = {
 /**
  * Stable identities for the Rivet Utility Shuttle's authored flight routes
  * (#358). A route is content (`game/content/ship-routes`); its cost and duration
- * are balance (`game/config/balance`). The first, and only, route is the
- * Crash Site -> Holo Hollow Landing hop; there is deliberately no way back.
+ * are balance (`game/config/balance`). The first route is the one-way Crash
+ * Site -> Holo Hollow Landing hop, with deliberately no way back; the other two
+ * are the two directions of the interplanetary leg between Holo Hollow Landing
+ * and Stillreach Landing Station (#375), each its own authored route.
  */
 export const SHIP_ROUTE_IDS = {
   crashSiteToHoloHollowLanding: asContentId("crash_site_to_holo_hollow_landing"),
+  holoHollowLandingToStillreachLandingStation: asContentId(
+    "holo_hollow_landing_to_stillreach_landing_station",
+  ),
+  stillreachLandingStationToHoloHollowLanding: asContentId(
+    "stillreach_landing_station_to_holo_hollow_landing",
+  ),
 } as const satisfies Record<string, ContentId>;
 
 export type ShipRouteId = (typeof SHIP_ROUTE_IDS)[keyof typeof SHIP_ROUTE_IDS];

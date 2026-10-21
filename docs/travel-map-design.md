@@ -28,8 +28,9 @@ planet with its own eight-location map — Stillreach Landing Station (0,0), Win
 Line (2,1), The Dry Seam (3,0) and Harmonic Workings (2,2) — joined by exactly seven
 authored walking edges (Landing–Track, Track–Workshop, Track–Quarry, Workshop–Low Hum,
 Quarry–Survey Line, Survey Line–Dry Seam, Survey Line–Harmonic Workings), each an ordinary
-24-second leg. See "Planet-scoped maps" below; Stillreach is **not reachable in ordinary
-play**.
+24-second leg. See "Planet-scoped maps" below. Since #375 a character reaches it only by
+flying their Rivet from Holo Hollow Landing to Stillreach Landing Station; no walk or ride
+crosses planets.
 
 Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
 map hexes: they own no coordinate, no adjacency, and never appear on this panel.
@@ -253,13 +254,14 @@ throws unless each list is exactly that planet's locations.
 - **Walking cannot cross planets.** `assertBidirectionalAdjacency` rejects any edge joining
   two planets at load, so `areLocationsAdjacent`, `planTravel` and the persisted-journey
   check all refuse a forged cross-planet walk (`not_adjacent`) with no second rule.
-  Stillreach is in no `SHIP_ROUTES` or `TRANSPORT_ROUTES` entry (`unknown_route` for a
-  ride), so no walk, ride, flight or map control moves a character between worlds until the
-  flight slice.
+  Stillreach is in no `TRANSPORT_ROUTES` entry (`unknown_route` for a ride). The only
+  thing that moves a character between worlds is the Rivet's two authored
+  Landing-to-Landing `SHIP_ROUTES` (#375, `docs/gameplay-foundations.md`).
 - **Same map, same components.** Stillreach renders through the one `?surface=map` panel
   with the existing identifiers, selection, Walk confirmation, scroll affordances and
   Journey/Turn Back; there is no planet selector. Its hexes show state plates but no
-  status plate and no mission guidance, because none of its locations hosts an activity.
+  status plate and no mission guidance: no accepted Mission targets a Stillreach
+  location yet, and a Skatboll target never appears on Stillreach's map.
 - **Regions stay Skatboll's.** `region` is optional: `holo_hollow` remains Skatboll's
   region (it is not renamed to the planet) and Stillreach's starter region name is not
   approved, so its locations author none. Travel flavor therefore uses only the general
@@ -268,9 +270,9 @@ throws unless each list is exactly that planet's locations.
   are location-agnostic, so they apply on Stillreach legs exactly as on Skatboll's; this
   slice adds no Stillreach drop rule and no Stillreach balance, and the table's items are
   Skatboll's. Whether Stillreach should keep that table is an open product question.
-- **Reaching it.** Only Admin → Teleport / Set Location (`ADMIN_DESTINATIONS`, derived from
-  `LOCATIONS`) can place a character on Stillreach, and teleport back returns them to
-  Skatboll's map.
+- **Reaching it.** In play, by the Rivet's interplanetary flight (#375). Admin → Teleport /
+  Set Location (`ADMIN_DESTINATIONS`, derived from `LOCATIONS`) still places a character
+  on either planet for support and preview; it moves the character, not the ship.
 
 ### Stillreach map identifiers (issue #373)
 

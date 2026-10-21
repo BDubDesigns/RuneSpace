@@ -118,10 +118,25 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Rune Fragment mystery Update as the newest (#369)", () => {
+  it("publishes the Stillreach flight Update as the newest (#375)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("something-strange-in-the-rock");
+    expect(latest.slug).toBe("next-stop-stillreach");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("something-strange-in-the-rock")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/stillreach-landing-station-cinematic.webp");
+    const text = JSON.stringify(latest);
+    // The shipped numbers, the honest warning, and no Stillreach content beyond the slice.
+    expect(text).toContain("120 Fuel Units and 4 minutes 20 seconds");
+    expect(text).toContain("nothing refuels the ship for free");
+    expect(text).toContain("this is the arrival, not the whole planet");
+    expect(text).not.toMatch(/Enby|researcher|Refiner/);
+  });
+
+  it("keeps the Rune Fragment mystery Update published beneath it (#369)", () => {
+    const latest = getPublicUpdate("something-strange-in-the-rock")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("watch-the-rivet-fly")!.publishedAt),
     );
