@@ -9,6 +9,7 @@ import {
   waitForFlightVisuals,
   warmFlightCinematic,
 } from "@/features/ship/flight-cinematic-images";
+import { flightDurationLabel } from "@/features/ship/flight";
 import { launchShipAction } from "@/server/actions";
 
 /**
@@ -178,13 +179,4 @@ export function ShipFlightControls() {
       ) : null}
     </section>
   );
-}
-
-/** "15 seconds", "4 min 20 s": the route's authored duration, never rounded up. */
-export function flightDurationLabel(durationMs: number): string {
-  const totalSeconds = Math.round(durationMs / 1_000);
-  if (totalSeconds < 60) return `${totalSeconds} seconds`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `${minutes} min` : `${minutes} min ${seconds} s`;
 }

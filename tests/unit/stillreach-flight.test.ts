@@ -31,9 +31,8 @@ import {
   type LaunchFacts,
 } from "@/game/domain/ship";
 import { FlightCinematic } from "@/features/ship/FlightCinematic";
-import { flightCinematicFrame } from "@/features/ship/flight";
+import { flightCinematicFrame, flightDurationLabel } from "@/features/ship/flight";
 import { interplanetaryChartGeometry } from "@/features/ship/flight-chart";
-import { flightDurationLabel } from "@/features/ship/ShipFlightControls";
 import { readImageHeader } from "./image-header";
 
 /**

@@ -14,6 +14,7 @@ import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge
 import { STARTING_LEVEL } from "@/game/domain/character-progression";
 import { fabricationRecipeUnlocked } from "@/game/domain/fabrication";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import { merchantVenues } from "@/game/domain/merchant-venues";
 import { locationsOfferingAction } from "@/game/domain/location-state";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
@@ -98,7 +99,8 @@ export type ItemSourceBody =
   | {
       kind: "merchant";
       merchantId: string;
-      npcId: string;
+      /** The resident fronting this venue; absent for an automated terminal (#375). */
+      npcId?: string;
       locationId: string;
       /** Present when the merchant keeps shop inside a Local Place. */
       localPlaceId?: string;
@@ -319,21 +321,21 @@ export function resolveItemSources(
     const line = merchant.prices.find((price) => price.itemId === itemId);
     if (line?.sellPrice === undefined) continue;
     if (!isMerchantOpen(merchant, facts)) continue;
-    const place = registries.localPlaces.find((candidate) => candidate.merchantId === merchant.id);
-    const location = registries.locations.find((candidate) => candidate.merchantId === merchant.id);
-    const locationId = place?.parentLocationId ?? location?.id;
-    if (locationId === undefined) continue;
-    if (place && !deriveLocalPlaceAccess(place, facts.completedMissionIds).available) continue;
-    sources.push({
-      kind: "merchant",
-      merchantId: merchant.id,
-      npcId: merchant.npcId,
-      locationId,
-      ...(place ? { localPlaceId: place.id } : {}),
-      unitPrice: line.sellPrice,
-      ...(line.dailySellLimit !== undefined ? { dailyLimit: line.dailySellLimit } : {}),
-      access: { state: "available" },
-    });
+    // One source per venue of the business (#375), all the one merchant.
+    for (const venue of merchantVenues(merchant, registries)) {
+      const { place } = venue;
+      if (place && !deriveLocalPlaceAccess(place, facts.completedMissionIds).available) continue;
+      sources.push({
+        kind: "merchant",
+        merchantId: merchant.id,
+        ...(venue.npcId ? { npcId: venue.npcId } : {}),
+        locationId: venue.locationId,
+        ...(place ? { localPlaceId: place.id } : {}),
+        unitPrice: line.sellPrice,
+        ...(line.dailySellLimit !== undefined ? { dailyLimit: line.dailySellLimit } : {}),
+        access: { state: "available" },
+      });
+    }
   }
 
   for (const claim of registries.fixedClaims) {

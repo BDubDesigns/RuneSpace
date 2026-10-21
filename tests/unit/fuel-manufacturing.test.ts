@@ -253,12 +253,13 @@ describe("the two canister items", () => {
       const sources = buildItemReference(itemId, registries)!.sources.map((source) => source.kind);
       expect(sources).toContain("player_trade");
       // Last Leg Trading (#357) is the one merchant, and its prices live in the
-      // merchant registry rather than here.
+      // merchant registry rather than here. It keeps two venues (#375): Toll's
+      // counter and the Stillreach terminal, both the one merchant.
       expect(
         buildItemReference(itemId, registries)!
           .sources.filter((source) => source.kind === "merchant")
           .map((source) => (source as { merchantId: string }).merchantId),
-      ).toEqual([MERCHANT_IDS.lastLegTrading]);
+      ).toEqual([MERCHANT_IDS.lastLegTrading, MERCHANT_IDS.lastLegTrading]);
     }
   });
 });

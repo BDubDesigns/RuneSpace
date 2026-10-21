@@ -26,6 +26,7 @@ import { partitionFailureAwards } from "@/game/domain/refining";
 import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import type { FixedClaimSource } from "@/game/domain/item-sources";
+import { merchantVenues } from "@/game/domain/merchant-venues";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
@@ -126,7 +127,8 @@ export type ItemReferenceSource =
   | {
       kind: "merchant";
       merchantId: string;
-      npcId: string;
+      /** The resident fronting this venue; absent for an automated terminal (#375). */
+      npcId?: string;
       locationId: string;
       localPlaceId?: string;
       /** Credits per unit the merchant charges the player. */
@@ -484,28 +486,27 @@ export function buildItemReference(
     const line = merchant.prices.find((price) => price.itemId === itemId);
     // Only what a merchant SELLS to the player is a source; a buy price is not.
     if (line?.sellPrice === undefined) continue;
-    const place = registries.localPlaces.find((candidate) => candidate.merchantId === merchant.id);
-    const location = registries.locations.find((candidate) => candidate.merchantId === merchant.id);
-    const locationId = place?.parentLocationId ?? location?.id;
-    if (locationId === undefined) continue;
-    sources.push({
-      kind: "merchant",
-      merchantId: merchant.id,
-      npcId: merchant.npcId,
-      locationId,
-      ...(place ? { localPlaceId: place.id } : {}),
-      unitPrice: line.sellPrice,
-      ...(line.dailySellLimit !== undefined ? { dailyLimit: line.dailySellLimit } : {}),
-      ...(merchant.authorizingMissionId !== undefined
-        ? { opensWithMissionId: merchant.authorizingMissionId }
-        : {}),
-      ...(merchant.requiredCompletedMissionId !== undefined
-        ? { opensAfterCompletedMissionId: merchant.requiredCompletedMissionId }
-        : {}),
-      ...(place?.access.kind === "locked_until_mission_completed"
-        ? { placeOpensWithMissionId: place.access.missionId }
-        : {}),
-    });
+    for (const venue of merchantVenues(merchant, registries)) {
+      const { place } = venue;
+      sources.push({
+        kind: "merchant",
+        merchantId: merchant.id,
+        ...(venue.npcId ? { npcId: venue.npcId } : {}),
+        locationId: venue.locationId,
+        ...(place ? { localPlaceId: place.id } : {}),
+        unitPrice: line.sellPrice,
+        ...(line.dailySellLimit !== undefined ? { dailyLimit: line.dailySellLimit } : {}),
+        ...(merchant.authorizingMissionId !== undefined
+          ? { opensWithMissionId: merchant.authorizingMissionId }
+          : {}),
+        ...(merchant.requiredCompletedMissionId !== undefined
+          ? { opensAfterCompletedMissionId: merchant.requiredCompletedMissionId }
+          : {}),
+        ...(place?.access.kind === "locked_until_mission_completed"
+          ? { placeOpensWithMissionId: place.access.missionId }
+          : {}),
+      });
+    }
   }
 
   for (const claim of registries.fixedClaims) {
