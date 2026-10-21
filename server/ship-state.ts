@@ -17,6 +17,7 @@ import {
   launchRefusalMessage,
   planLaunch,
   shipFlightDurationMs,
+  shipReturnFuelShortfall,
   validateShipRoutes,
   type LaunchRefusalReason,
 } from "@/game/domain/ship";
@@ -63,6 +64,12 @@ export type ShipProjection = {
     fuelCostFuelUnits: number;
     durationMs: number;
     launchNotice: string;
+    /**
+     * Present when the tank would land holding less than the authored flight
+     * back costs (#375). A warning only: it never blocks the launch, and nothing
+     * refuels the ship for free at the other end.
+     */
+    returnFuelWarning?: { fuelAfterArrival: number; returnFuelCostFuelUnits: number };
     /** Why a launch would be refused right now, when it would be. */
     launchRefusal?: { reason: LaunchRefusalReason; message: string };
   }[];
@@ -265,6 +272,20 @@ async function commitShipArrival(
     if (stamped.length > 0) completedMissionId ??= mission.id;
   }
 
+  // A newer landing supersedes any receipt the player never dismissed (#375):
+  // with repeatable flights, an old "Arrived at Holo Hollow Landing" must never
+  // greet a player who has just landed somewhere else. Superseding stamps the
+  // older receipt dismissed at this arrival's instant; the arrival and any
+  // Mission it completed are untouched, as for any dismissal.
+  await transaction
+    .update(shipArrivalNotices)
+    .set({ acknowledgedAt: arrivedAt })
+    .where(
+      and(
+        eq(shipArrivalNotices.characterId, character.id),
+        isNull(shipArrivalNotices.acknowledgedAt),
+      ),
+    );
   await transaction
     .insert(shipArrivalNotices)
     .values({
@@ -381,6 +402,12 @@ export async function projectShip(
             completedMissionIds: input.completedMissionIds,
             acceptedMissionIds: input.acceptedMissionIds,
           });
+          // A launch already refused for fuel says so; the warning is only for
+          // a launch that would go ahead.
+          const shortfall =
+            !plan.ok && plan.reason === "insufficient_fuel"
+              ? undefined
+              : shipReturnFuelShortfall(route, fuelUnits);
           return {
             routeId: route.id,
             destinationLocationId: route.destinationLocationId,
@@ -389,6 +416,7 @@ export async function projectShip(
             fuelCostFuelUnits: flight.fuelCostFuelUnits,
             durationMs: shipFlightDurationMs(route.id),
             launchNotice: route.launchNotice,
+            ...(shortfall ? { returnFuelWarning: shortfall } : {}),
             ...(plan.ok
               ? {}
               : {

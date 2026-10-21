@@ -242,6 +242,30 @@ export function resolveNpcPlacement(
 }
 
 /**
+ * Whether one NPC is ever authored to stand at this exact venue: their home
+ * placement or any authored relocation (#375). Used to say whether a merchant's
+ * venue is fronted by that person, as opposed to an automated terminal of the
+ * same business where nobody stands. It is about authored placement, not where
+ * they are for this character right now.
+ */
+export function npcCanStandAt(
+  npc: NpcDefinition,
+  locationId: string,
+  localPlaceId?: string,
+): boolean {
+  const placements = [
+    { locationId: npc.homeLocationId, localPlaceId: npc.localPlaceId },
+    ...(npc.relocations ?? []).map((relocation) => ({
+      locationId: relocation.locationId,
+      localPlaceId: relocation.localPlaceId,
+    })),
+  ];
+  return placements.some(
+    (placement) => placement.locationId === locationId && placement.localPlaceId === localPlaceId,
+  );
+}
+
+/**
  * The background a present-tense local conversation with one NPC plays against.
  *
  * Only sequences authored as `presentsAtCurrentVenue` — replayable topics and

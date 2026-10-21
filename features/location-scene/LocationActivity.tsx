@@ -10,6 +10,7 @@ import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWor
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
+import { LastLegTerminal } from "@/features/trade/LastLegTerminal";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import type { RepairProjection } from "@/server/play";
@@ -65,6 +66,10 @@ export function LocationActivity({
     switch (activePlace.id) {
       case LOCAL_PLACE_IDS.holoHollowCrewStop:
         return <CrewStopPanel />;
+      case LOCAL_PLACE_IDS.stillreachFuelTerminal:
+        // Last Leg Trading's unmanned outlet (#375): the place's merchant,
+        // presented as a machine because nobody stands here to front it.
+        return <LastLegTerminal localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.hhBnb:
         return (
           <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />

@@ -764,11 +764,18 @@ the content that already owns each way of getting an item.
 | --- | --- |
 | Fabricate / Refine | `fabricationRecipes()` / `refiningRecipes()` in `game/config/balance.ts` |
 | Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds` |
-| Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source) |
+| Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source), one entry per venue of the business (`merchantVenues`, `game/domain/merchant-venues.ts`, #375) |
 | Daily claim | `POWER_ANNEX_CLAIM` in `game/domain/power-annex.ts`, which `server/power-annex.ts` also reads |
 | Scavenge | `SCAVENGE_OUTCOMES` (qualitative only: no odds are exposed) |
 | Player trade | `isItemTransferable` in `game/domain/player-trade.ts` |
 
+- **A merchant is a business with venues** (#375). Every Local Place or World
+  Location that names a merchant is one venue, all trading as that one merchant,
+  so a source is listed per venue and every venue shares its prices, unlock and
+  daily allowances. Last Leg Trading's Toll counter and Stillreach terminal are
+  two venues. A venue credits the merchant's NPC only if that NPC is authored to
+  stand there (`npcCanStandAt`), so an automated terminal names no one; a
+  venue's own access rule (a locked Local Place) still hides only that venue.
 - **Location** is never authored on a recipe: an action's host comes from
   `locationsOfferingAction` (`game/domain/location-state.ts`) over the
   character's already-resolved `locationStates`, joined by action ID. Refining

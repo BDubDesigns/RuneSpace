@@ -37,8 +37,9 @@ describe("approved ship numbers (#358)", () => {
   });
 
   it("makes the first flight 10 FU and 15 real seconds", () => {
-    expect(getShipFlightBalance(ROUTE)).toEqual({ fuelCostFuelUnits: 10, durationTicks: 25 });
+    expect(getShipFlightBalance(ROUTE)).toEqual({ fuelCostFuelUnits: 10, durationSeconds: 15 });
     expect(shipFlightDurationMs(ROUTE)).toBe(15_000);
+    // Unchanged from the shipped 25 ticks when durations moved to seconds (#375).
     expect(25 * GAME_TICK_MS).toBe(15_000);
   });
 
@@ -56,15 +57,20 @@ describe("approved ship numbers (#358)", () => {
 });
 
 describe("authored routes", () => {
-  it("authors exactly one route: Crash Site to Holo Hollow Landing, and no way back", () => {
-    expect(SHIP_ROUTES).toHaveLength(1);
+  it("authors the first flight Crash Site to Holo Hollow Landing, with no way back", () => {
+    // The first flight plus the interplanetary leg's two directions (#375).
+    expect(SHIP_ROUTES).toHaveLength(3);
     const route = getShipRoute(ROUTE)!;
     expect(route.originLocationId).toBe(LOCATION_IDS.crashSite);
     expect(route.destinationLocationId).toBe(LOCATION_IDS.holoHollowLanding);
-    expect(shipRoutesFrom(LOCATION_IDS.holoHollowLanding)).toEqual([]);
     expect(shipRoutesFrom(LOCATION_IDS.crashSite)).toEqual([route]);
-    // No Stillreach, no interplanetary leg.
-    expect(JSON.stringify(SHIP_ROUTES)).not.toMatch(/stillreach/i);
+    // Nothing ever flies back to the Crash Site.
+    expect(
+      SHIP_ROUTES.filter((entry) => entry.destinationLocationId === LOCATION_IDS.crashSite),
+    ).toEqual([]);
+    expect(
+      shipRoutesFrom(LOCATION_IDS.holoHollowLanding).map((entry) => entry.destinationLocationId),
+    ).toEqual([LOCATION_IDS.stillreachLandingStation]);
   });
 
   it("requires the whole ship, a reported Thrust Issues, and an accepted Move Along", () => {

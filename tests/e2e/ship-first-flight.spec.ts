@@ -379,11 +379,11 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   await page.reload();
   await expect(page.locator(NOTICE)).toHaveCount(0);
 
-  // At the new berth there is no flight back, and the Cargo Hold is right here.
+  // At the new berth there is no flight back to the Crash Site: the one route on
+  // offer is the Stillreach leg (#375). The Cargo Hold is right here.
   await page.locator(SHIP).locator(BOARD).click();
-  await expect(page.locator("[data-ship-no-routes]")).toContainText(
-    "No flights are available from Holo Hollow Landing.",
-  );
+  await expect(page.locator("[data-ship-route]")).toHaveCount(1);
+  await expect(page.locator("[data-ship-route]")).toContainText("Stillreach Landing Station");
   await expect(page.locator(`${SHIP} [data-cargo-hold-status="operational"]`)).toBeVisible();
 
   // Wade has a line only now that the Rivet has made the Landing.

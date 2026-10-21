@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { CreditsAmount, CreditsIcon } from "@/components/ui/CreditsAmount";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { usePlay } from "@/features/play/PlayContext";
+import { useMerchantCounter } from "@/features/trade/useMerchantCounter";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
-import { getItemDefinition } from "@/game/config/balance";
 import {
-  maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
   merchantTradeDirections,
@@ -18,7 +16,6 @@ import {
   type TradeDirection,
 } from "@/game/domain/trade";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
-import { tradeWithMerchantAction } from "@/server/actions";
 
 const MODES: readonly { id: TradeDirection; label: string }[] = [
   { id: "buy", label: "Buy" },
@@ -43,18 +40,17 @@ export function TradePanel({
   merchant: MerchantDefinition;
 }) {
   const {
-    acceptState,
-    enqueueForeground,
-    foregroundBusy: busy,
-    releaseCommand,
-    requestAutoRefresh,
-    state,
-  } = usePlay();
-  const [, startTransition] = useTransition();
+    busy,
+    clearFeedback,
+    commit: commitTrade,
+    credits,
+    dailyAllowance,
+    feedback,
+    ownedQuantity,
+    purchasableMaximum,
+  } = useMerchantCounter({ ...(localPlaceId ? { localPlaceId } : {}), merchant });
   const [requestedMode, setMode] = useState<TradeDirection>("buy");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [message, setMessage] = useState<string>();
-  const [messageTone, setMessageTone] = useState<"danger" | "muted">("muted");
 
   const purchasableItemIds = merchantPurchasableItemIds(merchant);
   const sellableItemIds = merchantSellableItemIds(merchant);
@@ -70,79 +66,13 @@ export function TradePanel({
 
   const itemIds = mode === "buy" ? purchasableItemIds : sellableItemIds;
   const quantityFor = (itemId: string) => quantities[itemId] ?? 1;
-  const ownedQuantity = (itemId: string) =>
-    state.inventory.stacks
-      .filter((stack) => stack.itemId === itemId)
-      .reduce((total, stack) => total + stack.quantity, 0);
 
   function setQuantity(itemId: string, quantity: number) {
     setQuantities((current) => ({ ...current, [itemId]: Math.max(1, quantity) }));
   }
 
-  /**
-   * The Max preview for a purchase. Capacity comes from the shared inventory
-   * planner via the domain helper, so this surface never re-derives stacking,
-   * slot, or mass rules of its own.
-   */
-  function purchasableMaximum(
-    itemId: string,
-    unitPrice: number,
-    dailyRemaining: number | undefined,
-  ): number {
-    const definition = getItemDefinition(itemId);
-    if (!definition || definition.kind !== "stack") return 0;
-    return maximumPurchasableQuantity({
-      credits: state.credits,
-      unitPrice,
-      existingStacks: state.inventory.stacks,
-      itemId,
-      stackLimit: definition.stackLimit,
-      availableSlots: state.inventory.slotsAvailable,
-      availableWeight: Math.max(0, state.inventory.capacityGrams - state.inventory.massGrams),
-      itemWeight: definition.massGrams,
-      ...(dailyRemaining === undefined ? {} : { dailyRemaining }),
-    });
-  }
-
   function commit(itemId: string, quantity: number) {
-    enqueueForeground(() => {
-      startTransition(async () => {
-        try {
-          const result = await tradeWithMerchantAction({
-            characterId: state.characterId,
-            ...(localPlaceId ? { localPlaceId } : {}),
-            itemId,
-            direction: mode,
-            quantity,
-          });
-          if ("error" in result) {
-            setMessage(result.error);
-            setMessageTone("danger");
-          } else {
-            acceptState(result.state);
-            if (result.trade.status === "refused") {
-              setMessage(result.trade.message);
-              setMessageTone("danger");
-            } else {
-              const name = resolveItemPresentation(itemId, itemId).displayName;
-              setMessage(
-                result.trade.direction === "buy"
-                  ? `Bought ${result.trade.quantity} ${name} for ${result.trade.totalCredits} Credits.`
-                  : `Sold ${result.trade.quantity} ${name} for ${result.trade.totalCredits} Credits.`,
-              );
-              setMessageTone("muted");
-              setQuantity(itemId, 1);
-            }
-          }
-        } catch {
-          setMessage("Comms interruption. The trade could not be confirmed.");
-          setMessageTone("danger");
-          requestAutoRefresh();
-        } finally {
-          releaseCommand();
-        }
-      });
-    });
+    commitTrade(itemId, mode, quantity, () => setQuantity(itemId, 1));
   }
 
   return (
@@ -158,7 +88,7 @@ export function TradePanel({
           className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-trade-credits
         >
-          <CreditsAmount amount={state.credits} />
+          <CreditsAmount amount={credits} />
         </p>
       </div>
 
@@ -175,7 +105,7 @@ export function TradePanel({
                 setMode(option.id);
                 // Every transaction starts at one, including after switching mode.
                 setQuantities({});
-                setMessage(undefined);
+                clearFeedback();
               }}
             >
               {option.label}
@@ -195,8 +125,7 @@ export function TradePanel({
           // A daily-limited line (#230) shows today's allowance from the
           // authoritative projection; it only matters when buying, because
           // selling back never restores it.
-          const allowance =
-            mode === "buy" ? state.merchantDailyPurchases[merchant.id]?.[itemId] : undefined;
+          const allowance = mode === "buy" ? dailyAllowance(itemId) : undefined;
           // Buy caps at the largest purchase that is affordable, within today's
           // allowance, and actually carryable; Sell caps at the authoritative
           // carried quantity. The server re-plans either way.
@@ -204,7 +133,7 @@ export function TradePanel({
             mode === "buy" ? purchasableMaximum(itemId, unitPrice, allowance?.remaining) : owned;
           const affordable =
             mode === "buy"
-              ? total <= state.credits && quantity <= (allowance?.remaining ?? quantity)
+              ? total <= credits && quantity <= (allowance?.remaining ?? quantity)
               : quantity <= owned;
 
           return (
@@ -317,9 +246,9 @@ export function TradePanel({
         })}
       </ul>
 
-      {message ? (
+      {feedback ? (
         <div className="mt-4" data-trade-feedback>
-          <Feedback tone={messageTone}>{message}</Feedback>
+          <Feedback tone={feedback.tone}>{feedback.text}</Feedback>
         </div>
       ) : null}
     </div>

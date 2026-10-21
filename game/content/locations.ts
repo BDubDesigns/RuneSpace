@@ -44,9 +44,11 @@ import {
  *   World Location at (1,1) with three walking edges. Its one Local Place is
  *   Last Leg Trading. The pad is empty until the character's own Rivet lands
  *   there (#358); only then does its scene carry the ship overlay.
- * - Stillreach (#373): a second planet with its own eight-location local map. Every
- *   location is scenery-only in Slice A and nothing in ordinary play leads there;
- *   each location belongs to one planet, and a walking edge never joins two.
+ * - Stillreach (#373): a second planet with its own eight-location local map; each
+ *   location belongs to one planet, and a walking edge never joins two. The Rivet
+ *   reaches it by flight (#375) and berths at Stillreach Landing Station, whose
+ *   one Local Place is Last Leg Trading's automated terminal; the rest is
+ *   scenery-only.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -65,6 +67,10 @@ export const CRASH_SITE_SHIP_DEPARTED_VARIANT_ID = "crash_site_ship_departed";
 
 /** Holo Hollow Landing once the character's own Rivet is berthed on the pad (#358). */
 export const HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID = "holo_hollow_landing_ship_berthed";
+
+/** Stillreach Landing Station once the character's own Rivet is berthed in the ring (#375). */
+export const STILLREACH_LANDING_STATION_SHIP_BERTHED_VARIANT_ID =
+  "stillreach_landing_station_ship_berthed";
 
 /**
  * The Crash Site is one approved empty environment plus a state-selected
@@ -116,6 +122,29 @@ const LANDING_RIVET_OVERLAY = {
   width: REPAIRED_RIVET_OVERLAY.width,
   height: REPAIRED_RIVET_OVERLAY.height,
   placement: { left: 36.0, top: 38.2, width: 28.0 },
+};
+
+/**
+ * The Rivet inside Stillreach Landing Station's fungal ring (#375): the canonical
+ * transparent repaired overlay over the approved empty 1536x384 panorama. Placement
+ * is the owner-approved Pillow composite "Option 2 — balanced": the 1774x887 master
+ * scaled by 0.205 with its top-left at (585, 84) on the 1536x384 canvas. The runtime
+ * overlay is that master trimmed to its alpha bounds (16, 43, 1742x816), so the mark
+ * is the trimmed box at the same scale: left (585 + 16 x 0.205) / 1536, top
+ * (84 + 43 x 0.205) / 384, width 1742 x 0.205 / 1536.
+ */
+const STILLREACH_RIVET_OVERLAY = {
+  asset: REPAIRED_RIVET_OVERLAY.asset,
+  width: REPAIRED_RIVET_OVERLAY.width,
+  height: REPAIRED_RIVET_OVERLAY.height,
+  placement: { left: 38.3, top: 24.171, width: 23.249 },
+};
+
+const STILLREACH_LANDING_STATION_SCENE = {
+  asset: "/location-scenes/stillreach-landing-station.webp" as const,
+  width: 1536,
+  height: 384,
+  focal: { x: 45, y: 50 } as const,
 };
 
 const locationDefinitions = [
@@ -564,30 +593,48 @@ const locationDefinitions = [
     },
   },
   // Stillreach Slice A (#373): eight scenery-only World Locations on a second
-  // planet. Each authors no activity, status or merchant, and the seven walking
-  // edges below are the whole graph; none is inferred from axial adjacency. No
-  // ship route and no transport route reaches Stillreach, so ordinary play has no
-  // way here until the flight slice. A starter region name is not yet approved, so
-  // these locations author none.
+  // planet. The seven walking edges below are the whole graph; none is inferred
+  // from axial adjacency. Slice B (#375) reaches the planet by the Rivet's own
+  // interplanetary flight to the Landing Station, which also hosts the ship's
+  // berth and, as a Local Place, Last Leg Trading's terminal; the other seven
+  // stay scenery-only. A
+  // starter region name is not yet approved, so these locations author none.
   {
     id: LOCATION_IDS.stillreachLandingStation,
     planetId: PLANET_IDS.stillreach,
     displayName: "Stillreach Landing Station",
     description:
-      "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge.",
+      "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge, where a Last Leg Trading fuel terminal serves pilots.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack],
     availableActionIds: [],
+    // The station hosts no merchant itself: Last Leg Trading's terminal is its
+    // own Local Place (#375, game/content/local-places), so trading there always
+    // carries that place's validated context.
+    // The ring is empty for everyone until their own Rivet lands in it (#375).
+    // Read from the ship's berth, so walking here never puts a ship in the ring
+    // and walking away never takes it out.
+    stateVariants: [
+      {
+        id: STILLREACH_LANDING_STATION_SHIP_BERTHED_VARIANT_ID,
+        requires: { shipBerth: "here" },
+        description:
+          "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. Your Rivet Utility Shuttle stands in the middle of the ring, and a Last Leg Trading fuel terminal serves pilots from the weathered station buildings at its edge.",
+        scene: {
+          ...STILLREACH_LANDING_STATION_SCENE,
+          alt: "Your repaired Rivet Utility Shuttle standing in the open clearing inside a ring of glowing violet, blue and amber mushrooms on a frosted highland plain, a few weathered station buildings and antenna masts at the left edge, aurora overhead at twilight",
+          overlay: STILLREACH_RIVET_OVERLAY,
+        },
+      },
+    ],
     dormantActivities: [],
     presentation: {
       mapIconKey: "stillreach_landing_station" as const,
       layout: "stillreach_landing_station" as const,
+      localPlacesEyebrow: "Around the station",
       localMap: { axial: { q: 0, r: 0 }, label: "Landing Station" },
       scene: {
-        asset: "/location-scenes/stillreach-landing-station.webp" as const,
-        width: 1536,
-        height: 384,
+        ...STILLREACH_LANDING_STATION_SCENE,
         alt: "An empty ring of glowing violet, blue and amber mushrooms around a flat open clearing on a frosted highland plain, a few weathered station buildings and antenna masts at its left edge, aurora overhead at twilight",
-        focal: { x: 45, y: 50 } as const,
       },
     },
   },

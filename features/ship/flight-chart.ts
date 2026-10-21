@@ -1,4 +1,11 @@
+import { PLANET_IDS, type PlanetId } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
+import {
+  getPlanetPresentation,
+  planetAnchorPoint,
+  planetHorizontalReach,
+  planetVerticalReach,
+} from "@/game/content/planets";
 import { axialToPixel } from "@/features/travel/local-map-layout";
 
 /**
@@ -27,6 +34,76 @@ export type FlightChartGeometry = {
   /** The route as an SVG path. */
   path: string;
 };
+
+/**
+ * Where each world sits on the interplanetary chart (#375). A fixed presentation
+ * convention, not astronomy: Skatboll always on the left and Stillreach on the
+ * right, so the outbound leg reads left to right and the flight home right to
+ * left, and the two directions are visibly the same leg. No distance, scale,
+ * orbit or third body is drawn.
+ */
+export const INTERPLANETARY_CHART_PLANETS: Readonly<
+  Record<PlanetId, { center: ChartPoint; radius: number }>
+> = {
+  [PLANET_IDS.skatboll]: { center: { x: 122, y: 160 }, radius: 40 },
+  [PLANET_IDS.stillreach]: { center: { x: 478, y: 160 }, radius: 40 },
+};
+
+/**
+ * Where a flight leaves or lands on one charted world: its authored station
+ * anchor (`game/content/planets`) resolved onto this chart's layout. The route
+ * ends here, the station marker is drawn here, and the Rivet marker starts and
+ * finishes here, so the three can never disagree.
+ */
+export function chartPlanetAnchor(planetId: PlanetId): ChartPoint {
+  const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  return planetAnchorPoint(getPlanetPresentation(planetId), center, radius);
+}
+
+/**
+ * How far one charted world's drawing reaches from its centre, horizontally and
+ * vertically, in chart units: its ring or halo from `game/content/planets`, or
+ * its disc. The labels keep clear of it; the route does not, it lands on the disc.
+ */
+export function chartPlanetReach(planetId: PlanetId): { x: number; y: number } {
+  const { radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  const presentation = getPlanetPresentation(planetId);
+  return {
+    x: radius * planetHorizontalReach(presentation),
+    y: radius * planetVerticalReach(presentation),
+  };
+}
+
+/**
+ * The vertical clearance every charted world's labels keep, so the names above
+ * and the stations below sit on one line across the chart, whichever world has
+ * the taller ring or halo.
+ */
+export function chartPlanetLabelReach(): number {
+  return Math.max(
+    ...Object.keys(INTERPLANETARY_CHART_PLANETS).map(
+      (planetId) => chartPlanetReach(planetId as PlanetId).y,
+    ),
+  );
+}
+
+export function interplanetaryChartGeometry(
+  originPlanetId: PlanetId,
+  destinationPlanetId: PlanetId,
+): FlightChartGeometry {
+  // Station anchor to station anchor, on the discs. The control point depends
+  // only on the unordered pair, so the flight home is the same curve reversed.
+  const origin = chartPlanetAnchor(originPlanetId);
+  const destination = chartPlanetAnchor(destinationPlanetId);
+  // The same upward bow as the local chart, so a transfer arc reads as a flight.
+  const control = { x: (origin.x + destination.x) / 2, y: Math.min(origin.y, destination.y) - 96 };
+  return {
+    origin,
+    destination,
+    control,
+    path: `M ${round(origin.x)} ${round(origin.y)} Q ${round(control.x)} ${round(control.y)} ${round(destination.x)} ${round(destination.y)}`,
+  };
+}
 
 export function flightChartGeometry(
   originLocationId: string,

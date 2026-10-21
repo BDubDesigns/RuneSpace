@@ -13,6 +13,10 @@ import {
   clampChartLabelX,
   FLIGHT_CHART_VIEWBOX,
   flightChartGeometry,
+  chartPlanetAnchor,
+  chartPlanetLabelReach,
+  INTERPLANETARY_CHART_PLANETS,
+  interplanetaryChartGeometry,
   pointOnFlightChart,
   type ChartPoint,
 } from "@/features/ship/flight-chart";
@@ -28,6 +32,9 @@ import {
   type FlightCinematic as FlightCinematicContent,
   type FlightCinematicBackdrop,
 } from "@/game/content/flight-cinematics";
+import { getPlanetPresentation } from "@/game/content/planets";
+import { PlanetBody } from "@/features/ship/PlanetBody";
+import type { PlanetId } from "@/game/config/foundations";
 
 type Flight = {
   routeId: string;
@@ -302,7 +309,13 @@ function FlightChart({
   destinationName: string;
 }) {
   const reducedMotion = usePrefersReducedMotion();
-  const geometry = flightChartGeometry(flight.originLocationId, flight.destinationLocationId);
+  const { chart } = content;
+  // The local hop is drawn between the two places' map positions; the
+  // interplanetary leg between the two worlds (#375), same arc and marker.
+  const geometry =
+    chart.kind === "interplanetary"
+      ? interplanetaryChartGeometry(chart.originPlanetId, chart.destinationPlanetId)
+      : flightChartGeometry(flight.originLocationId, flight.destinationLocationId);
   const marker = pointOnFlightChart(geometry, frame.travelProgress);
   const percent = Math.round(frame.travelProgress * 100);
   // The ship art faces left. Heading right, it is mirrored first so it never flies upside down.
@@ -311,11 +324,34 @@ function FlightChart({
     ? `rotate(${marker.headingDegrees.toFixed(1)}deg) scaleX(-1)`
     : `rotate(${(marker.headingDegrees - 180).toFixed(1)}deg)`;
   const glyph = flightChartGlyph(content);
+  const interplanetary = chart.kind === "interplanetary";
+  const route = (
+    <>
+      <path className="rs-flight-chart__route" d={geometry.path} fill="none" />
+      {/* Reduced motion: a static chart. The moving marker and growing trail are
+          not rendered at all; the panel's countdown and meter carry progress. */}
+      {reducedMotion ? null : (
+        <path
+          className="rs-flight-chart__flown"
+          d={geometry.path}
+          data-flight-chart-flown
+          fill="none"
+          pathLength={1}
+          strokeDasharray="1 1"
+          strokeDashoffset={1 - frame.travelProgress}
+        />
+      )}
+    </>
+  );
 
   return (
     <div className="rs-flight-cinematic__phase rs-flight-chart absolute inset-0" data-flight-chart>
       <svg
-        aria-label={`${content.chartTitle}: ${originName} to ${destinationName}, ${percent}% of the way.`}
+        aria-label={
+          chart.kind === "interplanetary"
+            ? `${content.chartTitle}: ${originName}, ${getPlanetPresentation(chart.originPlanetId).displayName}, to ${destinationName}, ${getPlanetPresentation(chart.destinationPlanetId).displayName}, ${percent}% of the way.`
+            : `${content.chartTitle}: ${originName} to ${destinationName}, ${percent}% of the way.`
+        }
         className="h-full w-full"
         preserveAspectRatio="xMidYMid meet"
         role="img"
@@ -334,22 +370,23 @@ function FlightChart({
         <text className="rs-flight-chart__title" x="24" y={FLIGHT_CHART_VIEWBOX.height - 20}>
           {content.chartTitle.toUpperCase()}
         </text>
-        <path className="rs-flight-chart__route" d={geometry.path} fill="none" />
-        {/* Reduced motion: a static chart. The moving marker and growing trail are
-            not rendered at all; the panel's countdown and meter carry progress. */}
-        {reducedMotion ? null : (
-          <path
-            className="rs-flight-chart__flown"
-            d={geometry.path}
-            data-flight-chart-flown
-            fill="none"
-            pathLength={1}
-            strokeDasharray="1 1"
-            strokeDashoffset={1 - frame.travelProgress}
-          />
+        {interplanetary ? (
+          <>
+            {/* Draw order (#375): the worlds, then the route and its flown trail over
+                them, then the station markers, and the Rivet above everything. */}
+            <ChartPlanet planetId={chart.originPlanetId} stationName={originName} />
+            <ChartPlanet planetId={chart.destinationPlanetId} stationName={destinationName} />
+            {route}
+            <ChartStation planetId={chart.originPlanetId} />
+            <ChartStation planetId={chart.destinationPlanetId} />
+          </>
+        ) : (
+          <>
+            {route}
+            <ChartPlace label={originName} point={geometry.origin} />
+            <ChartPlace label={destinationName} point={geometry.destination} />
+          </>
         )}
-        <ChartPlace label={originName} point={geometry.origin} />
-        <ChartPlace label={destinationName} point={geometry.destination} />
         {reducedMotion ? null : (
           <g
             className="rs-flight-chart__marker"
@@ -369,6 +406,58 @@ function FlightChart({
         )}
       </svg>
     </div>
+  );
+}
+
+/**
+ * One world on the interplanetary chart (#375): the planet drawn from its
+ * authored presentation (`PlanetBody`), its name above and the landing station
+ * the leg uses below, both clear of its ring or halo. The station's marker is
+ * `ChartStation`, drawn above both worlds.
+ */
+function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationName: string }) {
+  const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  const labelReach = chartPlanetLabelReach();
+  const name = getPlanetPresentation(planetId).displayName.toUpperCase();
+  const station = stationName.toUpperCase();
+  return (
+    <g data-flight-chart-planet={planetId} data-flight-chart-place={stationName}>
+      <PlanetBody cx={center.x} cy={center.y} planetId={planetId} r={radius} />
+      <text
+        className="rs-flight-chart__label"
+        textAnchor="middle"
+        x={clampChartLabelX(center.x, name, 18)}
+        y={center.y - labelReach - 12}
+      >
+        {name}
+      </text>
+      <text
+        className="rs-flight-chart__station"
+        textAnchor="middle"
+        x={clampChartLabelX(center.x, station, 13)}
+        y={center.y + labelReach + 24}
+      >
+        {station}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * A world's landing-station marker at its authored flight anchor: exactly where
+ * the route begins or ends and where the Rivet marker sets off or arrives. It is
+ * static, so it stays under reduced motion and marks both ends of the leg.
+ */
+function ChartStation({ planetId }: { planetId: PlanetId }) {
+  const anchor = chartPlanetAnchor(planetId);
+  return (
+    <circle
+      className="rs-flight-chart__place"
+      cx={anchor.x}
+      cy={anchor.y}
+      data-flight-chart-station={planetId}
+      r="4"
+    />
   );
 }
 

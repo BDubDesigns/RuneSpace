@@ -791,11 +791,13 @@ suite("issue #358 Rivet first flight (real PostgreSQL)", () => {
       expect((await missionRow(characterId, MISSION_IDS.moveAlong))?.completedAt).toBeNull();
     });
 
-    it("offers no flight back to the Crash Site and none beyond Skatboll", async () => {
+    it("offers no flight back to the Crash Site; only the Stillreach leg (#375) departs the Landing", async () => {
       const { userId, characterId } = await makeCharacter({ fuel: 200 });
       await launch(userId, characterId);
       const landed = await stateAt(userId, characterId, after(now, FLIGHT_MS));
-      expect(landed.ship.routes).toEqual([]);
+      expect(landed.ship.routes.map((route) => route.destinationLocationId)).toEqual([
+        LOCATION_IDS.stillreachLandingStation,
+      ]);
       const back = await ship.launchShip(
         userId,
         characterId,

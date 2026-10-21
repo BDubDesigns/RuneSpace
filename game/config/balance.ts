@@ -858,8 +858,10 @@ const balanceSchema = z.object({
    * The Rivet Utility Shuttle (#358). The tank holds 300 Fuel Units and every
    * character's ship starts empty. Which routes exist is content
    * (`game/content/ship-routes`); what each costs and how long it takes is here.
-   * A flight's duration is whole ticks, like every other timed action, so
-   * 25 ticks is the approved 15 real seconds.
+   * A flight's duration is authored in real seconds (#375): the approved 260-second
+   * interplanetary leg is not a whole number of 600 ms ticks, and a flight is
+   * scheduled by its recorded absolute arrival instant rather than by counting
+   * ticks, so the first flight's 15 seconds (formerly 25 ticks) is unchanged.
    */
   ship: z.object({
     actionId: z.literal(ACTION_IDS.shipFlight),
@@ -868,7 +870,17 @@ const balanceSchema = z.object({
     flights: z.object({
       [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: z.object({
         fuelCostFuelUnits: z.literal(10),
-        durationTicks: z.literal(25),
+        durationSeconds: z.literal(15),
+      }),
+      // Holo Hollow Landing <-> Stillreach Landing Station (#375): 120 FU and
+      // 4 minutes 20 seconds each way, no extra fee.
+      [SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation]: z.object({
+        fuelCostFuelUnits: z.literal(120),
+        durationSeconds: z.literal(260),
+      }),
+      [SHIP_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding]: z.object({
+        fuelCostFuelUnits: z.literal(120),
+        durationSeconds: z.literal(260),
       }),
     }),
   }),
@@ -1632,7 +1644,15 @@ const defaults = balanceSchema.parse({
     flights: {
       [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: {
         fuelCostFuelUnits: 10,
-        durationTicks: 25,
+        durationSeconds: 15,
+      },
+      [SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation]: {
+        fuelCostFuelUnits: 120,
+        durationSeconds: 260,
+      },
+      [SHIP_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding]: {
+        fuelCostFuelUnits: 120,
+        durationSeconds: 260,
       },
     },
   },
@@ -1762,8 +1782,7 @@ export function getEffectiveGameBalance(): EffectiveGameBalance {
 }
 
 /** One flight route's approved cost and duration (#358). */
-export type ShipFlightBalance =
-  EffectiveGameBalance["ship"]["flights"][typeof SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding];
+export type ShipFlightBalance = EffectiveGameBalance["ship"]["flights"][ShipRouteId];
 
 /** The authoritative cost and duration of one authored flight route. */
 export function getShipFlightBalance(

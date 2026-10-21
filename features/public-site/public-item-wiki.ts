@@ -286,7 +286,10 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
         .filter(Boolean)
         .join(", ");
       const line: (string | { text: string; href: string })[] = [
-        `Buy from ${getNpc(source.npcId)?.displayName ?? "a merchant"} — ${where} — for ${source.unitPrice} Credits each`,
+        source.npcId
+          ? `Buy from ${getNpc(source.npcId)?.displayName ?? "a merchant"} — ${where} — for ${source.unitPrice} Credits each`
+          : // An unmanned venue (#375) is named by its place alone.
+            `Buy at ${where} for ${source.unitPrice} Credits each`,
       ];
       if (source.dailyLimit !== undefined) {
         line.push(`, up to ${source.dailyLimit} a day per character`);

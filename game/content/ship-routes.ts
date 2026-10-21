@@ -19,9 +19,11 @@ import {
  * never names it, so the two cannot disagree.
  *
  * A route is **one-way** and is a physical move of the ship: the berth after a
- * flight is the route's destination, permanently. There is deliberately no
- * route back to the Crash Site, no schedule, no pathfinding and no
- * interplanetary leg here; a later route is a second authored entry.
+ * flight is the route's destination until another flight moves it. There is
+ * deliberately no route back to the Crash Site, no schedule and no pathfinding.
+ * The interplanetary leg between Holo Hollow Landing and Stillreach Landing
+ * Station (#375) is two authored entries, one per direction, so each direction
+ * keeps its own cost, duration and cinematic.
  */
 export type ShipRouteDefinition = {
   id: ShipRouteId;
@@ -60,6 +62,38 @@ export const SHIP_ROUTES: readonly ShipRouteDefinition[] = [
     requiredAcceptedMissionId: MISSION_IDS.moveAlong,
     launchNotice:
       "Launching permanently moves your ship from the Crash Site to Holo Hollow Landing.",
+  },
+  // The interplanetary leg (#375). Flown from the ship's actual berth by the
+  // whole, repaired ship and a character who has reported Thrust Issues: the
+  // same authorization as the first flight, without its one-time Move Along
+  // gate, and with no Rune Fragment or conversation gate of its own.
+  {
+    id: SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation,
+    displayName: "Stillreach Landing Station",
+    originLocationId: LOCATION_IDS.holoHollowLanding,
+    destinationLocationId: LOCATION_IDS.stillreachLandingStation,
+    requiredRepairTargetIds: [
+      REPAIR_TARGET_IDS.cargoHold,
+      REPAIR_TARGET_IDS.landingGear,
+      REPAIR_TARGET_IDS.propulsionSystem,
+    ],
+    requiredCompletedMissionIds: [MISSION_IDS.thrustIssues],
+    launchNotice:
+      "Launching flies you, the Rivet and everything in its Cargo Hold to Stillreach. Once launched, the flight cannot be cancelled.",
+  },
+  {
+    id: SHIP_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding,
+    displayName: "Holo Hollow Landing",
+    originLocationId: LOCATION_IDS.stillreachLandingStation,
+    destinationLocationId: LOCATION_IDS.holoHollowLanding,
+    requiredRepairTargetIds: [
+      REPAIR_TARGET_IDS.cargoHold,
+      REPAIR_TARGET_IDS.landingGear,
+      REPAIR_TARGET_IDS.propulsionSystem,
+    ],
+    requiredCompletedMissionIds: [MISSION_IDS.thrustIssues],
+    launchNotice:
+      "Launching flies you, the Rivet and everything in its Cargo Hold back to Skatboll. Once launched, the flight cannot be cancelled.",
   },
 ];
 
