@@ -384,7 +384,7 @@ approved pixels. The composites themselves are review references only and are no
   `{-0.55, 0}`). `planetAnchorPoint` resolves it for any drawn size, and `chartPlanetAnchor`
   for the chart: the route's two ends, the station dot on each world and the Rivet marker's
   start and finish are that one point, so the flight home is the same two points reversed.
-  Draw order: route, worlds, station dots, Rivet. The dots stay under reduced motion.
+  Draw order: worlds, route and flown trail, station dots, Rivet. The dots stay under reduced motion.
 - **Timing.** The same `flightCinematicFrame`: 2.5 s takeoff and 3 s touchdown inside the
   recorded 260 s, so the chart holds the other 254.5 s. Resume, reduced motion, minimize,
   arrival-pending and no-replay-after-landing behave exactly as for the first flight.

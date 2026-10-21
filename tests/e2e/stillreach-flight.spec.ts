@@ -128,6 +128,24 @@ async function expectPlanetIdentities(page: Page) {
   await expect(skatboll.locator("[data-planet-halo]")).toHaveCount(0);
   await expect(stillreach.locator("[data-planet-halo]")).toHaveCount(1);
   await expect(stillreach.locator("[data-planet-ring]")).toHaveCount(0);
+  // Draw order: the route and its trail over both worlds, the station dots over
+  // the route, and the Rivet over everything.
+  const order = await page.locator("[data-flight-chart] svg").evaluate((svg) => {
+    const position = (selector: string) => {
+      const element = svg.querySelector(selector);
+      return element ? [...svg.querySelectorAll("*")].indexOf(element) : -1;
+    };
+    return {
+      worlds: Math.max(
+        position('[data-planet-body="skatboll"] [data-planet-surface]'),
+        position('[data-planet-body="stillreach"] [data-planet-surface]'),
+      ),
+      route: position(".rs-flight-chart__route"),
+      station: position("[data-flight-chart-station]"),
+    };
+  });
+  expect(order.route).toBeGreaterThan(order.worlds);
+  expect(order.station).toBeGreaterThan(order.route);
   const left = await skatboll.locator("[data-planet-surface]").boundingBox();
   const right = await stillreach.locator("[data-planet-surface]").boundingBox();
   expect(left!.x).toBeLessThan(right!.x);

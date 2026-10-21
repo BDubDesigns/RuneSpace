@@ -324,6 +324,25 @@ function FlightChart({
     ? `rotate(${marker.headingDegrees.toFixed(1)}deg) scaleX(-1)`
     : `rotate(${(marker.headingDegrees - 180).toFixed(1)}deg)`;
   const glyph = flightChartGlyph(content);
+  const interplanetary = chart.kind === "interplanetary";
+  const route = (
+    <>
+      <path className="rs-flight-chart__route" d={geometry.path} fill="none" />
+      {/* Reduced motion: a static chart. The moving marker and growing trail are
+          not rendered at all; the panel's countdown and meter carry progress. */}
+      {reducedMotion ? null : (
+        <path
+          className="rs-flight-chart__flown"
+          d={geometry.path}
+          data-flight-chart-flown
+          fill="none"
+          pathLength={1}
+          strokeDasharray="1 1"
+          strokeDashoffset={1 - frame.travelProgress}
+        />
+      )}
+    </>
+  );
 
   return (
     <div className="rs-flight-cinematic__phase rs-flight-chart absolute inset-0" data-flight-chart>
@@ -351,31 +370,19 @@ function FlightChart({
         <text className="rs-flight-chart__title" x="24" y={FLIGHT_CHART_VIEWBOX.height - 20}>
           {content.chartTitle.toUpperCase()}
         </text>
-        <path className="rs-flight-chart__route" d={geometry.path} fill="none" />
-        {/* Reduced motion: a static chart. The moving marker and growing trail are
-            not rendered at all; the panel's countdown and meter carry progress. */}
-        {reducedMotion ? null : (
-          <path
-            className="rs-flight-chart__flown"
-            d={geometry.path}
-            data-flight-chart-flown
-            fill="none"
-            pathLength={1}
-            strokeDasharray="1 1"
-            strokeDashoffset={1 - frame.travelProgress}
-          />
-        )}
-        {chart.kind === "interplanetary" ? (
+        {interplanetary ? (
           <>
-            {/* The route passes under the worlds; the station markers sit on top
-                of them, at the route's own ends, and the Rivet above everything. */}
+            {/* Draw order (#375): the worlds, then the route and its flown trail over
+                them, then the station markers, and the Rivet above everything. */}
             <ChartPlanet planetId={chart.originPlanetId} stationName={originName} />
             <ChartPlanet planetId={chart.destinationPlanetId} stationName={destinationName} />
+            {route}
             <ChartStation planetId={chart.originPlanetId} />
             <ChartStation planetId={chart.destinationPlanetId} />
           </>
         ) : (
           <>
+            {route}
             <ChartPlace label={originName} point={geometry.origin} />
             <ChartPlace label={destinationName} point={geometry.destination} />
           </>
