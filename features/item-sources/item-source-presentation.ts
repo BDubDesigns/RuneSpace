@@ -132,7 +132,10 @@ export function describeItemSource(
         key: `${source.merchantId}:${source.localPlaceId ?? source.locationId}`,
         kind: source.kind,
         title: "Buy",
-        where: `${source.npcId ? (getNpc(source.npcId)?.displayName ?? "Merchant") : "Automated terminal"} — ${where}`,
+        // An unmanned venue (#375) is named by its place alone: nobody to credit.
+        where: source.npcId
+          ? `${getNpc(source.npcId)?.displayName ?? "Merchant"} — ${where}`
+          : where,
         price: source.unitPrice,
         notes: source.dailyLimit === undefined ? [] : [`Up to ${source.dailyLimit} a day`],
       };

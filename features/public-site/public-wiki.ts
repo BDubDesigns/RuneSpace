@@ -527,11 +527,11 @@ const authoredWikiArticles = [
         heading: "Last Leg Trading's terminal on Stillreach",
         paragraphs: [
           [
-            "At Stillreach Landing Station, Last Leg Trading runs an automated fuel terminal (see ",
+            "At Stillreach Landing Station, Last Leg Trading runs an unmanned automated fuel terminal, listed among the station's places (see ",
             { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
             "). It is the same business as Toll's counter, with the same prices, the same Thrust Issues requirement for both buying and selling, and the same daily limits: canisters you buy at either place count toward one shared allowance of 5 Full and 5 Empty a day, so buying at one leaves less for the other.",
           ],
-          "You have to be standing at the Landing Station to use it; it cannot be reached from anywhere else on Stillreach, from Skatboll, or while you are in flight.",
+          "Step into it from the Landing Station; anyone can, and until your Thrust Issues report is in it shows Access restricted. It cannot be used from anywhere else on Stillreach, from Skatboll, or while you are in flight, and there is nobody to talk to there.",
         ],
       },
     ],

@@ -13,6 +13,7 @@ import {
   clampChartLabelX,
   FLIGHT_CHART_VIEWBOX,
   flightChartGeometry,
+  chartPlanetLabelReach,
   INTERPLANETARY_CHART_PLANETS,
   interplanetaryChartGeometry,
   pointOnFlightChart,
@@ -30,7 +31,8 @@ import {
   type FlightCinematic as FlightCinematicContent,
   type FlightCinematicBackdrop,
 } from "@/game/content/flight-cinematics";
-import { PLANET_DISPLAY_NAMES } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
+import { PlanetBody } from "@/features/ship/PlanetBody";
 import type { PlanetId } from "@/game/config/foundations";
 
 type Flight = {
@@ -327,7 +329,7 @@ function FlightChart({
       <svg
         aria-label={
           chart.kind === "interplanetary"
-            ? `${content.chartTitle}: ${originName}, ${PLANET_DISPLAY_NAMES[chart.originPlanetId]}, to ${destinationName}, ${PLANET_DISPLAY_NAMES[chart.destinationPlanetId]}, ${percent}% of the way.`
+            ? `${content.chartTitle}: ${originName}, ${getPlanetPresentation(chart.originPlanetId).displayName}, to ${destinationName}, ${getPlanetPresentation(chart.destinationPlanetId).displayName}, ${percent}% of the way.`
             : `${content.chartTitle}: ${originName} to ${destinationName}, ${percent}% of the way.`
         }
         className="h-full w-full"
@@ -396,29 +398,25 @@ function FlightChart({
 }
 
 /**
- * One world on the interplanetary chart (#375): a plain native-SVG disc, the
- * planet's name above it and the landing station the leg uses below it. The
- * disc is a chart symbol, not a portrait of the planet.
+ * One world on the interplanetary chart (#375): the planet drawn from its
+ * authored presentation (`PlanetBody`), its name above and the landing station
+ * the leg uses below, both clear of its ring or halo, with the station marked on
+ * the body.
  */
 function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationName: string }) {
   const { center, radius } = INTERPLANETARY_CHART_PLANETS[planetId];
-  const name = PLANET_DISPLAY_NAMES[planetId].toUpperCase();
+  const labelReach = chartPlanetLabelReach();
+  const name = getPlanetPresentation(planetId).displayName.toUpperCase();
   const station = stationName.toUpperCase();
   return (
     <g data-flight-chart-planet={planetId} data-flight-chart-place={stationName}>
-      <circle
-        className="rs-flight-chart__planet"
-        cx={center.x}
-        cy={center.y}
-        data-planet={planetId}
-        r={radius}
-      />
-      <circle className="rs-flight-chart__place" cx={center.x} cy={center.y} r="6" />
+      <PlanetBody cx={center.x} cy={center.y} planetId={planetId} r={radius} />
+      <circle className="rs-flight-chart__place" cx={center.x} cy={center.y} r="4" />
       <text
         className="rs-flight-chart__label"
         textAnchor="middle"
         x={clampChartLabelX(center.x, name, 18)}
-        y={center.y - radius - 14}
+        y={center.y - labelReach - 12}
       >
         {name}
       </text>
@@ -426,7 +424,7 @@ function ChartPlanet({ planetId, stationName }: { planetId: PlanetId; stationNam
         className="rs-flight-chart__station"
         textAnchor="middle"
         x={clampChartLabelX(center.x, station, 13)}
-        y={center.y + radius + 26}
+        y={center.y + labelReach + 24}
       >
         {station}
       </text>

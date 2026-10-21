@@ -7,8 +7,9 @@ import { usePlay } from "@/features/play/PlayContext";
 import { useMerchantCounter } from "@/features/trade/useMerchantCounter";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getLocalPlace, LOCAL_PLACES } from "@/game/content/local-places";
-import { getLocation } from "@/game/content/locations";
-import { getLocationMerchant, isMerchantOpen } from "@/game/content/merchants";
+import { getLocation, LOCATIONS } from "@/game/content/locations";
+import { getMerchant, isMerchantOpen } from "@/game/content/merchants";
+import { merchantVenues } from "@/game/domain/merchant-venues";
 import { deriveAcceptedMissionIds, deriveCompletedMissionIds } from "@/game/domain/missions";
 import {
   merchantPurchasableItemIds,
@@ -17,46 +18,58 @@ import {
   merchantUnitPrice,
   type TradeDirection,
 } from "@/game/domain/trade";
+import type { MerchantDefinition } from "@/game/schemas/merchants";
 
 /**
  * Last Leg Trading's automated fuel terminal at Stillreach Landing Station (#375).
  *
- * A distinct front end for an existing counter, not a second shop. The merchant
- * is the World Location's own authored merchant, the same Last Leg Trading that
- * Toll fronts at Holo Hollow Landing, so its prices, its Thrust Issues unlock and
- * its per-character daily allowances are the ones the ledger already keys on that
- * merchant's ID: a canister bought here spends the allowance there, and the
+ * The activity of its own Local Place (`stillreach_fuel_terminal`), rendered only
+ * inside that place: the parent station shows the Ship panel and a directory
+ * entry, never this machine. A distinct front end for an existing counter, not a
+ * second shop: the place's merchant is the same Last Leg Trading that Toll fronts
+ * at Holo Hollow Landing, so its prices, its Thrust Issues unlock and its
+ * per-character daily allowances are the ones the ledger already keys on that
+ * merchant's ID. A canister bought here spends the allowance there, and the
  * reverse. Every figure is read from the authoritative projection and every
- * commit is the ordinary `tradeWithMerchantAction` through `useMerchantCounter`,
- * which the server re-quotes and re-validates against the character's real
- * position. This component decides nothing; its job is to look and read like a
- * practical industrial vending machine rather than a person behind a counter.
+ * commit is the ordinary `tradeWithMerchantAction` with this place's
+ * `localPlaceId`, which the server re-validates against the character's real
+ * position and the place's own access before quoting anything. This component
+ * decides nothing; its job is to look and read like a practical industrial
+ * vending machine rather than a person behind a counter.
  *
  * The skin is CSS and inline SVG only (`.rs-terminal` in app/globals.css): a
  * steel bezel, a dim screen, hardware-style keys. No generated illustration.
  * Reduced motion removes the screen's only animation (the status lamp's pulse).
  */
-export function LastLegTerminal() {
+export function LastLegTerminal({ localPlaceId }: { localPlaceId: string }) {
   const { state } = usePlay();
-  const locationId = state.location.currentLocationId;
-  const merchant = getLocationMerchant(locationId);
-  if (!merchant) return null;
+  const place = getLocalPlace(localPlaceId);
+  const merchant = place?.merchantId ? getMerchant(place.merchantId) : undefined;
+  if (!place || !merchant) return null;
   const open = isMerchantOpen(merchant, {
     acceptedMissionIds: deriveAcceptedMissionIds(state.missions),
     completedMissionIds: deriveCompletedMissionIds(state.missions),
   });
-  // The counter that shares this terminal's allowances, named from content.
-  const counter = LOCAL_PLACES.find((place) => place.merchantId === merchant.id);
-  const counterLocation = counter ? getLocation(counter.parentLocationId) : undefined;
-  const sharedWith =
-    counter && counterLocation
-      ? `${getLocalPlace(counter.id)?.displayName ?? counter.id} at ${counterLocation.displayName}`
-      : undefined;
+  // The business's other venues share this terminal's allowances; named from content.
+  const sharedWith = merchantVenues(merchant, { localPlaces: LOCAL_PLACES, locations: LOCATIONS })
+    .filter((venue) => venue.localPlaceId !== place.id)
+    .map((venue) =>
+      [
+        venue.localPlaceId ? getLocalPlace(venue.localPlaceId)?.displayName : undefined,
+        getLocation(venue.locationId)?.displayName,
+      ]
+        .filter(Boolean)
+        .join(" at "),
+    );
 
   return (
     <TerminalFrame online={open}>
       {open ? (
-        <TerminalCounter merchant={merchant} sharedWith={sharedWith} />
+        <TerminalCounter
+          localPlaceId={place.id}
+          merchant={merchant}
+          sharedWith={sharedWith.length > 0 ? sharedWith.join(" and ") : undefined}
+        />
       ) : (
         <div className="rs-terminal__screen" data-terminal-locked>
           <p className="rs-terminal__readout rs-terminal__readout--alert">ACCESS RESTRICTED</p>
@@ -78,18 +91,23 @@ function TerminalFrame({ online, children }: { online: boolean; children: React.
       data-last-leg-terminal
       data-terminal-state={online ? "online" : "locked"}
     >
+      {/* Two rows (#375 playtest): the maker's mark and the status lamp share the
+          top row at every width, so the status never wraps below the name; the
+          name and model line sit beneath them, free to wrap on a phone. */}
       <header className="rs-terminal__header">
-        <TerminalMark />
+        <div className="rs-terminal__header-top">
+          <TerminalMark />
+          <p className="rs-terminal__status" data-terminal-status role="status">
+            <span aria-hidden="true" className="rs-terminal__lamp" />
+            {online ? "Online" : "Access restricted"}
+          </p>
+        </div>
         <div className="min-w-0">
           <h2 className="rs-terminal__brand" id={headingId}>
             Last Leg Trading
           </h2>
           <p className="rs-terminal__model">Automated fuel terminal · Stillreach outlet</p>
         </div>
-        <p className="rs-terminal__status" data-terminal-status>
-          <span aria-hidden="true" className="rs-terminal__lamp" />
-          {online ? "Online" : "Locked"}
-        </p>
       </header>
       <div aria-hidden="true" className="rs-terminal__hazard" />
       {children}
@@ -123,10 +141,12 @@ const MODES: readonly { id: TradeDirection; label: string }[] = [
 ];
 
 function TerminalCounter({
+  localPlaceId,
   merchant,
   sharedWith,
 }: {
-  merchant: NonNullable<ReturnType<typeof getLocationMerchant>>;
+  localPlaceId: string;
+  merchant: MerchantDefinition;
   sharedWith: string | undefined;
 }) {
   const { state } = usePlay();
@@ -139,7 +159,7 @@ function TerminalCounter({
     feedback,
     ownedQuantity,
     purchasableMaximum,
-  } = useMerchantCounter({ merchant });
+  } = useMerchantCounter({ localPlaceId, merchant });
   const [requestedMode, setMode] = useState<TradeDirection>("buy");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const directions = merchantTradeDirections(merchant);

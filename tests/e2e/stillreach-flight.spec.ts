@@ -12,11 +12,13 @@ import {
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import {
   ITEM_IDS,
+  LOCAL_PLACE_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   REPAIR_TARGET_IDS,
   SHIP_ROUTE_IDS,
 } from "@/game/config/foundations";
+import { getLocalPlace } from "@/game/content/local-places";
 import { LOCAL_MAP_LOCATION_IDS_BY_PLANET } from "@/game/content/locations";
 import { expect, openMapSurface, openTestCharacter, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
@@ -43,6 +45,7 @@ const NOTICE = "[data-ship-arrival-notice]";
 const CINEMATIC = "[data-flight-cinematic]";
 const OVERLAY = 'img[data-scene-layer="overlay"]';
 const TERMINAL = "[data-last-leg-terminal]";
+const FUEL_TERMINAL = LOCAL_PLACE_IDS.stillreachFuelTerminal;
 
 async function seedPilot(
   characterId: string,
@@ -117,6 +120,41 @@ async function backdropSrc(page: Page) {
   return page.locator(`${CINEMATIC} img[data-scene-layer="background"]`).getAttribute("src");
 }
 
+/** Skatboll ringed on the left, Stillreach haloed on the right, in either direction. */
+async function expectPlanetIdentities(page: Page) {
+  const skatboll = page.locator('[data-flight-chart] [data-planet-body="skatboll"]');
+  const stillreach = page.locator('[data-flight-chart] [data-planet-body="stillreach"]');
+  await expect(skatboll.locator("[data-planet-ring]")).toHaveCount(2);
+  await expect(skatboll.locator("[data-planet-halo]")).toHaveCount(0);
+  await expect(stillreach.locator("[data-planet-halo]")).toHaveCount(1);
+  await expect(stillreach.locator("[data-planet-ring]")).toHaveCount(0);
+  const left = await skatboll.locator("[data-planet-surface]").boundingBox();
+  const right = await stillreach.locator("[data-planet-surface]").boundingBox();
+  expect(left!.x).toBeLessThan(right!.x);
+}
+
+/** Mark top-left and status top-right on one row, the name beneath both. */
+async function expectTerminalHeaderRow(page: Page) {
+  const terminal = page.locator(TERMINAL);
+  const frame = (await terminal.boundingBox())!;
+  const mark = (await terminal.locator(".rs-terminal__mark").boundingBox())!;
+  const status = (await terminal.locator("[data-terminal-status]").boundingBox())!;
+  const brand = (await terminal.locator(".rs-terminal__brand").boundingBox())!;
+  expect(Math.abs(mark.y + mark.height / 2 - (status.y + status.height / 2))).toBeLessThan(8);
+  expect(mark.x - frame.x).toBeLessThan(40);
+  expect(frame.x + frame.width - (status.x + status.width)).toBeLessThan(40);
+  expect(brand.y).toBeGreaterThanOrEqual(
+    Math.max(mark.y + mark.height, status.y + status.height) - 1,
+  );
+  expect(status.height).toBeLessThan(40);
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+}
+
 async function markerX(page: Page) {
   return page
     .locator("[data-flight-chart-marker]")
@@ -171,6 +209,7 @@ test("flies Holo Hollow Landing to Stillreach: warning, takeoff, interplanetary 
   await expect(chart).toContainText("STILLREACH LANDING STATION");
   await expect(chart).toContainText("SKATBOLL TO STILLREACH");
   await expect(chart).not.toContainText("CRASH SITE");
+  await expectPlanetIdentities(page);
   expect(await markerX(page)).toBeLessThan(300);
   await captureReviewScreenshot(page, "stillreach-flight-chart-outbound-mobile.png");
 
@@ -223,7 +262,9 @@ test("flies Holo Hollow Landing to Stillreach: warning, takeoff, interplanetary 
   await expect(page.locator("[data-location-description]")).toContainText(
     "Your Rivet Utility Shuttle stands in the middle of the ring",
   );
-  await expect(page.locator(TERMINAL)).toHaveAttribute("data-terminal-state", "online");
+  // The station shows the ship and a compact directory entry, never the machine.
+  await expect(page.locator(TERMINAL)).toHaveCount(0);
+  await expect(page.locator(`[data-local-place="${FUEL_TERMINAL}"]`)).toBeVisible();
   await captureReviewScreenshot(page, "stillreach-landing-berthed-mobile.png");
   expect((await shipRow(characterId)).berthLocationId).toBe(LOCATION_IDS.stillreachLandingStation);
 
@@ -279,11 +320,15 @@ test("flies home from Stillreach: Stillreach takeoff, the chart right to left, H
   await page.reload();
   await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "travel");
   await expect(page.locator("[data-flight-chart]")).toContainText("STILLREACH TO SKATBOLL");
+  await expectPlanetIdentities(page);
   await expect.poll(() => markerX(page)).toBeGreaterThan(300);
+  await captureReviewScreenshot(page, "stillreach-flight-chart-home-desktop.png");
 
-  // Reduced motion: a static chart, the countdown carries the flight.
+  // Reduced motion: a static chart, the countdown carries the flight. The worlds
+  // are static art and keep their identities.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("[data-flight-chart-marker]")).toHaveCount(0);
+  await expectPlanetIdentities(page);
   await expect(page.locator("[data-flight-progress]")).toContainText(/seconds? remaining/);
   await page.emulateMedia({ reducedMotion: "no-preference" });
 
@@ -310,7 +355,7 @@ test("flies home from Stillreach: Stillreach takeoff, the chart right to left, H
   );
 });
 
-test("Last Leg Trading's terminal: locked until Thrust Issues is turned in, then the shared counter", async ({
+test("Last Leg Trading's terminal is its own Local Place: directory, entry, Back, reload and the locked screen", async ({
   page,
   testCharacter,
 }) => {
@@ -324,13 +369,53 @@ test("Last Leg Trading's terminal: locked until Thrust Issues is turned in, then
     thrustReported: false,
   });
   await openTestCharacter(page, characterId);
+  const place = getLocalPlace(FUEL_TERMINAL)!;
 
+  // The station: the Ship panel and a compact directory entry, no machine.
+  const entry = page.locator(`[data-local-place="${FUEL_TERMINAL}"]`);
+  await expect(entry).toContainText("Last Leg Trading — Automated Fuel Terminal");
+  await expect(entry.locator("[data-local-place-enter]")).toBeVisible();
+  await expect(page.locator(TERMINAL)).toHaveCount(0);
+  // Boarding shows ship controls, never a terminal beside them.
+  await page.locator(SHIP).locator(BOARD).click();
+  await expect(page.locator("[data-ship-flight-controls]")).toBeVisible();
+  await expect(page.locator(TERMINAL)).toHaveCount(0);
+
+  // Enter: the place's own scene, the terminal alone, and no Ship panel.
+  await entry.locator("[data-local-place-enter]").click();
+  await expect(page).toHaveURL(new RegExp(`[?&]place=${FUEL_TERMINAL}`));
+  await expect(page.locator(`[data-local-place-surface="${FUEL_TERMINAL}"]`)).toBeVisible();
+  const background = page.getByTestId("location-scene").locator('[data-scene-layer="background"]');
+  await expect(background).toHaveAttribute("alt", place.presentation.scene.alt);
+  await expect(background).toHaveAttribute("src", /stillreach-fuel-terminal/);
+  await expect(page.locator(SHIP)).toHaveCount(0);
   const terminal = page.locator(TERMINAL);
   await expect(terminal).toHaveAttribute("data-terminal-state", "locked");
+  await expect(terminal.locator("[data-terminal-status]")).toHaveText("Access restricted");
   await expect(terminal.locator("[data-terminal-locked]")).toContainText(
     "Trading unlocks after you report the completed Thrust Issues repair to Wade",
   );
   await expect(terminal.locator("[data-terminal-commit]")).toHaveCount(0);
+  // An unmanned outlet: nobody to talk to, and no NPC Trade row.
+  await expect(page.locator("[data-npc-interaction]")).toHaveCount(0);
+  await expectTerminalHeaderRow(page);
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "stillreach-terminal-locked-mobile.png");
+
+  // Reload keeps the place; browser Back returns to the station and its ship.
+  await page.reload();
+  await expect(page.locator(`[data-local-place-surface="${FUEL_TERMINAL}"]`)).toBeVisible();
+  await page.goBack();
+  await expect(page).not.toHaveURL(/[?&]place=/);
+  await expect(page.locator(SHIP).locator(BOARD)).toBeVisible();
+  await expect(page.locator(TERMINAL)).toHaveCount(0);
+
+  // A stale or foreign place parameter falls back to the station, never a terminal.
+  for (const stale of ["no_such_place", LOCAL_PLACE_IDS.lastLegTrading]) {
+    await page.goto(`/play/${characterId}?place=${stale}`);
+    await expect(page.locator(SHIP).locator(BOARD)).toBeVisible();
+    await expect(page.locator(TERMINAL)).toHaveCount(0);
+  }
 
   await db
     .update(characterMissions)
@@ -341,9 +426,12 @@ test("Last Leg Trading's terminal: locked until Thrust Issues is turned in, then
         eq(characterMissions.missionId, MISSION_IDS.thrustIssues),
       ),
     );
-  await page.reload();
+  // A deep link opens the place directly.
+  await page.goto(`/play/${characterId}?place=${FUEL_TERMINAL}`);
   await expect(terminal).toHaveAttribute("data-terminal-state", "online");
+  await expect(terminal.locator("[data-terminal-status]")).toHaveText("Online");
   await expect(terminal.locator("[data-terminal-credits]")).toContainText("1000");
+  await expectTerminalHeaderRow(page);
 
   const full = terminal.locator(`[data-terminal-row="${ITEM_IDS.fullSmallFuelCanister}"]`);
   await expect(full.locator("[data-terminal-unit-price]")).toHaveText("225 CR");
@@ -367,6 +455,11 @@ test("Last Leg Trading's terminal: locked until Thrust Issues is turned in, then
     "Last Leg Trading at Holo Hollow Landing",
   );
   await captureReviewScreenshot(page, "stillreach-terminal-mobile.png");
+  await page.setViewportSize(DESKTOP);
+  await expectTerminalHeaderRow(page);
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "stillreach-terminal-desktop.png");
+  await page.setViewportSize(PHONE);
 
   // The allowance is Last Leg Trading's: one ledger row for the business.
   const ledger = await db

@@ -1275,24 +1275,8 @@ body {
   transition: transform 250ms linear;
 }
 
-/* The interplanetary chart's two worlds (#375): chart symbols, faintly tinted
-   after each world's approved scenery (Skatboll's overcast stone, Stillreach's
-   violet aurora), never planet illustrations. */
-.rs-flight-chart__planet {
-  fill: var(--rs-surface-panel);
-  stroke: var(--rs-border-structural);
-  stroke-width: 2;
-}
-
-.rs-flight-chart__planet[data-planet="skatboll"] {
-  fill: rgb(120 128 136 / 0.32);
-}
-
-.rs-flight-chart__planet[data-planet="stillreach"] {
-  fill: rgb(196 140 255 / 0.22);
-  stroke: rgb(196 140 255 / 0.55);
-}
-
+/* The interplanetary chart's worlds are drawn from their authored presentation
+   (game/content/planets, features/ship/PlanetBody): no per-planet CSS here. */
 .rs-flight-chart__station {
   fill: var(--rs-text-secondary);
   font-family: var(--rs-font-display);
@@ -1612,11 +1596,17 @@ body {
 }
 
 .rs-terminal__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
+  display: grid;
+  gap: 0.5rem;
   padding: 0 0.5rem;
+}
+
+/* Mark top-left, status top-right, always on one row. */
+.rs-terminal__header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .rs-terminal__mark {
@@ -1655,8 +1645,8 @@ body {
 }
 
 .rs-terminal__status {
-  margin-left: auto;
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 0.4rem;
   flex-shrink: 0;

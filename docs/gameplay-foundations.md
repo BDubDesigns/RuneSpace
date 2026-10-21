@@ -820,18 +820,32 @@ text, and the berth already moved with each landing).
 
 ### Last Leg Trading's Stillreach terminal (issue #375)
 
-Stillreach Landing Station hosts **the same merchant** as Toll's counter:
-`merchantId: last_leg_trading` on the World Location itself, the venue pattern
-Wade's yard already uses (#190). Prices, the completed-Thrust-Issues gate
-(both directions) and the per-character Pacific-day ledger are therefore the
-existing ones, and because the ledger keys on the merchant ID, Full and Empty
-canister purchases at either venue spend one shared allowance. `tradeWithMerchant`
-resolves it from the character's authoritative position with no `localPlaceId`,
-so it is refused from any other location and in flight. Nobody stands at the
-station to front the merchant, so `NpcInteractionPanel` presents no Trade there;
-the station's activity (`LocationActivity`) renders `features/trade/LastLegTerminal`,
-a distinct CSS/SVG vending-terminal front end over `useMerchantCounter`, the hook
-`TradePanel` now also uses. No stock, rotation, extra catalog or second allowance.
+The terminal is its own Local Place, `stillreach_fuel_terminal` ("Last Leg Trading
+— Automated Fuel Terminal"), inside Stillreach Landing Station: a second physical
+venue of **the same merchant** as Toll's counter (`merchantId: last_leg_trading`
+on both places). Prices, the completed-Thrust-Issues gate (both directions) and the
+per-character Pacific-day ledger are therefore the existing ones, and because the
+ledger keys on the merchant ID, Full and Empty canister purchases at either venue
+spend one shared allowance.
+
+- **Place, not location.** The station World Location hosts no merchant, so a
+  world-level trade there (no `localPlaceId`) finds none. The terminal sends its
+  own `localPlaceId`, which `tradeWithMerchant` honours only when the character's
+  authoritative location is its parent; from anywhere else, including Skatboll,
+  it is `unknown_place`, and in flight every trade is refused.
+- **Navigation.** The place is `access: open`, so anyone at the station can step in
+  through the ordinary `?place=` route and see the locked screen; the merchant's
+  unlock gates buying and selling. Entering moves nothing and is not travel.
+- **Presentation.** At the station, `LocationActivity` shows the Ship panel and the
+  directory shows the place; inside, the place's activity is
+  `features/trade/LastLegTerminal`, a distinct CSS/SVG vending-terminal front end
+  over `useMerchantCounter` (the hook `TradePanel` also uses), and no Ship panel.
+  Nobody stands there, so `NpcInteractionPanel` presents no person or Trade row.
+- **Sources.** Item Sources lists each venue of a merchant (`merchantVenues`,
+  `docs/architecture.md`), so canisters show Toll's counter and the terminal, the
+  terminal credited to no one.
+
+No stock, rotation, extra catalog, second allowance or migration.
 
 ### The Crash Site's two scenes (issue #330)
 

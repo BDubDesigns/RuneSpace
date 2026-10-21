@@ -14,13 +14,15 @@ import {
   SHIP_ROUTE_IDS,
 } from "@/game/config/foundations";
 import { getFlightCinematic } from "@/game/content/flight-cinematics";
-import { getLocalPlace } from "@/game/content/local-places";
+import { getLocalPlace, getLocalPlacesForLocation } from "@/game/content/local-places";
 import {
   getLocation,
+  LOCAL_MAP_LOCATION_IDS_BY_PLANET,
   REPAIRED_RIVET_OVERLAY,
   STILLREACH_LANDING_STATION_SHIP_BERTHED_VARIANT_ID,
 } from "@/game/content/locations";
-import { getLocationMerchant } from "@/game/content/merchants";
+import { getLocationMerchant, getMerchant } from "@/game/content/merchants";
+import { getResidentNpcs } from "@/game/content/npcs";
 import { getShipRoute, shipRoutesFrom } from "@/game/content/ship-routes";
 import { NO_LOCATION_STATE_FACTS, resolveLocationState } from "@/game/domain/location-state";
 import {
@@ -316,33 +318,54 @@ describe("the interplanetary cinematic", () => {
 });
 
 describe("Last Leg Trading's Stillreach terminal", () => {
-  it("is the same Last Leg Trading merchant Toll fronts, hosted by the Landing Station", () => {
-    const terminal = getLocationMerchant(LOCATION_IDS.stillreachLandingStation)!;
+  const terminal = () => getLocalPlace(LOCAL_PLACE_IDS.stillreachFuelTerminal)!;
+
+  it("is its own open Local Place at the Landing Station, distinct from Toll's counter", () => {
+    expect(terminal().parentLocationId).toBe(LOCATION_IDS.stillreachLandingStation);
+    expect(terminal().id).not.toBe(LOCAL_PLACE_IDS.lastLegTrading);
+    expect(terminal().access).toEqual({ kind: "open" });
+    expect(getLocalPlacesForLocation(LOCATION_IDS.stillreachLandingStation)).toEqual([terminal()]);
+    expect(terminal().presentation.scene).toMatchObject({
+      asset: "/location-scenes/stillreach-fuel-terminal.webp",
+      width: 1536,
+      height: 384,
+    });
+    expect(readImageHeader("public/location-scenes/stillreach-fuel-terminal.webp")).toMatchObject({
+      width: 1536,
+      height: 384,
+      container: "VP8 ",
+    });
+    expect(
+      readImageHeader("assets/location-scenes/stillreach-fuel-terminal-master.png"),
+    ).toMatchObject({ width: 2048, height: 512, container: "png" });
+  });
+
+  it("binds the same Last Leg Trading merchant Toll fronts, with nobody standing there", () => {
     const counter = getLocalPlace(LOCAL_PLACE_IDS.lastLegTrading)!;
-    expect(terminal.id).toBe(MERCHANT_IDS.lastLegTrading);
-    expect(counter.merchantId).toBe(terminal.id);
-    expect(terminal.requiredCompletedMissionId).toBe(MISSION_IDS.thrustIssues);
+    expect(terminal().merchantId).toBe(MERCHANT_IDS.lastLegTrading);
+    expect(counter.merchantId).toBe(terminal().merchantId);
+    expect(getMerchant(MERCHANT_IDS.lastLegTrading)!.requiredCompletedMissionId).toBe(
+      MISSION_IDS.thrustIssues,
+    );
+    expect(
+      getResidentNpcs({
+        locationId: LOCATION_IDS.stillreachLandingStation,
+        localPlaceId: LOCAL_PLACE_IDS.stillreachFuelTerminal,
+        completedMissionIds: new Set(Object.values(MISSION_IDS)),
+      }),
+    ).toEqual([]);
   });
 
   it("carries exactly the locked first-pass catalog and daily limits", () => {
-    const terminal = getLocationMerchant(LOCATION_IDS.stillreachLandingStation)!;
-    expect(terminal.prices).toEqual([
+    expect(getMerchant(terminal().merchantId!)!.prices).toEqual([
       { itemId: ITEM_IDS.fullSmallFuelCanister, buyPrice: 160, sellPrice: 225, dailySellLimit: 5 },
       { itemId: ITEM_IDS.emptySmallFuelCanister, buyPrice: 25, sellPrice: 40, dailySellLimit: 5 },
       { itemId: ITEM_IDS.oilShale, buyPrice: 6 },
     ]);
   });
 
-  it("puts no merchant anywhere else on Stillreach", () => {
-    for (const id of [
-      LOCATION_IDS.windwardTrack,
-      LOCATION_IDS.hilltopWorkshop,
-      LOCATION_IDS.prospectingQuarry,
-      LOCATION_IDS.theLowHum,
-      LOCATION_IDS.theSurveyLine,
-      LOCATION_IDS.theDrySeam,
-      LOCATION_IDS.harmonicWorkings,
-    ]) {
+  it("puts no merchant on any Stillreach World Location itself", () => {
+    for (const id of LOCAL_MAP_LOCATION_IDS_BY_PLANET.stillreach) {
       expect(getLocationMerchant(id)).toBeUndefined();
     }
   });

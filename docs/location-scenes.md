@@ -359,20 +359,41 @@ approved pixels. The composites themselves are review references only and are no
 - **Cinematic art.** The new approved empty 15:8 scene (1717×916, master
   `assets/location-scenes/stillreach-landing-station-cinematic-master.png`, SHA-256
   `7cee91fe78f9…`) is encoded at its native size, q80, by
-  `scripts/prepare-stillreach-cinematic-art.mjs`, which refuses any other file. It is not a
+  `scripts/prepare-stillreach-slice-b-art.mjs`, which refuses any other file. It is not a
   crop of the 4:1 panorama.
 - **Both directions.** Holo Hollow Landing → Stillreach takes off from Holo Hollow Landing's
   existing approved 15:8 pad backdrop (`holo-hollow-landing-arrival.webp`, same mark as the
   first flight's touchdown) and touches down on the Stillreach scene; the return takes off
   from the Stillreach scene and touches down on the same Holo Hollow pad. The Crash Site is
   never an interplanetary backdrop, and no new Skatboll art was needed.
-- **Chart.** `chart: { kind: "interplanetary" }` draws two native-SVG world discs (Skatboll
-  always left, Stillreach always right), each labelled with its landing station, and the same
-  bowed route and Rivet marker as the local chart (`interplanetaryChartGeometry`). Outbound
-  the marker crosses left to right, home right to left. It states no distance or scale.
+- **Chart.** `chart: { kind: "interplanetary" }` draws the two worlds (Skatboll always left,
+  Stillreach always right), each labelled with its landing station, and the same bowed route
+  and Rivet marker as the local chart (`interplanetaryChartGeometry`). Outbound the marker
+  crosses left to right, home right to left. It states no distance or scale.
+- **Planet appearances.** Each world is drawn by the generic native-SVG `PlanetBody`
+  (`features/ship/PlanetBody.tsx`) from its typed presentation in `game/content/planets.ts`:
+  a palette (surface, shadow, highlight, rim) lit from one off-centre light, optional faint
+  bands, an optional tilted ring (far half behind the body, near half in front) and an
+  optional atmospheric halo. Skatboll is slate blue and steel grey with banding, a thin ring
+  and a cold rim; Stillreach is deep violet with teal accents and a soft aurora halo, no
+  ring. No per-planet CSS or ID branches: a new world is a new entry. The route ends and
+  labels keep clear of each world's ring or halo (`chartPlanetReach`), with labels aligned
+  across the chart. Static art, so reduced motion changes nothing about them.
 - **Timing.** The same `flightCinematicFrame`: 2.5 s takeoff and 3 s touchdown inside the
   recorded 260 s, so the chart holds the other 254.5 s. Resume, reduced motion, minimize,
   arrival-pending and no-replay-after-landing behave exactly as for the first flight.
+
+### Last Leg Trading's fuel terminal Local Place (issue #375)
+
+`stillreach_fuel_terminal` is a 4:1 Local Place scene like Holo Hollow's: the owner-approved
+2048×512 PNG (SHA-256 `654577e0220e…`, kept unaltered as
+`assets/location-scenes/stillreach-fuel-terminal-master.png`) downsampled whole to
+`stillreach-fuel-terminal.webp`, 1536×384 lossy q80, by
+`scripts/prepare-stillreach-slice-b-art.mjs`, as Slice A treated its 2048×512 panorama. It
+shows the unmanned trading post at the edge of the landing ground under the same twilight
+aurora, with the vending terminal and a canister rack at its centre; focal (50, 55) keeps
+both in the 390 px header strip and the directory card. No person, ship or game UI is baked
+in. Its alt text describes a terminal service, not an NPC or another World Location.
 
 ## Transit truthfulness
 

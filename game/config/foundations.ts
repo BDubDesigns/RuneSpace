@@ -583,6 +583,9 @@ export const LOCAL_PLACE_IDS = {
   holoHollowCrewStop: asContentId("holo_hollow_crew_stop"),
   // Holo Hollow Landing's first Local Place (#357).
   lastLegTrading: asContentId("last_leg_trading"),
+  // Last Leg Trading's unmanned fuel terminal at Stillreach Landing Station
+  // (#375): a second physical venue of the same merchant, so its own place ID.
+  stillreachFuelTerminal: asContentId("stillreach_fuel_terminal"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */

@@ -471,7 +471,12 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
           trade.tradeWithMerchant(
             userId,
             characterId,
-            { itemId: FULL, direction: "buy", quantity: 1 },
+            {
+              localPlaceId: LOCAL_PLACE_IDS.stillreachFuelTerminal,
+              itemId: FULL,
+              direction: "buy",
+              quantity: 1,
+            },
             after(now, 61_000),
           ),
         ),
@@ -491,6 +496,20 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
 
   describe("Last Leg Trading's Stillreach terminal", () => {
     const atTerminal = (
+      who: { userId: string; characterId: string },
+      direction: "buy" | "sell",
+      itemId: string,
+      quantity: number,
+      at = now,
+    ) =>
+      trade.tradeWithMerchant(
+        who.userId,
+        who.characterId,
+        { localPlaceId: LOCAL_PLACE_IDS.stillreachFuelTerminal, itemId, direction, quantity },
+        at,
+      );
+    /** A trade with no place context: what a forged world-level request sends. */
+    const atWorldLevel = (
       who: { userId: string; characterId: string },
       direction: "buy" | "sell",
       itemId: string,
@@ -629,24 +648,44 @@ suite("issue #375 Stillreach flight and terminal (real PostgreSQL)", () => {
       ]);
     });
 
-    it("is not reachable from the Landing Station's neighbours or from Skatboll without the counter", async () => {
+    it("trades only through the terminal's own place, never at world level or from elsewhere", async () => {
+      // At the station itself, without the place context, there is no merchant:
+      // the station hosts none, so a forged world-level request finds nothing.
+      const atStation = await stillreachTrader({ credits: 1000 });
+      expect((await atWorldLevel(atStation, "buy", FULL, 1)).trade).toMatchObject({
+        status: "refused",
+        reason: "no_merchant",
+      });
+      // Toll's counter's place ID is not honoured from Stillreach.
+      expect((await atCounter(atStation, "buy", FULL, 1)).trade).toMatchObject({
+        status: "refused",
+        reason: "unknown_place",
+      });
+      expect(await carried(atStation.characterId, FULL)).toBe(0);
+
+      // The terminal's place ID is not honoured from a neighbour or from Skatboll.
       const who = await makePilot({
         berth: LOCATION_IDS.stillreachLandingStation,
         location: LOCATION_IDS.windwardTrack,
       });
       expect((await atTerminal(who, "buy", FULL, 1)).trade).toMatchObject({
         status: "refused",
-        reason: "no_merchant",
+        reason: "unknown_place",
       });
-      // At Holo Hollow Landing itself (not in the shop) there is no location merchant.
       await db
         .update(rune.characters)
         .set({ currentLocationId: LOCATION_IDS.holoHollowLanding })
         .where(eq(rune.characters.id, who.characterId));
       expect((await atTerminal(who, "buy", FULL, 1)).trade).toMatchObject({
         status: "refused",
-        reason: "no_merchant",
+        reason: "unknown_place",
       });
+      expect(await carried(who.characterId, FULL)).toBe(0);
+      const ledger = await db
+        .select()
+        .from(rune.characterMerchantDailyPurchases)
+        .where(eq(rune.characterMerchantDailyPurchases.characterId, who.characterId));
+      expect(ledger).toEqual([]);
     });
   });
 });

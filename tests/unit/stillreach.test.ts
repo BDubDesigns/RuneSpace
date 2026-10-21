@@ -420,15 +420,15 @@ describe("Stillreach is scenery-only (#373)", () => {
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();
+      // Last Leg Trading's terminal is a Local Place, never a location merchant (#375).
+      expect(location.merchantId).toBeUndefined();
       if (location.id === LOCATION_IDS.stillreachLandingStation) {
-        // Last Leg Trading's terminal and the berthed-ship scene (#375).
-        expect(location.merchantId).toBe("last_leg_trading");
+        // The berthed-ship scene (#375).
         expect(location.stateVariants.map((variant) => variant.requires)).toEqual([
           { shipBerth: "here" },
         ]);
         continue;
       }
-      expect(location.merchantId).toBeUndefined();
       expect(location.stateVariants).toEqual([]);
       expect(location.travelable).toBe(true);
       expect(location.presentation.localPlacesEyebrow).toBeUndefined();

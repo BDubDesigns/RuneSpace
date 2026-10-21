@@ -141,6 +141,33 @@ const localPlaceDefinitions = [
       },
     },
   },
+  {
+    // Last Leg Trading's unmanned outlet at Stillreach Landing Station (#375).
+    // A second physical venue of the SAME merchant as Toll's counter: one set of
+    // prices, one Thrust Issues unlock and one shared daily allowance, keyed on
+    // the merchant ID. Nobody stands here, so no resident fronts it; the place's
+    // activity presents the counter as a machine (features/trade/LastLegTerminal).
+    // Open to walk into from the start, so the locked screen is visible; the
+    // merchant's own unlock gates buying and selling, on every server command.
+    id: LOCAL_PLACE_IDS.stillreachFuelTerminal,
+    parentLocationId: LOCATION_IDS.stillreachLandingStation,
+    displayName: "Last Leg Trading — Automated Fuel Terminal",
+    description:
+      "An unmanned Last Leg Trading outlet at the edge of the landing ring: a fuel vending terminal and a lit rack of canisters under a canvas awning, crates and tanks stacked along its weathered walls.",
+    access: { kind: "open" as const },
+    merchantId: MERCHANT_IDS.lastLegTrading,
+    presentation: {
+      scene: {
+        // The owner-approved 2048x512 master downsampled to the 1536x384 Local
+        // Place production size (scripts/prepare-stillreach-slice-b-art.mjs).
+        asset: "/location-scenes/stillreach-fuel-terminal.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A weathered prefab trading post under a lit Last Leg Trading sign at twilight, an automated fuel vending terminal and a glass-fronted rack of fuel canisters at its centre, crates and tanks along its walls, aurora and a pale moon over the highlands behind",
+        focal: { x: 50, y: 55 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocalPlaceDefinition[];
 
 export const LOCAL_PLACES: readonly LocalPlaceDefinition[] = localPlaceDefinitions.map((place) =>

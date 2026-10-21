@@ -66,6 +66,10 @@ export function LocationActivity({
     switch (activePlace.id) {
       case LOCAL_PLACE_IDS.holoHollowCrewStop:
         return <CrewStopPanel />;
+      case LOCAL_PLACE_IDS.stillreachFuelTerminal:
+        // Last Leg Trading's unmanned outlet (#375): the place's merchant,
+        // presented as a machine because nobody stands here to front it.
+        return <LastLegTerminal localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.hhBnb:
         return (
           <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />
@@ -122,10 +126,6 @@ function primaryActivity(
       return <RefiningConsole />;
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
-    case LOCATION_IDS.stillreachLandingStation:
-      // Last Leg Trading's automated terminal (#375): the station's own merchant,
-      // presented as a machine because nobody stands here to front it.
-      return <LastLegTerminal />;
     case LOCATION_IDS.ruskRecovery:
       // Wade's Welding Workshop — one bench, one component, following the
       // authoritative Workbench occupancy (#207) — and, once Tansy opens it,

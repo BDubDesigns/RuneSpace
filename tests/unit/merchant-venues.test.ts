@@ -67,7 +67,11 @@ describe("merchant venues", () => {
         npcId: NPC_IDS.tollKade,
       },
       // Nobody stands at the terminal, so no NPC is credited there.
-      { locationId: LOCATION_IDS.stillreachLandingStation },
+      {
+        locationId: LOCATION_IDS.stillreachLandingStation,
+        localPlaceId: LOCAL_PLACE_IDS.stillreachFuelTerminal,
+        place: LOCAL_PLACES.find((place) => place.id === LOCAL_PLACE_IDS.stillreachFuelTerminal),
+      },
     ]);
   });
 
@@ -114,12 +118,12 @@ describe.each([
     });
     expect(sources[1]).toMatchObject({
       locationId: LOCATION_IDS.stillreachLandingStation,
+      localPlaceId: LOCAL_PLACE_IDS.stillreachFuelTerminal,
       unitPrice: price,
       dailyLimit: 5,
     });
     // No second economy and no NPC at the terminal.
     expect(sources[1]).not.toHaveProperty("npcId");
-    expect(sources[1]).not.toHaveProperty("localPlaceId");
   });
 
   it("shows neither venue to a character who has not turned in Thrust Issues", () => {
@@ -153,7 +157,9 @@ describe.each([
     expect(described[0]!.where).toBe(
       "Tolliver “Toll” Kade — Last Leg Trading, Holo Hollow Landing",
     );
-    expect(described[1]!.where).toBe("Automated terminal — Stillreach Landing Station");
+    expect(described[1]!.where).toBe(
+      "Last Leg Trading — Automated Fuel Terminal, Stillreach Landing Station",
+    );
     for (const entry of described) {
       expect(entry).toMatchObject({ price, notes: ["Up to 5 a day"] });
     }
@@ -166,8 +172,10 @@ describe.each([
       )
       .join("\n");
     expect(text).toContain("Tolliver “Toll” Kade — Last Leg Trading, Holo Hollow Landing");
-    expect(text).toContain("the automated terminal — Stillreach Landing Station");
-    expect(text).toContain(`for ${price} Credits each, up to 5 a day per character`);
+    expect(text).toContain(
+      `Buy at Last Leg Trading — Automated Fuel Terminal, Stillreach Landing Station for ${price} Credits each, up to 5 a day per character`,
+    );
+    expect(text).toContain(`— for ${price} Credits each, up to 5 a day per character`);
   });
 });
 

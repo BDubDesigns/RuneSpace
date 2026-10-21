@@ -46,8 +46,9 @@ import {
  *   there (#358); only then does its scene carry the ship overlay.
  * - Stillreach (#373): a second planet with its own eight-location local map; each
  *   location belongs to one planet, and a walking edge never joins two. The Rivet
- *   reaches it by flight (#375) and berths at Stillreach Landing Station, which
- *   hosts Last Leg Trading's automated terminal; the rest is scenery-only.
+ *   reaches it by flight (#375) and berths at Stillreach Landing Station, whose
+ *   one Local Place is Last Leg Trading's automated terminal; the rest is
+ *   scenery-only.
  */
 /**
  * The Crash Site state variant that shows the repaired ship (#330). Named once so
@@ -595,7 +596,8 @@ const locationDefinitions = [
   // planet. The seven walking edges below are the whole graph; none is inferred
   // from axial adjacency. Slice B (#375) reaches the planet by the Rivet's own
   // interplanetary flight to the Landing Station, which also hosts the ship's
-  // berth and Last Leg Trading's terminal; the other seven stay scenery-only. A
+  // berth and, as a Local Place, Last Leg Trading's terminal; the other seven
+  // stay scenery-only. A
   // starter region name is not yet approved, so these locations author none.
   {
     id: LOCATION_IDS.stillreachLandingStation,
@@ -605,11 +607,9 @@ const locationDefinitions = [
       "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge, where a Last Leg Trading fuel terminal serves pilots.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack],
     availableActionIds: [],
-    // Last Leg Trading's automated terminal (#375): the same business as the
-    // Holo Hollow Landing counter, so the same merchant, prices, unlock and
-    // shared daily allowances. Nobody stands here to front it; the station's
-    // activity presents it as a terminal (features/trade/LastLegTerminal).
-    merchantId: MERCHANT_IDS.lastLegTrading,
+    // The station hosts no merchant itself: Last Leg Trading's terminal is its
+    // own Local Place (#375, game/content/local-places), so trading there always
+    // carries that place's validated context.
     // The ring is empty for everyone until their own Rivet lands in it (#375).
     // Read from the ship's berth, so walking here never puts a ship in the ring
     // and walking away never takes it out.
@@ -630,6 +630,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "stillreach_landing_station" as const,
       layout: "stillreach_landing_station" as const,
+      localPlacesEyebrow: "Around the station",
       localMap: { axial: { q: 0, r: 0 }, label: "Landing Station" },
       scene: {
         ...STILLREACH_LANDING_STATION_SCENE,
@@ -826,12 +827,6 @@ export function isActionAvailableAtLocation(locationId: string, actionId: string
 export function areLocationsAdjacent(originId: string, destinationId: string): boolean {
   return getLocation(originId)?.adjacentLocationIds.includes(destinationId as never) ?? false;
 }
-
-/** Each planet's player-facing name, for the interplanetary flight chart (#375). */
-export const PLANET_DISPLAY_NAMES: Readonly<Record<PlanetId, string>> = {
-  [PLANET_IDS.skatboll]: "Skatboll",
-  [PLANET_IDS.stillreach]: "Stillreach",
-};
 
 /** Resolve the planet a World Location belongs to, or undefined for an unknown ID. */
 export function getLocationPlanetId(locationId: string): PlanetId | undefined {

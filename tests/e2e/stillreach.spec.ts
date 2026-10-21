@@ -185,17 +185,14 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       await expect(scene.locator('[data-scene-layer="overlay"]')).toHaveCount(0);
 
       // Nothing operable: no work controls, no merchant, no ship, no stash. The
-      // one exception is Last Leg Trading's terminal at the Landing Station
-      // (#375), locked for this admin-placed character who never reported
-      // Thrust Issues.
+      // Landing Station's one Local Place is Last Leg Trading's terminal (#375),
+      // listed in its directory; the machine itself is only inside that place.
       await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(0);
       await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
-      await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(
+      await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
+      await expect(page.locator("[data-local-place]")).toHaveCount(
         id === LOCATION_IDS.stillreachLandingStation ? 1 : 0,
       );
-      if (id === LOCATION_IDS.stillreachLandingStation) {
-        await expect(page.locator("[data-terminal-locked]")).toBeVisible();
-      }
       await expectNoPageOverflow(page);
       if (viewport === PHONE && id === LOCATION_IDS.stillreachLandingStation) {
         await captureReviewScreenshot(page, "stillreach-landing-mobile.png");

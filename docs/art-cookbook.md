@@ -447,11 +447,17 @@ shadow under them. The route chart is native SVG, never a generated map.
 Stillreach's 15:8 cinematic scene (#375) is the owner-approved empty 1717×916 PNG, kept
 unaltered as `assets/location-scenes/stillreach-landing-station-cinematic-master.png` and
 encoded at native size to `stillreach-landing-station-cinematic.webp` (q80) by
-`scripts/prepare-stillreach-cinematic-art.mjs`, which checks the approved SHA-256. Its Rivet
+`scripts/prepare-stillreach-slice-b-art.mjs`, which checks the approved SHA-256. Its Rivet
 mark, and the berthed mark on the 4:1 Landing Station panorama, come from the owner's true
 Pillow composites; `docs/location-scenes.md` ("Stillreach Slice B") records the coordinates
 and the trimmed-overlay conversion. Composite previews are review references and are never
 committed or used as runtime art.
+
+Last Leg Trading's Stillreach fuel terminal Local Place scene (#375) is the owner-approved
+2048×512 PNG (SHA-256 `654577e0220e2e55…`), kept unaltered as
+`assets/location-scenes/stillreach-fuel-terminal-master.png` and downsampled whole (never
+cropped) to the 1536×384 Local Place production size, `stillreach-fuel-terminal.webp` q80,
+by the same script.
 
 ## Signage and generated text
 

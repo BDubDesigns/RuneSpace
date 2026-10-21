@@ -1,5 +1,10 @@
 import { PLANET_IDS, type PlanetId } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
+import {
+  getPlanetPresentation,
+  planetHorizontalReach,
+  planetVerticalReach,
+} from "@/game/content/planets";
 import { axialToPixel } from "@/features/travel/local-map-layout";
 
 /**
@@ -39,12 +44,39 @@ export type FlightChartGeometry = {
 export const INTERPLANETARY_CHART_PLANETS: Readonly<
   Record<PlanetId, { center: ChartPoint; radius: number }>
 > = {
-  [PLANET_IDS.skatboll]: { center: { x: 118, y: 168 }, radius: 46 },
-  [PLANET_IDS.stillreach]: { center: { x: 482, y: 168 }, radius: 46 },
+  [PLANET_IDS.skatboll]: { center: { x: 122, y: 160 }, radius: 40 },
+  [PLANET_IDS.stillreach]: { center: { x: 478, y: 160 }, radius: 40 },
 };
 
-/** Clearance between a world's disc and the end of the route drawn from it. */
+/** Clearance between a world's drawing (ring or halo included) and the route end. */
 const PLANET_ROUTE_GAP = 10;
+
+/**
+ * How far one charted world's drawing reaches from its centre, horizontally and
+ * vertically, in chart units: its ring or halo from `game/content/planets`, or
+ * its disc. The route and the labels keep clear of it.
+ */
+export function chartPlanetReach(planetId: PlanetId): { x: number; y: number } {
+  const { radius } = INTERPLANETARY_CHART_PLANETS[planetId];
+  const presentation = getPlanetPresentation(planetId);
+  return {
+    x: radius * planetHorizontalReach(presentation),
+    y: radius * planetVerticalReach(presentation),
+  };
+}
+
+/**
+ * The vertical clearance every charted world's labels keep, so the names above
+ * and the stations below sit on one line across the chart, whichever world has
+ * the taller ring or halo.
+ */
+export function chartPlanetLabelReach(): number {
+  return Math.max(
+    ...Object.keys(INTERPLANETARY_CHART_PLANETS).map(
+      (planetId) => chartPlanetReach(planetId as PlanetId).y,
+    ),
+  );
+}
 
 export function interplanetaryChartGeometry(
   originPlanetId: PlanetId,
@@ -55,13 +87,16 @@ export function interplanetaryChartGeometry(
   const length = Math.hypot(to.center.x - from.center.x, to.center.y - from.center.y) || 1;
   const ux = (to.center.x - from.center.x) / length;
   const uy = (to.center.y - from.center.y) / length;
+  // The two worlds sit level, so the route leaves each along its horizontal reach.
+  const fromReach = chartPlanetReach(originPlanetId).x + PLANET_ROUTE_GAP;
+  const toReach = chartPlanetReach(destinationPlanetId).x + PLANET_ROUTE_GAP;
   const origin = {
-    x: from.center.x + ux * (from.radius + PLANET_ROUTE_GAP),
-    y: from.center.y + uy * (from.radius + PLANET_ROUTE_GAP),
+    x: from.center.x + ux * fromReach,
+    y: from.center.y + uy * fromReach,
   };
   const destination = {
-    x: to.center.x - ux * (to.radius + PLANET_ROUTE_GAP),
-    y: to.center.y - uy * (to.radius + PLANET_ROUTE_GAP),
+    x: to.center.x - ux * toReach,
+    y: to.center.y - uy * toReach,
   };
   // The same upward bow as the local chart, so a transfer arc reads as a flight.
   const control = { x: (origin.x + destination.x) / 2, y: Math.min(origin.y, destination.y) - 96 };
