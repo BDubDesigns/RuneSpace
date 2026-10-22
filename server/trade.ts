@@ -17,6 +17,7 @@ import { pacificResetDate } from "@/game/domain/daily-reset";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import {
   dailyPurchaseAllowance,
+  merchantAtVenue,
   merchantDailySellLimit,
   quoteTrade,
   type TradeDirection,
@@ -186,7 +187,10 @@ export async function tradeWithMerchant(
         await loadCompletedMissionIds(transaction, character.id),
       );
       if (!access.available) return refuse("place_locked", access.reason);
-      merchant = place.merchantId ? getMerchant(place.merchantId) : undefined;
+      // The place may add venue-local lines (#379), e.g. the Stillreach terminal's
+      // Stone buyback; they are priced and refused by the same quote below.
+      const owned = place.merchantId ? getMerchant(place.merchantId) : undefined;
+      merchant = owned ? merchantAtVenue(owned, place) : undefined;
     }
     if (!merchant) return refuse("no_merchant", "Nobody trades here.");
 

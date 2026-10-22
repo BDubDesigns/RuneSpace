@@ -52,6 +52,16 @@ clients.
   scaled to a 576 px long edge (439×576 and 495×576), centred on a 640×640
   transparent canvas and saved as lossless WebP. Both read at the 80 px
   Inventory tile size. Nothing was regenerated, recomposed or recoloured.
+- `stone.png` and `boulder.png` are the approved 1254×1254 transparent RGBA renders
+  of the Stone (a small pile of four angular quarry stones) and the Boulder (one
+  large angular boulder) (#379), byte-identical to the owner-supplied masters and
+  checked by SHA-256. `scripts/prepare-stillreach-slice-c-art.mjs` produces the
+  derivatives with the Wheel Assembly convention — alpha noise below 4 cleared,
+  near-opaque alpha (252 and above) snapped to 255, trimmed to content (1109×866
+  and 1203×1077), scaled to a 576 px long edge (576×450 and 576×516), centred on a
+  640×640 transparent canvas and saved as lossless WebP. Neither carries a baked
+  sparkle: the Boulder's Ultra Rare shimmer is the UI's. Nothing was regenerated,
+  recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

@@ -136,9 +136,10 @@ describe("canonical article art", () => {
     expect(index).toContain("Something Strange in the Rock");
     expect(index).toContain("Next Stop: Stillreach");
     expect(index).toContain("Plot a Course");
-    // The homepage shows only the newest Update's summary (#377).
-    expect(landing).toContain("Plot a Course");
-    expect(landing).not.toContain("Next Stop: Stillreach");
+    expect(index).toContain("Something to Chip At");
+    // The homepage shows only the newest Update's summary (#379).
+    expect(landing).toContain("Something to Chip At");
+    expect(landing).not.toContain("Plot a Course");
     for (const markup of [index, landing]) {
       expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");
@@ -148,6 +149,8 @@ describe("canonical article art", () => {
       expect(markup).not.toContain("oil-shale.webp");
       expect(markup).not.toContain("motherlode-slab.webp");
       expect(markup).not.toContain("uncut-topaz.webp");
+      expect(markup).not.toContain("stone.webp");
+      expect(markup).not.toContain("boulder.webp");
       // Newer Updates open with an item figure of their own (#322, #326, #330);
       // like any other, it is an article-only feature.
       expect(markup).not.toContain("wheel-assembly.webp");

@@ -691,9 +691,10 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Prospecting Quarry",
     description:
-      "A shallow quarry of pale, layered rock cut into the hillside in terraces, lit timber and metal rigs standing on its floor.",
+      "A shallow quarry of pale, layered rock cut into the hillside in terraces, lit timber and metal rigs standing on its floor. The face is open to prospecting: chip loose Stone from it with a cutter.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theSurveyLine],
-    availableActionIds: [],
+    availableActionIds: [ACTION_IDS.stoneMining],
+    mapStatus: "Mining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "prospecting_quarry" as const,

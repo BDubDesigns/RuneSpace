@@ -148,6 +148,49 @@ const balanceSchema = z.object({
           }),
         ]),
       }),
+      /**
+       * Stillreach's Stone at the Prospecting Quarry (#379). A fast, level-1
+       * prospecting cut: 33 ticks (19.8 s) because 20.0 s cannot be expressed in
+       * whole 0.6-second ticks. A miss is a dead miss (`lowYield: null`) with no
+       * Stone, no find and no XP, unlike The South Cut. The Secondary Find table is
+       * one 600-outcome roll (see `secondaryFindRollSize`): 150 Rune Fragment, 100
+       * Uncut Quartz, 50 Uncut Topaz, 3 Boulder and 297 none.
+       */
+      stone: z.object({
+        actionId: z.literal(ACTION_IDS.stoneMining),
+        itemId: z.literal(ITEM_IDS.stone),
+        attemptDurationTicks: z.literal(33),
+        successAtLevelOneBps: z.literal(3_500),
+        guaranteedSuccessLevel: z.literal(30),
+        successRangeBps: z.literal(6_500),
+        successXp: z.literal(45),
+        yieldMinimum: z.literal(1),
+        yieldMaximum: z.literal(2),
+        requiredMiningLevel: z.literal(1),
+        lowYield: z.null(),
+        secondaryFinds: z.tuple([
+          z.object({
+            itemId: z.literal(ITEM_IDS.runeFragment),
+            oneIn: z.literal(4),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutQuartz),
+            oneIn: z.literal(6),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutTopaz),
+            oneIn: z.literal(12),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.boulder),
+            oneIn: z.literal(200),
+            announce: z.literal(true),
+          }),
+        ]),
+      }),
     }),
   }),
   /**
@@ -1108,6 +1151,23 @@ const balanceSchema = z.object({
       massGrams: z.literal(1_000),
       stackLimit: z.literal(5),
     }),
+    /**
+     * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
+     * 5 kg and the slot count is the real limit. The Boulder is one unbroken 5 kg
+     * specimen: it never stacks, and it owns its +150 Mining XP like every other
+     * find. Nothing breaks it down, buys it or converts it into Stone.
+     */
+    stone: z.object({
+      itemId: z.literal(ITEM_IDS.stone),
+      massGrams: z.literal(1_000),
+      stackLimit: z.literal(5),
+    }),
+    boulder: z.object({
+      itemId: z.literal(ITEM_IDS.boulder),
+      massGrams: z.literal(5_000),
+      stackLimit: z.literal(1),
+      secondaryFindMiningXp: z.literal(150),
+    }),
   }),
   /**
    * Rune materials (#367). Break Apart is the one Inventory conversion: one intact
@@ -1219,6 +1279,25 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.uncutSapphire, oneIn: 20, announce: false },
           { itemId: ITEM_IDS.motherlodeSlab, oneIn: 100, announce: true },
           { itemId: ITEM_IDS.runeFragment, oneIn: 6, announce: false },
+        ],
+      },
+      stone: {
+        actionId: ACTION_IDS.stoneMining,
+        itemId: ITEM_IDS.stone,
+        attemptDurationTicks: 33,
+        successAtLevelOneBps: 3_500,
+        guaranteedSuccessLevel: 30,
+        successRangeBps: 6_500,
+        successXp: 45,
+        yieldMinimum: 1,
+        yieldMaximum: 2,
+        requiredMiningLevel: 1,
+        lowYield: null,
+        secondaryFinds: [
+          { itemId: ITEM_IDS.runeFragment, oneIn: 4, announce: false },
+          { itemId: ITEM_IDS.uncutQuartz, oneIn: 6, announce: false },
+          { itemId: ITEM_IDS.uncutTopaz, oneIn: 12, announce: false },
+          { itemId: ITEM_IDS.boulder, oneIn: 200, announce: true },
         ],
       },
     },
@@ -1760,6 +1839,13 @@ const defaults = balanceSchema.parse({
       secondaryFindMiningXp: 20,
     },
     runestone: { itemId: ITEM_IDS.runestone, massGrams: 1_000, stackLimit: 5 },
+    stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
+    boulder: {
+      itemId: ITEM_IDS.boulder,
+      massGrams: 5_000,
+      stackLimit: 1,
+      secondaryFindMiningXp: 150,
+    },
   },
   runeMaterials: {
     breakApart: {

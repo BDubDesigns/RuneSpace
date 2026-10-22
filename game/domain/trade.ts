@@ -1,4 +1,5 @@
 import { planStackAddition, type StackState } from "@/game/domain/inventory";
+import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
 
 /**
@@ -93,6 +94,27 @@ export function merchantDailyAllowances(
     }
   }
   return allowances;
+}
+
+/**
+ * The catalog one venue of a merchant actually trades (#379): the merchant's own
+ * lines plus the lines that venue alone authors. The merchant stays one business
+ * (identity, unlock, shared daily allowances); a venue line is only ever a price
+ * the other venues do not have, so it may not restate one of the merchant's.
+ * With no Local Place, or a place that authors none, this is the merchant itself.
+ */
+export function merchantAtVenue(
+  merchant: MerchantDefinition,
+  place?: Pick<LocalPlaceDefinition, "venuePrices">,
+): MerchantDefinition {
+  if (!place?.venuePrices) return merchant;
+  const authored = new Set(merchant.prices.map((price) => price.itemId));
+  for (const line of place.venuePrices) {
+    if (authored.has(line.itemId)) {
+      throw new Error(`Venue line for ${line.itemId} duplicates ${merchant.id}'s own price line`);
+    }
+  }
+  return { ...merchant, prices: [...merchant.prices, ...place.venuePrices] };
 }
 
 /** Items the player may buy from this merchant, in authored order. */
