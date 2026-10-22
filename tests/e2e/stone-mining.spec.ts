@@ -111,8 +111,8 @@ test("a due Stone attempt pays its Stone and 45 XP and shows the result", async 
   const latest = page.getByRole("region", { name: "Latest mining attempt", exact: true });
   await expect(latest).toContainText("Latest attempt: Success");
   await expect(latest).toHaveAttribute("data-result-outcome", "success");
-  // The deterministic CI random is a certain success with the larger yield and no find.
-  await expect(page.getByText("2 Stone gained", { exact: true })).toBeVisible();
+  // The deterministic CI random is a certain success with the smaller yield (the coin flip is 0) and no find.
+  await expect(page.getByText("1 Stone gained", { exact: true })).toBeVisible();
   await expect(page.getByText("45 Mining XP", { exact: true })).toBeVisible();
 });
 
