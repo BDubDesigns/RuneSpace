@@ -458,6 +458,113 @@ describe("item sources — follow the authoritative content", () => {
   });
 });
 
+describe("item sources — Mining skill gate (#387)", () => {
+  const atMiningLevel = (level: number) => facts({ levels: { [SKILL_IDS.mining]: level } });
+
+  /** The one Mining source of `actionId` for `itemId` at `level`, if it is listed. */
+  const mineAt = (itemId: string, actionId: string, level: number) =>
+    of(resolveItemSources(itemId, atMiningLevel(level)), "mine").find(
+      (source) => source.kind === "mine" && source.sourceActionId === actionId,
+    );
+
+  it("lists Oil Shale Locked below Mining 5 and Available at it, at both World Locations", () => {
+    const { oilShale } = balance.mining.sources;
+    const below = of(resolveItemSources(ITEM_IDS.oilShale, atMiningLevel(4)), "mine");
+    expect(below).toHaveLength(1);
+    expect(below[0]).toMatchObject({
+      locationIds: expect.arrayContaining([LOCATION_IDS.theSouthCut, LOCATION_IDS.theDrySeam]),
+      access: {
+        state: "locked",
+        gates: [
+          {
+            kind: "skill_level",
+            skillId: balance.mining.skillId,
+            level: oilShale.requiredMiningLevel,
+          },
+        ],
+      },
+    });
+    expect(oilShale.requiredMiningLevel).toBe(5);
+    expect(mineAt(ITEM_IDS.oilShale, oilShale.actionId, 5)?.access).toEqual({
+      state: "available",
+    });
+  });
+
+  it.each([
+    ["the Rune Fragment primary", ITEM_IDS.runeFragment],
+    ["the intact Runestone secondary", ITEM_IDS.runestone],
+    ["the Sapphire secondary", ITEM_IDS.uncutSapphire],
+  ])("gates Harmonic Workings' %s by the same level, whatever its role", (_name, itemId) => {
+    const { harmonicMining } = balance.mining.sources;
+    const gate = {
+      state: "locked",
+      gates: [
+        {
+          kind: "skill_level",
+          skillId: balance.mining.skillId,
+          level: harmonicMining.requiredMiningLevel,
+        },
+      ],
+    };
+    expect(
+      mineAt(itemId, harmonicMining.actionId, harmonicMining.requiredMiningLevel - 1),
+    ).toMatchObject({
+      access: gate,
+    });
+    expect(
+      mineAt(itemId, harmonicMining.actionId, harmonicMining.requiredMiningLevel)?.access,
+    ).toEqual({ state: "available" });
+  });
+
+  it("keeps a Level 1 mine Available at starting Mining wherever it is discovered", () => {
+    for (const [itemId, actionId] of [
+      [ITEM_IDS.ferriteShale, balance.mining.sources.ferriteShale.actionId],
+      [ITEM_IDS.galvanite, balance.mining.sources.galvanite.actionId],
+      [ITEM_IDS.stone, balance.mining.sources.stone.actionId],
+    ] as const) {
+      expect(mineAt(itemId, actionId, 1)?.access).toEqual({ state: "available" });
+    }
+  });
+
+  it("never reveals an undiscovered mine by Mining level, not even as Locked", () => {
+    // Deep Jag stays hidden until its repair unlock, however high the level.
+    const closedDeepJag = facts({ deepJagOpen: false, levels: { [SKILL_IDS.mining]: 99 } });
+    expect(of(resolveItemSources(ITEM_IDS.galvanite, closedDeepJag), "mine")).toEqual([]);
+    // A mine whose location has not opened is absent at the level it needs and above.
+    const notOpened = { ...atMiningLevel(8), locationStates: {} };
+    expect(of(resolveItemSources(ITEM_IDS.uncutSapphire, notOpened), "mine")).toEqual([]);
+  });
+
+  it("sorts a locked mine after usable sources and before player trade", () => {
+    const sources = resolveItemSources(ITEM_IDS.uncutSapphire, atMiningLevel(7));
+    const reference = sources.filter((source) => source.kind !== "player_trade");
+    const firstLocked = reference.findIndex((source) => source.access.state === "locked");
+    expect(firstLocked).toBeGreaterThan(0);
+    expect(reference.slice(firstLocked).every((source) => source.access.state === "locked")).toBe(
+      true,
+    );
+    expect(sources.at(-1)?.kind).toBe("player_trade");
+  });
+
+  it("takes the gate from the authored requiredMiningLevel, not from the item or source name", () => {
+    const doctored = structuredClone(balance) as unknown as {
+      mining: { sources: { ferriteShale: { requiredMiningLevel: number } } };
+    };
+    doctored.mining.sources.ferriteShale.requiredMiningLevel = 6;
+    const registries = {
+      ...defaultItemSourceRegistries(),
+      balance: doctored as unknown as EffectiveGameBalance,
+    };
+    const ferriteAt = (level: number) =>
+      of(resolveItemSources(ITEM_IDS.ferriteShale, atMiningLevel(level), registries), "mine")[0];
+    expect(ferriteAt(5)?.access).toEqual({
+      state: "locked",
+      gates: [{ kind: "skill_level", skillId: balance.mining.skillId, level: 6 }],
+    });
+    expect(ferriteAt(6)?.access).toEqual({ state: "available" });
+  });
+});
+
 describe("item sources — what is deliberately not a source", () => {
   it("never reads Mission, dialogue or Work Order content", () => {
     const source = readFileSync("game/domain/item-sources.ts", "utf8");
