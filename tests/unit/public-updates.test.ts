@@ -118,14 +118,26 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Refiner-To-Go Update as the newest (#381)", () => {
+  it("publishes the Harmonic Workings Update as the newest (#383)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("refiner-to-go");
+    expect(latest.slug).toBe("harmonic-workings-opens");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("refiner-to-go")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/harmonic-workings.webp");
+    const text = JSON.stringify(latest);
+    expect(text).toContain("130 Mining experience");
+    expect(text).toContain("RARE FIND line");
+    expect(text).toContain("names Harmonic Workings");
+  });
+
+  it("keeps the Refiner-To-Go Update published beneath it (#381)", () => {
+    const latest = getPublicUpdate("refiner-to-go")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("dry-seam-opens")!.publishedAt),
     );
-    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     expect(latest.hero?.src).toBe("/location-scenes/refiner-to-go.webp");
     const text = JSON.stringify(latest);
     expect(text).toContain("108 seconds instead of 36");

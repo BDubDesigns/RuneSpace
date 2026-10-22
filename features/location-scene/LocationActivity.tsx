@@ -112,6 +112,7 @@ function primaryActivity(
     case LOCATION_IDS.theSouthCut:
     case LOCATION_IDS.theDrySeam:
     case LOCATION_IDS.prospectingQuarry:
+    case LOCATION_IDS.harmonicWorkings:
       return <MiningActivity characterName={characterName} />;
     case LOCATION_IDS.deepJag:
       // One place, two jobs, and the repair's own completion decides which

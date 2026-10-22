@@ -60,6 +60,7 @@ resolved attempt awards is recovered from the durable action ID.
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
 | Oil Shale | The South Cut and Stillreach's The Dry Seam (#380), **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
 | Stone | Stillreach's Prospecting Quarry | 33 | 35% at 1 → 100% at 30 | 1–2 (a miss awards nothing) | 45 |
+| Rune Fragment | Stillreach's Harmonic Workings (#383), **Mining 8** | 75 | 35% at 1 → 46.66% at 8 → 100% at 40 | 1–2 (a miss awards nothing) | 130 |
 
 Every source also authors a `requiredMiningLevel` (the personal access gate; 1
 for The Jag and Deep Jag, so neither is newly gated) and a `lowYield` (`null` for
@@ -854,6 +855,35 @@ text, and the berth already moved with each landing).
   Stillreach's eight-location map (#373), derived from the current location as before.
   Walking away leaves the ship in the ring; walking edges never cross planets.
 - **Not From Around Here** is untouched: its deferred stage still has no target.
+
+### Rune Fragment Mining at Harmonic Workings (#383)
+
+Stillreach's Harmonic Workings (2,2) is the dedicated Mining-8 Rune Fragment
+source. It is one more `balance.mining.sources` entry (`harmonicMining`, with
+its own action ID) read by the one resolver, so the Cutters, Power Cell
+boosting, run history, active-action identity and lazy/offline resolution all
+apply unchanged. It remains reachable only from The Survey Line.
+
+- **Gate and curve:** personal Mining 8 (refused below it before any action,
+  time or roll), a 75-tick (45 s) attempt, and the level-1-anchored curve:
+  35% at Mining 1, 46.66% (4,666 bps) at Mining 8, certain at Mining 40.
+- **Primary:** a true success yields one or two Rune Fragments, uniformly, and
+  130 Mining XP regardless of the count. A charged Loadsteel Cutter adds one
+  primary Fragment on a full success only. A primary Fragment earns no
+  secondary-find bonus of its own. A miss awards nothing, not even a low yield.
+- **One secondary per success, 40 outcomes:** an Intact Runestone (1/8, silent,
+  +130 Mining XP once when kept), an Uncut Sapphire (1/20, its usual +30 XP once,
+  and a RARE FIND line naming Harmonic Workings only when actually kept), or
+  nothing (33/40). The Runestone's find XP is authored as
+  `secondaryFindMiningXp: 130` on the canonical intact Runestone item, so the
+  shared find projection reads it unchanged.
+- **Find XP totals per success:** nothing 130; Intact Runestone 260 (130 base
+  plus 130); Uncut Sapphire 160 (130 plus 30); a failure 0. A find that is
+  rolled but forfeited for capacity pays no find XP and no announcement. Using
+  or breaking apart a Runestone grants no XP.
+- **Capacity:** the shared Prioritize primary resources rules apply. Off reserves
+  room for the primary plus the largest single find (a 1 kg Runestone); On keeps
+  at least one Fragment and forfeits a find that does not fit.
 
 ### Stone at the Prospecting Quarry (#379)
 

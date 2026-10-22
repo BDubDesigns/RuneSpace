@@ -197,10 +197,11 @@ suite("issue #380 The Dry Seam Oil Shale Mining (real PostgreSQL)", () => {
     });
 
     it("refuses Mining anywhere else on Stillreach, and from The South Cut's neighbours", async () => {
+      // Harmonic Workings (#383) is a Mining site of its own now, so it is not an
+      // "elsewhere": its Mining-8 gate is covered in harmonic-mining.test.ts.
       for (const elsewhere of [
         LOCATION_IDS.theSurveyLine,
         LOCATION_IDS.stillreachLandingStation,
-        LOCATION_IDS.harmonicWorkings,
         LOCATION_IDS.southAccessTrack,
       ]) {
         const { userId, character } = await makeCharacter(5, elsewhere);

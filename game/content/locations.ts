@@ -788,9 +788,10 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Harmonic Workings",
     description:
-      "An old lifting frame and suspended ore bucket stand against a fractured rock face threaded with iridescent mineral seams, with battered ore carts waiting on short rails below.",
+      "An old lifting frame works a fractured rock face threaded with shimmering mineral veins. Ore buckets clatter onto a short rail, and cutting usable rune fragments here takes Mining 8.",
     adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
-    availableActionIds: [],
+    availableActionIds: [ACTION_IDS.harmonicMining],
+    mapStatus: "Mining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "harmonic_workings" as const,

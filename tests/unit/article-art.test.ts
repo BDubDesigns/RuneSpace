@@ -139,8 +139,10 @@ describe("canonical article art", () => {
     expect(index).toContain("Something to Chip At");
     expect(index).toContain("The Dry Seam Opens");
     expect(index).toContain("Refiner-To-Go");
-    // The homepage shows only the newest Update's summary (#381).
-    expect(landing).toContain("Refiner-To-Go");
+    expect(index).toContain("Harmonic Workings Opens");
+    // The homepage shows only the newest Update's summary (#383).
+    expect(landing).toContain("Harmonic Workings Opens");
+    expect(landing).not.toContain("Refiner-To-Go");
     expect(landing).not.toContain("The Dry Seam Opens");
     for (const markup of [index, landing]) {
       expect(markup).not.toContain("rune-fragment.webp");
