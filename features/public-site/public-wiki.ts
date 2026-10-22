@@ -1209,7 +1209,7 @@ const authoredWikiArticles = [
         list: [
           [
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
-            " — offered by a Rune Fragment in your Inventory, not by a person. Ask around about it on Skatboll, or go straight to the Wise Old Enby at Hilltop Workshop on Stillreach, who finishes it. Nothing is needed first, and it pays nothing.",
+            " — offered by a Rune Fragment or intact Runestone you carry (through Inventory Inspect), or in person by the Wise Old Enby on Stillreach (Show strange mineral). Ask around about it on Skatboll, or go straight to the Wise Old Enby at Hilltop Workshop on Stillreach, who finishes it. Nothing is needed first, and it pays nothing.",
           ],
         ],
       },

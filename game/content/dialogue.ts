@@ -2830,7 +2830,7 @@ const dialogue = {
       ),
       enbyLocal(
         EXPRESSION_IDS.neutral,
-        "It's a Rune Fragment. It resonates with something we call RuneSpace.",
+        "What you found was rune material. Fragments and intact Runestones both resonate with something we call RuneSpace.",
       ),
       enbyLocal(
         EXPRESSION_IDS.thoughtful,
@@ -2873,7 +2873,7 @@ const dialogue = {
       ),
       enbyLocal(
         EXPRESSION_IDS.neutral,
-        "It's a Rune Fragment. It resonates with something we call RuneSpace.",
+        "What you found was rune material. Fragments and intact Runestones both resonate with something we call RuneSpace.",
       ),
       enbyLocal(
         EXPRESSION_IDS.thoughtful,
