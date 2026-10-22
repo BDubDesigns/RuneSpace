@@ -190,6 +190,40 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.tollFuelTopic,
     availability: { kind: "always" },
   },
+  {
+    // The Wise Old Enby (#389). Their introduction and two ordinary topics are
+    // there for anyone who reaches Hilltop Workshop, with or without a Fragment or
+    // the mystery, and say nothing about how runes work. Nothing records that the
+    // introduction was heard: it is a replayable topic, not a first-meeting state.
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyGreeting,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "Introductions",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyGreetingTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyWorkshop,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "The workshop",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyWorkshopTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyStillreach,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "Stillreach",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyStillreachTopic,
+    availability: { kind: "always" },
+  },
+  {
+    // Only once the mystery is solved: RuneSpace has been named by then. Replaying
+    // it runs no Mission command, pays nothing and records nothing.
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyAboutRuneSpace,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "About RuneSpace",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutRuneSpaceTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.notFromAroundHere },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(

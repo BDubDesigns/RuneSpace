@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
   characterMissionProgress,
@@ -39,6 +39,7 @@ import {
 } from "@/game/domain/inventory";
 import {
   leadContactLocationId,
+  requirementWaived,
   uniqueItemRequirementHolds,
   unmetMissionSkillPrerequisite,
   type MissionObservation,
@@ -394,6 +395,35 @@ export async function acceptMission(
           status: "refused",
           message: `${definition.title} can only be accepted while you are stationary at ${locationName(offer.locationId)}.`,
         });
+      }
+
+      // The in-person item offer (#389) needs what Inventory's would: a real
+      // stack of an authored item in THIS character's carried inventory. The
+      // Cargo Hold, a stash and another character's stacks are other tables or
+      // other rows, so they are simply not found. Nothing is consumed.
+      if (offer.requiresCarriedOfferItem) {
+        const offerItemIds = definition.itemOffer?.itemIds ?? [];
+        const carried =
+          offerItemIds.length > 0
+            ? await transaction
+                .select({ id: inventoryStacks.id })
+                .from(inventoryStacks)
+                .where(
+                  and(
+                    eq(inventoryStacks.characterId, context.character.id),
+                    inArray(inventoryStacks.itemId, [...offerItemIds]),
+                    gte(inventoryStacks.quantity, 1),
+                  ),
+                )
+                .for("update")
+                .limit(1)
+            : [];
+        if (carried.length === 0) {
+          return stateFor({
+            status: "refused",
+            message: `${definition.title} starts with something you carry. Bring it with you and try again.`,
+          });
+        }
       }
 
       // An authored item grant is preflighted BEFORE anything is written, so a
@@ -932,6 +962,9 @@ async function completeMissionForDefinition(input: {
       continue;
     }
     if (requirement.kind === "npc_conversation") {
+      // Waived on this planet (#389): the conversation is not needed here, and
+      // the waiver records nothing about it.
+      if (requirementWaived(requirement, locationId)) continue;
       if ((observation.trackedProgress?.get(requirement.progressKey) ?? 0) < 1) {
         return stateFor({
           status: "refused",

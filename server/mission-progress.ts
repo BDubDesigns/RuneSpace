@@ -278,7 +278,12 @@ export async function recordFabricationOutcomes(
     .filter((definition): definition is MissionDefinition => definition !== undefined)
     .flatMap((definition) =>
       (definition.reactiveFacts ?? [])
-        .filter((fact) => fact.observes.actionId === input.actionId)
+        // A conversation fact (#389) is derived from its marker, never written here.
+        .filter(
+          (fact) =>
+            fact.observes.kind !== "conversation_acknowledged" &&
+            fact.observes.actionId === input.actionId,
+        )
         .map((fact) => ({ missionId: definition.id, fact })),
     );
   for (const outcome of input.outcomes) {

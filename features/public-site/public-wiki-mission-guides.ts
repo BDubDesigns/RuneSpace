@@ -25,6 +25,7 @@ const tansy = link("Tansy Rusk", "tansy-rusk");
 const bix = link("Bix Weller", "bix-weller");
 const renn = link("Renn Calder", "renn-calder");
 const curly = link("Curly", "curly");
+const enby = link("the Wise Old Enby", "the-wise-old-enby");
 
 const miningAndRefining = (text: string) => link(text, "mining-and-refining");
 const welding = (text: string) => link(text, "cargo-hold-and-welding");
@@ -1143,7 +1144,7 @@ export const missionGuideArticles = [
     category: "getting-started",
     showInIndex: false,
     summary:
-      "A Rune Fragment or intact Runestone in your Inventory offers it: ask around about the unusual mineral. Wade or Tansy can point you to Tolliver Kade, and Tolliver points you toward a researcher on Stillreach. It pays nothing, and it does not finish yet.",
+      "A Rune Fragment or intact Runestone you carry offers it: find out what the unusual mineral is. On Skatboll, Wade or Tansy can point you to Tolliver Kade, who points you to a researcher on Stillreach; on Stillreach you can go straight to the Wise Old Enby at Hilltop Workshop. It pays nothing.",
     sections: [
       {
         paragraphs: [
@@ -1160,7 +1161,12 @@ export const missionGuideArticles = [
             miningAndRefining("Mining"),
             " can turn up. The tile glows blue, and its picture hops now and then, in your ",
             inventory("Inventory"),
-            ". Select the stack, choose Inspect in Item details, and then Start mission. Choosing Not now, or closing the offer, changes nothing. Either item starts the same Mission, and one you keep in the Cargo Hold or a stash does not offer it, because the offer comes from a stack you are carrying.",
+            ". Select the stack, choose Inspect in Item details, and then Start mission. Choosing Not now, or closing the offer, changes nothing. Either item starts the same Mission, and one you keep in the Cargo Hold or a stash does not offer it, because the offer comes from a stack you are carrying. This works on either planet.",
+          ],
+          [
+            "On Stillreach you can also start it in person. Carry either stone to Hilltop Workshop and talk to ",
+            enby,
+            ": their Talk glows blue and Show strange mineral is in their list. It is the same Mission, with Start mission and Not now at the end.",
           ],
           "Starting the Mission does not use up the Fragment or the Runestone. It stays in your Inventory, and once the Mission is started both stop glowing.",
         ],
@@ -1168,13 +1174,19 @@ export const missionGuideArticles = [
       {
         heading: "What you need",
         paragraphs: [
-          "To talk to Tolliver Kade at Last Leg Trading in Holo Hollow Landing. He is the only person the Mission needs, and you can go straight to him: Talk is open before you have repaired your ship, and Trade is a separate thing that does not matter here.",
           [
-            "Until you have spoken to anyone, the Mission Log names three possible contacts: ",
+            "To talk to ",
+            enby,
+            " at Hilltop Workshop on Stillreach, and to hear them out. You do not need to be carrying the stone by then: once the Mission is started, the investigation counts whatever you have done with it since.",
+          ],
+          [
+            "Getting to Stillreach means flying the Rivet there (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). While you are on Skatboll, the Mission helps you find out where to go: until you have spoken to anyone, the Mission Log names three possible contacts, ",
             wade,
             ", ",
             tansy,
-            " and Tolliver Kade, and all three of their places glow green on the Map.",
+            " and Tolliver Kade, and all three of their places glow green on the Map. Tolliver, at Last Leg Trading in Holo Hollow Landing, is the one who knows; Talk is open before you have repaired your ship, and Trade is a separate thing that does not matter here.",
           ],
         ],
       },
@@ -1182,27 +1194,33 @@ export const missionGuideArticles = [
         heading: "Walkthrough",
         list: [
           [
-            "Optionally, show the Fragment to ",
+            "On Skatboll, optionally show the Fragment to ",
             wade,
             " or ",
             tansy,
             ", wherever each of them is standing for you right now, and choose Worth asking at the end. Either of them is enough: once one has pointed you toward Tolliver, the Map and the Mission Log narrow to him alone, and the other adds nothing.",
           ],
-          "Talk to Tolliver Kade at Last Leg Trading and choose Noted at the end of the conversation. Backing out of a conversation early, or just opening it, records nothing.",
-          "The Mission now reads Find the researcher at Hilltop Workshop on Stillreach.",
+          "Talk to Tolliver Kade at Last Leg Trading and choose Noted at the end of the conversation. The Mission then reads Find the researcher at Hilltop Workshop on Stillreach, and nothing on Skatboll's Map glows for it any more.",
+          "On Stillreach, the Mission points straight at Hilltop Workshop, whether or not you ever spoke to Wade, Tansy or Tolliver: it is the one place that glows on the Map. If you fly back to Skatboll before finishing, anything you had not yet done there is waiting as you left it.",
+          [
+            "At Hilltop Workshop, talk to ",
+            enby,
+            " and choose Not From Around Here. Hear them out and choose I understand at the end. That is what completes the Mission. Backing out of any of these conversations early, or just opening one, records nothing.",
+          ],
         ],
       },
       {
         heading: "What you get",
         list: [
-          "Nothing yet: no Credits, no XP and no item for inspecting the Fragment, for a hint, or for Tolliver's lead.",
+          "No Credits, no XP and no item, at any step. Nothing is taken from you either.",
+          "An answer about the mineral, and a new thing to ask the Wise Old Enby about: About RuneSpace, which you can read again whenever you like.",
         ],
       },
       {
         heading: "Good to know",
         list: [
-          "The Mission stays accepted and Active at the end of Tolliver's lead. You can now fly the Rivet to Stillreach and walk to Hilltop Workshop, but the researcher is not there yet: there is nowhere to hand the Mission in and nothing to complete, and the Map points to nothing. Your progress is kept for when the researcher arrives.",
-          "You can unpin the Mission and the Map's highlights go quiet; you can still talk to anyone you like. Talking to Wade or Tansy about anything else works as it always did.",
+          "Tolliver does not have to be the one who sent you. If he did, the Wise Old Enby will say so; if not, they start from the beginning. Either way the explanation is the same.",
+          "You can unpin the Mission and the Map's highlights go quiet; you can still talk to anyone you like. Talking to Wade, Tansy or Tolliver about anything else works as it always did.",
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },

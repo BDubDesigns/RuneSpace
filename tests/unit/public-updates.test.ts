@@ -118,14 +118,28 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Harmonic Workings Update as the newest (#383)", () => {
+  it("publishes The Wise Old Enby Update as the newest (#389)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("harmonic-workings-opens");
+    expect(latest.slug).toBe("the-wise-old-enby");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("harmonic-workings-opens")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/hilltop-workshop.webp");
+    const text = JSON.stringify(latest);
+    expect(text).toContain("Show strange mineral");
+    expect(text).toContain("About RuneSpace");
+    expect(text).toContain("pays nothing");
+    // Nothing unshipped is announced.
+    expect(text).not.toMatch(/Runeworking|Echo|Seeker|lesson/i);
+  });
+
+  it("keeps the Harmonic Workings Update published beneath it (#383)", () => {
+    const latest = getPublicUpdate("harmonic-workings-opens")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("refiner-to-go")!.publishedAt),
     );
-    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     expect(latest.hero?.src).toBe("/location-scenes/harmonic-workings.webp");
     const text = JSON.stringify(latest);
     expect(text).toContain("130 Mining experience");

@@ -99,6 +99,8 @@ const npcIds = {
   curly: asContentId("curly"),
   // Last Leg Trading's resident at Holo Hollow Landing (#357).
   tollKade: asContentId("toll_kade"),
+  // The researcher at Hilltop Workshop on Stillreach (#389).
+  wiseOldEnby: asContentId("wise_old_enby"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -346,6 +348,16 @@ const dialogueIds = {
   wadeNotFromAroundHereHint: asContentId("wade_rusk_not_from_around_here_hint"),
   tansyNotFromAroundHereHint: asContentId("tansy_rusk_not_from_around_here_hint"),
   tollNotFromAroundHere: asContentId("toll_kade_not_from_around_here"),
+  // The Wise Old Enby at Hilltop Workshop (#389): three ordinary topics, the
+  // in-person "Show strange mineral" offer of Not From Around Here, its two
+  // openings (sent by Toll, or not), and the replayable topic after it.
+  wiseOldEnbyGreetingTopic: asContentId("wise_old_enby_topic_greeting"),
+  wiseOldEnbyWorkshopTopic: asContentId("wise_old_enby_topic_workshop"),
+  wiseOldEnbyStillreachTopic: asContentId("wise_old_enby_topic_stillreach"),
+  wiseOldEnbyAboutRuneSpaceTopic: asContentId("wise_old_enby_topic_about_runespace"),
+  wiseOldEnbyNotFromAroundHereOffer: asContentId("wise_old_enby_not_from_around_here_offer"),
+  wiseOldEnbyNotFromAroundHere: asContentId("wise_old_enby_not_from_around_here"),
+  wiseOldEnbyNotFromAroundHereTollSent: asContentId("wise_old_enby_not_from_around_here_toll_sent"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -372,6 +384,10 @@ const conversationTopicIds = {
   tollSkatboll: asContentId("toll_kade_skatboll"),
   tollStillreach: asContentId("toll_kade_stillreach"),
   tollFuel: asContentId("toll_kade_fuel"),
+  wiseOldEnbyGreeting: asContentId("wise_old_enby_greeting"),
+  wiseOldEnbyWorkshop: asContentId("wise_old_enby_workshop"),
+  wiseOldEnbyStillreach: asContentId("wise_old_enby_stillreach"),
+  wiseOldEnbyAboutRuneSpace: asContentId("wise_old_enby_about_runespace"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -414,6 +430,8 @@ const conversationBackgroundIds = {
   crashSiteExteriorRepaired: asContentId("crash_site_exterior_repaired"),
   // Last Leg Trading's shop interior at Holo Hollow Landing (#357).
   lastLegTradingInterior: asContentId("last_leg_trading_interior"),
+  // The Wise Old Enby's workshop interior at Hilltop Workshop (#389).
+  hilltopWorkshopInterior: asContentId("hilltop_workshop_interior"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {

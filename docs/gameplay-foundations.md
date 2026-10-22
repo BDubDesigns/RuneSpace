@@ -327,6 +327,9 @@ are `public/item-art/rune-fragment.webp` and `runestone.webp`.
   nothing. This is a generic item-offer mechanism
   (`MissionDefinition.itemOffer`, `docs/missions.md` §4.1), so no Inventory code
   names the Fragment. Break Apart and Drop on a Runestone are unchanged.
+  Since #389 the Wise Old Enby at Hilltop Workshop also makes the same offer in
+  person (**Show strange mineral**) to a visitor carrying either stone, and
+  completes the Mission; see `docs/missions.md`, "Not From Around Here".
 - **Break Apart** is the one conversion (`balance.runeMaterials.breakApart`:
   1 Runestone → 5 Rune Fragments, 1,000 g either way). It is offered in the
   Runestone stack's ordinary Item Details, with an irreversible confirmation;
@@ -854,7 +857,9 @@ text, and the berth already moved with each landing).
 - **Planets.** Landing on Stillreach Landing Station puts the character on
   Stillreach's eight-location map (#373), derived from the current location as before.
   Walking away leaves the ship in the ring; walking edges never cross planets.
-- **Not From Around Here** is untouched: its deferred stage still has no target.
+- **Not From Around Here** completes at the Wise Old Enby on Stillreach (#389). On
+  Stillreach its Toll conversation is waived, so Hilltop Workshop is the one
+  target whichever planet the Mission was accepted on (`docs/missions.md`).
 
 ### Rune Fragment Mining at Harmonic Workings (#383)
 

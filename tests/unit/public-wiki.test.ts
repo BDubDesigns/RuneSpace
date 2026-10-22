@@ -323,6 +323,7 @@ describe("public Wiki content boundary", () => {
       "renn-calder",
       "mara-kells",
       "curly",
+      "the-wise-old-enby",
     ]);
   });
 

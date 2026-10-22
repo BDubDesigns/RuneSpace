@@ -25,12 +25,15 @@ import {
 } from "./fixtures";
 
 /**
- * Not From Around Here (#369) at the 390 px portrait width the Inventory and the
- * conversation hub are designed for: the Rune Fragment's Inspect offer, the three
- * guided contacts, an optional hint that narrows to Toll, and the deliberately
- * unfinished end. Unit and PostgreSQL coverage own the rules; this proves what
- * needs the running app — the blue tile, the modal's keyboard and focus
- * behavior, the Map hexes, and that nothing fabricates a target or a Turn In.
+ * Not From Around Here (#369, #389) at the 390 px portrait width the Inventory and
+ * the conversation hub are designed for: the Rune Fragment's Inspect offer, the
+ * three guided contacts, an optional hint that narrows to Toll, and the Wise Old
+ * Enby at Hilltop Workshop — their ordinary topics, the in-person "Show strange
+ * mineral" offer with its Not now, the single Stillreach pin, and the revelation
+ * whose I UNDERSTAND alone completes the Mission. Unit and PostgreSQL coverage own
+ * the rules; this proves what needs the running app — the blue tile, the modal's
+ * keyboard and focus behavior, the Map hexes, the hub refreshing in place, and
+ * that nothing fabricates a target.
  */
 
 const MISSION = MISSION_IDS.notFromAroundHere;
@@ -380,7 +383,7 @@ test.describe("the investigation", () => {
     ).toHaveAttribute("data-mission-guidance", "active");
   });
 
-  test("Toll alone advances the Mission, which then waits honestly at Stillreach", async ({
+  test("Toll alone advances the Mission, which then points to Stillreach with no Skatboll pin", async ({
     page,
     testCharacter,
   }) => {
@@ -419,9 +422,9 @@ test.describe("the investigation", () => {
     const expectUnfinished = async () => {
       const strip = page.locator(`[data-mission-strip="${MISSION}"]`);
       await expect(strip).toContainText("Find the researcher at Hilltop Workshop on Stillreach");
-      await expect(strip).toHaveAttribute("data-mission-phase", "work");
-      await expect(strip).not.toContainText("Turn in");
-      // No fabricated target anywhere on the Map.
+      // Only the hand-in to the Enby is left, and it is on another planet.
+      await expect(strip).toHaveAttribute("data-mission-phase", "turn_in");
+      // No Skatboll hex is pinned: the researcher is not on this map.
       await openMapSurface(page);
       await expect(litHexes(page)).toHaveCount(0);
       const [row] = await missionRows(testCharacter.id);
@@ -487,5 +490,127 @@ test.describe("NPC placement", () => {
     for (const npc of [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]) {
       await expect(page.locator(`[data-npc-interaction="${npc}"]`)).toBeVisible();
     }
+  });
+});
+
+test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
+  const ENBY = "The Wise Old Enby";
+  const talk = (page: Page) => page.getByRole("button", { name: `Talk to ${ENBY}` });
+
+  test("is there for any visitor, with three ordinary topics and no Mission", async ({
+    page,
+    testCharacter,
+  }) => {
+    await seed(testCharacter.id, []);
+    await standAt(testCharacter.id, LOCATION_IDS.hilltopWorkshop);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(page.locator(`[data-npc-interaction="${NPC_IDS.wiseOldEnby}"]`)).toBeVisible();
+    await expect(talk(page)).not.toHaveAttribute("data-mission-guidance", /.+/);
+
+    const conversation = await openNpcConversation(page, ENBY);
+    await expect(conversation.locator('[data-conversation-section="current"]')).toHaveCount(0);
+    const topics = conversation.locator('[data-conversation-section="topics"] button');
+    await expect(topics).toHaveText(["Introductions", "The workshop", "Stillreach"]);
+
+    await openConversationEntry(conversation, /Introductions/);
+    // The workshop interior is behind the portrait, labelled by the hill.
+    await expect(conversation.getByText("Hilltop Workshop").first()).toBeVisible();
+    await playDialogueToText(conversation, /‘Wise’ is still under review/);
+    await conversation.locator("[data-dialogue-text]").click();
+    await expect(conversation.locator("[data-dialogue-next]")).toHaveText("Finish");
+    await conversation.locator("[data-dialogue-next]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    expect(await missionRows(testCharacter.id)).toHaveLength(0);
+  });
+
+  test("offers the mystery in person for a carried stone, and finishes it on I UNDERSTAND", async ({
+    page,
+    testCharacter,
+  }) => {
+    await seed(testCharacter.id, [{ itemId: FRAGMENT, quantity: 2 }]);
+    await standAt(testCharacter.id, LOCATION_IDS.hilltopWorkshop);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(talk(page)).toHaveAttribute("data-mission-guidance", "available");
+
+    const conversation = await openNpcConversation(page, ENBY);
+    const offer = conversation.locator(`[data-conversation-entry="${MISSION}:offer"]`);
+    await expect(offer).toContainText("Show strange mineral");
+    await expect(offer).toHaveAttribute("data-mission-guidance", "available");
+
+    // Not now is read-only and returns to the hub.
+    await openConversationEntry(conversation, /Show strange mineral/);
+    await playDialogueToText(conversation, /longer story than it looks/);
+    await expect(conversation.locator("[data-dialogue-action]")).toHaveText("Start mission");
+    await conversation.locator("[data-dialogue-decline]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    expect(await missionRows(testCharacter.id)).toHaveLength(0);
+
+    // Start mission accepts the same Mission and the hub refreshes in place.
+    await openConversationEntry(conversation, /Show strange mineral/);
+    await playDialogueToText(conversation, /longer story than it looks/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    await expect(offer).toHaveCount(0);
+    const turnIn = conversation.locator(`[data-conversation-entry="${MISSION}:turn_in"]`);
+    await expect(turnIn).toHaveAttribute("data-mission-guidance", "turn_in");
+    expect(await missionRows(testCharacter.id)).toHaveLength(1);
+    expect(total(await rows(testCharacter.id), FRAGMENT)).toBe(2);
+
+    // The direct opening, then the shared explanation; reading it completes nothing.
+    await openConversationEntry(conversation, /Not From Around Here/);
+    await expect(conversation.locator("[data-dialogue-text]")).toContainText(
+      /rather well-equipped fool/,
+    );
+    await playDialogueToText(conversation, /One step at a time/);
+    expect((await missionRows(testCharacter.id))[0]?.completedAt).toBeNull();
+    await expect(conversation.locator("[data-dialogue-action]")).toHaveText("I UNDERSTAND");
+    await conversation.locator("[data-dialogue-action]").click();
+
+    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+    await expect(conversation.locator('[data-conversation-section="current"]')).toHaveCount(0);
+    await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
+    expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
+    expect(total(await rows(testCharacter.id), FRAGMENT)).toBe(2);
+    expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 0, "toll-hint": 0 });
+
+    // A refresh keeps it Completed, with no stale offer, pin or Inspect.
+    await page.reload();
+    await expect(talk(page)).not.toHaveAttribute("data-mission-guidance", /.+/);
+    await expect(page.locator(`[data-mission-strip="${MISSION}"]`)).toHaveCount(0);
+    const inventory = await openInventory(page);
+    await expect(tile(inventory, "Rune Fragment")).not.toHaveAttribute(
+      "data-mission-guidance",
+      /.+/,
+    );
+  });
+
+  test("pins only Hilltop on Stillreach and lets Toll's lead open the scene without the stone", async ({
+    page,
+    testCharacter,
+  }) => {
+    await accepted(testCharacter.id, { "toll-lead": 1 });
+    await seed(testCharacter.id, []);
+    await standAt(testCharacter.id, LOCATION_IDS.stillreachLandingStation);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(page.locator(`[data-mission-strip="${MISSION}"]`)).toContainText(
+      "Find the researcher at Hilltop Workshop on Stillreach",
+    );
+    await openMapSurface(page);
+    await expect(litHexes(page)).toHaveCount(1);
+    await expect(
+      page.locator(`[data-map-location="${LOCATION_IDS.hilltopWorkshop}"]`),
+    ).toHaveAttribute("data-mission-guidance", "turn_in");
+
+    await standAt(testCharacter.id, LOCATION_IDS.hilltopWorkshop);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(talk(page)).toHaveAttribute("data-mission-guidance", "turn_in");
+    const conversation = await openNpcConversation(page, ENBY);
+    await openConversationEntry(conversation, /Not From Around Here/);
+    await expect(conversation.locator("[data-dialogue-text]")).toContainText(/Toll sent you/);
+    await playDialogueToText(conversation, /One step at a time/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
+    expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
+    expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });
   });
 });

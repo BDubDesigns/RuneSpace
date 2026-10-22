@@ -91,6 +91,11 @@ export type NpcConversationProjection = {
    * variant of the same moment; they never change what the Mission requires.
    */
   facts?: readonly string[];
+  /**
+   * Present only while a carried item offers this Mission (#369). An offer
+   * route that requires a carried offer item (#389) is listed only then.
+   */
+  itemOffer?: { itemIds: readonly string[] };
 };
 
 /** Which Mission conversation this entry is; drives its short role copy. */
@@ -104,6 +109,11 @@ export type MissionConversationRole = "offer" | "active" | "turn_in" | "complete
 export type MissionConversationAction = {
   kind: "accept_mission" | "complete_mission" | "acknowledge_conversation";
   label: string;
+  /**
+   * Authored copy for an explicit decline control beside the command (#389).
+   * Declining returns to the hub and sends nothing to the server.
+   */
+  declineLabel?: string;
   /**
    * The authored sequence the command is being reported for. Present only for
    * `acknowledge_conversation`, whose server command confirms the played scene
@@ -210,11 +220,13 @@ export function resolveNpcConversationWith(
     const definition = byId.get(projection.missionId);
     const offer = definition?.offers.find((candidate) => candidate.npcId === npcId);
     if (!definition || !offer) continue;
+    // An in-person item offer exists only while the item would offer it (#389).
+    if (offer.requiresCarriedOfferItem && !projection.itemOffer?.itemIds.length) continue;
     if (!getDialogue(offer.dialogueId)) continue;
     offers.push({
       kind: "mission",
       id: `${definition.id}:offer`,
-      label: definition.title,
+      label: offer.subject ?? definition.title,
       role: "offer",
       roleLabel: ROLE_LABELS.offer,
       dialogueId: offer.dialogueId,
@@ -223,6 +235,7 @@ export function resolveNpcConversationWith(
       action: {
         kind: "accept_mission",
         label: offer.actionLabel ?? DEFAULT_ACCEPT_ACTION_LABEL,
+        ...(offer.declineLabel ? { declineLabel: offer.declineLabel } : {}),
       },
       ...(offer.acceptedContinuation
         ? {

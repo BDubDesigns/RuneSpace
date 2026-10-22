@@ -247,6 +247,7 @@ export function NpcConversation({
           <DialoguePlayer
             actionBusy={pending}
             actionLabel={open?.action?.label}
+            declineLabel={open?.action?.declineLabel}
             actionMessage={message}
             onAction={open?.action ? runConversationAction : undefined}
             onBack={returnToHub}

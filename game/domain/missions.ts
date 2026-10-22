@@ -9,7 +9,12 @@ import { ACTION_IDS, type DialogueId, type ShipRouteId } from "@/game/config/fou
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
-import { getLocation, isActionAvailableAtLocation, LOCATIONS } from "@/game/content/locations";
+import {
+  getLocation,
+  getLocationPlanetId,
+  isActionAvailableAtLocation,
+  LOCATIONS,
+} from "@/game/content/locations";
 import { getNpc, resolveNpcPlacement } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { getShipRoute } from "@/game/content/ship-routes";
@@ -19,6 +24,7 @@ import type {
   MissionDefinition,
   MissionDialogue,
   MissionLifecycleMoment,
+  MissionReactiveFact,
   MissionRequirement,
   MissionRequirementKind,
   MissionSkillPrerequisite,
@@ -549,12 +555,37 @@ export function uniqueItemRequirementHolds(
   );
 }
 
+/**
+ * Whether a requirement is waived where the character stands (#389): it applies
+ * on one authored planet only, and the character is on another. A waived
+ * requirement neither gates nor guides, and nothing is recorded by the waiver —
+ * its own progress, if any, is untouched and still read where it is read
+ * (reactive facts). The server's turn-in check asks the same question.
+ */
+export function requirementWaived(
+  requirement: MissionRequirement,
+  currentLocationId: string,
+): boolean {
+  if (requirement.kind !== "npc_conversation" || !requirement.appliesOnPlanetId) return false;
+  return getLocationPlanetId(currentLocationId) !== requirement.appliesOnPlanetId;
+}
+
+/** The requirements that apply where the character stands, in authored order. */
+function applicableRequirements(
+  definition: MissionDefinition,
+  currentLocationId: string,
+): readonly MissionRequirement[] {
+  return definition.requirements.filter(
+    (requirement) => !requirementWaived(requirement, currentLocationId),
+  );
+}
+
 function firstUnsatisfiedRequirement(
   definition: MissionDefinition,
   currentLocationId: string,
   observation: MissionObservation | undefined,
 ): MissionRequirement | undefined {
-  return definition.requirements.find(
+  return applicableRequirements(definition, currentLocationId).find(
     (requirement) => !requirementSatisfied(requirement, currentLocationId, observation),
   );
 }
@@ -570,7 +601,7 @@ function requirementsHold(
   currentLocationId: string,
   observation: MissionObservation | undefined,
 ): boolean {
-  return definition.requirements.every((requirement) =>
+  return applicableRequirements(definition, currentLocationId).every((requirement) =>
     requirementSatisfied(requirement, currentLocationId, observation),
   );
 }
@@ -643,8 +674,17 @@ function deriveGuidance(
   if (state === "completed") return undefined;
   if (state === "not_accepted") {
     if (!prerequisiteSatisfied) return undefined;
+    // An in-person item offer (#389) is available exactly when the carried item
+    // would offer the Mission in Inventory.
+    const carriesOfferItem = itemOfferAvailable(
+      definition,
+      state,
+      prerequisiteSatisfied,
+      observation,
+    );
     const availableNpcIds = definition.offers
       .filter((offer) => offer.locationId === currentLocationId)
+      .filter((offer) => !offer.requiresCarriedOfferItem || carriesOfferItem)
       .map((offer) => offer.npcId);
     // A carried item offers its Mission wherever the player is (#369): the blue
     // affordance sits on the item itself, so no location is involved.
@@ -996,8 +1036,10 @@ export function projectMission(
     currentObjective: active
       ? deriveCurrentObjective(definition, currentLocationId, observation)
       : undefined,
+    // A requirement waived on this planet (#389) is not part of the work here,
+    // so the Log does not list it — not as done, and not as outstanding.
     requirements: active
-      ? definition.requirements.map((requirement) =>
+      ? applicableRequirements(definition, currentLocationId).map((requirement) =>
           projectRequirement(requirement, currentLocationId, observation),
         )
       : undefined,
@@ -1022,11 +1064,27 @@ export function projectMission(
     ...(active && definition.reactiveFacts
       ? {
           facts: definition.reactiveFacts
-            .filter((fact) => (observation?.trackedProgress?.get(fact.key) ?? 0) >= 1)
+            .filter((fact) => reactiveFactHolds(fact, observation))
             .map((fact) => fact.key),
         }
       : {}),
   };
+}
+
+/**
+ * Whether one reactive fact holds (#232). A recorded fact reads its own row; a
+ * conversation fact (#389) reads the marker of the conversation it names, so it
+ * holds only when that scene genuinely happened.
+ */
+function reactiveFactHolds(
+  fact: MissionReactiveFact,
+  observation: MissionObservation | undefined,
+): boolean {
+  const key =
+    fact.observes.kind === "conversation_acknowledged"
+      ? fact.observes.requirementProgressKey
+      : fact.key;
+  return (observation?.trackedProgress?.get(key) ?? 0) >= 1;
 }
 
 /** Projects one authored requirement with live satisfaction/progress. */
@@ -1554,6 +1612,17 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       } else if (offer.acceptEffect) {
         throw new Error(`${where} offer references an unsupported acceptance effect.`);
       }
+      if (offer.requiresCarriedOfferItem && !definition.itemOffer) {
+        // The in-person item offer reads the authored item list; without one
+        // there is nothing for the carried check to find (#389).
+        throw new Error(`${where} offer requires a carried offer item but authors no item offer.`);
+      }
+      if (offer.subject !== undefined && offer.subject.trim().length === 0) {
+        throw new Error(`${where} offer subject must not be empty.`);
+      }
+      if (offer.declineLabel !== undefined && offer.declineLabel.trim().length === 0) {
+        throw new Error(`${where} offer decline label must not be empty.`);
+      }
     }
     if (definition.completedNpcDialogue) {
       const seen = new Set<string>();
@@ -1724,6 +1793,24 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         if (requirement.leads) {
           assertConversationLeads(definition, requirement, requirement.leads, progressKeys);
+        }
+        if (requirement.appliesOnPlanetId) {
+          // A planet-local conversation (#389) is met on its own planet and
+          // waived only on the turn-in's, so both ends must be where the
+          // waiver can make sense.
+          if (getLocationPlanetId(requirement.locationId) !== requirement.appliesOnPlanetId) {
+            throw new Error(
+              `${where} conversation requirement applies on planet "${requirement.appliesOnPlanetId}" but is met on another.`,
+            );
+          }
+          if (
+            !definition.turnIn ||
+            getLocationPlanetId(definition.turnIn.locationId) === requirement.appliesOnPlanetId
+          ) {
+            throw new Error(
+              `${where} planet-local conversation requirement needs a turn-in on another planet.`,
+            );
+          }
         }
         continue;
       }
@@ -1977,7 +2064,11 @@ export function missionLifecycleMoments(
   // moment of (#358).
   if (!definition.turnIn) return [];
   const moments = new Set<MissionLifecycleMoment>();
+  // A requirement waived wherever the turn-in NPC stands (#389) is never the
+  // first unmet one in front of them, so it reaches no reminder there.
+  const turnInLocationId = definition.turnIn.locationId;
   for (const requirement of definition.requirements) {
+    if (requirementWaived(requirement, turnInLocationId)) continue;
     const moment = reminderMomentFor(requirement.kind);
     if (moment) moments.add(moment);
   }
@@ -2142,6 +2233,21 @@ function assertReactiveContent(
       throw new Error(`${where} reactive fact key "${fact.key}" is not unique.`);
     }
     factKeys.add(fact.key);
+    if (fact.observes.kind === "conversation_acknowledged") {
+      const watched = fact.observes;
+      if (
+        !definition.requirements.some(
+          (candidate) =>
+            candidate.kind === "npc_conversation" &&
+            candidate.progressKey === watched.requirementProgressKey,
+        )
+      ) {
+        throw new Error(
+          `${where} reactive conversation fact must name one of its own conversation requirements.`,
+        );
+      }
+      continue;
+    }
     if (!fabricationActionIds().includes(fact.observes.actionId)) {
       throw new Error(`${where} reactive fact must observe an authored Fabrication recipe.`);
     }

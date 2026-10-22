@@ -151,6 +151,11 @@ const authoredWikiArticles = [
           "Before you launch, the Flight Controls show the cost, your fuel now and your fuel after landing. If you would land with less than the 120 FU the flight back needs, they warn you. You can still go: nothing refuels the ship for free on the other side and there is no automatic return, so plan to load fuel you have bought, traded or made before you fly home.",
           "Once launched, the flight cannot be cancelled and the fuel is spent. You watch the Rivet lift off, cross a chart from Skatboll to Stillreach for most of the trip, and touch down. You can minimize the flight and still browse your Inventory, Equipment and Missions, but you cannot walk, mine, refine, trade or move anything until you land. The flight keeps going if you close the game; come back early and it picks up where it is, come back late and you have already landed.",
           "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of eight locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
+          [
+            "Two walks from the Landing Station, by way of Windward Track, is Hilltop Workshop, where ",
+            { text: "the Wise Old Enby", articleSlug: "the-wise-old-enby" },
+            " lives and works. Anyone who gets there can talk to them.",
+          ],
         ],
       },
       {
@@ -1204,7 +1209,7 @@ const authoredWikiArticles = [
         list: [
           [
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
-            " — offered by a Rune Fragment in your Inventory, not by a person. Ask around about it; Tolliver Kade points you toward a researcher on Stillreach. Nothing is needed first, and it pays nothing yet.",
+            " — offered by a Rune Fragment in your Inventory, not by a person. Ask around about it on Skatboll, or go straight to the Wise Old Enby at Hilltop Workshop on Stillreach, who finishes it. Nothing is needed first, and it pays nothing.",
           ],
         ],
       },
@@ -1748,6 +1753,43 @@ const authoredWikiArticles = [
             ", is to build a mount for the MYKEA SCHLEPPRAUM-8 he already owns, so it has somewhere to go in his room. It needs ",
             { text: "Welding", articleSlug: "cargo-hold-and-welding" },
             " level 1, and its guide has the details.",
+          ],
+        ],
+      },
+    ],
+  },
+  {
+    // Issue #389 — written only from the Public-Wiki-safe facts on the Wise Old
+    // Enby's Notion Canon page: name, appearance, nonbinary identity, and role.
+    slug: "the-wise-old-enby",
+    title: "The Wise Old Enby",
+    category: "people",
+    summary:
+      "A researcher who lives and works at Hilltop Workshop on Stillreach, and who knows far more about unusual minerals than they first let on.",
+    sections: [
+      {
+        paragraphs: [
+          "The Wise Old Enby is a researcher at Hilltop Workshop, on the planet Stillreach. They are nonbinary, and they go by they and them.",
+          "You will know them by the blue party hat, the long white hair and braided beard, the amber goggles, and a well-worn staff that is as much equipment as walking stick. They came to the hill following something odd in the ground, and stayed.",
+        ],
+      },
+      {
+        heading: "Finding them",
+        paragraphs: [
+          [
+            "Hilltop Workshop is two walks from Stillreach Landing Station, by way of Windward Track (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). Anyone who reaches it can talk to them about the workshop and about Stillreach; no Mission or item is needed.",
+          ],
+        ],
+      },
+      {
+        heading: "The unusual mineral",
+        paragraphs: [
+          [
+            "They are the person ",
+            { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+            " leads to. Bring them a Rune Fragment or an intact Runestone and they can tell you what it is; afterwards, About RuneSpace is something you can ask them about again whenever you like.",
           ],
         ],
       },

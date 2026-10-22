@@ -6,6 +6,7 @@ import {
   MERCHANT_IDS,
   MISSION_IDS,
   NPC_IDS,
+  PLANET_IDS,
   REPAIR_TARGET_IDS,
   SHIP_ROUTE_IDS,
   SKILL_IDS,
@@ -15,6 +16,7 @@ import {
   type LocationId,
   type MissionId,
   type NpcId,
+  type PlanetId,
   type RepairTargetId,
   type ShipRouteId,
   type SkillId,
@@ -242,6 +244,22 @@ export type MissionRequirement =
        * skips every lead.
        */
       leads?: MissionConversationLeads;
+      /**
+       * The one planet this conversation is required on (#389). It must be the
+       * planet of its own `locationId`, and the Mission's turn-in must be on a
+       * different one.
+       *
+       * The conversation is how a player on that planet learns where to go next;
+       * a player who has already reached the turn-in's planet does not need it.
+       * While the character stands on any other planet the requirement is WAIVED:
+       * it neither gates the turn-in nor guides, and the Mission Log does not list
+       * it. Nothing is recorded by the waiver — changing planets never satisfies
+       * the conversation — and a marker it already holds is kept and still read
+       * (a reactive fact can tell the turn-in NPC who sent the player). Back on
+       * this planet the requirement, its leads and their guidance are exactly as
+       * they were.
+       */
+      appliesOnPlanetId?: PlanetId;
     }
   | {
       /**
@@ -353,6 +371,17 @@ export type MissionReactiveFact = {
   key: string;
   observes:
     | {
+        /**
+         * One of this Mission's own conversation requirements was genuinely
+         * acknowledged (#389): Toll really did send the player to the Enby.
+         * Derived from that requirement's existing marker, so it writes no row
+         * of its own and holds exactly when the conversation happened — never
+         * because the requirement is waived on another planet.
+         */
+        kind: "conversation_acknowledged";
+        requirementProgressKey: string;
+      }
+    | {
         /** A Manual Override push busted a workpiece of this recipe while the Mission was active. */
         kind: "fabrication_override_bust";
         actionId: ActionId;
@@ -414,6 +443,24 @@ export type MissionOffer = {
    * Keep the Change job budget). Absent for an ordinary offer.
    */
   acceptEffect?: MissionAcceptEffect;
+  /**
+   * This route is the Mission's item offer made in person (#389): it is offered
+   * only while the character genuinely carries a stack of one of `itemOffer`'s
+   * items — exactly when Inventory would offer it — and the acceptance command
+   * revalidates that carried stack. Nothing is consumed. Only a Mission that
+   * authors an `itemOffer` may set it.
+   */
+  requiresCarriedOfferItem?: true;
+  /**
+   * Short hub subject for this offer's conversation entry instead of the Mission
+   * title ("Show strange mineral"). An interface label, never a player line.
+   */
+  subject?: string;
+  /**
+   * Label for an explicit decline control beside the acceptance control. It
+   * returns to the hub and changes nothing.
+   */
+  declineLabel?: string;
 };
 
 /**
@@ -1739,33 +1786,42 @@ export const CURLY_MUST_STASH: MissionDefinition = {
 
 /**
  * Not From Around Here — the first item-originated Mission and the opening Rune
- * Fragment investigation (#369).
+ * Fragment investigation (#369), solved by the Wise Old Enby (#389).
  *
  * A carried Rune Fragment or intact Runestone offers it through the ordinary
- * Inventory Item Details (`itemOffer`), not an NPC. Accepting consumes nothing: the item stays the
- * player's, and no quest-only Fragment exists.
+ * Inventory Item Details (`itemOffer`). On Stillreach the Enby makes the same
+ * offer in person ("Show strange mineral") to a visitor who carries either stone.
+ * Accepting by either route consumes nothing: the item stays the player's, and no
+ * quest-only Fragment exists.
  *
- * The investigation has three honest contacts — Wade, Tansy and Toll — expressed
- * as ONE conversation requirement. Toll is the only contact the Mission needs;
- * Wade and Tansy are optional leads that each record the same single durable
- * fact, which narrows guidance and the objective to Toll alone. Visiting Toll
- * directly is always enough.
+ * On Skatboll the investigation has three honest contacts — Wade, Tansy and Toll —
+ * expressed as ONE conversation requirement. Toll is the only contact needed there;
+ * Wade and Tansy are optional leads that each record the same single durable fact,
+ * which narrows guidance and the objective to Toll alone. That requirement applies
+ * on Skatboll only (`appliesOnPlanetId`): on Stillreach the researcher is a walk
+ * away, so the Enby at Hilltop Workshop is the one objective whether or not Toll
+ * was ever asked. Nothing records Toll's conversation except Toll's own scene.
  *
- * It ends, deliberately, at a `deferred_stage`: the Stillreach researcher, their
- * Hilltop Workshop and the route there are a later slice, so the Mission stays
- * accepted and Active with an honest objective instead of a fabricated target, a
- * false Turn In or an artificial completion. The slice that ships them replaces
- * that stage with real requirements and a completion; see docs/missions.md.
- *
- * It pays nothing: no Credits, XP or item for inspecting, for a hint, or for
- * Toll's lead.
+ * The Mission completes at the Enby's explicit terminal control after their
+ * explanation, with no reward, no consumption and no continuation. Toll's lead
+ * (`toll-lead`) chooses which opening the Enby speaks; both converge. The finished
+ * Mission's durable completion stamp is the seam the next story Mission reads.
  */
 export const NOT_FROM_AROUND_HERE: MissionDefinition = {
   id: MISSION_IDS.notFromAroundHere,
   title: "Not From Around Here",
-  summary:
-    "Something unusual turned up in the rock. Find out whether anyone around Holo Hollow recognizes it.",
-  offers: [],
+  summary: "Something unusual turned up in the rock. Find someone who can tell you what it is.",
+  offers: [
+    {
+      npcId: NPC_IDS.wiseOldEnby,
+      locationId: LOCATION_IDS.hilltopWorkshop,
+      dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereOffer,
+      subject: "Show strange mineral",
+      actionLabel: "Start mission",
+      declineLabel: "Not now",
+      requiresCarriedOfferItem: true,
+    },
+  ],
   itemOffer: {
     // A Fragment or an intact Runestone: a player who has moved on to Runestones
     // can still start the same mystery.
@@ -1801,13 +1857,44 @@ export const NOT_FROM_AROUND_HERE: MissionDefinition = {
         ],
         followedObjective: "Ask Tolliver Kade at Last Leg Trading about the fragment",
       },
-    },
-    {
-      kind: "deferred_stage",
-      objective: "Find the researcher at Hilltop Workshop on Stillreach",
+      appliesOnPlanetId: PLANET_IDS.skatboll,
     },
   ],
-  dialogue: {},
+  turnIn: {
+    npcId: NPC_IDS.wiseOldEnby,
+    locationId: LOCATION_IDS.hilltopWorkshop,
+    requiresStationary: true,
+    objective: "Find the researcher at Hilltop Workshop on Stillreach",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHere,
+    actionLabel: "I UNDERSTAND",
+  },
+  reactiveFacts: [
+    {
+      key: "toll-sent",
+      observes: { kind: "conversation_acknowledged", requirementProgressKey: "toll-lead" },
+    },
+  ],
+  dialogue: {
+    reactive: [
+      {
+        factKey: "toll-sent",
+        moment: "turn_in",
+        dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereTollSent,
+      },
+    ],
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "Hilltop Workshop hosts no activity, so nothing keeps a character busy in front of the Enby.",
+      },
+      {
+        moment: "completion_presentation",
+        reason:
+          "The Mission grants nothing and the Enby's explanation ends the scene, so success returns to their hub, where About RuneSpace is now listed.",
+      },
+    ],
+  },
 };
 
 export const MISSIONS: readonly MissionDefinition[] = [
@@ -1845,7 +1932,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Curly's optional commission at HH B&B (#292), after Keep the Change.
   CURLY_MUST_STASH,
   // The first Mission offered by a carried item (#369): standalone, no
-  // prerequisite, and it ends at an intentionally unfinished deferred stage.
+  // prerequisite, solved by the Wise Old Enby on Stillreach (#389).
   NOT_FROM_AROUND_HERE,
 ];
 

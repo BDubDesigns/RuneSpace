@@ -13,7 +13,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
 
 /**
- * Issue #369 — Not From Around Here, against real PostgreSQL.
+ * Issues #369 and #389 — Not From Around Here, against real PostgreSQL.
  *
  * The rules a pure unit test cannot prove: that a carried Rune Fragment offers
  * and accepts the Mission atomically and exactly once under retries and
@@ -21,10 +21,12 @@ const suite = DATABASE_URL ? describe : describe.skip;
  * wrong-item or Cargo-Hold-only stack is refused and writes nothing; that an
  * optional hint records one durable idempotent fact only at the place the lead
  * NPC actually stands for THAT character; that Toll's acknowledgement is the
- * only thing that advances the Mission; and that the Mission then stays Active
- * with no completion, reward or turn-in that could be reached.
+ * only thing that records Toll; and (#389) that the Wise Old Enby offers the
+ * same Mission in person only to a visitor carrying a stone, and completes it
+ * exactly once at Hilltop Workshop — with or without Toll, with or without the
+ * stone — paying, consuming and recording nothing else.
  */
-suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
+suite("issues #369 and #389 Not From Around Here (real PostgreSQL)", () => {
   let db: (typeof import("@/db"))["db"];
   let authSchema: typeof import("@/db/auth-schema");
   let rune: typeof import("@/db/rune-space");
@@ -304,7 +306,7 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
       expect((await projection(userId, character.id)).itemOffer).toBeUndefined();
     });
 
-    it("cannot be accepted through an NPC, and the item route accepts no other Mission", async () => {
+    it("cannot be accepted through Toll, and the item route accepts no other Mission", async () => {
       const { userId, character } = await makeCharacter();
       const fragment = await giveStack(character.id, ITEM_IDS.runeFragment);
       const viaNpc = await missions.acceptMission(
@@ -451,7 +453,7 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
     });
   });
 
-  describe("Toll, and the deliberately unfinished end", () => {
+  describe("Toll, on Skatboll", () => {
     it("advances the Mission directly, with no hint, before Thrust Issues or Trade", async () => {
       const { userId, character } = await acceptedCharacter();
       await move(character.id, LOCATION_IDS.holoHollowLanding);
@@ -477,7 +479,7 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
       expect(await progress(character.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });
     });
 
-    it("leaves the same Mission Active with the Stillreach objective and no reachable finish", async () => {
+    it("points the same Active Mission at the Enby on Stillreach, completable only there", async () => {
       const { userId, character } = await acceptedCharacter();
       await move(character.id, LOCATION_IDS.holoHollowLanding);
       const before = await snapshot(character.id);
@@ -489,19 +491,26 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
         "Find the researcher at Hilltop Workshop on Stillreach",
       );
       expect(projected.stage?.turnInAvailable).toBe(false);
-      expect(projected.guidance).toBeUndefined();
+      // The only target is off this planet's map: no Skatboll pin at all.
+      expect(projected.guidance).toEqual({
+        npcId: NPC_IDS.wiseOldEnby,
+        locationId: LOCATION_IDS.hilltopWorkshop,
+        turnIn: true,
+      });
       expect(projected.completedAt).toBeUndefined();
 
-      // Nothing can complete it: Toll is not a turn-in, and a forged hand-in is refused.
-      const forged = await missions.completeMission(
-        userId,
-        character.id,
-        MISSION,
-        NPC_IDS.tollKade,
-        now,
-        random(),
-      );
-      expect(forged.mission).toMatchObject({ status: "refused" });
+      // Toll is not the turn-in, and the Enby cannot be reached from the Landing.
+      for (const npcId of [NPC_IDS.tollKade, NPC_IDS.wiseOldEnby]) {
+        const forged = await missions.completeMission(
+          userId,
+          character.id,
+          MISSION,
+          npcId,
+          now,
+          random(),
+        );
+        expect(forged.mission).toMatchObject({ status: "refused" });
+      }
       const [row] = await missionRows(character.id);
       expect(row?.completedAt).toBeNull();
       // No Credits, XP or item for the hint, the lead, or the attempt to finish.
@@ -527,6 +536,266 @@ suite("issue #369 Not From Around Here (real PostgreSQL)", () => {
       await move(character.id, LOCATION_IDS.crashSite);
       expect((await hintWade(userId, character.id)).mission.status).toBe("already_acknowledged");
       expect(await progress(character.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });
+    });
+  });
+
+  describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
+    const enby = NPC_IDS.wiseOldEnby;
+    const acceptAtEnby = (userId: string, characterId: string) =>
+      missions.acceptMission(userId, characterId, MISSION, enby, now, random());
+    const finish = (userId: string, characterId: string) =>
+      missions.completeMission(userId, characterId, MISSION, enby, now, random());
+
+    async function skillXp(characterId: string) {
+      const rows = await db
+        .select({ skillId: rune.characterSkillXp.skillId, xp: rune.characterSkillXp.totalXp })
+        .from(rune.characterSkillXp)
+        .where(eq(rune.characterSkillXp.characterId, characterId));
+      return rows.sort((a, b) => a.skillId.localeCompare(b.skillId));
+    }
+
+    /** Completes at the Enby and proves it was exactly that, and nothing else. */
+    async function completesCleanly(userId: string, characterId: string) {
+      const progressBefore = await progress(characterId);
+      const before = await snapshot(characterId);
+      const xpBefore = await skillXp(characterId);
+      const ready = await projection(userId, characterId);
+      expect(ready.state).toBe("ready_for_completion");
+      expect(ready.requirements).toEqual([]);
+
+      const result = await finish(userId, characterId);
+      expect(result.mission).toEqual({ status: "completed" });
+      const [row] = await missionRows(characterId);
+      expect(row?.completedAt).toEqual(now);
+      // Nothing paid, granted, consumed or recorded beyond the completion stamp.
+      expect(await snapshot(characterId)).toEqual(before);
+      expect(await skillXp(characterId)).toEqual(xpBefore);
+      expect(await progress(characterId)).toEqual(progressBefore);
+
+      const done = await projection(userId, characterId);
+      expect(done.state).toBe("completed");
+      expect(done.earnedReward).toBeUndefined();
+      expect(done.guidance).toBeUndefined();
+      expect(done.itemOffer).toBeUndefined();
+      // A refresh or a fresh login reads the same durable completion.
+      expect(await projection(userId, characterId)).toEqual(done);
+      expect((await finish(userId, characterId)).mission.status).toBe("already_completed");
+    }
+
+    describe("offering it in person", () => {
+      it("accepts the same Mission from a carried Fragment, consuming nothing", async () => {
+        const { userId, character } = await makeCharacter();
+        await giveStack(character.id, ITEM_IDS.runeFragment, 2);
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        const before = await snapshot(character.id);
+        const result = await acceptAtEnby(userId, character.id);
+        expect(result.mission).toEqual({ status: "accepted" });
+        expect(await snapshot(character.id)).toEqual(before);
+        expect(await missionRows(character.id)).toHaveLength(1);
+        expect(await progress(character.id)).toEqual({ "toll-lead": 0, "toll-hint": 0 });
+        // The same hub now offers the revelation: no Inventory, Toll or walk needed.
+        const projected = await projection(userId, character.id);
+        expect(projected.state).toBe("ready_for_completion");
+        expect(projected.itemOffer).toBeUndefined();
+      });
+
+      it("accepts from an intact Runestone too", async () => {
+        const { userId, character } = await makeCharacter();
+        await giveStack(character.id, ITEM_IDS.runestone, 1);
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        expect((await acceptAtEnby(userId, character.id)).mission.status).toBe("accepted");
+      });
+
+      it("refuses a visitor with no carried stone, writing nothing", async () => {
+        const { userId, character } = await makeCharacter();
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        await giveStack(character.id, ITEM_IDS.ferriteShale);
+        await db
+          .insert(rune.cargoHoldStacks)
+          .values({ characterId: character.id, itemId: ITEM_IDS.runeFragment, quantity: 2 });
+        const other = await makeCharacter("Other");
+        await giveStack(other.character.id, ITEM_IDS.runestone);
+        const refused = await acceptAtEnby(userId, character.id);
+        expect(refused.mission).toMatchObject({ status: "refused" });
+        expect(await missionRows(character.id)).toHaveLength(0);
+        expect(await progress(character.id)).toEqual({});
+      });
+
+      it("refuses anywhere but the hill", async () => {
+        const { userId, character } = await makeCharacter();
+        await giveStack(character.id, ITEM_IDS.runeFragment);
+        for (const locationId of [LOCATION_IDS.windwardTrack, LOCATION_IDS.holoHollowLanding]) {
+          await move(character.id, locationId);
+          expect((await acceptAtEnby(userId, character.id)).mission.status).toBe("refused");
+        }
+        expect(await missionRows(character.id)).toHaveLength(0);
+      });
+
+      it("accepts exactly once under concurrent requests, and never after", async () => {
+        const { userId, character } = await makeCharacter();
+        await giveStack(character.id, ITEM_IDS.runeFragment);
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        const results = await Promise.all(
+          [1, 2, 3, 4].map(() => acceptAtEnby(userId, character.id)),
+        );
+        expect(results.map((result) => result.mission.status).sort()).toEqual([
+          "accepted",
+          "already_accepted",
+          "already_accepted",
+          "already_accepted",
+        ]);
+        expect(await missionRows(character.id)).toHaveLength(1);
+        await completesCleanly(userId, character.id);
+        expect((await acceptAtEnby(userId, character.id)).mission.status).toBe("already_completed");
+      });
+    });
+
+    describe("finishing it at the Enby", () => {
+      it("(i) accepted on Skatboll with no hint and no Toll", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await move(character.id, LOCATION_IDS.stillreachLandingStation);
+        const away = await projection(userId, character.id);
+        expect(away.currentObjective).toBe("Find the researcher at Hilltop Workshop on Stillreach");
+        expect(away.guidance).toEqual({
+          npcId: NPC_IDS.wiseOldEnby,
+          locationId: LOCATION_IDS.hilltopWorkshop,
+          turnIn: true,
+        });
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        await completesCleanly(userId, character.id);
+        // Toll's fact was never recorded by the direct route.
+        expect(await progress(character.id)).toEqual({ "toll-lead": 0, "toll-hint": 0 });
+      });
+
+      it("(ii) after a Wade hint, without Toll", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await move(character.id, LOCATION_IDS.crashSite);
+        await hintWade(userId, character.id);
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        await completesCleanly(userId, character.id);
+        expect(await progress(character.id)).toEqual({ "toll-lead": 0, "toll-hint": 1 });
+      });
+
+      it("(iii) after Toll, opening with Toll", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await move(character.id, LOCATION_IDS.holoHollowLanding);
+        await meetToll(userId, character.id);
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        expect((await projection(userId, character.id)).facts).toEqual(["toll-sent"]);
+        await completesCleanly(userId, character.id);
+        expect(await progress(character.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });
+      });
+
+      it("(iv, v) accepted in person with either stone", async () => {
+        for (const itemId of [ITEM_IDS.runeFragment, ITEM_IDS.runestone]) {
+          const { userId, character } = await makeCharacter();
+          await giveStack(character.id, itemId);
+          await move(character.id, LOCATION_IDS.hilltopWorkshop);
+          await acceptAtEnby(userId, character.id);
+          await completesCleanly(userId, character.id);
+        }
+      });
+
+      it("(vi) after the stone was sold, used or put in the Cargo Hold", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await db
+          .delete(rune.inventoryStacks)
+          .where(eq(rune.inventoryStacks.characterId, character.id));
+        await db
+          .insert(rune.cargoHoldStacks)
+          .values({ characterId: character.id, itemId: ITEM_IDS.runestone, quantity: 1 });
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        await completesCleanly(userId, character.id);
+      });
+
+      it("(vii) an old save parked at the end of Toll's lead upgrades in place", async () => {
+        // Exactly the rows a pre-#389 character holds: accepted, both facts set.
+        const { userId, character } = await makeCharacter();
+        await db
+          .insert(rune.characterMissions)
+          .values({ characterId: character.id, missionId: MISSION, acceptedAt: now });
+        await db.insert(rune.characterMissionProgress).values(
+          ["toll-lead", "toll-hint"].map((progressKey) => ({
+            characterId: character.id,
+            missionId: MISSION,
+            progressKey,
+            progress: 1,
+            updatedAt: now,
+          })),
+        );
+        await move(character.id, LOCATION_IDS.holoHollowLanding);
+        expect((await projection(userId, character.id)).currentObjective).toBe(
+          "Find the researcher at Hilltop Workshop on Stillreach",
+        );
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        await completesCleanly(userId, character.id);
+        expect(await progress(character.id)).toEqual({ "toll-lead": 1, "toll-hint": 1 });
+      });
+
+      it("completes exactly once under concurrent clicks and clients", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        const before = await snapshot(character.id);
+        const results = await Promise.all([1, 2, 3, 4, 5].map(() => finish(userId, character.id)));
+        expect(results.map((result) => result.mission.status).sort()).toEqual([
+          "already_completed",
+          "already_completed",
+          "already_completed",
+          "already_completed",
+          "completed",
+        ]);
+        expect(await missionRows(character.id)).toHaveLength(1);
+        expect(await snapshot(character.id)).toEqual(before);
+      });
+
+      it("is never finished from elsewhere on Stillreach, by someone else, or unaccepted", async () => {
+        const { userId, character } = await acceptedCharacter();
+        await move(character.id, LOCATION_IDS.windwardTrack);
+        expect((await finish(userId, character.id)).mission).toMatchObject({
+          status: "refused",
+          reason: "not_stationary",
+        });
+        await move(character.id, LOCATION_IDS.hilltopWorkshop);
+        const wrongNpc = await missions.completeMission(
+          userId,
+          character.id,
+          MISSION,
+          NPC_IDS.tollKade,
+          now,
+          random(),
+        );
+        expect(wrongNpc.mission).toMatchObject({ status: "refused", reason: "wrong_npc" });
+        const [row] = await missionRows(character.id);
+        expect(row?.completedAt).toBeNull();
+
+        const stranger = await makeCharacter("Stranger");
+        await move(stranger.character.id, LOCATION_IDS.hilltopWorkshop);
+        expect((await finish(stranger.userId, stranger.character.id)).mission).toMatchObject({
+          status: "refused",
+          reason: "not_accepted",
+        });
+        expect(await missionRows(stranger.character.id)).toHaveLength(0);
+      });
+    });
+
+    it("never records Toll by travelling, standing at the hill, or claiming his scene there", async () => {
+      const { userId, character } = await acceptedCharacter();
+      for (const locationId of [
+        LOCATION_IDS.stillreachLandingStation,
+        LOCATION_IDS.hilltopWorkshop,
+        LOCATION_IDS.crashSite,
+      ]) {
+        await move(character.id, locationId);
+        await projection(userId, character.id);
+      }
+      await move(character.id, LOCATION_IDS.hilltopWorkshop);
+      expect((await meetToll(userId, character.id)).mission.status).toBe("refused");
+      expect(await progress(character.id)).toEqual({ "toll-lead": 0, "toll-hint": 0 });
+      // Back on Skatboll, the investigation is exactly where it was.
+      await move(character.id, LOCATION_IDS.holoHollow);
+      const back = await projection(userId, character.id);
+      expect(back.currentObjective).toBe("Find someone who might recognize the unusual fragment");
+      expect(back.guidance?.candidates).toHaveLength(3);
     });
   });
 });
