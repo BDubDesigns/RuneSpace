@@ -46,6 +46,7 @@ const CINEMATIC = "[data-flight-cinematic]";
 const OVERLAY = 'img[data-scene-layer="overlay"]';
 const TERMINAL = "[data-last-leg-terminal]";
 const FUEL_TERMINAL = LOCAL_PLACE_IDS.stillreachFuelTerminal;
+const STAR_CHART = "[data-star-chart]";
 
 async function seedPilot(
   characterId: string,
@@ -346,6 +347,125 @@ test("flies Holo Hollow Landing to Stillreach: warning, takeoff, interplanetary 
   );
 });
 
+test("chooses the flight on the star chart: worlds, selection, refusal, keyboard, mobile and desktop", async ({
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(90_000);
+  const characterId = testCharacter.id;
+  await page.setViewportSize(PHONE);
+  await seedPilot(characterId, { berth: LOCATION_IDS.holoHollowLanding, fuel: 40 });
+  await openTestCharacter(page, characterId);
+  await page.locator(SHIP).locator(BOARD).click();
+
+  const chart = page.locator(STAR_CHART);
+  const stillreach = chart.locator('[data-star-chart-destination="stillreach"]');
+  const launch = page.locator(
+    `[data-ship-launch="${SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation}"]`,
+  );
+  // The berth's world is the origin, never a button; the one other world a route
+  // reaches is the only destination, drawn from its typed presentation.
+  await expect(chart).toHaveAttribute("data-star-chart-origin", "skatboll");
+  await expect(chart.locator('[data-star-chart-planet="skatboll"]')).toContainText("You are here");
+  await expect(chart.locator('[data-star-chart-planet="skatboll"]')).toContainText(
+    "Holo Hollow Landing",
+  );
+  await expect(chart.locator('[data-star-chart-destination="skatboll"]')).toHaveCount(0);
+  await expect(chart.locator("[data-planet-body]")).toHaveCount(2);
+  await expect(chart.locator('[data-planet-body="skatboll"] [data-planet-ring]')).toHaveCount(2);
+  await expect(chart.locator('[data-planet-body="stillreach"] [data-planet-halo]')).toHaveCount(1);
+  await expect(chart.locator("[data-star-chart-route]")).toHaveCount(1);
+
+  // 40 FU: known but refused. Dimmed, marked unavailable, still readable, and the
+  // server's own reason beside a disabled LAUNCH.
+  await expect(stillreach).toHaveAttribute("data-state", "unavailable");
+  await expect(stillreach).toHaveAttribute("aria-pressed", "true");
+  await expect(stillreach.locator("[data-star-chart-status]")).toHaveText("Unavailable");
+  await expect(chart.locator('[data-star-chart-world="stillreach"]')).toHaveClass(
+    /rs-star-chart__dimmed/,
+  );
+  await expect(launch).toBeDisabled();
+  await expect(page.locator("[data-ship-launch-guidance]")).toHaveAttribute(
+    "data-ship-launch-guidance",
+    "insufficient_fuel",
+  );
+  await expect(page.locator("[data-ship-return-fuel-warning]")).toHaveCount(0);
+  await chart.scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, "star-chart-refused-mobile.png");
+
+  // Fuelled: the same world, now launchable and preselected, with its readout.
+  await db
+    .update(characterShips)
+    .set({ fuelUnits: 200 })
+    .where(eq(characterShips.characterId, characterId));
+  await page.reload();
+  await page.locator(SHIP).locator(BOARD).click();
+  await expect(stillreach).toHaveAttribute("data-state", "available");
+  await expect(stillreach).toHaveAttribute("aria-pressed", "true");
+  await expect(stillreach.locator("[data-star-chart-status]")).toHaveText("Selected");
+  await expect(chart.locator('[data-star-chart-route="stillreach"]')).toHaveAttribute(
+    "data-selected",
+    "",
+  );
+  const readout = page.locator("[data-star-chart-readout]");
+  await expect(readout).toContainText("Stillreach Landing Station");
+  await expect(readout.locator("[data-ship-route-cost]")).toHaveText("120 FU");
+  await expect(readout.locator("[data-ship-route-duration]")).toHaveText("4 min 20 s");
+  await expect(readout.locator("[data-ship-route-tank-now]")).toHaveText("200 / 300 FU");
+  await expect(readout.locator("[data-ship-route-tank-after]")).toHaveText("80 / 300 FU");
+  await expect(readout.locator("[data-ship-return-fuel-warning]")).toBeVisible();
+  await expect(launch).toBeEnabled();
+
+  // Phone: a large touch target, readable labels, nothing off the page, and the
+  // chart, readout and LAUNCH within one screen.
+  const target = (await stillreach.boundingBox())!;
+  expect(target.width).toBeGreaterThanOrEqual(44);
+  expect(target.height).toBeGreaterThanOrEqual(44);
+  await expectNoHorizontalOverflow(page);
+  const chartBox = (await chart.boundingBox())!;
+  const launchBox = (await launch.boundingBox())!;
+  expect(launchBox.y + launchBox.height - chartBox.y).toBeLessThan(PHONE.height);
+  await chart.scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, "star-chart-outbound-mobile.png");
+
+  // Keyboard: the world is a real button; selecting again changes nothing and
+  // sends nothing. Selecting is presentation only.
+  await stillreach.focus();
+  await expect(stillreach).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(stillreach).toHaveAttribute("aria-pressed", "true");
+  const beforeLaunch = await shipRow(characterId);
+  expect(beforeLaunch.fuelUnits).toBe(200);
+  expect(beforeLaunch.flightRouteId).toBeNull();
+
+  // Reduced motion: the selected leg and the berth ring stay drawn but still.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const selector of ["[data-star-chart-route][data-selected]", ".rs-star-chart__berth"]) {
+    expect(
+      await chart.locator(selector).evaluate((element) => getComputedStyle(element).animationName),
+    ).toBe("none");
+  }
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+
+  await page.setViewportSize(DESKTOP);
+  await expectNoHorizontalOverflow(page);
+  const desktopChart = (await chart.boundingBox())!;
+  const desktopLaunch = (await launch.boundingBox())!;
+  expect(desktopLaunch.y + desktopLaunch.height - desktopChart.y).toBeLessThan(DESKTOP.height);
+  await chart.scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, "star-chart-outbound-desktop.png");
+
+  // LAUNCH acts on the selected route only, and leads into the same cinematic.
+  await launch.click();
+  await expect(page.locator(CINEMATIC)).toHaveAttribute("data-flight-phase", "takeoff", {
+    timeout: 10_000,
+  });
+  const row = await shipRow(characterId);
+  expect(row.flightRouteId).toBe(SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation);
+  expect(row.fuelUnits).toBe(80);
+  await expect(chart).toHaveCount(0);
+});
+
 test("flies home from Stillreach: Stillreach takeoff, the chart right to left, Holo Hollow touchdown", async ({
   page,
   testCharacter,
@@ -365,6 +485,17 @@ test("flies home from Stillreach: Stillreach takeoff, the chart right to left, H
   await captureReviewScreenshot(page, "stillreach-landing-berthed-desktop.png");
 
   await page.locator(SHIP).locator(BOARD).click();
+  // The star chart's reverse leg (#377): Stillreach here, Skatboll the one choice.
+  await expect(page.locator(STAR_CHART)).toHaveAttribute("data-star-chart-origin", "stillreach");
+  await expect(
+    page.locator('[data-star-chart-planet="stillreach"] [data-star-chart-you-are-here]'),
+  ).toBeVisible();
+  await expect(page.locator('[data-star-chart-destination="skatboll"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator('[data-star-chart-destination="stillreach"]')).toHaveCount(0);
+  await captureReviewScreenshot(page, "star-chart-home-desktop.png");
   const route = page.locator(
     `[data-ship-route="${SHIP_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding}"]`,
   );

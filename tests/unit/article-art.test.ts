@@ -135,9 +135,10 @@ describe("canonical article art", () => {
     expect(index).toContain("Holo Hollow Landing");
     expect(index).toContain("Something Strange in the Rock");
     expect(index).toContain("Next Stop: Stillreach");
-    // The homepage shows only the newest Update's summary (#375).
-    expect(landing).toContain("Next Stop: Stillreach");
-    expect(landing).not.toContain("Something Strange in the Rock");
+    expect(index).toContain("Plot a Course");
+    // The homepage shows only the newest Update's summary (#377).
+    expect(landing).toContain("Plot a Course");
+    expect(landing).not.toContain("Next Stop: Stillreach");
     for (const markup of [index, landing]) {
       expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");

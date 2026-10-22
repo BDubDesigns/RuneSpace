@@ -118,10 +118,23 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Stillreach flight Update as the newest (#375)", () => {
+  it("publishes the star chart Update as the newest (#377)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("next-stop-stillreach");
+    expect(latest.slug).toBe("plot-a-course");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("next-stop-stillreach")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    // Presentation only: the flight, its cost and the first hop are unchanged.
+    expect(text).toContain("star chart");
+    expect(text).toContain("nothing is spent and the ship does not move until you press LAUNCH");
+    expect(text).toContain("keeps its own simple launch card");
+  });
+
+  it("keeps the Stillreach flight Update published beneath it (#375)", () => {
+    const latest = getPublicUpdate("next-stop-stillreach")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("something-strange-in-the-rock")!.publishedAt),
     );

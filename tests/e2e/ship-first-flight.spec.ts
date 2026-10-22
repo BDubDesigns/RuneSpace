@@ -238,6 +238,9 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   const bay = ship.locator(BAY);
   await expect(bay).toBeVisible();
 
+  // The first flight keeps its own launch card: no star chart for a hop on Skatboll (#377).
+  await expect(bay.locator("[data-star-chart]")).toHaveCount(0);
+  await expect(bay.locator("[data-ship-route]")).toHaveCount(1);
   // Launch is shown, with its numbers, but cannot go with an empty tank.
   const launch = bay.locator(LAUNCH);
   await expect(launch).toBeDisabled();
@@ -384,6 +387,10 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   await page.locator(SHIP).locator(BOARD).click();
   await expect(page.locator("[data-ship-route]")).toHaveCount(1);
   await expect(page.locator("[data-ship-route]")).toContainText("Stillreach Landing Station");
+  // Chosen on the star chart (#377), preselected as the only flight.
+  await expect(
+    page.locator('[data-star-chart-destination="stillreach"][aria-pressed="true"]'),
+  ).toBeVisible();
   await expect(page.locator(`${SHIP} [data-cargo-hold-status="operational"]`)).toBeVisible();
 
   // Wade has a line only now that the Rivet has made the Landing.
