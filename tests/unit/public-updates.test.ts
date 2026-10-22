@@ -118,10 +118,23 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Prospecting Quarry Update as the newest (#379)", () => {
+  it("publishes The Dry Seam Update as the newest (#380)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("something-to-chip-at");
+    expect(latest.slug).toBe("dry-seam-opens");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("something-to-chip-at")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/the-dry-seam.webp");
+    const text = JSON.stringify(latest);
+    expect(text).toContain("6 Credits a piece");
+    expect(text).toContain("names The Dry Seam");
+    expect(text).not.toMatch(/Harmonic|Enby|Runestone/);
+  });
+
+  it("keeps the Prospecting Quarry Update published beneath it (#379)", () => {
+    const latest = getPublicUpdate("something-to-chip-at")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("plot-a-course")!.publishedAt),
     );

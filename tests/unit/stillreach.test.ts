@@ -425,6 +425,17 @@ describe("Stillreach is scenery-only (#373)", () => {
         expect(location.stateVariants).toEqual([]);
         continue;
       }
+      // The Dry Seam's Oil Shale Mining (#380) is the other: the same canonical
+      // action as The South Cut, with a Mining map status.
+      if (location.id === LOCATION_IDS.theDrySeam) {
+        expect(location.availableActionIds).toEqual([ACTION_IDS.oilShaleMining]);
+        expect(location.mapStatus).toBe("Mining");
+        expect(location.dormantActivities).toEqual([]);
+        expect(location.merchantId).toBeUndefined();
+        expect(location.stateVariants).toEqual([]);
+        expect(location.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
+        continue;
+      }
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();

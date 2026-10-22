@@ -90,7 +90,7 @@ small number of critical mobile player journeys.
   intermediate and desktop widths and in dialogue (`crash-site-scene`, #351), and Mission pinning with the Mission Log
   (`mission-pinning`, #325), the dialogue-stepping helper's own harness
   (`dialogue-steps`, #344), and Skatboll Oil Shale Mining's map, scene, gate,
-  setting and Ultra Rare shimmer (`oil-shale-mining`, #342), and fuel manufacturing's
+  setting and Ultra Rare shimmer (`oil-shale-mining`, #342; Stillreach's The Dry Seam in `dry-seam-mining`, #380), and fuel manufacturing's
   Empty and Full Small Fuel Canister recipes, art and failure shape
   (`fuel-manufacturing`, #343), Break Apart for the intact Runestone from Inventory Item Details at the 390 px portrait width (`rune-materials`, #367), Holo Hollow Landing's Last Leg Trading shop, Toll's
   topics and the completed-Thrust-Issues trade gate (`last-leg-trading`, #357), the Rune Fragment's Inspect offer, the three guided contacts and the deliberately unfinished Stillreach stage at the 390 px portrait width (`not-from-around-here`, #369), the Rivet's Ship panel, refueling, first flight, landing and durable arrival notice (`ship-first-flight`, #358) with the in-phase flight cinematic (#359), Stillreach's planet-scoped eight-hex map, admin-placed walking and eight scenes at the 390 px and desktop widths (`stillreach`, #373), the two-way interplanetary Rivet flight with its takeoff, Skatboll–Stillreach chart and touchdown cinematic in both directions, the berthed Stillreach scene and Last Leg Trading's locked and online Stillreach terminal (`stillreach-flight`, #375), and panel scroll hints plus the Play page preview

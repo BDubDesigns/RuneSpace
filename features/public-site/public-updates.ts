@@ -9,6 +9,44 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #380 — Stillreach Slice D: The Dry Seam's Oil Shale Mining.
+    slug: "dry-seam-opens",
+    title: "The Dry Seam Opens",
+    publishedAt: "2026-10-22T03:00:00-07:00",
+    summary:
+      "Stillreach's The Dry Seam is now an Oil Shale mine: the same Mining 5 work, numbers and finds as The South Cut. Carry your haul back to the Landing Station and the Last Leg Trading terminal pays 6 Credits a piece.",
+    hero: {
+      src: "/location-scenes/the-dry-seam.webp",
+      alt: "A pale quarry wall split by a dark glossy seam, with conveyors, cylindrical tanks and lamp-lit steel processing frames on the floor in front of it, aurora and a low sun overhead",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.oilShale }, side: "right" },
+      [
+        "The Dry Seam, at the end of the Survey Line on Stillreach, is no longer just scenery. A glossy black seam of Oil Shale runs through the quarry wall, and with Mining 5 and a Cutter you can cut it. Nothing else is asked: no Mission, no Rune Fragment. See ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " for the numbers.",
+      ],
+      "It is the same work as Skatboll's The South Cut, number for number: a minute an attempt, two to four Oil Shale and 100 Mining experience on a success, one Oil Shale and 20 experience when the cut comes up short. A success can also turn up one find: a Rune Fragment about one time in six, an Uncut Sapphire one in twenty and, once in about a hundred, a Motherlode Slab.",
+      "A Motherlode Slab found here posts an ULTRA RARE FIND line in General that names The Dry Seam. Fragments and Sapphires stay quiet.",
+      [
+        "Haul what you cut back to Stillreach Landing Station: Last Leg Trading's terminal buys Oil Shale at 6 Credits a piece, as it always has. See ",
+        { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+        ".",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Oil Shale Mining at Stillreach's The Dry Seam: Mining 5, about a minute an attempt, with The South Cut's success, low-yield and find numbers.",
+          "ULTRA RARE FIND announcements for a Motherlode Slab name The Dry Seam when it is found there.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #379 — Stillreach Slice C: the Prospecting Quarry and Stone buyback.
     slug: "something-to-chip-at",
     title: "Something to Chip At",

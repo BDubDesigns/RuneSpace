@@ -58,7 +58,7 @@ resolved attempt awards is recovered from the durable action ID.
 | --- | --- | ---: | --- | ---: | ---: |
 | Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
-| Oil Shale | The South Cut, **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
+| Oil Shale | The South Cut and Stillreach's The Dry Seam (#380), **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
 | Stone | Stillreach's Prospecting Quarry | 33 | 35% at 1 → 100% at 30 | 1–2 (a miss awards nothing) | 45 |
 
 Every source also authors a `requiredMiningLevel` (the personal access gate; 1
@@ -120,7 +120,23 @@ The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
 summaries are retained. Starting a genuinely new Mining action resets this run.
 
-### Oil Shale at The South Cut (#342)
+### Oil Shale at The South Cut (#342) and The Dry Seam (#380)
+
+**The Dry Seam (#380).** Stillreach's The Dry Seam (axial (3,0), adjacent only to
+The Survey Line) lists the same `ACTION_IDS.oilShaleMining` in its
+`availableActionIds`, with a `Mining` map status. There is exactly one
+`balance.mining.sources.oilShale` entry, one resolver and one set of numbers
+below for both mines: no location-specific source, copied constant or second
+timer. Authorization is the same physical-location check as everywhere:
+`loadLocationState` for the character's *stored* location must list the action,
+so a character anywhere else on either planet is refused
+(`mining_unavailable_here`), and Mining 5 is enforced before any action row,
+time, roll or XP exists. Run history and the Motherlode Slab's ULTRA RARE FIND
+line name the character's actual location, so a Dry Seam slab reads "at The Dry
+Seam". No migration is needed: the action is derived from authored content, and
+no schema or stored state changes. The Last Leg terminal's existing 6 Credit
+Oil Shale buyback (#375) is how the haul is sold. The rest of this section
+describes The South Cut; every rule applies unchanged at The Dry Seam.
 
 Skatboll's first dedicated fuel-supply source, and the first source with a
 **personal Mining level gate**. It is one more `balance.mining.sources` entry
@@ -215,6 +231,7 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 | The Jag (#367) | Rune Fragment | 1 / 25 | +20 | no |
 | Deep Jag (#367) | Rune Fragment | 1 / 8 | +20 | no |
 | The South Cut (#367) | Rune Fragment | 1 / 6 | +20 | no |
+| The Dry Seam (#380) | Uncut Sapphire, Motherlode Slab, Rune Fragment | as The South Cut (1 / 20, 1 / 100, 1 / 6) | +30, +150, +20 | Slab only, as ULTRA RARE FIND naming The Dry Seam |
 | Prospecting Quarry (#379) | Rune Fragment | 1 / 4 | +20 | no |
 | Prospecting Quarry (#379) | Uncut Quartz | 1 / 6 | +10 | no |
 | Prospecting Quarry (#379) | Uncut Topaz | 1 / 12 | +20 | no |
@@ -223,7 +240,7 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 - **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
   over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
   is an integer drawn from the least common multiple of the table's
-  denominators (600 at The Jag, 3,080 at Deep Jag, 300 at The South Cut, 600 at the Prospecting Quarry), and each entry owns a
+  denominators (600 at The Jag, 3,080 at Deep Jag, 300 at The South Cut and The Dry Seam, 600 at the Prospecting Quarry), and each entry owns a
   consecutive span of it. The Rune Fragment is appended last to each table, so
   every existing gem keeps the span, and therefore the absolute chance, it had. One roll can therefore never award two finds, and no
   authored chance is rounded to basis points. Current content awards at most one
@@ -280,7 +297,7 @@ recipe, Echo Seeker, Mission, merchant price or new location here.
 
 | Item | Unit mass | Stack limit | Where from |
 | --- | ---: | ---: | --- |
-| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 25 at The Jag, 1 / 8 at Deep Jag, 1 / 6 at The South Cut, 1 / 4 at the Prospecting Quarry; Break Apart |
+| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 25 at The Jag, 1 / 8 at Deep Jag, 1 / 6 at The South Cut and The Dry Seam, 1 / 4 at the Prospecting Quarry; Break Apart |
 | Runestone (intact) | 1,000 g | 5 | **No natural source yet.** An authorized admin grant, until a later source is authored |
 
 Both are ordinary stackable, tradable, carriable materials classified under

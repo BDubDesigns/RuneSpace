@@ -234,6 +234,18 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Oil Shale at The Dry Seam",
+        paragraphs: [
+          [
+            "Stillreach has an Oil Shale mine of its own: The Dry Seam, at the far end of the Survey Line from the Landing Station, four ordinary 24-second walks in all (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). Mining there needs Mining 5 and a Cutter, and nothing else: no Mission or Rune Fragment is needed to walk in.",
+          ],
+          "It is exactly the same work as The South Cut, on the same numbers: a full minute an attempt before your Cutter and any Power Cell change that, a 40.30% chance of success at Mining 5 climbing to certain at Mining 50, two, three or four Oil Shale and 100 Mining experience on a success, and one Oil Shale and 20 experience on a low yield. A charged Loadsteel Cutter, Prioritize primary resources and the finds all work the same way: about one success in six gives a Rune Fragment, one in twenty an Uncut Sapphire and one in a hundred a Motherlode Slab, never more than one of them, and never on a low yield.",
+          "A Motherlode Slab found at The Dry Seam posts an ULTRA RARE FIND line in General that names The Dry Seam. Fragments and Sapphires are not announced. Oil Shale carried back to Stillreach Landing Station sells to Last Leg Trading's terminal at 6 Credits a piece, the same as at Toll's counter.",
+        ],
+      },
+      {
         heading: "Stone at the Prospecting Quarry",
         paragraphs: [
           [
@@ -262,7 +274,7 @@ const authoredWikiArticles = [
           "The Jag, Deep Jag and The South Cut can also turn up a Rune Fragment: about one success in twenty-five at The Jag, one in eight at Deep Jag and one in six at The South Cut. It is one of the same single find an attempt can turn up, so an attempt never gives both a Rune Fragment and a gem or a Slab, and it comes on top of your ore and its experience. A Rune Fragment adds 20 Mining experience wherever it is found. It is an ordinary 200g material that stacks ten to a tile — no purple frame — and finding one is not announced in General.",
           "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
           "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find — a Rune Fragment is 200g, so that includes room for its weight. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
-          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
+          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut or The Dry Seam gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
           "The Prospecting Quarry on Stillreach can give a Rune Fragment, Uncut Quartz, Uncut Topaz or, very rarely, a Boulder; see Stone at the Prospecting Quarry.",
         ],
       },

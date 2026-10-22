@@ -80,6 +80,7 @@ export const FOCUSED_PHASES = [
   "crash-site-scene",
   "oil-shale-mining",
   "stone-mining",
+  "dry-seam-mining",
   "fuel-manufacturing",
   "rune-materials",
   "last-leg-trading",

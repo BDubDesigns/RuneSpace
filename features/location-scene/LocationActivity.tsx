@@ -105,6 +105,7 @@ function primaryActivity(
   switch (locationId) {
     case LOCATION_IDS.theJag:
     case LOCATION_IDS.theSouthCut:
+    case LOCATION_IDS.theDrySeam:
     case LOCATION_IDS.prospectingQuarry:
       return <MiningActivity characterName={characterName} />;
     case LOCATION_IDS.deepJag:
