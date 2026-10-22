@@ -16,6 +16,7 @@ import { fabricationRecipeUnlocked } from "@/game/domain/fabrication";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import { merchantVenues } from "@/game/domain/merchant-venues";
 import { locationsOfferingAction } from "@/game/domain/location-state";
+import { miningSourceUnlocked } from "@/game/domain/mining";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import { refiningRecipeUnlocked } from "@/game/domain/refining";
@@ -50,8 +51,8 @@ import type { MerchantDefinition } from "@/game/schemas/merchants";
  *   exists in a location's opened state). An undiscovered source is omitted
  *   entirely — it is never listed, and never hinted at.
  * - A CAPABILITY gate is something the character already knows exists but
- *   cannot use yet (a recipe's minimum skill level). The source is listed,
- *   locked, with its concrete gate.
+ *   cannot use yet (a recipe's or a mine's minimum skill level). The source is
+ *   listed, locked, with its concrete gate.
  */
 
 /** What a source asks of the character that they do not yet have. */
@@ -187,8 +188,12 @@ export function itemSourceSkillLevel(facts: ItemSourceFacts, skillId: string): n
   return facts.skillLevels[skillId] ?? STARTING_LEVEL;
 }
 
-/** A recipe gated by `unlocked` is capability-gated: below the level it is locked, not hidden. */
-function recipeAccess(unlocked: boolean, skillId: string, minimumLevel: number): ItemSourceAccess {
+/** A source gated by `unlocked` is capability-gated: below the level it is locked, not hidden. */
+function skillGateAccess(
+  unlocked: boolean,
+  skillId: string,
+  minimumLevel: number,
+): ItemSourceAccess {
   return unlocked
     ? { state: "available" }
     : { state: "locked", gates: [{ kind: "skill_level", skillId, level: minimumLevel }] };
@@ -244,7 +249,7 @@ export function resolveItemSources(
           quantity,
         })),
         outputQuantity: recipe.outputQuantity,
-        access: recipeAccess(
+        access: skillGateAccess(
           fabricationRecipeUnlocked(
             itemSourceSkillLevel(facts, balance.fabrication.skillId),
             recipe,
@@ -278,7 +283,7 @@ export function resolveItemSources(
         })),
         outputQuantity: recipe.outputQuantity,
         deterministic: refiningRecipeIsDeterministic(recipe),
-        access: recipeAccess(
+        access: skillGateAccess(
           refiningRecipeUnlocked(itemSourceSkillLevel(facts, balance.refining.skillId), recipe),
           balance.refining.skillId,
           recipe.minimumLevel,
@@ -288,7 +293,9 @@ export function resolveItemSources(
   }
 
   // Mining: the primary ore, and every source whose Secondary Find table can
-  // turn the item up. A source with no reachable mine yet is undiscovered.
+  // turn the item up. A source with no reachable mine yet is undiscovered. A
+  // discovered mine is gated by the same level the server checks before it
+  // lets an attempt start, whichever role the item plays there (#387).
   for (const source of miningSources(balance)) {
     const role =
       source.itemId === itemId
@@ -310,7 +317,11 @@ export function resolveItemSources(
       locationIds,
       role,
       oreItemId: source.itemId,
-      access: { state: "available" },
+      access: skillGateAccess(
+        miningSourceUnlocked(itemSourceSkillLevel(facts, balance.mining.skillId), source),
+        balance.mining.skillId,
+        source.requiredMiningLevel,
+      ),
     });
   }
 

@@ -21,10 +21,14 @@ import type { PlayGameplayState } from "@/server/play";
 
 const balance = getEffectiveGameBalance();
 
-function facts(fabricationLevel = 5): ItemSourceFacts {
+function facts(fabricationLevel = 5, miningLevel = 8): ItemSourceFacts {
   const completedRepairTargetIds = new Set<string>([balance.repairTargets.deepJagCaveIn.targetId]);
   return {
-    skillLevels: { [SKILL_IDS.fabrication]: fabricationLevel, [SKILL_IDS.refining]: 5 },
+    skillLevels: {
+      [SKILL_IDS.fabrication]: fabricationLevel,
+      [SKILL_IDS.refining]: 5,
+      [SKILL_IDS.mining]: miningLevel,
+    },
     acceptedMissionIds: new Set([MISSION_IDS.returnTheFavor, MISSION_IDS.tenThousandHours]),
     completedMissionIds: new Set(),
     fabricationStationUnlocked: true,
@@ -138,6 +142,54 @@ describe("item source details", () => {
 
   it("says plainly when nothing is known", () => {
     expect(render(["not_an_item"])).toContain("No known way to get this yet.");
+  });
+});
+
+describe("mining skill gate wording (#387)", () => {
+  const harmonic = balance.mining.sources.harmonicMining;
+  const miningEntry = (itemId: string, miningLevel: number) =>
+    describeItemSources(
+      itemId,
+      resolveItemSources(itemId, facts(5, miningLevel)),
+      facts(5, miningLevel),
+    ).find((entry) => entry.key === harmonic.actionId);
+
+  it("states the concrete Mining requirement and the character's own level on a locked mine", () => {
+    expect(miningEntry(ITEM_IDS.runeFragment, harmonic.requiredMiningLevel - 1)).toMatchObject({
+      kind: "mine",
+      title: "Mine",
+      locked: `Requires Mining ${harmonic.requiredMiningLevel} — you are ${harmonic.requiredMiningLevel - 1}`,
+    });
+  });
+
+  it("shows no lock reason once the character meets the requirement", () => {
+    const entry = miningEntry(ITEM_IDS.runeFragment, harmonic.requiredMiningLevel);
+    expect(entry?.locked).toBeUndefined();
+    expect(entry?.notes).toEqual([]);
+  });
+
+  it("renders a locked mine with the Locked badge, below the usable ones", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(ItemSourcesDetails, {
+        path: [ITEM_IDS.runeFragment],
+        facts: facts(5, harmonic.requiredMiningLevel - 1),
+        onDrill: () => undefined,
+        onBack: () => undefined,
+      }),
+    );
+    expect(markup).toContain(
+      `Requires Mining ${harmonic.requiredMiningLevel} — you are ${harmonic.requiredMiningLevel - 1}`,
+    );
+    expect(markup).toContain('data-item-source-badge="locked"');
+    // Oil Shale is usable at this level and sits above the locked Harmonic row;
+    // player trade, the fallback, sits below it.
+    const row = (key: string) => markup.indexOf(`data-item-source="${key}"`);
+    const lockedRow = row(harmonic.actionId);
+    expect(markup).toContain(
+      `data-item-source="${harmonic.actionId}" data-item-source-kind="mine" data-item-source-locked="true"`,
+    );
+    expect(row(balance.mining.sources.oilShale.actionId)).toBeLessThan(lockedRow);
+    expect(markup.indexOf('data-item-source-kind="player_trade"')).toBeGreaterThan(lockedRow);
   });
 });
 

@@ -763,7 +763,7 @@ the content that already owns each way of getting an item.
 | Source | Derived from |
 | --- | --- |
 | Fabricate / Refine | `fabricationRecipes()` / `refiningRecipes()` in `game/config/balance.ts` |
-| Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds` |
+| Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds`; access from `requiredMiningLevel` via `miningSourceUnlocked` |
 | Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source), one entry per venue of the business (`merchantVenues`, `game/domain/merchant-venues.ts`, #375) |
 | Daily claim | `POWER_ANNEX_CLAIM` in `game/domain/power-annex.ts`, which `server/power-annex.ts` also reads |
 | Scavenge | `SCAVENGE_OUTCOMES` (qualitative only: no odds are exposed) |
@@ -783,9 +783,10 @@ the content that already owns each way of getting an item.
 - **Discovery versus capability.** A source the character has not been shown
   (the Fabrication Station before its Mission is accepted, a merchant before
   theirs, a mine that exists only in a location's opened state) is **omitted**,
-  never hinted at. A source they know of but cannot use (a recipe above their
-  skill level) is **listed locked** with its concrete gate. Order: usable, then
-  the occasional walking find, then locked, then player trade.
+  never hinted at. A source they know of but cannot use (a recipe or a mine
+  above their skill level, the mine gated by the same `requiredMiningLevel` the
+  server checks, #387) is **listed locked** with its concrete gate. Order: usable,
+  then the occasional walking find, then locked, then player trade.
 - **Transferability** is the one item-level rule, `isItemTransferable`: whether
   this item type may take part in a player trade in principle. The offer
   commands, the settlement planner, the trade surface's offerable lists and the
