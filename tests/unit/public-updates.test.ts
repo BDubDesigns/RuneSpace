@@ -118,14 +118,26 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes The Dry Seam Update as the newest (#380)", () => {
+  it("publishes the Refiner-To-Go Update as the newest (#381)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("dry-seam-opens");
+    expect(latest.slug).toBe("refiner-to-go");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("dry-seam-opens")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/refiner-to-go.webp");
+    const text = JSON.stringify(latest);
+    expect(text).toContain("108 seconds instead of 36");
+    expect(text).toContain("three times as long");
+    expect(text).not.toMatch(/Harmonic|Enby|Runestone/);
+  });
+
+  it("keeps The Dry Seam Update published beneath it (#380)", () => {
+    const latest = getPublicUpdate("dry-seam-opens")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("something-to-chip-at")!.publishedAt),
     );
-    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     expect(latest.hero?.src).toBe("/location-scenes/the-dry-seam.webp");
     const text = JSON.stringify(latest);
     expect(text).toContain("6 Credits a piece");

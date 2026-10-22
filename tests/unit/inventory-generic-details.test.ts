@@ -136,6 +136,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       inputsConsumed: {},
       xpGained: 0,
       recentAttempts: [],
+      localPlaceId: null,
     },
     cargoHold: {
       repair: {

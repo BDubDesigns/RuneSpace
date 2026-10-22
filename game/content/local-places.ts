@@ -172,6 +172,30 @@ const localPlaceDefinitions = [
       },
     },
   },
+  {
+    // A second Refining venue beside the terminal (#381): the same complete
+    // recipe catalog as the Abandoned Processing Yard, worked at 3x each
+    // recipe's canonical attempt duration. Open to every character standing at
+    // the Landing Station; the recipe's own level and inputs are the only gates.
+    id: LOCAL_PLACE_IDS.stillreachRefinerToGo,
+    parentLocationId: LOCATION_IDS.stillreachLandingStation,
+    displayName: "Refiner-To-Go",
+    description:
+      "A patched-together refinery bolted to the side of the service building: fuel tank, hopper and a shuddering press on one shared frame. It is slow and it rattles, but it will run anything you can feed it.",
+    access: { kind: "open" as const },
+    refiningStation: { attemptDurationMultiplier: 3 },
+    presentation: {
+      scene: {
+        // The owner-approved 2172x543 master downsampled to the 1536x384 Local
+        // Place production size (scripts/prepare-refiner-to-go-art.mjs).
+        asset: "/location-scenes/refiner-to-go.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A rust-patched refinery machine, a red fuel tank, control panel and hopper bolted together under a lit REFINER-TO-GO sign on the wall of a weathered service building, workbenches and crates to either side, aurora and a pale moon over the highlands at twilight",
+        focal: { x: 50, y: 55 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocalPlaceDefinition[];
 
 export const LOCAL_PLACES: readonly LocalPlaceDefinition[] = localPlaceDefinitions.map((place) =>

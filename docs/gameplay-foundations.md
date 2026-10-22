@@ -552,7 +552,7 @@ increasing linearly to 100% at level 20 and clamping thereafter
 exactly 7 ticks (4.2 seconds); there is no speed boost for Refining.
 
 Refining is available only while stationary at the Abandoned Processing
-Yard. Travel generalizes so that starting Travel while Mining or Refining is
+Yard (or, from #381, inside Stillreach's Refiner-To-Go at 3x duration). Travel generalizes so that starting Travel while Mining or Refining is
 active resolves only already-completed work exactly once, persists it
 atomically, discards any partial attempt, stops the work action with
 `action_replaced`, and begins Travel. The preflight for each attempt
@@ -894,6 +894,34 @@ character who has physically reached Stillreach and has an eligible Cutter can m
   allowances are unchanged, the terminal does not sell Stone, and nothing buys the
   Boulder. The Thrust Issues gate and carried-inventory-only rules are the
   merchant's own.
+
+### Refiner-To-Go: a second Refining venue (issue #381)
+
+`stillreach_refiner_to_go` is a Local Place of Stillreach Landing Station, beside the
+terminal, that hosts the **same** Refining console and the **same** authored recipes as the
+Abandoned Processing Yard. It authors one fact, `refiningStation:
+{ attemptDurationMultiplier: 3 }`; recipes, inputs, outputs, chances, XP, slag rules and
+batching are untouched, so there is no second catalog or engine.
+
+- **Rate.** Every attempt takes exactly 3x the recipe's canonical
+  `attemptDurationTicks` (fuel 60 → 180 ticks / 108 s). The Yard is 1x. The multiplier is
+  applied by `resolveRefining` (`attemptDurationMultiplier`) and never mutates the recipe,
+  and XP is not scaled.
+- **Authority.** `startRefining` takes an optional `localPlaceId`, revalidated with
+  `resolveRefiningStation`: the place must belong to the character's authoritative
+  location, be accessible, and be a Refining station; a named place never rescues a
+  location that hosts nothing, and a station is never reachable without naming it. The
+  venue is persisted on the run as `character_refining_state.run_local_place_id` (NULL =
+  Yard, migration `0046`) — a nullable column, because `active_actions` is payload-free and
+  nothing else survives refresh, another device or offline resolution. Run resolution, the
+  projection's `nextAttemptDurationTicks`/ETA and the console labels all read it through
+  `refiningDurationMultiplier`; the client sends no speed factor.
+- **Idempotent start.** Starting the recipe already running returns the existing run, so
+  reopening the other venue cannot reprice it.
+- **Inventory.** Only carried Inventory feeds and receives Refining. The Cargo Hold is not
+  an ingredient pool; players move items by the existing Cargo Hold transfer controls.
+- **Not a World Location activity.** The landing ring (`availableActionIds: []`) and the
+  fuel terminal host no Refining.
 
 ### Last Leg Trading's Stillreach terminal (issue #375)
 

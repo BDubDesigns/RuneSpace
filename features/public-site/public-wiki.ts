@@ -184,7 +184,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Working material into something useful is a two-step loop: mine ore, then refine it at the Abandoned Processing Yard. There are two places to mine, three things you can refine, and — from Refining 5 — two ways to turn ore into Slag on purpose.",
+          "Working material into something useful is a two-step loop: mine ore, then refine it at the Abandoned Processing Yard, or on Stillreach at Refiner-To-Go. There are two places to mine, three things you can refine, and — from Refining 5 — two ways to turn ore into Slag on purpose.",
         ],
       },
       {
@@ -279,9 +279,9 @@ const authoredWikiArticles = [
         ],
       },
       {
-        heading: "Refining at the Abandoned Processing Yard",
+        heading: "Where to refine",
         paragraphs: [
-          "Refining is only available at the Abandoned Processing Yard. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
+          "Refining happens at the Abandoned Processing Yard, or at Refiner-To-Go, a patched-together refinery beside the fuel terminal at Stillreach Landing Station (step into it from the station's places). Refiner-To-Go refines every recipe the Yard does, with the same materials, chances and experience, but each attempt takes three times as long. It uses what you are carrying, never your Cargo Hold, so move what you need out of the hold first. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
           "A failed attempt says so: any Slag it makes, or any input a failed Galvaferrite pour or fuel attempt hands back, is shown as what the failure left, not as something you refined.",
           "The Slag a failed Refined Ferrite or Galvanic Stock attempt makes is a bonus, never a requirement. You do not need room for it to start or keep refining; the attempt still finishes, spends its ore and pays its Refining XP. Slag is kept for as long as you have room, and whatever will not fit is thrown out. Turn Auto-discard Slag on and every bit of it is thrown out instead. It is the same setting as the Practice Welding bench's, so changing it in one place changes it in the other, and it stays until you change it. The result and history say when Slag was discarded, so it is never counted as something you are carrying.",
           "Auto-discard Slag only covers Slag from a failure. A pour that makes Slag on purpose still puts it in your Inventory and needs room for it, and a failed Galvaferrite pour or fuel attempt always gives back what it returns. The product you are actually refining still needs room too, and Slag you keep can use up that room.",
@@ -303,7 +303,7 @@ const authoredWikiArticles = [
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
             " (Fabrication 8). Refining then takes ten Oil Shale and one Empty canister for 36 seconds. It needs Refining 8, and owning the ingredients does not get around that.",
           ],
-          "The chance of success follows the same climb as Galvanic Stock and Galvaferrite: 35% at Refining 1, rising to certain at Refining 30. Reaching Refining 8 does not reset it, so at Refining 8 it is 50.68%. The attempt takes the full 36 seconds whether it succeeds or not.",
+          "The chance of success follows the same climb as Galvanic Stock and Galvaferrite: 35% at Refining 1, rising to certain at Refining 30. Reaching Refining 8 does not reset it, so at Refining 8 it is 50.68%. The attempt takes the full 36 seconds whether it succeeds or not; at Refiner-To-Go on Stillreach it takes 108 seconds, with the same chances and rewards.",
           "A success gives one Full Small Fuel Canister, holding 50 Fuel Units, and 100 Refining experience. A failure is not total: it pays 20 Refining experience and gives back five of the ten Oil Shale and the same Empty canister, so you can try again without making another. The other five Oil Shale are lost. A failed fuel attempt never makes Slag, and Auto-discard Slag never touches what comes back.",
           "A Full canister weighs 6kg and stacks two to a slot; an Empty one weighs 800g and stacks five. Both are ordinary items: you can carry, stash and trade them, and they work the same for someone who never refined or fabricated anything. Nothing in the game uses Fuel Units yet. Toll Kade at Last Leg Trading buys and sells canisters once you have reported Thrust Issues to Wade; see Credits & Trading.",
         ],

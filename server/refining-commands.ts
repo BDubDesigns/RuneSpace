@@ -27,7 +27,9 @@ import {
   refiningPreflightStopReason,
   refiningRecipeUnlocked,
 } from "@/game/domain/refining";
+import { resolveRefiningStation } from "@/game/domain/local-places";
 import { levelFromXp } from "@/game/domain/progression";
+import { loadCompletedMissionIds } from "@/server/mission-state";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { resetE2eRefiningRandom, type PersistedRefiningOutcome } from "@/server/refining";
@@ -86,6 +88,7 @@ export async function startRefining(
   now = new Date(),
   random?: MiningRandom,
   selection: BoundedRunSelection = 1,
+  localPlaceId?: string,
 ): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
@@ -111,13 +114,24 @@ export async function startRefining(
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
       const recipe = refiningRecipeForActionId(recipeActionId);
-      // Refining is hosted by the location, not by the recipe: every authored
-      // recipe is worked at the same console, so the availability question stays
-      // the one the Yard already answers (#209).
-      const refiningBlockedHere = !isActionAvailableAtLocation(
-        currentLocationId,
-        ACTION_IDS.refining,
-      );
+      // Refining is hosted by a venue, not by the recipe: every authored recipe
+      // is worked at the same console. A venue is either the World Location
+      // itself (the Yard, 1x) or a Refining station Local Place inside it (#381).
+      // The named place is revalidated against the character's own position and
+      // access, so a forged, wrong-parent or locked place hosts nothing, and a
+      // place never rescues a location that hosts nothing itself.
+      const station =
+        localPlaceId === undefined
+          ? undefined
+          : resolveRefiningStation({
+              locationId: currentLocationId,
+              localPlaceId,
+              completedMissionIds: await loadCompletedMissionIds(transaction, context.character.id),
+            });
+      const refiningBlockedHere =
+        localPlaceId === undefined
+          ? !isActionAvailableAtLocation(currentLocationId, ACTION_IDS.refining)
+          : station === undefined;
       // If already refining this same recipe, idempotent
       if (recipe && context.action?.actionId === recipe.actionId) {
         return stateFromTransaction(
@@ -266,6 +280,8 @@ export async function startRefining(
       // Reset run counters for a genuinely new run
       const freshRun = {
         runSelectedAttempts: boundedRunSelectionToColumn(quantityCheck.selection),
+        // The venue prices the whole run (#381): NULL is the Yard's 1x.
+        runLocalPlaceId: station?.id ?? null,
         runAttempts: 0,
         runSuccesses: 0,
         runOutputsGained: {},

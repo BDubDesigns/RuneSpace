@@ -37,7 +37,8 @@ export const LocalPlaceAccessRuleSchema = z.discriminatedUnion("kind", [
  *
  * A Local Place belongs to exactly one parent World Location and deliberately
  * has NO axial coordinate, adjacency, or available action IDs: it is never a
- * Travel destination and never a second persisted character position. Nesting
+ * Travel destination and never a second persisted character position. The one
+ * activity marker it may carry is `refiningStation` (#381). Nesting
  * is one level only — a Local Place cannot contain another.
  */
 const LocalPlaceSceneSchema = z
@@ -91,6 +92,17 @@ export const LocalPlaceDefinitionSchema = z
      * Stillreach terminal buys Stone without Toll's counter ever doing so.
      */
     venuePrices: z.array(MerchantPriceSchema).min(1).optional(),
+    /**
+     * Marks this place as a Refining station (#381): its interior hosts the
+     * shared Refining console. The place authors only how much slower than the
+     * canonical recipe it works; recipes, inputs, outputs, chances and XP are
+     * never restated here. The Abandoned Processing Yard is a World Location
+     * and works at 1x, so it needs no entry.
+     */
+    refiningStation: z
+      .object({ attemptDurationMultiplier: z.number().int().min(2) })
+      .strict()
+      .optional(),
     presentation: z
       .object({
         scene: LocalPlaceSceneSchema,
