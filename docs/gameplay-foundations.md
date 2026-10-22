@@ -872,10 +872,15 @@ apply unchanged. It remains reachable only from The Survey Line.
   primary Fragment on a full success only. A primary Fragment earns no
   secondary-find bonus of its own. A miss awards nothing, not even a low yield.
 - **One secondary per success, 40 outcomes:** an Intact Runestone (1/8, silent,
-  zero bonus XP), an Uncut Sapphire (1/20, its usual +30 XP once, and a RARE FIND
-  line naming Harmonic Workings only when actually kept), or nothing (33/40).
-  The Runestone's find XP is authored as `secondaryFindMiningXp: 0`, so the
-  shared find projection accepts it without a client-side special case.
+  +130 Mining XP once when kept), an Uncut Sapphire (1/20, its usual +30 XP once,
+  and a RARE FIND line naming Harmonic Workings only when actually kept), or
+  nothing (33/40). The Runestone's find XP is authored as
+  `secondaryFindMiningXp: 130` on the canonical intact Runestone item, so the
+  shared find projection reads it unchanged.
+- **Find XP totals per success:** nothing 130; Intact Runestone 260 (130 base
+  plus 130); Uncut Sapphire 160 (130 plus 30); a failure 0. A find that is
+  rolled but forfeited for capacity pays no find XP and no announcement. Using
+  or breaking apart a Runestone grants no XP.
 - **Capacity:** the shared Prioritize primary resources rules apply. Off reserves
   room for the primary plus the largest single find (a 1 kg Runestone); On keeps
   at least one Fragment and forfeits a find that does not fit.

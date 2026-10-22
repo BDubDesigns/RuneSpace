@@ -28,14 +28,14 @@ const authoredUpdates = [
         { text: "Mining & Refining", articleSlug: "mining-and-refining" },
         " for the numbers.",
       ],
-      "A success gives one or two Rune Fragments and 130 Mining experience, the same experience whichever you get. A miss gives nothing. A success can also turn up an Intact Runestone, or, once in about twenty successes, an Uncut Sapphire. A Sapphire posts a RARE FIND line in General that names Harmonic Workings; a Runestone stays quiet.",
+      "A success gives one or two Rune Fragments and 130 Mining experience, the same experience whichever you get. A miss gives nothing. A success can also turn up an Intact Runestone, worth 130 more experience once you keep it, or, once in about twenty successes, an Uncut Sapphire, worth 30 more. A Sapphire posts a RARE FIND line in General that names Harmonic Workings; a Runestone stays quiet.",
     ],
     patchNotes: [
       {
         heading: "Added",
         items: [
           "Rune Fragment Mining at Stillreach's Harmonic Workings: Mining 8, about 45 seconds an attempt, one or two Rune Fragments and 130 Mining experience on a success, nothing on a miss.",
-          "One find a success at most: an Intact Runestone, or an Uncut Sapphire whose RARE FIND line names Harmonic Workings.",
+          "One find a success at most: an Intact Runestone, worth 130 more Mining experience once kept, or an Uncut Sapphire, worth 30 more, whose RARE FIND line names Harmonic Workings.",
         ],
       },
     ],

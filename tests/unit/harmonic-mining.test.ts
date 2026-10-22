@@ -214,15 +214,16 @@ describe("the one Harmonic Workings Secondary Find roll", () => {
     expect(outcome.attempts[0]?.secondaryFinds).toEqual([{ itemId: RUNESTONE, quantity: 1 }]);
   });
 
-  it("awards the Intact Runestone silently with zero bonus XP", () => {
+  it("awards the Intact Runestone silently, with its +130 find XP once, when kept", () => {
     const { outcome } = mine({}, { units: [0], integers: [FIRST_RUNESTONE] });
-    expect(outcome.attempts[0]).toMatchObject({ xpAwarded: 130, quantityAwarded: 1 });
+    expect(outcome.attempts[0]).toMatchObject({ xpAwarded: 260, quantityAwarded: 1 });
+    expect(outcome.awardedXp).toBe(260);
     expect(total(outcome, RUNESTONE)).toBe(1);
     const runestone = miningSecondaryFindFacts(balance, harmonic).find(
       (find) => find.itemId === RUNESTONE,
     );
     expect(runestone).toMatchObject({
-      bonusXp: 0,
+      bonusXp: 130,
       announce: false,
       stackLimit: 5,
       massGrams: 1_000,
@@ -286,11 +287,11 @@ describe("Harmonic Workings' capacity protection", () => {
 });
 
 describe("the Harmonic Workings award facts", () => {
-  it("projects the Runestone as a valid zero-XP secondary without changing Fragment or Sapphire", () => {
+  it("projects the Runestone as a valid 130 XP secondary without changing Fragment or Sapphire", () => {
     const award = miningAwardFacts(balance, harmonic);
     expect(award).toMatchObject({ itemId: FRAGMENT, yieldMinimum: 1, yieldMaximum: 2 });
     expect(award.secondaryFinds.map((find) => [find.itemId, find.oneIn, find.bonusXp])).toEqual([
-      [RUNESTONE, 8, 0],
+      [RUNESTONE, 8, 130],
       [SAPPHIRE, 20, 30],
     ]);
     expect(balance.items.runeFragment.secondaryFindMiningXp).toBe(20);

@@ -16,7 +16,7 @@ const suite = DATABASE_URL ? describe : describe.skip;
 /**
  * Issue #383 — Stillreach Harmonic Workings Rune Fragment Mining against real
  * PostgreSQL: the Mining 8 server gate, one exclusive success-only find roll,
- * the Runestone's silent zero-XP award, the Sapphire's single awarded-only
+ * the Runestone's silent award with its +130 find XP, the Sapphire's single awarded-only
  * RARE FIND line, and the shared Inventory preflight in both capacity modes.
  */
 suite("issue #383 Harmonic Workings Rune Fragment Mining (real PostgreSQL)", () => {
@@ -193,7 +193,7 @@ suite("issue #383 Harmonic Workings Rune Fragment Mining (real PostgreSQL)", () 
       expect(await anyAnnouncements()).toEqual([]);
     });
 
-    it("awards an Intact Runestone silently with no bonus XP beyond the 130 base", async () => {
+    it("awards an Intact Runestone silently, with its +130 find XP once, on top of the 130 base", async () => {
       const { userId, character } = await makeCharacter(8);
       const state = await mineOnce(
         userId,
@@ -202,7 +202,8 @@ suite("issue #383 Harmonic Workings Rune Fragment Mining (real PostgreSQL)", () 
       );
       expect(state.carriedByItemId[ITEM_IDS.runestone]).toBe(1);
       expect(state.carriedByItemId[ITEM_IDS.runeFragment]).toBe(1);
-      expect(await miningXp(character.id)).toBe(xpForLevel(8) + 130);
+      expect(await miningXp(character.id)).toBe(xpForLevel(8) + 130 + 130);
+      expect(state.run).toMatchObject({ xpGained: 260 });
       expect(await anyAnnouncements()).toEqual([]);
     });
 

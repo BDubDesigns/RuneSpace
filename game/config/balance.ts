@@ -195,7 +195,7 @@ const balanceSchema = z.object({
        * Harmonic Workings' Rune Fragment Mining (#383): Stillreach's dedicated
        * Mining-8 Rune Fragment source. The primary is the Fragment itself, 1 or 2
        * uniformly, and a success earns 130 XP whichever is drawn. Its one
-       * find-roll is 40 outcomes: 5 intact Runestone (1/8, silent, zero bonus XP),
+       * find-roll is 40 outcomes: 5 intact Runestone (1/8, silent, +130 XP when kept),
        * 2 Uncut Sapphire (1/20, a RARE FIND line only when awarded) and 33 none.
        * The curve is anchored at Mining 1 and is certain by Mining 40, so Mining 8
        * is 46.66%. A miss awards nothing.
@@ -1182,14 +1182,16 @@ const balanceSchema = z.object({
     }),
     /**
      * The intact Runestone (#383) is a Mining Secondary Find at Harmonic Workings,
-     * so it authors its find XP explicitly: zero. It is the rune material's
-     * rarer secondary, not a new XP source, and no +20 Fragment bonus is implied.
+     * so it authors its find XP explicitly: 130, paid once when it is actually kept
+     * in carried Inventory (owner correction, October 22). That bonus belongs to the
+     * find, not to using or breaking apart a Runestone, and no +20 Fragment bonus
+     * is implied.
      */
     runestone: z.object({
       itemId: z.literal(ITEM_IDS.runestone),
       massGrams: z.literal(1_000),
       stackLimit: z.literal(5),
-      secondaryFindMiningXp: z.literal(0),
+      secondaryFindMiningXp: z.literal(130),
     }),
     /**
      * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
@@ -1899,7 +1901,7 @@ const defaults = balanceSchema.parse({
       itemId: ITEM_IDS.runestone,
       massGrams: 1_000,
       stackLimit: 5,
-      secondaryFindMiningXp: 0,
+      secondaryFindMiningXp: 130,
     },
     stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
     boulder: {
