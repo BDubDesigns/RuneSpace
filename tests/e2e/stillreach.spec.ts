@@ -66,9 +66,13 @@ test("an admin-placed Stillreach character sees exactly the eight hexes and seve
   await expect(
     page.locator(`[data-map-location="${LOCATION_IDS.stillreachLandingStation}"]`),
   ).toHaveAttribute("aria-current", "true");
-  // Only the Quarry's Stone Mining (#379) and The Dry Seam's Oil Shale Mining (#380) carry a status.
-  await expect(page.locator("[data-map-status]")).toHaveCount(2);
-  for (const mine of [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.theDrySeam]) {
+  // The Quarry (#379), Dry Seam (#380), and Harmonic Workings (#383) are mines.
+  await expect(page.locator("[data-map-status]")).toHaveCount(3);
+  for (const mine of [
+    LOCATION_IDS.prospectingQuarry,
+    LOCATION_IDS.theDrySeam,
+    LOCATION_IDS.harmonicWorkings,
+  ]) {
     await expect(
       page.locator(`[data-map-location="${mine}"]`).locator("[data-map-status]"),
     ).toHaveText("Mining");
@@ -193,9 +197,12 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       // Nothing operable: no work controls, no merchant, no ship, no stash. The
       // Landing Station's two Local Places are Last Leg Trading (#375) and
       // Refiner-To-Go (#381), listed in its directory; their controls live inside.
-      // Except the Quarry's (#379) and The Dry Seam's (#380) Mining, which have their own specs.
+      // Except the Quarry (#379), Dry Seam (#380), and Harmonic Workings (#383),
+      // which each expose the shared Mining controls.
       await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(
-        id === LOCATION_IDS.prospectingQuarry || id === LOCATION_IDS.theDrySeam ? 1 : 0,
+        [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.theDrySeam, LOCATION_IDS.harmonicWorkings].includes(id)
+          ? 1
+          : 0,
       );
       await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
       await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
