@@ -459,6 +459,11 @@ Last Leg Trading's Stillreach fuel terminal Local Place scene (#375) is the owne
 cropped) to the 1536×384 Local Place production size, `stillreach-fuel-terminal.webp` q80,
 by the same script.
 
+The Refiner-To-Go Local Place scene (#381) is the owner-approved 2172×543 RGB PNG
+(SHA-256 `72e94c3efdf2b52a…`), kept unaltered as
+`assets/location-scenes/refiner-to-go-master.png` and downsampled whole to
+`refiner-to-go.webp`, 1536×384 q80, by `scripts/prepare-refiner-to-go-art.mjs`.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.

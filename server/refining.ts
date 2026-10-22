@@ -23,6 +23,7 @@ import {
   type BoundedRunSelection,
 } from "@/game/domain/bounded-run";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
+import { refiningDurationMultiplier } from "@/game/domain/local-places";
 import type { StackState } from "@/game/domain/inventory";
 import {
   refiningSuccessChanceBps,
@@ -52,6 +53,11 @@ export type RefiningSnapshot = {
   allowance: BoundedRunAllowance;
   /** The character-wide Auto-discard Slag preference (#256), read under the lock. */
   autoDiscardSlag: boolean;
+  /**
+   * The station multiplier of the venue this run was started at (#381), read
+   * from the run's own persisted state — never from the request or the route.
+   */
+  attemptDurationMultiplier: number;
 };
 
 export type RefiningRunAttempt = RefiningResolvedAttempt & {
@@ -79,6 +85,8 @@ export type RefiningRunState = {
   inputsConsumed: Readonly<Record<string, number>>;
   xpGained: number;
   recentAttempts: readonly RefiningRunAttempt[];
+  /** The Refining station the run was started at, or null for the Yard (#381). */
+  localPlaceId: string | null;
 };
 
 export type PersistedRefiningOutcome = RefiningResolution<string> & {
@@ -178,6 +186,7 @@ async function loadRefiningSnapshot(
       .select({
         runSelectedAttempts: characterRefiningState.runSelectedAttempts,
         runAttempts: characterRefiningState.runAttempts,
+        runLocalPlaceId: characterRefiningState.runLocalPlaceId,
       })
       .from(characterRefiningState)
       .where(eq(characterRefiningState.characterId, characterId))
@@ -208,6 +217,7 @@ async function loadRefiningSnapshot(
       ? boundedRunAllowance(boundedRunSelectionFromColumn(run.runSelectedAttempts), run.runAttempts)
       : { remaining: 0, exhaustedReason: "run_completed" },
     autoDiscardSlag,
+    attemptDurationMultiplier: refiningDurationMultiplier(run?.runLocalPlaceId),
   };
 }
 
@@ -247,6 +257,7 @@ export function createRefiningResolver(
         random,
         allowance: snapshot.allowance,
         autoDiscardSlag: snapshot.autoDiscardSlag,
+        attemptDurationMultiplier: snapshot.attemptDurationMultiplier,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedRefiningOutcome = {

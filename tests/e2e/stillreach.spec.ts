@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, characters } from "@/db/rune-space";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import { LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCAL_MAP_LOCATION_IDS_BY_PLANET, getLocation } from "@/game/content/locations";
 import { teleportCharacterAsAdmin } from "@/server/admin-command-seams";
 import { expect, openMapSurface, openTestCharacter, test } from "./fixtures";
@@ -191,17 +191,26 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       await expect(scene.locator('[data-scene-layer="overlay"]')).toHaveCount(0);
 
       // Nothing operable: no work controls, no merchant, no ship, no stash. The
-      // Landing Station's one Local Place is Last Leg Trading's terminal (#375),
-      // listed in its directory; the machine itself is only inside that place.
+      // Landing Station's two Local Places are Last Leg Trading (#375) and
+      // Refiner-To-Go (#381), listed in its directory; their controls live inside.
       // Except the Quarry's (#379) and The Dry Seam's (#380) Mining, which have their own specs.
       await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(
         id === LOCATION_IDS.prospectingQuarry || id === LOCATION_IDS.theDrySeam ? 1 : 0,
       );
       await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
       await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
-      await expect(page.locator("[data-local-place]")).toHaveCount(
-        id === LOCATION_IDS.stillreachLandingStation ? 1 : 0,
-      );
+      const places = page.locator("[data-local-place]");
+      if (id === LOCATION_IDS.stillreachLandingStation) {
+        await expect(places).toHaveCount(2);
+        await expect(
+          page.locator(`[data-local-place="${LOCAL_PLACE_IDS.stillreachFuelTerminal}"]`),
+        ).toHaveCount(1);
+        await expect(
+          page.locator(`[data-local-place="${LOCAL_PLACE_IDS.stillreachRefinerToGo}"]`),
+        ).toHaveCount(1);
+      } else {
+        await expect(places).toHaveCount(0);
+      }
       await expectNoPageOverflow(page);
       if (viewport === PHONE && id === LOCATION_IDS.stillreachLandingStation) {
         await captureReviewScreenshot(page, "stillreach-landing-mobile.png");

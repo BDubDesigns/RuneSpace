@@ -401,6 +401,18 @@ aurora, with the vending terminal and a canister rack at its centre; focal (50, 
 both in the 390 px header strip and the directory card. No person, ship or game UI is baked
 in. Its alt text describes a terminal service, not an NPC or another World Location.
 
+### Refiner-To-Go Local Place (issue #381)
+
+`stillreach_refiner_to_go` is a 4:1 Local Place scene: the owner-approved 2172×543 RGB PNG
+(SHA-256 `72e94c3efdf2…`, kept unaltered as
+`assets/location-scenes/refiner-to-go-master.png`) downsampled whole to
+`refiner-to-go.webp`, 1536×384 lossy q80, by `scripts/prepare-refiner-to-go-art.mjs`, which
+refuses any other file. It shows the patched generator, red fuel tank and hopper rig mounted on
+a different face of the same service-building complex, signed REFINER-TO-GO, with no mushrooms
+in this view; focal (50, 55) keeps the machine and sign in the 390 px header strip. The
+Landing Station panorama, the Rivet overlay and the terminal scene are unchanged. Its sign is
+part of the approved pixels; no UI is composited.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's

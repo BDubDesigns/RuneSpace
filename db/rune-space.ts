@@ -682,6 +682,14 @@ export const characterRefiningState = pgTable(
      */
     runOutputsDiscarded: jsonb("run_outputs_discarded").notNull().default({}),
     runXpGained: integer("run_xp_gained").notNull().default(0),
+    /**
+     * The Refining station (Local Place) the current run was started at (#381),
+     * or NULL for the Abandoned Processing Yard. The place's authored duration
+     * multiplier prices every attempt of the run, so reloading, another device
+     * or reopening the other venue can never reprice a run in progress.
+     * `active_actions` stays payload-free; the run's own state owns this.
+     */
+    runLocalPlaceId: text("run_local_place_id"),
     /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
     recentAttempts: jsonb("recent_attempts").notNull().default([]),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

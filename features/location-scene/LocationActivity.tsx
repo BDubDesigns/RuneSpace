@@ -70,6 +70,11 @@ export function LocationActivity({
         // Last Leg Trading's unmanned outlet (#375): the place's merchant,
         // presented as a machine because nobody stands here to front it.
         return <LastLegTerminal localPlaceId={activePlace.id} />;
+      case LOCAL_PLACE_IDS.stillreachRefinerToGo:
+        // The shared Refining console, worked at this station's authored rate
+        // (#381). It is the place's only activity; the landing ring and the
+        // fuel terminal next door host none.
+        return <RefiningConsole localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.hhBnb:
         return (
           <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />

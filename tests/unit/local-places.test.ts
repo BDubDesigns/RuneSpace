@@ -107,10 +107,11 @@ describe("issue #159 Local Place registry", () => {
     // Holo Hollow Landing's Last Leg Trading (#357) and Stillreach Landing
     // Station's fuel terminal (#375) are the registry's places outside the
     // settlement.
-    expect(places).toHaveLength(LOCAL_PLACES.length - 2);
+    expect(places).toHaveLength(LOCAL_PLACES.length - 3);
     const outside: Record<string, string> = {
       [LOCAL_PLACE_IDS.lastLegTrading]: LOCATION_IDS.holoHollowLanding,
       [LOCAL_PLACE_IDS.stillreachFuelTerminal]: LOCATION_IDS.stillreachLandingStation,
+      [LOCAL_PLACE_IDS.stillreachRefinerToGo]: LOCATION_IDS.stillreachLandingStation,
     };
     for (const place of LOCAL_PLACES) {
       expect(place.parentLocationId).toBe(outside[place.id] ?? LOCATION_IDS.holoHollow);

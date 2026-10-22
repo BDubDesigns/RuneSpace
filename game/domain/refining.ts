@@ -542,6 +542,12 @@ export function resolveRefining<Id>(input: {
    */
   allowance: BoundedRunAllowance;
   /**
+   * How many times the recipe's canonical attempt duration this run takes
+   * (#381): the authored multiplier of the station it was started at. Absent is
+   * 1x, the Abandoned Processing Yard.
+   */
+  attemptDurationMultiplier?: number;
+  /**
    * The character's shared Auto-discard Slag preference (#256). It decides only
    * whether a failure's byproduct Slag is kept when there is room; it never
    * touches a success output, a deliberate Slag recipe's output, or an input a
@@ -556,7 +562,12 @@ export function resolveRefining<Id>(input: {
   if (!Number.isInteger(allowance.remaining) || allowance.remaining < 0)
     throw new RangeError("A Refining run allowance must be a non-negative integer");
 
-  const durationTicks = recipe.attemptDurationTicks;
+  // The venue's multiplier scales this run's attempts only; the authored recipe
+  // is never mutated, so the Processing Yard stays at 1x (#381).
+  const durationMultiplier = input.attemptDurationMultiplier ?? 1;
+  if (!Number.isInteger(durationMultiplier) || durationMultiplier < 1)
+    throw new RangeError("A Refining duration multiplier must be a positive integer");
+  const durationTicks = recipe.attemptDurationTicks * durationMultiplier;
   const award = refiningAwardFacts(balance, recipe);
 
   const inputsConsumed: Record<string, number> = {};

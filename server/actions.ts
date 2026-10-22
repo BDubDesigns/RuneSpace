@@ -493,6 +493,7 @@ export async function startRefiningAction(input: unknown): Promise<PlayActionRes
       undefined,
       undefined,
       request.data.quantity,
+      request.data.localPlaceId,
     ),
   );
 }

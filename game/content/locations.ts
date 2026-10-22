@@ -604,7 +604,7 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Stillreach Landing Station",
     description:
-      "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge, where a Last Leg Trading fuel terminal serves pilots.",
+      "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. A few weathered station buildings sit at its edge, where a Last Leg Trading fuel terminal serves pilots and a patched-together Refiner-To-Go will refine whatever you bring it.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack],
     availableActionIds: [],
     // The station hosts no merchant itself: Last Leg Trading's terminal is its
@@ -618,7 +618,7 @@ const locationDefinitions = [
         id: STILLREACH_LANDING_STATION_SHIP_BERTHED_VARIANT_ID,
         requires: { shipBerth: "here" },
         description:
-          "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. Your Rivet Utility Shuttle stands in the middle of the ring, and a Last Leg Trading fuel terminal serves pilots from the weathered station buildings at its edge.",
+          "A wide ring of softly glowing mushrooms circles an open clearing: the landing ground, under a sky of banded aurora. Your Rivet Utility Shuttle stands in the middle of the ring, and a Last Leg Trading fuel terminal serves pilots from the weathered station buildings at its edge, beside a patched-together Refiner-To-Go.",
         scene: {
           ...STILLREACH_LANDING_STATION_SCENE,
           alt: "Your repaired Rivet Utility Shuttle standing in the open clearing inside a ring of glowing violet, blue and amber mushrooms on a frosted highland plain, a few weathered station buildings and antenna masts at the left edge, aurora overhead at twilight",

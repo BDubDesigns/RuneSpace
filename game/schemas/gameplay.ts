@@ -196,6 +196,12 @@ export const StartRefiningRequestSchema = z.object({
   characterId: z.string().uuid(),
   recipeActionId: ContentId,
   quantity: BoundedRunSelectionSchema,
+  /**
+   * The Local Place whose Refining station the player is working (#381). Only a
+   * name: the server revalidates it against the character's own position and
+   * derives the venue's rate itself. Absent means the Abandoned Processing Yard.
+   */
+  localPlaceId: ContentId.optional(),
 });
 
 /** Starting or stopping Welding names only the character and the repair target. */

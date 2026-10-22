@@ -593,6 +593,8 @@ export const LOCAL_PLACE_IDS = {
   // Last Leg Trading's unmanned fuel terminal at Stillreach Landing Station
   // (#375): a second physical venue of the same merchant, so its own place ID.
   stillreachFuelTerminal: asContentId("stillreach_fuel_terminal"),
+  // The shabby shared Refining station beside it (#381).
+  stillreachRefinerToGo: asContentId("stillreach_refiner_to_go"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */

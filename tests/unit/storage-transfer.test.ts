@@ -167,6 +167,7 @@ function cargoState(): PlayGameplayState {
       inputsConsumed: {},
       xpGained: 0,
       recentAttempts: [],
+      localPlaceId: null,
     },
     cargoHold: {
       repair: {

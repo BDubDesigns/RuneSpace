@@ -1,0 +1,1 @@
+ALTER TABLE "character_refining_state" ADD COLUMN "run_local_place_id" text;

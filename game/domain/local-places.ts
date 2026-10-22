@@ -1,4 +1,4 @@
-import { getLocalPlaceInLocation } from "@/game/content/local-places";
+import { getLocalPlace, getLocalPlaceInLocation } from "@/game/content/local-places";
 import type { LocalPlaceDefinition, LocalPlaceScene } from "@/game/schemas/local-places";
 
 /**
@@ -79,6 +79,35 @@ export function deriveLocalPlaceSurface(
     repairTargetId: repairedPresentation.repairTargetId,
     repaired,
   };
+}
+
+/**
+ * The Refining station a Local Place hosts, when it is one and the character
+ * may enter it (#381). The server's start command and the console's duration
+ * labels both ask this one question, so a venue's rate has one authored home.
+ */
+export function resolveRefiningStation(input: {
+  locationId: string;
+  localPlaceId: string;
+  completedMissionIds?: ReadonlySet<string>;
+}): LocalPlaceDefinition | undefined {
+  const place = resolveActiveLocalPlace({
+    locationId: input.locationId,
+    requestedLocalPlaceId: input.localPlaceId,
+    ...(input.completedMissionIds ? { completedMissionIds: input.completedMissionIds } : {}),
+  });
+  return place?.refiningStation ? place : undefined;
+}
+
+/**
+ * How many times a recipe's canonical attempt duration a Refining run takes.
+ * A run begun at the Abandoned Processing Yard persists no place and works at
+ * exactly 1x; a run begun at an authored station persists that place's ID and
+ * is priced by it for as long as it lasts, however the player later navigates.
+ */
+export function refiningDurationMultiplier(runLocalPlaceId: string | null | undefined): number {
+  if (!runLocalPlaceId) return 1;
+  return getLocalPlace(runLocalPlaceId)?.refiningStation?.attemptDurationMultiplier ?? 1;
 }
 
 /**

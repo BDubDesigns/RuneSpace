@@ -113,6 +113,7 @@ import {
   refiningSuccessChanceBps,
   type RefiningStopReason,
 } from "@/game/domain/refining";
+import { refiningDurationMultiplier } from "@/game/domain/local-places";
 import { skillLevelProgress } from "@/game/domain/progression";
 import {
   projectCharacterProgression,
@@ -2123,6 +2124,7 @@ export async function stateFromTransaction(
     inputsConsumed: (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
     xpGained: refiningState?.runXpGained ?? 0,
     recentAttempts: normalizePersistedRefiningAttempts(refiningState?.recentAttempts, balance),
+    localPlaceId: refiningState?.runLocalPlaceId ?? null,
   };
   // One carried-quantity map covers every authored repair material, so a
   // recipe that wants Power Cells needs no new tally here (#209).
@@ -2315,7 +2317,9 @@ export async function stateFromTransaction(
   const nextAttemptDurationTicks = isWeldingCadenceAction
     ? balance.welding.attemptDurationTicks
     : activeRefiningRecipe
-      ? activeRefiningRecipe.attemptDurationTicks
+      ? // The run's own persisted venue prices it (#381), never the route.
+        activeRefiningRecipe.attemptDurationTicks *
+        refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
       : activeFabricationRecipe
         ? activeFabricationRecipe.durationTicks
         : activeTinkeringTarget

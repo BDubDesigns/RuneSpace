@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
@@ -28,6 +28,7 @@ import {
   refiningUnmetRequirements,
 } from "@/features/refining/refining-lists";
 import { refiningActionIds } from "@/game/config/balance";
+import { refiningDurationMultiplier } from "@/game/domain/local-places";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import {
@@ -139,8 +140,7 @@ function refiningErrorMessage(error: string, recipe?: RefiningRecipeProjection):
   return (
     (
       {
-        refining_unavailable_here:
-          "Ferrite refining is only available at the Abandoned Processing Yard.",
+        refining_unavailable_here: "Refining is only available at a refining station.",
       } as Record<string, string>
     )[error] ?? error
   );
@@ -196,7 +196,13 @@ function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string 
     : `${catchUp}Attempt failed, ${describeFailureOutcome(attempt)}. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
 }
 
-export function RefiningConsole() {
+/**
+ * The shared Refining console. A station Local Place passes its own ID (#381):
+ * the console names it on Start, and shows the recipes' durations at that
+ * station's authored multiplier. Display only — the server revalidates the
+ * place and prices the run itself from the run's persisted venue.
+ */
+export function RefiningConsole({ localPlaceId }: { localPlaceId?: string } = {}) {
   const {
     acquireCommand,
     enqueueForeground,
@@ -224,7 +230,18 @@ export function RefiningConsole() {
   const observedAttempts = useRef(refiningRun.attempts);
   const observedSequence = useRef(latestRefiningAttempt(refiningRun.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
-  const recipes = state.refiningRecipes;
+  const durationMultiplier = refiningDurationMultiplier(localPlaceId);
+  const projectedRecipes = state.refiningRecipes;
+  const recipes = useMemo(
+    () =>
+      durationMultiplier === 1
+        ? projectedRecipes
+        : projectedRecipes.map((candidate) => ({
+            ...candidate,
+            attemptDurationTicks: candidate.attemptDurationTicks * durationMultiplier,
+          })),
+    [projectedRecipes, durationMultiplier],
+  );
   const active =
     state.activeAction && refiningActionIds().includes(state.activeAction.actionId)
       ? state.activeAction
@@ -368,7 +385,12 @@ export function RefiningConsole() {
     visible.some((candidate) => missionGuidanceTargets.actionIds.has(candidate.actionId));
 
   return (
-    <ActivityPanel title="Refining" data-refining-activity data-refining-mode={mode}>
+    <ActivityPanel
+      title="Refining"
+      data-refining-activity
+      data-refining-duration-multiplier={durationMultiplier}
+      data-refining-mode={mode}
+    >
       <div className="flex flex-wrap gap-2" role="group" aria-label="Refining view">
         <MissionGuidanceHalo guidance={refineGuided ? "active" : undefined}>
           <ActionButton
@@ -496,6 +518,7 @@ export function RefiningConsole() {
                       characterId,
                       recipeActionId: recipe?.actionId,
                       quantity: selection,
+                      ...(localPlaceId ? { localPlaceId } : {}),
                     }),
                   )
                 }

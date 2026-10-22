@@ -9,6 +9,37 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #381 — Stillreach Slice E: Refiner-To-Go.
+    slug: "refiner-to-go",
+    title: "Refiner-To-Go",
+    publishedAt: "2026-10-22T04:00:00-07:00",
+    summary:
+      "Stillreach Landing Station now has a refinery of its own: Refiner-To-Go refines every recipe the Abandoned Processing Yard does, three times slower. Fuel included.",
+    hero: {
+      src: "/location-scenes/refiner-to-go.webp",
+      alt: "A rust-patched refinery machine, a red fuel tank, control panel and hopper bolted together under a lit REFINER-TO-GO sign on the wall of a weathered service building, workbenches and crates to either side, aurora and a pale moon over the highlands at twilight",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      [
+        "Beside Last Leg Trading's terminal at Stillreach Landing Station, a patched-together refinery has been bolted to the service building. Step into Refiner-To-Go from the station's places and you get the same Refining console as the Abandoned Processing Yard. Nothing is asked of you first: no Mission and no ship, only the Refining level and materials each recipe already needs. See ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        ".",
+      ],
+      "It will run every recipe the Yard does, with the same materials, chances and experience, but each attempt takes three times as long. A Full Small Fuel Canister takes 108 seconds instead of 36, and at Refining 8 it is still a 50.68% chance. The Yard on Skatboll stays the quicker place to refine.",
+      "Refiner-To-Go works only from what you are carrying. Your Rivet's Cargo Hold is not an ingredient pool, so move Oil Shale and an Empty canister into your Inventory before you start.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Refiner-To-Go, a Refining station at Stillreach Landing Station with every Refining recipe, each attempt taking three times as long as at the Abandoned Processing Yard.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #380 — Stillreach Slice D: The Dry Seam's Oil Shale Mining.
     slug: "dry-seam-opens",
     title: "The Dry Seam Opens",
