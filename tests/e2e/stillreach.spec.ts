@@ -199,10 +199,12 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       // Refiner-To-Go (#381), listed in its directory; their controls live inside.
       // Except the Quarry (#379), Dry Seam (#380), and Harmonic Workings (#383),
       // which each expose the shared Mining controls.
+      const hasMining =
+        id === LOCATION_IDS.prospectingQuarry ||
+        id === LOCATION_IDS.theDrySeam ||
+        id === LOCATION_IDS.harmonicWorkings;
       await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(
-        [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.theDrySeam, LOCATION_IDS.harmonicWorkings].includes(id)
-          ? 1
-          : 0,
+        hasMining ? 1 : 0,
       );
       await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
       await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
