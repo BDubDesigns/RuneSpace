@@ -2,6 +2,7 @@ import { z } from "zod";
 import { LOCAL_PLACE_IDS, type LocalPlaceId } from "@/game/config/foundations";
 import { ContentId } from "./ids";
 import { LocationIdSchema } from "./locations";
+import { MerchantPriceSchema } from "./merchants";
 
 /** A Local Place's stable identifier is a normal content ID (see game/schemas/ids). */
 export const LocalPlaceIdSchema = ContentId;
@@ -83,6 +84,13 @@ export const LocalPlaceDefinitionSchema = z
     access: LocalPlaceAccessRuleSchema,
     /** The merchant this place owns, when it hosts one. Server-validated. */
     merchantId: ContentId.optional(),
+    /**
+     * Price lines this venue adds to its merchant's catalog and no other venue
+     * has (#379). The merchant stays one business, so prices, unlock and daily
+     * allowances are shared; only these lines are venue-local, which is how the
+     * Stillreach terminal buys Stone without Toll's counter ever doing so.
+     */
+    venuePrices: z.array(MerchantPriceSchema).min(1).optional(),
     presentation: z
       .object({
         scene: LocalPlaceSceneSchema,
@@ -91,7 +99,10 @@ export const LocalPlaceDefinitionSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .refine((place) => place.venuePrices === undefined || place.merchantId !== undefined, {
+    message: "A venue-local price line needs the merchant that owns this place",
+  });
 
 export type LocalPlaceAccessRule = z.infer<typeof LocalPlaceAccessRuleSchema>;
 export type LocalPlaceScene = z.infer<typeof LocalPlaceSceneSchema>;

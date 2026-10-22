@@ -630,6 +630,15 @@ Current production conventions:
   stone, so the Fragment is told from the Runestone by silhouette and scale (a
   pointed shard against a whole stone with its engraving), and both were checked
   at the 80 px inventory tile
+- the Stillreach Slice C items (#379): the approved Stone (a small pile of four
+  angular quarry stones) and Boulder (one large angular rock) masters (1254x1254
+  transparent RGBA PNG, kept unaltered in `assets/item-art/`, SHA-256 checked) and
+  their derivatives in `public/item-art/`, prepared by
+  `scripts/prepare-stillreach-slice-c-art.mjs` with the same recipe as the Oil
+  Shale and the canisters (alpha under 4 cleared, near-opaque alpha snapped to 255,
+  trimmed, scaled to a 576 px long edge, centred on a 640x640 transparent canvas,
+  lossless WebP; the Stone content is 576x450, the Boulder 576x516). Neither bakes
+  in the Ultra Rare shimmer; both were checked at the 80 px inventory tile
 - Holo Hollow Landing and Last Leg Trading (#357): the empty Landing panorama
   (`holo-hollow-landing.webp`, 1536x384 lossy WebP q80, from the approved
   1536x384 master), the Last Leg Trading exterior (2508x627) and interior (1717x916)

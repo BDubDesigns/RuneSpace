@@ -118,15 +118,28 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the star chart Update as the newest (#377)", () => {
+  it("publishes the Prospecting Quarry Update as the newest (#379)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("plot-a-course");
+    expect(latest.slug).toBe("something-to-chip-at");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
-      Date.parse(getPublicUpdate("next-stop-stillreach")!.publishedAt),
+      Date.parse(getPublicUpdate("plot-a-course")!.publishedAt),
     );
     expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero?.src).toBe("/location-scenes/prospecting-quarry.webp");
     const text = JSON.stringify(latest);
+    expect(text).toContain("2 Credits a piece");
+    expect(text).toContain("It does not sell Stone and it does not buy Boulders");
+    expect(text).not.toMatch(/Harmonic|Enby|Runestone/);
+  });
+
+  it("keeps the star chart Update published beneath it (#377)", () => {
+    const chart = getPublicUpdate("plot-a-course")!;
+    expect(Date.parse(chart.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("next-stop-stillreach")!.publishedAt),
+    );
+    expect(Date.parse(chart.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(chart);
     // Presentation only: the flight, its cost and the first hop are unchanged.
     expect(text).toContain("star chart");
     expect(text).toContain("nothing is spent and the ship does not move until you press LAUNCH");

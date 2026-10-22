@@ -1,4 +1,5 @@
 import {
+  ITEM_IDS,
   LOCAL_PLACE_IDS,
   LOCATION_IDS,
   MERCHANT_IDS,
@@ -156,6 +157,9 @@ const localPlaceDefinitions = [
       "An unmanned Last Leg Trading outlet at the edge of the landing ring: a fuel vending terminal and a lit rack of canisters under a canvas awning, crates and tanks stacked along its weathered walls.",
     access: { kind: "open" as const },
     merchantId: MERCHANT_IDS.lastLegTrading,
+    // Only this terminal buys Stone (#379): 2 Credits a piece. It never sells it,
+    // never buys Boulder, and Toll's counter does neither.
+    venuePrices: [{ itemId: ITEM_IDS.stone, buyPrice: 2 }],
     presentation: {
       scene: {
         // The owner-approved 2048x512 master downsampled to the 1536x384 Local

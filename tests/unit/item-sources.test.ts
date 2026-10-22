@@ -169,6 +169,8 @@ describe("item sources — Fabrication, Refining, Mining", () => {
     expect(topaz.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
       balance.mining.sources.ferriteShale.actionId,
       balance.mining.sources.galvanite.actionId,
+      // Stillreach's Prospecting Quarry table (#379).
+      balance.mining.sources.stone.actionId,
     ]);
     expect(topaz.every((source) => source.kind === "mine" && source.role === "secondary")).toBe(
       true,

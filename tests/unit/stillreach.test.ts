@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readImageHeader } from "./image-header";
-import { LOCATION_IDS, PLANET_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS, PLANET_IDS } from "@/game/config/foundations";
 import {
   LOCAL_MAP_LOCATION_IDS_BY_PLANET,
   LOCATIONS,
@@ -417,6 +417,14 @@ describe("planet-scoped local map geometry (#373)", () => {
 describe("Stillreach is scenery-only (#373)", () => {
   it("authors no activity, status, merchant or state variant beyond the Landing Station's (#375)", () => {
     for (const location of stillreachLocations) {
+      // The Prospecting Quarry's Stone Mining (#379) is the one other activity.
+      if (location.id === LOCATION_IDS.prospectingQuarry) {
+        expect(location.availableActionIds).toEqual([ACTION_IDS.stoneMining]);
+        expect(location.dormantActivities).toEqual([]);
+        expect(location.merchantId).toBeUndefined();
+        expect(location.stateVariants).toEqual([]);
+        continue;
+      }
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();

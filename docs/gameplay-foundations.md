@@ -59,6 +59,7 @@ resolved attempt awards is recovered from the durable action ID.
 | Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
 | Oil Shale | The South Cut, **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
+| Stone | Stillreach's Prospecting Quarry | 33 | 35% at 1 → 100% at 30 | 1–2 (a miss awards nothing) | 45 |
 
 Every source also authors a `requiredMiningLevel` (the personal access gate; 1
 for The Jag and Deep Jag, so neither is newly gated) and a `lowYield` (`null` for
@@ -214,11 +215,15 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 | The Jag (#367) | Rune Fragment | 1 / 25 | +20 | no |
 | Deep Jag (#367) | Rune Fragment | 1 / 8 | +20 | no |
 | The South Cut (#367) | Rune Fragment | 1 / 6 | +20 | no |
+| Prospecting Quarry (#379) | Rune Fragment | 1 / 4 | +20 | no |
+| Prospecting Quarry (#379) | Uncut Quartz | 1 / 6 | +10 | no |
+| Prospecting Quarry (#379) | Uncut Topaz | 1 / 12 | +20 | no |
+| Prospecting Quarry (#379) | Boulder | 1 / 200 | +150 | **yes**, as ULTRA RARE FIND |
 
 - **One mutually exclusive roll.** Only a *successful* extraction rolls, once,
   over the whole table. Chances are absolute (1 / `oneIn`) and exact: the roll
   is an integer drawn from the least common multiple of the table's
-  denominators (600 at The Jag, 3,080 at Deep Jag, 300 at The South Cut), and each entry owns a
+  denominators (600 at The Jag, 3,080 at Deep Jag, 300 at The South Cut, 600 at the Prospecting Quarry), and each entry owns a
   consecutive span of it. The Rune Fragment is appended last to each table, so
   every existing gem keeps the span, and therefore the absolute chance, it had. One roll can therefore never award two finds, and no
   authored chance is rounded to basis points. Current content awards at most one
@@ -275,7 +280,7 @@ recipe, Echo Seeker, Mission, merchant price or new location here.
 
 | Item | Unit mass | Stack limit | Where from |
 | --- | ---: | ---: | --- |
-| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 25 at The Jag, 1 / 8 at Deep Jag, 1 / 6 at The South Cut; Break Apart |
+| Rune Fragment | 200 g | 10 | Mining Secondary Find: 1 / 25 at The Jag, 1 / 8 at Deep Jag, 1 / 6 at The South Cut, 1 / 4 at the Prospecting Quarry; Break Apart |
 | Runestone (intact) | 1,000 g | 5 | **No natural source yet.** An authorized admin grant, until a later source is authored |
 
 Both are ordinary stackable, tradable, carriable materials classified under
@@ -833,6 +838,46 @@ text, and the berth already moved with each landing).
   Walking away leaves the ship in the ring; walking edges never cross planets.
 - **Not From Around Here** is untouched: its deferred stage still has no target.
 
+### Stone at the Prospecting Quarry (#379)
+
+Stillreach's first repeatable Mining activity, at the Prospecting Quarry (axial
+(1,1)). It is one more `balance.mining.sources` entry (`stone`, action
+`stone_mining`) read by the one resolver, so Cutters, Power Cells, boosting, run
+history, active-action identity, Prioritize primary resources and lazy/offline
+resolution apply unchanged. No new hex, edge, art, NPC or Mission gate: any
+character who has physically reached Stillreach and has an eligible Cutter can mine.
+
+- **Numbers.** **33 ticks** (19.8 s; 20.0 s is not a whole number of 0.6 s ticks),
+  35% at Mining 1 → 100% at Mining 30 (anchored at level 1), **1 or 2 Stone** from
+  one fair coin flip, **45** Mining XP on a success. `lowYield` is `null`: a miss
+  awards **no Stone, no find and no XP**. A charged Loadsteel Cutter adds one
+  **primary** Stone on a success, never a find.
+- **Items.** Stone is **1,000 g, stack 5**, an ordinary tradable, carriable
+  resource under *Ores & Gemstones*. The Boulder is **5,000 g, stack 1**,
+  `ultra_rare` presentation, owning its own +150 bonus Mining XP. The Boulder has
+  no breakdown into Stone, no recipe, no vehicle, no housing use and no NPC price.
+  Their art is the owner-approved masters in `assets/item-art/` with runtime
+  derivatives from `scripts/prepare-stillreach-slice-c-art.mjs`.
+- **Secondary table.** One exclusive 600-outcome roll per success: 150 Rune
+  Fragment, 100 Uncut Quartz, 50 Uncut Topaz, 3 Boulder, 297 none (`oneIn` 4, 6, 12
+  and 200, the shared `secondaryFindRollSize`). Only the Boulder is announced. At
+  Mining 1 the Fragment rate is about 15.9 an hour before inventory and travel, by
+  design well below the dedicated rune mine a later slice owns. There is no whole
+  Runestone here.
+- **Capacity.** The shared preflight applies unchanged. With Prioritize primary
+  resources Off, an attempt needs room for 1 Stone plus any one find (the 5 kg
+  Boulder included; finds are mutually exclusive, so only one is reserved). With
+  it On, one Stone is enough and a find that does not fit after the Stone is
+  forfeited with no item, XP, announcement or record.
+- **Buyback.** `LocalPlaceDefinition.venuePrices` lets one venue of a merchant add
+  price lines the merchant's other venues do not have. The Stillreach terminal
+  (`stillreach_fuel_terminal`) adds **Stone → 2 Credits** (the player sells, the
+  merchant buys); `merchantAtVenue` composes the catalog for the server command and
+  the terminal UI. Toll's counter, Skatboll's catalog and the shared daily canister
+  allowances are unchanged, the terminal does not sell Stone, and nothing buys the
+  Boulder. The Thrust Issues gate and carried-inventory-only rules are the
+  merchant's own.
+
 ### Last Leg Trading's Stillreach terminal (issue #375)
 
 The terminal is its own Local Place, `stillreach_fuel_terminal` ("Last Leg Trading
@@ -860,7 +905,10 @@ spend one shared allowance.
   `docs/architecture.md`), so canisters show Toll's counter and the terminal, the
   terminal credited to no one.
 
-No stock, rotation, extra catalog, second allowance or migration.
+The terminal also carries one venue-local line, a 2-Credit Stone buyback (#379;
+`venuePrices` on the Local Place), that Toll's counter does not have.
+
+No stock, rotation, second allowance or migration.
 
 ### The Crash Site's two scenes (issue #330)
 

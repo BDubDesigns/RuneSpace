@@ -205,6 +205,30 @@ const itemPresentations = {
     description:
       "An intact stone with an unusually strong resonance. Valuable for advanced Runeworking, but can be broken into five Rune Fragments.",
   },
+  // Stillreach Prospecting Quarry Mining (#379). Stone is the ordinary primary
+  // resource; the Boulder is its single Ultra Rare find. Neither's art bakes in
+  // a sparkle: the Ultra Rare shimmer belongs to the shared item visuals, keyed
+  // off `rarity`.
+  [ITEM_IDS.stone]: {
+    displayName: "Stone",
+    accessibleDescription:
+      "A small pile of four chipped, angular pieces of grey-tan quarry rock with rough faces and sharp edges",
+    textFallback: "ST",
+    artworkSrc: "/item-art/stone.webp",
+    description:
+      "Plain quarried rock, chipped off the face in pieces. Heavy for how little it is worth.",
+  },
+  [ITEM_IDS.boulder]: {
+    displayName: "Boulder",
+    pluralName: "Boulders",
+    accessibleDescription:
+      "One large, angular, tan and grey boulder with rough chiselled faces, ordinary in every way",
+    textFallback: "BO",
+    artworkSrc: "/item-art/boulder.webp",
+    rarity: "ultra_rare",
+    description:
+      "A rock. Just a rock, five kilograms of it, and somehow the one everyone wants to be seen holding.",
+  },
   // Fuel manufacturing (#343). The two canisters are one silver cylinder family;
   // the fill state is the physical red cap and red side locking bar, so the art
   // has no baked label and the Full one's contents are said in words.

@@ -72,6 +72,10 @@ const itemIds = {
   // its single-specimen Ultra Rare secondary find.
   oilShale: asContentId("oil_shale"),
   motherlodeSlab: asContentId("motherlode_slab"),
+  // Stillreach Prospecting Quarry Mining (#379): the primary Stone a Quarry
+  // extraction yields, and its single-specimen Ultra Rare secondary find.
+  stone: asContentId("stone"),
+  boulder: asContentId("boulder"),
   // Fuel manufacturing (#343). Two distinct stackable items rather than one item
   // with a fill state: the empty shell is fabricated and is what a failed
   // Refining attempt returns; the full canister carries the 50 Fuel Units.
@@ -436,6 +440,9 @@ export const ACTION_IDS = {
   // Oil Shale Mining at The South Cut (#342), a third authored source under the
   // same one-action-per-source rule.
   oilShaleMining: asContentId("oil_shale_mining"),
+  // Stone Mining at Stillreach's Prospecting Quarry (#379), a fourth authored
+  // source under the same one-action-per-source rule.
+  stoneMining: asContentId("stone_mining"),
   // Refining recipes follow that same established rule. The existing Refined
   // Ferrite recipe keeps its original action ID unchanged; the two new
   // authored recipes get their own, which is what makes the selected recipe

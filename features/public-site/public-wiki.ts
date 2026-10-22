@@ -234,6 +234,20 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Stone at the Prospecting Quarry",
+        paragraphs: [
+          [
+            "Stillreach's Prospecting Quarry is open to anyone who can stand in it: Mining 1 and a Cutter are all it asks, and no Rune Fragment, Mission or Mining level beyond that. You have to fly there first (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). Stone is heavy and not worth much — 1kg a piece, five to a tile — and an attempt takes 19.8 seconds, before your Cutter and any Power Cell change that. Your chance of success starts at 35% at Mining 1 and climbs to certain at Mining 30.",
+          ],
+          "A successful attempt gives one or two Stone, equally likely, and 45 Mining experience. A miss gives nothing at all: no Stone, no find and no experience. A charged Loadsteel Cutter adds one more Stone to a success, as long as there is room for it.",
+          "A success can also turn up one find, and never more than one: about one success in four gives a Rune Fragment, one in six an Uncut Quartz, one in twelve an Uncut Topaz and, once in about two hundred, a Boulder. The bonus experience is the same as anywhere else: 20 for a Fragment, 10 for Quartz, 20 for Topaz and 150 for a Boulder. At Mining 1 that is roughly sixteen Rune Fragments an hour before you stop to carry anything; it is a way to replace a lost Fragment, not the best place to look for them.",
+          "A Boulder is a single 5kg rock that does not stack, and it is Ultra Rare: its tile shimmers wherever you carry it, and finding one posts an ULTRA RARE FIND System line in General saying who found it and where. It cannot be broken up, bought or sold to anyone, and it does nothing. A Quarry Fragment, Quartz or Topaz is not announced.",
+          "Prioritize primary resources works here as everywhere: with it Off, Mining needs room for one Stone and for any one find, the 5kg Boulder included; with it On, one Stone is enough and a find without room is lost for good, even a Boulder, with no experience and no announcement.",
+        ],
+      },
+      {
         heading: "Prioritize primary resources",
         paragraphs: [
           "Mining has one setting for what happens when your Inventory is nearly full, and it belongs to each character separately. It is Off by default, which is the safe choice: Mining will not start an attempt unless you have room for its smallest full success and for any one find it could turn up — at The South Cut, that is two Oil Shale and room for either a Sapphire or the 12kg Slab — so you never lose a find. The cost is that Mining stops sooner.",
@@ -249,6 +263,7 @@ const authoredWikiArticles = [
           "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
           "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find — a Rune Fragment is 200g, so that includes room for its weight. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
           "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
+          "The Prospecting Quarry on Stillreach can give a Rune Fragment, Uncut Quartz, Uncut Topaz or, very rarely, a Boulder; see Stone at the Prospecting Quarry.",
         ],
       },
       {
@@ -533,6 +548,7 @@ const authoredWikiArticles = [
             "). It is the same business as Toll's counter, with the same prices, the same Thrust Issues requirement for both buying and selling, and the same daily limits: canisters you buy at either place count toward one shared allowance of 5 Full and 5 Empty a day, so buying at one leaves less for the other.",
           ],
           "Step into it from the Landing Station; anyone can, and until your Thrust Issues report is in it shows Access restricted. It cannot be used from anywhere else on Stillreach, from Skatboll, or while you are in flight, and there is nobody to talk to there.",
+          "The terminal also buys Stone from you at 2 Credits a piece, from what you are carrying. It does not sell Stone, and it does not buy Boulders. Toll's counter on Skatboll does not buy Stone, and selling Stone does not change the daily canister limits.",
         ],
       },
     ],

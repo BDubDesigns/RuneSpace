@@ -12,6 +12,7 @@ import { getMerchant, isMerchantOpen } from "@/game/content/merchants";
 import { merchantVenues } from "@/game/domain/merchant-venues";
 import { deriveAcceptedMissionIds, deriveCompletedMissionIds } from "@/game/domain/missions";
 import {
+  merchantAtVenue,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
   merchantTradeDirections,
@@ -44,8 +45,10 @@ import type { MerchantDefinition } from "@/game/schemas/merchants";
 export function LastLegTerminal({ localPlaceId }: { localPlaceId: string }) {
   const { state } = usePlay();
   const place = getLocalPlace(localPlaceId);
-  const merchant = place?.merchantId ? getMerchant(place.merchantId) : undefined;
-  if (!place || !merchant) return null;
+  const business = place?.merchantId ? getMerchant(place.merchantId) : undefined;
+  if (!place || !business) return null;
+  // The business's catalog plus this terminal's own lines (#379).
+  const merchant = merchantAtVenue(business, place);
   const open = isMerchantOpen(merchant, {
     acceptedMissionIds: deriveAcceptedMissionIds(state.missions),
     completedMissionIds: deriveCompletedMissionIds(state.missions),

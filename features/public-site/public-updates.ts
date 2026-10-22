@@ -9,6 +9,47 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #379 — Stillreach Slice C: the Prospecting Quarry and Stone buyback.
+    slug: "something-to-chip-at",
+    title: "Something to Chip At",
+    publishedAt: "2026-10-21T20:30:00-07:00",
+    summary:
+      "Stillreach's Prospecting Quarry is open for Mining: Stone from Mining 1, now and then a Rune Fragment or gem, and once in a very long while a Boulder. The Last Leg Trading terminal at the Landing Station pays 2 Credits a Stone.",
+    hero: {
+      src: "/location-scenes/prospecting-quarry.webp",
+      alt: "A terraced pale-stone quarry cut into a hillside at dusk, lamp-lit timber and metal extraction rigs, a ramp and storage tanks on its floor, ringed by violet and teal scrub under an aurora sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.stone }, side: "right" },
+      [
+        "Once your Rivet has landed on Stillreach, the Prospecting Quarry is somewhere to work. It is open to anyone with a Cutter and Mining 1: no Rune Fragment, Mission or higher level is needed. An attempt takes about twenty seconds, starts at a 35% chance and is certain by Mining 30, and a success gives one or two Stone and 45 Mining experience. A miss gives nothing at all. See ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " for the details.",
+      ],
+      "Stone is plain rock: 1kg a piece, five to a tile. The Quarry can also turn up a find on a success, one at a time: a Rune Fragment about one success in four, an Uncut Quartz one in six, an Uncut Topaz one in twelve. At low Mining levels that is a way to replace a Rune Fragment you have lost, not the best place to hunt for them.",
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.boulder }, side: "left" },
+      "Very rarely, around one success in two hundred, the find is a Boulder. It is a rock. A single, ordinary, five-kilogram rock, and it is Ultra Rare: it shimmers wherever you carry it, and finding one posts an ULTRA RARE FIND line in General. It does not break up, it cannot be sold to anyone yet, and it does nothing. Make of that what you will.",
+      [
+        "Last Leg Trading's automated terminal at Stillreach Landing Station now buys Stone at 2 Credits a piece, from what you are carrying, once your Thrust Issues report is in. It does not sell Stone and it does not buy Boulders. Toll's counter on Skatboll does not buy it. See ",
+        { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+        ".",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Stone Mining at Stillreach's Prospecting Quarry: Mining 1, about 20 seconds an attempt, one or two Stone and 45 Mining experience on a success, nothing on a miss.",
+          "Rune Fragments, Uncut Quartz and Uncut Topaz as finds at the Quarry, and the Ultra Rare Boulder, announced in General when found.",
+          "Stone and Boulder items, with new art.",
+          "The Stillreach Last Leg Trading terminal buys Stone at 2 Credits each.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #377 — the Rivet's star chart.
     slug: "plot-a-course",
     title: "Plot a Course",
