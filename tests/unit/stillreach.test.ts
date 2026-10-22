@@ -436,6 +436,18 @@ describe("Stillreach is scenery-only (#373)", () => {
         expect(location.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
         continue;
       }
+      // Harmonic Workings' Rune Fragment Mining (#383) is the third: its own
+      // Mining-8 action, a Mining map status, and still reachable only from The
+      // Survey Line.
+      if (location.id === LOCATION_IDS.harmonicWorkings) {
+        expect(location.availableActionIds).toEqual([ACTION_IDS.harmonicMining]);
+        expect(location.mapStatus).toBe("Mining");
+        expect(location.dormantActivities).toEqual([]);
+        expect(location.merchantId).toBeUndefined();
+        expect(location.stateVariants).toEqual([]);
+        expect(location.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
+        continue;
+      }
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();

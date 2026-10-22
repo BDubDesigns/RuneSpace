@@ -443,6 +443,9 @@ export const ACTION_IDS = {
   // Stone Mining at Stillreach's Prospecting Quarry (#379), a fourth authored
   // source under the same one-action-per-source rule.
   stoneMining: asContentId("stone_mining"),
+  // Harmonic Workings' Rune Fragment Mining (#383), a fifth authored source under
+  // the same one-action-per-source rule.
+  harmonicMining: asContentId("harmonic_mining"),
   // Refining recipes follow that same established rule. The existing Refined
   // Ferrite recipe keeps its original action ID unchanged; the two new
   // authored recipes get their own, which is what makes the selected recipe

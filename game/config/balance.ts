@@ -191,6 +191,40 @@ const balanceSchema = z.object({
           }),
         ]),
       }),
+      /**
+       * Harmonic Workings' Rune Fragment Mining (#383): Stillreach's dedicated
+       * Mining-8 Rune Fragment source. The primary is the Fragment itself, 1 or 2
+       * uniformly, and a success earns 130 XP whichever is drawn. Its one
+       * find-roll is 40 outcomes: 5 intact Runestone (1/8, silent, zero bonus XP),
+       * 2 Uncut Sapphire (1/20, a RARE FIND line only when awarded) and 33 none.
+       * The curve is anchored at Mining 1 and is certain by Mining 40, so Mining 8
+       * is 46.66%. A miss awards nothing.
+       */
+      harmonicMining: z.object({
+        actionId: z.literal(ACTION_IDS.harmonicMining),
+        itemId: z.literal(ITEM_IDS.runeFragment),
+        attemptDurationTicks: z.literal(75),
+        successAtLevelOneBps: z.literal(3_500),
+        guaranteedSuccessLevel: z.literal(40),
+        successRangeBps: z.literal(6_500),
+        successXp: z.literal(130),
+        yieldMinimum: z.literal(1),
+        yieldMaximum: z.literal(2),
+        requiredMiningLevel: z.literal(8),
+        lowYield: z.null(),
+        secondaryFinds: z.tuple([
+          z.object({
+            itemId: z.literal(ITEM_IDS.runestone),
+            oneIn: z.literal(8),
+            announce: z.literal(false),
+          }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.uncutSapphire),
+            oneIn: z.literal(20),
+            announce: z.literal(true),
+          }),
+        ]),
+      }),
     }),
   }),
   /**
@@ -1146,10 +1180,16 @@ const balanceSchema = z.object({
       stackLimit: z.literal(10),
       secondaryFindMiningXp: z.literal(20),
     }),
+    /**
+     * The intact Runestone (#383) is a Mining Secondary Find at Harmonic Workings,
+     * so it authors its find XP explicitly: zero. It is the rune material's
+     * rarer secondary, not a new XP source, and no +20 Fragment bonus is implied.
+     */
     runestone: z.object({
       itemId: z.literal(ITEM_IDS.runestone),
       massGrams: z.literal(1_000),
       stackLimit: z.literal(5),
+      secondaryFindMiningXp: z.literal(0),
     }),
     /**
      * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
@@ -1298,6 +1338,23 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.uncutQuartz, oneIn: 6, announce: false },
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 12, announce: false },
           { itemId: ITEM_IDS.boulder, oneIn: 200, announce: true },
+        ],
+      },
+      harmonicMining: {
+        actionId: ACTION_IDS.harmonicMining,
+        itemId: ITEM_IDS.runeFragment,
+        attemptDurationTicks: 75,
+        successAtLevelOneBps: 3_500,
+        guaranteedSuccessLevel: 40,
+        successRangeBps: 6_500,
+        successXp: 130,
+        yieldMinimum: 1,
+        yieldMaximum: 2,
+        requiredMiningLevel: 8,
+        lowYield: null,
+        secondaryFinds: [
+          { itemId: ITEM_IDS.runestone, oneIn: 8, announce: false },
+          { itemId: ITEM_IDS.uncutSapphire, oneIn: 20, announce: true },
         ],
       },
     },
@@ -1838,7 +1895,12 @@ const defaults = balanceSchema.parse({
       stackLimit: 10,
       secondaryFindMiningXp: 20,
     },
-    runestone: { itemId: ITEM_IDS.runestone, massGrams: 1_000, stackLimit: 5 },
+    runestone: {
+      itemId: ITEM_IDS.runestone,
+      massGrams: 1_000,
+      stackLimit: 5,
+      secondaryFindMiningXp: 0,
+    },
     stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
     boulder: {
       itemId: ITEM_IDS.boulder,

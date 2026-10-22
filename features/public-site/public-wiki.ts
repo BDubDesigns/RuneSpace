@@ -260,6 +260,19 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Rune Fragments at Harmonic Workings",
+        paragraphs: [
+          [
+            "Harmonic Workings, on Stillreach, is a working mine for Rune Fragments. Reach it along The Survey Line from Stillreach Landing Station (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). You need Mining 8 and a Cutter; below Mining 8 the rock face is out of reach. An attempt takes 45 seconds, before your Cutter and any Power Cell change that. Your chance of success starts at 35% at Mining 1, is about 46.66% at Mining 8 and climbs to certain at Mining 40.",
+          ],
+          "A successful attempt gives one or two Rune Fragments, equally likely, and 130 Mining experience. That experience is the same whether you get one Fragment or two. A miss gives nothing at all. A charged Loadsteel Cutter adds one more Fragment to a success, as long as there is room for it.",
+          "A success can also turn up one find, and never more than one: about one success in eight gives an Intact Runestone, and about one in twenty an Uncut Sapphire. An Intact Runestone is not announced and adds no experience of its own. An Uncut Sapphire adds its usual 30 experience and posts a RARE FIND line in General that names Harmonic Workings, but only when one is actually kept in your Inventory.",
+          "Prioritize primary resources works here as everywhere: with it Off, Mining needs room for one Fragment and for a find, including an Intact Runestone's weight; with it On, one Fragment is enough and a find without room is lost, with no experience and no announcement.",
+        ],
+      },
+      {
         heading: "Prioritize primary resources",
         paragraphs: [
           "Mining has one setting for what happens when your Inventory is nearly full, and it belongs to each character separately. It is Off by default, which is the safe choice: Mining will not start an attempt unless you have room for its smallest full success and for any one find it could turn up — at The South Cut, that is two Oil Shale and room for either a Sapphire or the 12kg Slab — so you never lose a find. The cost is that Mining stops sooner.",
@@ -274,7 +287,7 @@ const authoredWikiArticles = [
           "The Jag, Deep Jag and The South Cut can also turn up a Rune Fragment: about one success in twenty-five at The Jag, one in eight at Deep Jag and one in six at The South Cut. It is one of the same single find an attempt can turn up, so an attempt never gives both a Rune Fragment and a gem or a Slab, and it comes on top of your ore and its experience. A Rune Fragment adds 20 Mining experience wherever it is found. It is an ordinary 200g material that stacks ten to a tile — no purple frame — and finding one is not announced in General.",
           "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
           "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find — a Rune Fragment is 200g, so that includes room for its weight. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
-          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut or The Dry Seam gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
+          "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag or Harmonic Workings, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut or The Dry Seam gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
           "The Prospecting Quarry on Stillreach can give a Rune Fragment, Uncut Quartz, Uncut Topaz or, very rarely, a Boulder; see Stone at the Prospecting Quarry.",
         ],
       },

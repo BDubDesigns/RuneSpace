@@ -9,6 +9,38 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #383 — Stillreach Slice F: Harmonic Workings' Rune Fragment Mining.
+    slug: "harmonic-workings-opens",
+    title: "Harmonic Workings Opens",
+    publishedAt: "2026-10-22T09:00:00-07:00",
+    summary:
+      "Stillreach's Harmonic Workings is a working mine now: Mining 8 and a Cutter cut one or two Rune Fragments a success for 130 Mining experience, with a chance at an Intact Runestone and a RARE FIND line for the Uncut Sapphire.",
+    hero: {
+      src: "/location-scenes/harmonic-workings.webp",
+      alt: "A steep fractured rock face with shimmering violet and teal crystals set in it, a wooden mine headframe with a cable bucket and loaded ore carts on a short rail, and distant aurora-lit mesas",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.runeFragment }, side: "right" },
+      [
+        "Harmonic Workings, at the end of The Survey Line on Stillreach, now works its rock face. With Mining 8 and a Cutter you can cut Rune Fragments from it, and nothing else is asked: no Mission and no Rune Fragment to start with. See",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " for the numbers.",
+      ],
+      "A success gives one or two Rune Fragments and 130 Mining experience, the same experience whichever you get. A miss gives nothing. A success can also turn up an Intact Runestone, or, once in about twenty successes, an Uncut Sapphire. A Sapphire posts a RARE FIND line in General that names Harmonic Workings; a Runestone stays quiet.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Rune Fragment Mining at Stillreach's Harmonic Workings: Mining 8, about 45 seconds an attempt, one or two Rune Fragments and 130 Mining experience on a success, nothing on a miss.",
+          "One find a success at most: an Intact Runestone, or an Uncut Sapphire whose RARE FIND line names Harmonic Workings.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #381 — Stillreach Slice E: Refiner-To-Go.
     slug: "refiner-to-go",
     title: "Refiner-To-Go",
