@@ -1284,6 +1284,135 @@ body {
   letter-spacing: 0.08em;
 }
 
+/* The Rivet's pre-launch star chart (#377). The worlds are drawn from their
+   authored presentation (PlanetBody); this styles only the chart around them:
+   legs by state, the berth ring, the selection reticle, and the HTML labels
+   and touch targets laid over the drawing. State is always also in text (the
+   chips), never colour alone. */
+.rs-star-chart {
+  background: radial-gradient(ellipse at 50% 50%, rgb(75 216 245 / 0.08), transparent 72%),
+    var(--rs-surface-page);
+}
+
+.rs-star-chart__route {
+  stroke: var(--rs-border-structural);
+  stroke-dasharray: 6 8;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.rs-star-chart__route[data-state="unavailable"] {
+  stroke: var(--rs-border-subtle);
+  stroke-dasharray: 2 10;
+}
+
+.rs-star-chart__route[data-state="unavailable"][data-selected] {
+  stroke: var(--rs-text-muted);
+}
+
+.rs-star-chart__route[data-state="available"][data-selected] {
+  stroke: var(--rs-accent-primary);
+  stroke-dasharray: 10 8;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px rgb(75 216 245 / 0.6));
+  animation: rs-star-chart-route-flow 1.6s linear infinite;
+}
+
+.rs-star-chart__dimmed {
+  opacity: 0.4;
+  filter: saturate(0.35);
+}
+
+.rs-star-chart__berth {
+  stroke: var(--rs-accent-primary);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rs-star-chart-berth-pulse 2.4s ease-out infinite;
+}
+
+.rs-star-chart__reticle {
+  stroke: var(--rs-accent-primary);
+  stroke-linecap: square;
+  stroke-width: 3;
+}
+
+.rs-star-chart__reticle[data-state="unavailable"] {
+  stroke: var(--rs-text-muted);
+}
+
+.rs-star-chart__chip {
+  border: 1px solid currentColor;
+  padding: 0 0.35rem;
+  font-family: var(--rs-font-display);
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: rgb(5 9 15 / 0.7);
+}
+
+.rs-star-chart__chip[data-star-chart-status="selected"] {
+  color: var(--rs-accent-primary);
+}
+
+.rs-star-chart__chip[data-star-chart-status="available"] {
+  color: var(--rs-text-secondary);
+}
+
+.rs-star-chart__chip[data-star-chart-status="unavailable"] {
+  color: var(--rs-text-muted);
+  border-style: dashed;
+}
+
+.rs-star-chart__target {
+  border: 1px solid transparent;
+  transition:
+    background-color var(--rs-duration-fast),
+    border-color var(--rs-duration-fast);
+}
+
+.rs-star-chart__target:hover:not(:disabled),
+.rs-star-chart__target[data-selected] {
+  background: rgb(75 216 245 / 0.06);
+  border-color: rgb(75 216 245 / 0.25);
+}
+
+.rs-star-chart__target[data-state="unavailable"] {
+  opacity: 0.75;
+}
+
+.rs-star-chart__target:focus-visible {
+  outline-offset: -3px;
+}
+
+@keyframes rs-star-chart-route-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+@keyframes rs-star-chart-berth-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* Reduced motion: a static chart. The selected leg keeps its colour, weight and
+   glow, and the berth ring stays drawn, without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .rs-star-chart__route[data-state][data-selected],
+  .rs-star-chart__berth {
+    animation: none;
+  }
+}
+
 /* Reduced motion: the ship rests on its mark with no thrust, glow or dust, and
    the panel's countdown and progress meter carry the flight. The chart's moving
    marker and trail are not rendered at all (FlightCinematic). Phases still

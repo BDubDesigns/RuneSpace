@@ -781,6 +781,21 @@ ship's actual berth: the three systems with their repair work, the Cargo Hold's
 storage once repaired, and — once Propulsion is restored — a Board Ship control
 for fuel and flight. It renders nowhere else.
 
+**The star chart** (#377, `features/ship/StarChart.tsx`, `features/ship/star-chart.ts`)
+is how Board Ship's Flight Controls choose a flight to another world. It is
+presentation over the projected `ship.routes` only: the berth's planet is the
+origin (YOU ARE HERE, never a choice), and the only other worlds drawn are the
+planets a projected route lands on, each from its typed presentation
+(`game/content/planets`, `PlanetBody`) at the same left-to-right placement as the
+flight cinematic's chart. A planet no route from this berth reaches is not drawn,
+so planet art never reveals a world. A world whose every route carries a
+`launchRefusal` is dimmed and marked Unavailable; it can be selected to read the
+server's reason, but LAUNCH stays disabled. The sole launchable route (or a sole
+refused one) is preselected; with several, the player chooses. Selection is local
+state: LAUNCH sends that route's ID to the unchanged `launchShip`, and a stale
+choice the server no longer projects is never sent. A hop on one planet (the first
+flight) keeps its single launch card. No discovery state, schema or rule was added.
+
 ### The interplanetary leg: Holo Hollow Landing ↔ Stillreach (issue #375)
 
 Two more authored routes in the same registry, one per direction:

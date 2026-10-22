@@ -9,6 +9,31 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #377 — the Rivet's star chart.
+    slug: "plot-a-course",
+    title: "Plot a Course",
+    publishedAt: "2026-10-21T16:45:00-07:00",
+    summary:
+      "The Rivet's Flight Controls now open on a star chart. Your ship's world is marked You are here, and you pick where to fly by tapping the planet you want.",
+    body: [
+      [
+        "Board your Rivet at Holo Hollow Landing or Stillreach Landing Station and the Flight Controls now show a star chart instead of a box of numbers: the world you are berthed on, marked You are here, the world you can fly to, and the route between them. Skatboll is the ringed grey one and Stillreach the violet one with the glow. See ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        " for the flight itself.",
+      ],
+      "Tap a planet to choose it. Right now there is only one place to fly from each station, so it is already chosen for you. Below the chart you see the destination, the fuel it costs, how long it takes, your fuel now and after landing, any warning about the fuel you will need to fly back, and the LAUNCH button. If the flight is not possible yet, for example because the tank is too low, the planet is dimmed and marked Unavailable, and the game tells you why.",
+      "Choosing a planet does nothing on its own: nothing is spent and the ship does not move until you press LAUNCH. The flight, its cost and the takeoff and touchdown you watch are exactly as before, and the first hop from the Crash Site to Holo Hollow Landing keeps its own simple launch card.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Flights between Skatboll and Stillreach are chosen on a star chart in the Rivet's Flight Controls, with the route's cost, flight time and fuel shown beneath it.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #375 — Stillreach Slice B: the interplanetary flight and the terminal.
     slug: "next-stop-stillreach",
     title: "Next Stop: Stillreach",
