@@ -24,7 +24,7 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|crash-site-scene|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|dialogue-steps|fabrication|fabrication-advanced|fuel-manufacturing|gameplay-access|holo-hollow|inventory-equip|last-leg-trading|location-population|mining|mission-pinning|moderation|not-from-around-here|oil-shale-mining|overlay|player-trading|public-chat|refining|rune-materials|rusk-recovery|scroll-affordances|ship-first-flight|signout|site-stash|social-shell|stillreach|stillreach-flight|system-notices|thrust-issues|travel|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
+  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|crash-site-scene|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|dialogue-steps|dry-seam-mining|fabrication|fabrication-advanced|fuel-manufacturing|gameplay-access|harmonic-mining|holo-hollow|inventory-equip|last-leg-trading|location-population|mining|mission-pinning|moderation|not-from-around-here|oil-shale-mining|overlay|player-trading|public-chat|refiner-to-go|refining|rune-materials|rusk-recovery|scroll-affordances|ship-first-flight|signout|site-stash|social-shell|stillreach|stillreach-flight|stone-mining|system-notices|thrust-issues|travel|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
 
 /**
