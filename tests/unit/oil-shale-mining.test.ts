@@ -781,3 +781,38 @@ describe("a charged Loadsteel Cutter's bonus ore on any attempt that yields ore"
     });
   });
 });
+
+describe("Oil Shale at both planets' mines (#380)", () => {
+  const southCut = getLocation(LOCATION_IDS.theSouthCut)!;
+  const drySeam = getLocation(LOCATION_IDS.theDrySeam)!;
+
+  it("offers the one canonical Oil Shale action at The South Cut and The Dry Seam only", () => {
+    expect(southCut.availableActionIds).toEqual([ACTION_IDS.oilShaleMining]);
+    expect(drySeam.availableActionIds).toEqual([ACTION_IDS.oilShaleMining]);
+    expect(southCut.mapStatus).toBe("Mining");
+    expect(drySeam.mapStatus).toBe("Mining");
+    expect(southCut.planetId).not.toBe(drySeam.planetId);
+  });
+
+  it("resolves both locations to the same single source, with no second balance", () => {
+    expect(miningSourceForActionId(ACTION_IDS.oilShaleMining, balance)).toBe(oil);
+    expect(oil.attemptDurationTicks).toBe(100);
+    expect(oil.requiredMiningLevel).toBe(5);
+    expect(
+      Object.values(balance.mining.sources).filter(
+        (source) => source.actionId === ACTION_IDS.oilShaleMining,
+      ),
+    ).toHaveLength(1);
+    // 40.30% at the Mining 5 unlock, from the shared level-one-anchored curve.
+    expect(miningSuccessChanceBps(5, oil)).toBe(4_030);
+  });
+
+  it("keeps the Survey Line as the only way in and the South Cut's own identity", () => {
+    expect(drySeam.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
+    expect(drySeam.displayName).toBe("The Dry Seam");
+    expect(southCut.displayName).toBe("The South Cut");
+    expect(drySeam.description).toContain("Mining 5");
+    expect(drySeam.presentation.scene.asset).toBe("/location-scenes/the-dry-seam.webp");
+    expect(southCut.presentation.scene.asset).toBe("/location-scenes/the-south-cut.webp");
+  });
+});

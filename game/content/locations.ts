@@ -762,9 +762,13 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "The Dry Seam",
     description:
-      "A pale quarry wall opened to expose a dark, glossy seam, with conveyors, tanks and lit steel frames standing on the cut floor in front of it.",
+      "A pale quarry wall opens onto a glossy black seam, with conveyors and battered processing tanks strung across the floor. Cutting oil shale here takes Mining 5.",
     adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
-    availableActionIds: [],
+    // Stillreach's Oil Shale mine (#380): the same canonical source and balance
+    // as The South Cut, enabled by the action ID alone. The Mining 5 gate is the
+    // source's own, enforced by the server when a run starts.
+    availableActionIds: [ACTION_IDS.oilShaleMining],
+    mapStatus: "Mining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "the_dry_seam" as const,

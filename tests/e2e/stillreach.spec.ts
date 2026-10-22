@@ -66,13 +66,13 @@ test("an admin-placed Stillreach character sees exactly the eight hexes and seve
   await expect(
     page.locator(`[data-map-location="${LOCATION_IDS.stillreachLandingStation}"]`),
   ).toHaveAttribute("aria-current", "true");
-  // Only the Prospecting Quarry's Stone Mining (#379) carries a status.
-  await expect(page.locator("[data-map-status]")).toHaveCount(1);
-  await expect(
-    page
-      .locator(`[data-map-location="${LOCATION_IDS.prospectingQuarry}"]`)
-      .locator("[data-map-status]"),
-  ).toHaveText("Mining");
+  // Only the Quarry's Stone Mining (#379) and The Dry Seam's Oil Shale Mining (#380) carry a status.
+  await expect(page.locator("[data-map-status]")).toHaveCount(2);
+  for (const mine of [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.theDrySeam]) {
+    await expect(
+      page.locator(`[data-map-location="${mine}"]`).locator("[data-map-status]"),
+    ).toHaveText("Mining");
+  }
   for (const id of STILLREACH_IDS) {
     const asset = getLocation(id)!.presentation.mapIconKey.replaceAll("_", "-");
     const image = page.locator(`svg image[href="/map-icons/${asset}.webp"]`);
@@ -193,9 +193,9 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       // Nothing operable: no work controls, no merchant, no ship, no stash. The
       // Landing Station's one Local Place is Last Leg Trading's terminal (#375),
       // listed in its directory; the machine itself is only inside that place.
-      // Except the Quarry's Mining (#379), which has its own spec.
+      // Except the Quarry's (#379) and The Dry Seam's (#380) Mining, which have their own specs.
       await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(
-        id === LOCATION_IDS.prospectingQuarry ? 1 : 0,
+        id === LOCATION_IDS.prospectingQuarry || id === LOCATION_IDS.theDrySeam ? 1 : 0,
       );
       await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
       await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
