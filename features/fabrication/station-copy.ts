@@ -5,6 +5,7 @@ import type { FabricationCommandError } from "@/server/fabrication-commands";
 import type { TinkeringCommandError } from "@/server/tinkering-commands";
 import type { FabricationRecipeProjection } from "@/server/play";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { seconds } from "@/features/shared/duration-copy";
 
 /**
  * The Fabrication Station's player-facing copy (#232): refusals and stop
@@ -148,15 +149,6 @@ export function tinkeringStopIsExpected(
     selection === BOUNDED_RUN_MAX &&
     (reason === "no_eligible_items" || reason === "last_cutter" || reason === "run_safety_limit")
   );
-}
-
-/**
- * The station's one duration format: "7.2 sec", never a bare "s". The space is
- * non-breaking so a narrow tile never strands the unit on a line of its own.
- */
-export function seconds(ticks: number, tickMs: number): string {
-  const value = (ticks * tickMs) / 1000;
-  return `${Number.isInteger(value) ? value : value.toFixed(1)}\u00a0sec`;
 }
 
 /**

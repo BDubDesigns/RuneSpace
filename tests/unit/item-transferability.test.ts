@@ -31,6 +31,7 @@ const facts: ItemSourceFacts = {
   acceptedMissionIds: new Set(),
   completedMissionIds: new Set(),
   fabricationStationUnlocked: false,
+  resonanceRigUnlocked: false,
   locationStates: {},
 };
 

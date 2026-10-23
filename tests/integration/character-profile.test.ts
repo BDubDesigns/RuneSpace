@@ -198,6 +198,16 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           atMaximumLevel: false,
           accentTone: "refining",
         },
+        // A standard skill since #391, with its own approved accent.
+        {
+          displayName: "Runeworking",
+          level: 1,
+          totalXp: 0,
+          xpIntoLevel: 0,
+          xpToNextLevel: 500,
+          atMaximumLevel: false,
+          accentTone: "runeworking",
+        },
         {
           displayName: "Welding",
           level: 1,
@@ -302,6 +312,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       "Fabrication",
       "Mining",
       "Refining",
+      "Runeworking",
       "Welding",
     ]);
     expect(mining(playedProfile)).toMatchObject({ level: 2, totalXp: 500 });
@@ -310,6 +321,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       "Fabrication",
       "Mining",
       "Refining",
+      "Runeworking",
       "Welding",
     ]);
     expect(mining(freshProfile)).toMatchObject({ level: 1, totalXp: 0 });
@@ -343,9 +355,9 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
 
     try {
       const result = await profile.getCharacterProfile(owner, active.id, targetName);
-      // Fabrication, Mining, Refining, and Welding have approved level curves
-      // and are published.
-      expect(result.skills).toHaveLength(4);
+      // Fabrication, Mining, Refining, Runeworking, and Welding have approved
+      // level curves and are published.
+      expect(result.skills).toHaveLength(5);
     } finally {
       spy.mockRestore();
     }

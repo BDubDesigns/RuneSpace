@@ -49,6 +49,7 @@ separate actions (`docs/holo-hollow.md`).
 | Authored dialogue sequences (presentation content) | `game/content/dialogue.ts` — `DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue` |
 | Authored replayable topics | `game/content/conversation-topics.ts` — `ConversationTopicDefinition`, `CONVERSATION_TOPICS`, `getNpcConversationTopics` |
 | Mission conversation metadata | `game/content/missions.ts` — `MissionOffer` (`dialogueId`, `actionLabel`, `acceptedContinuation`, `activeDialogueId`), `MissionTurnIn` (`dialogueId`, `actionLabel`), `MissionDialogue`, `activeNpcDialogue`, `completedNpcDialogue`, and the `npc_conversation` requirement's own `dialogueId` / `actionLabel` |
+| Skill-level-dependent dialogue (#391) | `game/content/dialogue.ts` — `SkillLevelDialogue`, `SKILL_LEVEL_DIALOGUES`, `DialogueSequence.skillLevelDialogueId`; `game/domain/skill-level-dialogue.ts` — the selector, `resolvePresentedDialogue`, validation; `server/play.ts` — `PlayGameplayState.skillLevelDialogue`. Recipe: §8 |
 | Conversation resolution (pure) | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `topicAvailable`, `validateConversationTopics`, `getMissionCompletionPresentation`, `getMissionCapacityRefusalDialogue` |
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
 | Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (the place's resident rows: Talk control + guidance, Trade), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
@@ -296,11 +297,15 @@ type ConversationTopicDefinition = {
 
 type ConversationTopicAvailability =
   | { kind: "always" }
+  | { kind: "mission_accepted"; missionId: MissionId }
   | { kind: "mission_completed"; missionId: MissionId };
 ```
 
 The availability vocabulary is **closed and narrow**. `mission_completed` reads
-the existing semantic Mission projection and requires no new persistence. Do not
+the existing semantic Mission projection and requires no new persistence.
+`mission_accepted` (#391) reads the same projection and holds from acceptance
+onward — Active, ready, or Completed — so a lesson's instructions stay
+replayable for the rest of the game once they have been given. Do not
 add a generic boolean-expression DSL, relationship/reputation meter, hidden trust
 score, or world-state scripting language. If real later content needs another
 kind, extend this closed union deliberately when that use case arrives.
@@ -338,6 +343,9 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | The Wise Old Enby | The workshop | always |
 | The Wise Old Enby | Stillreach | always |
 | The Wise Old Enby | About RuneSpace | after **Not From Around Here** is completed |
+| The Wise Old Enby | First lesson | once **First Runeworking Lesson** is accepted |
+| The Wise Old Enby | Where to Find Fragments | after **Not From Around Here** is completed |
+| The Wise Old Enby | About the Seekers | after **First Runeworking Lesson** is completed |
 
 The Wise Old Enby (#389) stands at Hilltop Workshop itself (no Local Place), so
 their first three topics are there for anyone who reaches the hill, with or
@@ -349,6 +357,15 @@ their own approved 15:8 workshop interior with the four portraits (neutral,
 friendly, thoughtful, amused) separate from it. *About RuneSpace* is an ordinary
 `mission_completed` topic: replaying it runs no command, pays nothing and records
 nothing.
+
+*First lesson* replays the lesson's instruction scene (#391) as a topic of its
+own: the same verbatim beats, authored in a topic-owned sequence because a topic
+may never reuse a Mission-owned one. *Where to Find Fragments* is nothing but
+the Enby's skill-level-dependent Fragment advice (§8), and *First lesson* ends
+with it too, so both always give the advice the character's current Mining level
+earns. *About the Seekers* is the lesson's aftercare. None of them carries a
+Mission command; the Resonance Rig is a separate control below the Enby's card
+and is never reached through Talk.
 
 Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,
@@ -436,6 +453,8 @@ If a new conversation seems to need a mission-ID branch in React, a bespoke
 accept/complete path, prose parsing, or a per-NPC conversation adapter, stop and
 inspect whether this model is being bypassed.
 
+Adding skill-level-dependent lines: follow §8.
+
 ### Dialogue scene location labels (issue #357 follow-up)
 
 The dialogue background identifies the place shown, not merely the World Location
@@ -446,3 +465,123 @@ from that Local Place registry entry. Outdoor/exterior backdrops continue to
 show the World Location. The scene plate is single-line and ellipsizes when the
 full name is too long; the full location name remains accessible in its text
 and title attribute.
+
+## 8. Skill-level-dependent dialogue (#391)
+
+Some advice should depend on what the character can already do: the Wise Old
+Enby sends a novice miner to the Prospecting Quarry for Rune Fragments and an
+experienced one to Harmonic Workings. That is a **skill-level-dependent
+dialogue**: one authored choice between ordinary sequences of the same NPC, by
+the character's level in one skill. It is content plus a tiny pure selector —
+not a scripting language, not a condition in React, and no new persistence.
+
+### Where it lives
+
+| Piece | Home |
+| --- | --- |
+| The choice (skill, thresholds, variant sequences) | `SKILL_LEVEL_DIALOGUES` in `game/content/dialogue.ts`, typed by `SkillLevelDialogue` |
+| Its stable ID | `SKILL_LEVEL_DIALOGUE_IDS` in `game/config/foundations.ts` |
+| Invoking it from a sequence | `skillLevelDialogueId` on any `DialogueSequence` |
+| Selection and the played beats (pure) | `game/domain/skill-level-dialogue.ts` — `selectSkillLevelDialogueVariant`, `selectSkillLevelDialogues`, `resolvePresentedDialogue` |
+| Authority | `server/play.ts` puts `skillLevelDialogue` (choice ID → selected variant ID) on every `PlayGameplayState`, from the character's persisted XP |
+| Presentation | `features/npc/NpcConversation.tsx` plays `resolvePresentedDialogue(dialogueId, state.skillLevelDialogue)` |
+| Fail-fast validation | `validateSkillLevelDialogues`, run at module load by `server/mission-state.ts` |
+
+The production example is `SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice`,
+invoked by the lesson's instruction scene (`wiseOldEnbyFirstLesson`), its replay
+topic (`wiseOldEnbyFirstLessonTopic`), and the *Where to Find Fragments* topic
+(`wiseOldEnbyWhereToFindFragmentsTopic`). Tests:
+`tests/unit/first-runeworking-lesson.test.ts` (selector, fallback, refresh,
+validation) and `tests/integration/first-runeworking-lesson.test.ts` (the
+server's selection at Mining 7, 8 and with no Mining XP row).
+
+### The recipe
+
+1. Author each variant as an ordinary sequence of the NPC in `dialogue.ts`,
+   with its own `DIALOGUE_IDS` entry. Variants carry only beats — never a
+   Mission command — and every beat is the NPC's (the player stays silent).
+2. Declare the choice, lowest threshold first:
+
+   ```ts
+   // game/config/foundations.ts
+   export const SKILL_LEVEL_DIALOGUE_IDS = {
+     wiseOldEnbyFragmentAdvice: "wise_old_enby_fragment_advice",
+   } as const;
+
+   // game/content/dialogue.ts — SKILL_LEVEL_DIALOGUES
+   {
+     id: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+     npcId: NPC_IDS.wiseOldEnby,
+     skillId: SKILL_IDS.mining,
+     variants: [
+       { minimumLevel: 1, dialogueId: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceNovice },
+       {
+         // Read from the gate the advice is about, never restated.
+         minimumLevel: getEffectiveGameBalance().mining.sources.harmonicMining.requiredMiningLevel,
+         dialogueId: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceExperienced,
+       },
+     ],
+   },
+   ```
+
+3. Invoke it from every sequence that should end with it:
+
+   ```ts
+   [DIALOGUE_IDS.wiseOldEnbyFirstLesson]: {
+     id: DIALOGUE_IDS.wiseOldEnbyFirstLesson,
+     npcId: NPC_IDS.wiseOldEnby,
+     skillLevelDialogueId: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+     beats: [/* the scene's own beats, played first */],
+   },
+   // A topic whose whole subject is the advice authors no beats of its own.
+   [DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic]: {
+     id: DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic,
+     npcId: NPC_IDS.wiseOldEnby,
+     skillLevelDialogueId: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+     beats: [],
+   },
+   ```
+
+4. Use the invoking sequence wherever a sequence ID goes — a Mission offer,
+   continuation, completion presentation or a topic. Nothing else changes: the
+   conversation surface resolves every played sequence through
+   `resolvePresentedDialogue`.
+5. Cover the thresholds in a unit test (`selectSkillLevelDialogueVariant` at the
+   level below and at each threshold, plus a missing skill) and the played beats
+   (`resolvePresentedDialogue`).
+
+### Rules
+
+- **Thresholds.** `variants` ascend strictly; the first is always
+  `minimumLevel: 1`. A variant applies from its `minimumLevel` up to the next
+  one's, so only one variant's lines are ever played — never both branches.
+  When the advice is about a gate (a source's required level, a recipe's
+  minimum), read the threshold from that registry so it cannot drift.
+- **Fallback and missing skill.** No XP row in the skill is Level 1 (the
+  starting level), so it selects the first variant. A Play state that does not
+  name the choice — an older client state, a test fixture — also plays the
+  first variant. A choice is never silent.
+- **Authority.** The server computes the selection from persisted XP through the
+  skill's own curve (`skillLevelThresholds`), in the same Play state as
+  everything else. The client never reads XP or knows a threshold; it plays the
+  variant the map names. Choosing lines grants, records and unlocks nothing.
+- **Order.** The invoking sequence's own beats play first, then the selected
+  variant's. A choice is a tail; there is exactly one per sequence.
+- **Refresh.** Selection is recomputed on every Play state, so a character who
+  levels up and returns hears the new variant the next time the conversation is
+  opened. A conversation already open keeps the beats it started with.
+- **Reuse.** Several sequences may invoke one choice; the lines are authored
+  once. Validation rejects a duplicate choice ID, a skill without a level
+  curve, fewer than two variants, a first threshold other than 1, thresholds
+  that do not ascend or exceed the skill's maximum, an unknown, wrong-NPC or
+  beat-less variant or one that itself invokes a choice, a beat-less sequence
+  that invokes nothing, and a sequence invoking an unknown choice or another
+  NPC's.
+- **QC Studio.** Variants are ordinary sequences and preview as such. A
+  beat-less invoking sequence (a topic that is only the choice) has nothing of
+  its own to preview and is left out of the QC Studio dialogue list
+  (`docs/qc-studio.md`).
+
+Do not grow this into conditions on Missions, items or flags. A line that
+depends on a Mission's state is Mission dialogue (`docs/missions.md` §9); a
+topic that depends on a Mission is topic availability (§5).

@@ -37,6 +37,8 @@ import {
   refiningRecipeIsDeterministic,
   refiningRecipes,
   repairTargetBalances,
+  runeworkingRecipeForActionId,
+  runeworkingRecipes,
   repairTargetForActionId,
   skillLevelThresholds,
   standardSkillLevelThresholds,
@@ -202,6 +204,7 @@ import {
   boundedRunSelectionFromColumn,
 } from "@/game/domain/bounded-run";
 import { isMissionAccepted } from "@/server/mission-state";
+import { selectSkillLevelDialogues } from "@/game/domain/skill-level-dialogue";
 import {
   createWorkOrderWeldingResolver,
   ensureWorkOrderBoard,
@@ -235,6 +238,20 @@ import {
   type TinkeringRunState,
 } from "@/server/tinkering";
 import type { TinkeringCommandError } from "@/server/tinkering-commands";
+import {
+  createRuneworkingResolver,
+  isRuneworkingAction,
+  loadResonanceRigUnlocked,
+  loadRuneworkingRow,
+  runeworkingRunStateFromRow,
+  type RuneworkingRunState,
+} from "@/server/runeworking";
+import type { RuneworkingCommandError } from "@/server/runeworking-commands";
+import {
+  runeworkingAffordableCycles,
+  runeworkingRecipeUnlocked,
+  type RuneworkingStopReason,
+} from "@/game/domain/runeworking";
 import {
   fabricationAffordableBatches,
   fabricationRecipeUnlocked,
@@ -687,6 +704,53 @@ export type FabricationProjection = {
   lastStopReason?: FabricationStopReason;
 };
 
+/** One authored Runeworking recipe as the Resonance Rig presents it (#391). */
+export type RuneworkingRecipeProjection = {
+  actionId: string;
+  outputItemId: string;
+  outputName: string;
+  /** Per-cycle output: the tile's badge, never the selected run's total. */
+  outputQuantity: number;
+  outputStackLimit: number;
+  minimumLevel: number;
+  /** The character's Runeworking level authorizes it. */
+  unlocked: boolean;
+  durationTicks: number;
+  baseXp: number;
+  inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
+  /** Enough of every input is carried for one cycle right now. */
+  inputsAvailable: boolean;
+  /**
+   * How many cycles the inputs carried right now pay for (#229): the most a
+   * number may ask for, and what Start revalidates against. Not a prediction
+   * and not what Max does.
+   */
+  affordableCycles: number;
+};
+
+/**
+ * The Wise Old Enby's Resonance Rig at Hilltop Workshop (#391): every authored
+ * Runeworking recipe, the cycle on the Rig, and the run. A Runeworking cycle
+ * never fails, so there is nothing here about chance or failure.
+ */
+export type ResonanceRigProjection = {
+  /** Not From Around Here is complete: the Rig is the player's to use. */
+  unlocked: boolean;
+  recipes: readonly RuneworkingRecipeProjection[];
+  /** The cycle on the Rig, when there is one. */
+  cycle?: {
+    recipeActionId: string;
+    /** The run's number for this cycle. */
+    sequence: number;
+    startedAt: string;
+    endsAt: string;
+    /** The Stop request: finish this cycle, then start no other. */
+    finishCurrent: boolean;
+  };
+  run: RuneworkingRunState;
+  lastStopReason?: RuneworkingStopReason;
+};
+
 /** One Tinkering target as the Tinker mode presents it (#232). */
 export type TinkeringTargetProjection = {
   actionId: string;
@@ -885,6 +949,13 @@ export type PlayGameplayState = {
    * so the operator console reads per-skill totals here (#242).
    */
   skillTotalXp: Readonly<Record<string, number>>;
+  /**
+   * Skill-level-dependent dialogue (#391): for each authored choice
+   * (`SKILL_LEVEL_DIALOGUES`), the variant this character's current level
+   * selects, decided here from persisted XP. The conversation surface plays the
+   * variant this names and never evaluates a level itself.
+   */
+  skillLevelDialogue: Readonly<Record<string, string>>;
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
@@ -897,6 +968,11 @@ export type PlayGameplayState = {
   fabricationError?: FabricationCommandError;
   /** One current Tinkering refusal, for the Tinker surface (#232). */
   tinkeringError?: TinkeringCommandError;
+  runeworking: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  /** The Wise Old Enby's Resonance Rig (#391). */
+  resonanceRig: ResonanceRigProjection;
+  /** One current Runeworking refusal, for the Rig (#391). */
+  runeworkingError?: RuneworkingCommandError;
   /**
    * The Mining source reachable where the character is standing, or undefined
    * where none is (#209). Replaces the old global `successChanceBps`, which
@@ -1262,6 +1338,13 @@ export function createPlayResolver(
     ...tinkeringTargets().map((target) => ({
       actionId: target.actionId,
       resolver: createTinkeringResolver() as PlayResolver,
+    })),
+    // One Runeworking resolver under every authored recipe's action (#391). It
+    // credits Missions from its own persistence, one completed cycle at a time,
+    // in the same transaction that consumed the Fragment and made the Seeker.
+    ...runeworkingRecipes().map((recipe) => ({
+      actionId: recipe.actionId,
+      resolver: createRuneworkingResolver() as PlayResolver,
     })),
   ];
   return composePlayResolvers(entries);
@@ -1881,6 +1964,79 @@ async function projectFabricationStation(
   };
 }
 
+/**
+ * The Resonance Rig (#391): every authored recipe with what it needs, the cycle
+ * on the Rig, and the run. Everything a surface shows is decided here or in the
+ * domain; the browser derives nothing it could be wrong about.
+ */
+async function projectResonanceRig(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    action: typeof activeActions.$inferSelect | undefined;
+    level: number;
+    stacks: readonly (typeof inventoryStacks.$inferSelect)[];
+    carriedByItemId: Readonly<Record<string, number>>;
+    balance: EffectiveGameBalance;
+  },
+): Promise<ResonanceRigProjection> {
+  const { balance } = input;
+  const row = await loadRuneworkingRow(transaction, input.characterId);
+  const activeRecipe =
+    input.action && isRuneworkingAction(input.action.actionId)
+      ? runeworkingRecipeForActionId(input.action.actionId, balance)
+      : undefined;
+  return {
+    unlocked: await loadResonanceRigUnlocked(transaction, input.characterId),
+    recipes: runeworkingRecipes(balance).map((recipe) => {
+      const output = getItemDefinition(recipe.outputItemId, balance);
+      if (output?.kind !== "stack") {
+        throw new Error(`Runeworking output "${recipe.outputItemId}" must stack`);
+      }
+      return {
+        actionId: recipe.actionId,
+        outputItemId: recipe.outputItemId,
+        outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
+        outputQuantity: recipe.outputQuantity,
+        outputStackLimit: output.stackLimit,
+        minimumLevel: recipe.minimumLevel,
+        unlocked: runeworkingRecipeUnlocked(input.level, recipe),
+        durationTicks: recipe.durationTicks,
+        baseXp: recipe.baseXp,
+        inputs: recipe.inputs.map((each) => ({
+          itemId: each.itemId,
+          name: resolveItemPresentation(each.itemId, each.itemId).displayName,
+          quantity: each.quantity,
+          carried: input.carriedByItemId[each.itemId] ?? 0,
+        })),
+        inputsAvailable: recipe.inputs.every(
+          (each) => (input.carriedByItemId[each.itemId] ?? 0) >= each.quantity,
+        ),
+        affordableCycles: runeworkingAffordableCycles(
+          { runeworkingLevel: input.level, stacks: input.stacks },
+          recipe,
+        ),
+      };
+    }),
+    ...(activeRecipe && input.action
+      ? {
+          cycle: {
+            recipeActionId: activeRecipe.actionId,
+            sequence: (row?.runCycles ?? 0) + 1,
+            startedAt: input.action.resolvedThroughAt.toISOString(),
+            endsAt: new Date(
+              input.action.resolvedThroughAt.getTime() +
+                ticksToMilliseconds(activeRecipe.durationTicks),
+            ).toISOString(),
+            finishCurrent: row?.finishCurrent ?? false,
+          },
+        }
+      : {}),
+    run: runeworkingRunStateFromRow(row),
+    ...(row?.lastStopReason ? { lastStopReason: row.lastStopReason as RuneworkingStopReason } : {}),
+  };
+}
+
 /** The Tinker side of the station (#232), with the last-Cutter guard already applied. */
 async function projectTinkering(
   transaction: DatabaseTransaction,
@@ -1987,7 +2143,10 @@ export async function stateFromTransaction(
   refiningError?: PlayGameplayState["refiningError"],
   weldingError?: PlayGameplayState["weldingError"],
   practiceError?: PlayGameplayState["practiceError"],
-  stationErrors?: Pick<PlayGameplayState, "fabricationError" | "tinkeringError" | "miningError">,
+  stationErrors?: Pick<
+    PlayGameplayState,
+    "fabricationError" | "tinkeringError" | "miningError" | "runeworkingError"
+  >,
 ): Promise<PlayGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadPlaySnapshot(transaction, characterId);
@@ -2085,6 +2244,13 @@ export async function stateFromTransaction(
   const weldingProgress = skillLevelProgress(weldingTotalXp, weldingThresholds);
   const fabricationProgress = skillLevelProgress(
     fabricationTotalXp,
+    standardSkillLevelThresholds(balance),
+  );
+  // No Runeworking row is the canonical zero: Level 1 (#391).
+  const runeworkingTotalXp =
+    xpRows.find((row) => row.skillId === SKILL_IDS.runeworking)?.totalXp ?? 0;
+  const runeworkingProgress = skillLevelProgress(
+    runeworkingTotalXp,
     standardSkillLevelThresholds(balance),
   );
   const action = actionRows[0];
@@ -2193,6 +2359,14 @@ export async function stateFromTransaction(
     level: fabricationProgress.level,
     miningLevel: miningProgress.level,
     snapshot,
+    carriedByItemId,
+    balance,
+  });
+  const resonanceRig = await projectResonanceRig(transaction, {
+    characterId,
+    action,
+    level: runeworkingProgress.level,
+    stacks: snapshot.stacks,
     carriedByItemId,
     balance,
   });
@@ -2314,6 +2488,9 @@ export async function stateFromTransaction(
   const activeTinkeringTarget = action
     ? tinkeringTargetForActionId(action.actionId, balance)
     : undefined;
+  const activeRuneworkingRecipe = action
+    ? runeworkingRecipeForActionId(action.actionId, balance)
+    : undefined;
   const nextAttemptDurationTicks = isWeldingCadenceAction
     ? balance.welding.attemptDurationTicks
     : activeRefiningRecipe
@@ -2322,16 +2499,18 @@ export async function stateFromTransaction(
         refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
       : activeFabricationRecipe
         ? activeFabricationRecipe.durationTicks
-        : activeTinkeringTarget
-          ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
-          : activeMiningSource
-            ? miningAttemptDurationTicks(
-                balance,
-                activeMiningSource,
-                equippedTool?.definition,
-                nextAttemptBoosted,
-              )
-            : balance.welding.attemptDurationTicks;
+        : activeRuneworkingRecipe
+          ? activeRuneworkingRecipe.durationTicks
+          : activeTinkeringTarget
+            ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
+            : activeMiningSource
+              ? miningAttemptDurationTicks(
+                  balance,
+                  activeMiningSource,
+                  equippedTool?.definition,
+                  nextAttemptBoosted,
+                )
+              : balance.welding.attemptDurationTicks;
   // A workpiece's timer runs from the cursor, which always stands at its start.
   // A Tinkering cycle's cursor moves with every resolution, so its timer runs
   // from the ticks it has already had.
@@ -2410,6 +2589,7 @@ export async function stateFromTransaction(
         activeRefiningRecipe !== undefined ||
         activeFabricationRecipe !== undefined ||
         activeTinkeringTarget !== undefined ||
+        activeRuneworkingRecipe !== undefined ||
         isWeldingCadenceAction)
         ? {
             actionId: action.actionId,
@@ -2424,6 +2604,15 @@ export async function stateFromTransaction(
         : undefined,
     progression,
     skillTotalXp: Object.fromEntries(xpRows.map((row) => [row.skillId, row.totalXp])),
+    // No XP row is Level 1, which the selection itself applies.
+    skillLevelDialogue: selectSkillLevelDialogues(
+      Object.fromEntries(
+        xpRows.flatMap((row) => {
+          const curve = skillLevelThresholds(row.skillId);
+          return curve ? [[row.skillId, skillLevelProgress(row.totalXp, curve).level]] : [];
+        }),
+      ),
+    ),
     mining: {
       totalXp,
       level: miningProgress.level,
@@ -2450,6 +2639,16 @@ export async function stateFromTransaction(
     },
     fabricationStation,
     tinkering,
+    runeworking: {
+      totalXp: runeworkingTotalXp,
+      level: runeworkingProgress.level,
+      xpToNextLevel: runeworkingProgress.xpToNextLevel,
+      xpIntoLevel: runeworkingProgress.xpIntoLevel,
+    },
+    resonanceRig,
+    ...(stationErrors?.runeworkingError
+      ? { runeworkingError: stationErrors.runeworkingError }
+      : {}),
     ...(stationErrors?.fabricationError
       ? { fabricationError: stationErrors.fabricationError }
       : {}),

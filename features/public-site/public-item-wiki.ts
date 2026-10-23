@@ -191,13 +191,26 @@ function stationRequirement(missionId: string): WikiItemLine {
   ];
 }
 
+function rigRequirement(missionId: string): WikiItemLine {
+  return [
+    "Needs the Wise Old Enby's Resonance Rig, which opens once you have completed ",
+    missionLink(missionId),
+    ". This is separate from the skill level; you need both.",
+  ];
+}
+
 function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
   const facts: WikiItemLine[] = [
     [`Requires ${skillRequirement(recipe.skillId, recipe.minimumLevel)}`],
   ];
   // The station is a separate gate from the recipe's level: both apply.
   if (recipe.kind === "fabricate") facts.push(stationRequirement(recipe.stationOpensWithMissionId));
+  if (recipe.kind === "runework") {
+    facts.push(rigRequirement(recipe.stationOpensAfterCompletedMissionId));
+  }
   facts.push(["Where: ", ...locationPhrase(recipe.locations)]);
+  // Runeworking has no failure: every attunement makes its piece (#391).
+  if (recipe.kind === "runework") facts.push(["Always succeeds"]);
   if (recipe.kind === "refine") {
     if (recipe.deterministic) {
       facts.push(["Always succeeds"]);
@@ -239,7 +252,12 @@ function joinLinks(links: readonly { text: string; href: string }[]) {
 function recipeView(recipe: ItemReferenceRecipe): WikiItemRecipeView {
   return {
     key: recipe.actionId,
-    heading: recipe.kind === "fabricate" ? "Fabrication" : "Refining",
+    heading:
+      recipe.kind === "fabricate"
+        ? "Fabrication"
+        : recipe.kind === "refine"
+          ? "Refining"
+          : "Runeworking",
     facts: recipeFacts(recipe),
     inputs: recipe.inputs.map((input) => [itemLink(input.itemId, input.quantity)]),
     yields: `Makes ${itemQuantityLabel(recipe.outputItemId, recipe.outputQuantity, itemName(recipe.outputItemId))}`,
@@ -264,6 +282,18 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
               ".",
             ]
           : []),
+      ];
+    }
+    case "runework": {
+      const { recipe } = source;
+      return [
+        "Attune it from ",
+        ...joinLinks(recipe.inputs.map((input) => itemLink(input.itemId, input.quantity))),
+        ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) at the Resonance Rig — `,
+        ...locationPhrase(recipe.locations),
+        ". Always succeeds. The Rig opens once you have completed ",
+        missionLink(recipe.stationOpensAfterCompletedMissionId),
+        ".",
       ];
     }
     case "tinkering":
@@ -372,7 +402,7 @@ function useLine(itemId: string, use: ItemReferenceUse): { group: string; line: 
       return {
         group: "Recipes",
         line: [
-          `${use.recipeKind === "fabricate" ? "Fabricating" : "Refining"} `,
+          `${use.recipeKind === "fabricate" ? "Fabricating" : use.recipeKind === "refine" ? "Refining" : "Attuning"} `,
           itemLink(use.outputItemId),
           ` — uses ${use.quantity}.`,
         ],

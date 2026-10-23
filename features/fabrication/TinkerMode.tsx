@@ -11,12 +11,12 @@ import { RecipeTile } from "@/features/shared/RecipeTile";
 import { tinkerVisibleTargets } from "@/features/fabrication/station-lists";
 import {
   BATCH_UNIT,
-  seconds,
   tinkeringErrorMessage,
   tinkeringStopIsExpected,
   tinkeringStopMessage,
 } from "@/features/fabrication/station-copy";
-import { useStationCommand } from "@/features/fabrication/use-station-command";
+import { seconds } from "@/features/shared/duration-copy";
+import { useStationCommand } from "@/features/shared/use-station-command";
 import { usePlay } from "@/features/play/PlayContext";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import {

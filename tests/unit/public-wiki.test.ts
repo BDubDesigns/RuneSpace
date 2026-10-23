@@ -34,6 +34,7 @@ const MISSION_GUIDE_SLUGS = {
   "Cutting Costs": "mission-cutting-costs",
   "Curly Must-Stash": "mission-curly-must-stash",
   "Not From Around Here": "mission-not-from-around-here",
+  "First Runeworking Lesson": "mission-first-runeworking-lesson",
 } as const;
 
 const missionGuideSlugs: readonly string[] = Object.values(MISSION_GUIDE_SLUGS);
@@ -351,8 +352,8 @@ describe("Mission guides (#339)", () => {
     expect(MISSIONS.map((mission) => mission.title).sort()).toEqual(
       Object.keys(MISSION_GUIDE_SLUGS).sort(),
     );
-    expect(missionGuideSlugs).toHaveLength(18);
-    expect(new Set(missionGuideSlugs).size).toBe(18);
+    expect(missionGuideSlugs).toHaveLength(19);
+    expect(new Set(missionGuideSlugs).size).toBe(19);
 
     for (const [title, slug] of Object.entries(MISSION_GUIDE_SLUGS)) {
       const guide = getWikiArticle(slug);

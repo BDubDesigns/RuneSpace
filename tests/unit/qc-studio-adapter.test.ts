@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { runespaceDialogueAdapter } from "@/tools/qc-studio/adapters/runespace/dialogue-adapter";
 import { validateDialogueDraft } from "@/tools/qc-studio/core/validation";
 import { createDraftFromAdapterSequence } from "@/tools/qc-studio/core/draft";
+import { DIALOGUE_IDS } from "@/game/config/foundations";
 
 describe("RuneSpace QC Studio adapter", () => {
   it("translates the complete authored dialogue catalog into valid Studio input", () => {
@@ -39,5 +40,14 @@ describe("RuneSpace QC Studio adapter", () => {
         expect(expression.asset).toMatch(/^\/npc-art\//);
       }
     }
+  });
+
+  it("lists skill-level variants as ordinary sequences and leaves out a choice with no beats of its own (#391)", () => {
+    const ids = new Set(runespaceDialogueAdapter.sequences.map((sequence) => sequence.id));
+    expect(ids.has(DIALOGUE_IDS.wiseOldEnbyFragmentAdviceNovice)).toBe(true);
+    expect(ids.has(DIALOGUE_IDS.wiseOldEnbyFragmentAdviceExperienced)).toBe(true);
+    // The lesson keeps its own beats, so it stays editable.
+    expect(ids.has(DIALOGUE_IDS.wiseOldEnbyFirstLesson)).toBe(true);
+    expect(ids.has(DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic)).toBe(false);
   });
 });

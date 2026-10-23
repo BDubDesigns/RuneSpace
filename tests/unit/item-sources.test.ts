@@ -56,6 +56,7 @@ function facts(
     ),
     completedMissionIds: new Set(overrides.completed ?? []),
     fabricationStationUnlocked: overrides.fabricationUnlocked ?? true,
+    resonanceRigUnlocked: overrides.fabricationUnlocked ?? true,
     locationStates: Object.fromEntries(
       LOCATIONS.map((location) => [
         location.id,

@@ -52,6 +52,12 @@ const toACutAbove = link("A Cut Above", "mission-a-cut-above");
 const toOutOfTheWeather = link("Out of the Weather", "mission-out-of-the-weather");
 const toCuttingCosts = link("Cutting Costs", "mission-cutting-costs");
 const toCurlyMustStash = link("Curly Must-Stash", "mission-curly-must-stash");
+const toNotFromAroundHere = link("Not From Around Here", "mission-not-from-around-here");
+const toFirstRuneworkingLesson = link(
+  "First Runeworking Lesson",
+  "mission-first-runeworking-lesson",
+);
+const runeworking = (text: string) => link(text, "runeworking");
 
 export const missionGuideArticles = [
   {
@@ -1213,7 +1219,17 @@ export const missionGuideArticles = [
         heading: "What you get",
         list: [
           "No Credits, no XP and no item, at any step. Nothing is taken from you either.",
-          "An answer about the mineral, and a new thing to ask the Wise Old Enby about: About RuneSpace, which you can read again whenever you like.",
+          "An answer about the mineral, and a new thing to ask the Wise Old Enby about: About RuneSpace, which you can read again whenever you like. Where to Find Fragments joins it, too.",
+          [
+            "The Wise Old Enby's Resonance Rig, which is yours to use from now on (see ",
+            runeworking("Runeworking"),
+            ").",
+          ],
+          [
+            "The next Mission, ",
+            toFirstRuneworkingLesson,
+            ", starts by itself the moment you choose I understand, and the Wise Old Enby carries straight on into the lesson. If you finished this Mission before that lesson existed, ask the Wise Old Enby for it instead.",
+          ],
         ],
       },
       {
@@ -1221,6 +1237,82 @@ export const missionGuideArticles = [
         list: [
           "Tolliver does not have to be the one who sent you. If he did, the Wise Old Enby will say so; if not, they start from the beginning. Either way the explanation is the same.",
           "You can unpin the Mission and the Map's highlights go quiet; you can still talk to anyone you like. Talking to Wade, Tansy or Tolliver about anything else works as it always did.",
+        ],
+      },
+      { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
+  {
+    slug: "mission-first-runeworking-lesson",
+    title: "First Runeworking Lesson",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "The Wise Old Enby teaches the first Runeworking recipe: attune three Beginner Echo Seekers at the Resonance Rig on Hilltop Workshop, then return to them. It pays 150 Runeworking XP.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Your first lesson in ",
+            runeworking("Runeworking"),
+            ", from ",
+            enby,
+            " at Hilltop Workshop on Stillreach. ",
+            toNotFromAroundHere,
+            " has to be finished first.",
+          ],
+        ],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "It starts by itself when you finish ",
+            toNotFromAroundHere,
+            ": choosing I understand at the end of that conversation hands you this Mission, and the Wise Old Enby goes straight on into the lesson.",
+          ],
+          [
+            "If you finished Not From Around Here before this lesson existed, talk to ",
+            enby,
+            " instead. Their Talk glows blue and First Runeworking Lesson is in their list; choose Begin Lesson at the end, or Not Now to leave it for later. It is the same lesson either way, and once you have it the offer is gone.",
+          ],
+        ],
+      },
+      {
+        heading: "What you need",
+        paragraphs: [
+          [
+            "Rune Fragments, one for each Beginner Echo Seeker. Tap Sources beside the objective in the Mission Log to see how a Seeker is made, and from there where Rune Fragments come from. The Wise Old Enby also has advice: ask them about Where to Find Fragments, and come back once your Mining has improved for a different answer.",
+          ],
+          "No Runeworking level beyond the 1 you start with.",
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          "At Hilltop Workshop, the Resonance Rig sits below the Wise Old Enby. Choose Attune, pick the Beginner Echo Seeker, choose how many to make (or Max), and start.",
+          "Each Seeker takes 20.4 seconds and one Rune Fragment, always succeeds, and pays 25 Runeworking XP. The finished Seeker goes straight into your Inventory.",
+          "Three Seekers attuned after you have the lesson is what counts, made in one run or several, in one sitting or across days, with you watching or away. Seekers you made before you had the lesson, and Seekers you bought, were given or traded for, do not count, and neither does simply carrying three.",
+          [
+            "Once the Mission Log shows 3 / 3, go back to ",
+            enby,
+            " and choose Complete First Runeworking Lesson at the end of what they have to say. Reaching three never finishes the lesson by itself, and if the Rig is still running you need to let it stop first.",
+          ],
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "150 Runeworking XP when you complete the lesson, once. The three Seekers already paid 25 each as you made them, so a fresh character finishes the lesson on 225 Runeworking XP.",
+          "Your Seekers: you keep every one you make.",
+          "Something new to ask the Wise Old Enby about: About the Seekers. First lesson stays there too, so you can hear the instructions again.",
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "The Rig is yours whether or not you have the lesson. Keep making Seekers as often as you like, before, during and after it; each one pays its own XP.",
+          "A Seeker cannot be used yet. Its description says what it is for; there is nothing to do with it today beyond keeping, trading or storing it.",
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },

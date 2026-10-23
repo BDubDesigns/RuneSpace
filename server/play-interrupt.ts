@@ -17,6 +17,7 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
 import { interruptPracticeWelding } from "@/server/practice-welding";
 import { clearFabricationWorkpiece, isFabricationAction } from "@/server/fabrication";
 import { interruptTinkering, isTinkeringAction } from "@/server/tinkering";
+import { clearRuneworkingCycle, isRuneworkingAction } from "@/server/runeworking";
 import { clearActiveJourney } from "@/server/travel";
 import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
@@ -44,6 +45,10 @@ import { missOpenRepairCleanPass } from "@/server/welding";
  *             the run. Its reserved inputs were never consumed — they only
  *             ever leave at resolution — so nothing is lost and nothing is
  *             granted. There is no player path to this; it is an operator's.
+ * - Runeworking (#391): clear the cycle on the Resonance Rig and end the run,
+ *             exactly as Fabrication: its reserved Rune Fragment was never
+ *             consumed, so nothing is lost and no Seeker, XP or Mission
+ *             progress is granted. The player's own Stop is Finish Current.
  * - Tinkering (#232): the shared Tinkering interruption — delete the action,
  *             keeping the committed cycle exactly as the player's own Stop does.
  * - Travel:   delete the remaining active action + `characterTravelState` only;
@@ -129,6 +134,11 @@ export async function forceIdleResolvedAction(
 
   if (isFabricationAction(actionId)) {
     await clearFabricationWorkpiece(transaction, character.id, "manually_stopped", now);
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  if (isRuneworkingAction(actionId)) {
+    await clearRuneworkingCycle(transaction, character.id, "manually_stopped", now);
     return { interrupted: true, interruptedActionId: actionId };
   }
 

@@ -10,13 +10,13 @@ import type { PlayGameplayState } from "@/server/play";
  * read from the Play projection that is already on screen (#326). Nothing is
  * fetched or persisted for this feature, and no rule is restated here: levels
  * come from each skill's authoritative XP through its own level curve, Mission
- * sets from the shared Mission derivations, and the Fabrication Station's
- * unlock and each location's resolved actions are the server's.
+ * sets from the shared Mission derivations, and the Fabrication Station's and
+ * Resonance Rig's unlocks and each location's resolved actions are the server's.
  */
 export function itemSourceFactsFromState(
   state: Pick<
     PlayGameplayState,
-    "skillTotalXp" | "missions" | "locationStates" | "fabricationStation"
+    "skillTotalXp" | "missions" | "locationStates" | "fabricationStation" | "resonanceRig"
   >,
 ): ItemSourceFacts {
   const skillLevels: Record<string, number> = {};
@@ -31,6 +31,7 @@ export function itemSourceFactsFromState(
     acceptedMissionIds: deriveAcceptedMissionIds(state.missions),
     completedMissionIds: deriveCompletedMissionIds(state.missions),
     fabricationStationUnlocked: state.fabricationStation.unlocked,
+    resonanceRigUnlocked: state.resonanceRig.unlocked,
     locationStates: state.locationStates,
   };
 }

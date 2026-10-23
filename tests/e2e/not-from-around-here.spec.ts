@@ -110,6 +110,25 @@ const tile = (inventory: Locator, name: string) =>
 
 const litHexes = (page: Page) => page.locator("[data-map-location][data-mission-guidance]");
 
+/**
+ * Since #391 completing the mystery plays First Runeworking Lesson's opening
+ * scene as its completion presentation, and accepts that lesson. Play it to its
+ * end and back to the hub, which now lists the lesson.
+ */
+async function finishLessonScene(conversation: Locator) {
+  await expect(conversation.locator("[data-dialogue-text]")).toContainText(/as promised/);
+  await playDialogueToText(conversation, /a little more Mining experience/);
+  await conversation.locator("[data-dialogue-text]").click();
+  await expect(conversation.locator("[data-dialogue-next]")).toHaveText("Finish");
+  await conversation.locator("[data-dialogue-next]").click();
+  await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+  await expect(
+    conversation.locator(
+      `[data-conversation-entry="${MISSION_IDS.firstRuneworkingLesson}:active"]`,
+    ),
+  ).toBeVisible();
+}
+
 test.describe("the Rune Fragment offer", () => {
   test("a carried Fragment glows blue and offers the Mission through Inspect, without using it up", async ({
     page,
@@ -566,8 +585,8 @@ test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
     await expect(conversation.locator("[data-dialogue-action]")).toHaveText("I UNDERSTAND");
     await conversation.locator("[data-dialogue-action]").click();
 
-    await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
-    await expect(conversation.locator('[data-conversation-section="current"]')).toHaveCount(0);
+    await finishLessonScene(conversation);
+    await expect(conversation.locator(`[data-conversation-entry^="${MISSION}:"]`)).toHaveCount(0);
     await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
     expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
     expect(total(await rows(testCharacter.id), FRAGMENT)).toBe(2);
@@ -609,6 +628,7 @@ test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
     await expect(conversation.locator("[data-dialogue-text]")).toContainText(/Toll sent you/);
     await playDialogueToText(conversation, /One step at a time/);
     await conversation.locator("[data-dialogue-action]").click();
+    await finishLessonScene(conversation);
     await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
     expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
     expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });

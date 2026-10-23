@@ -1,7 +1,10 @@
 import {
   fabricationActionIds,
+  fabricationRecipeForActionId,
   getItemDefinition,
   getShipFlightBalance,
+  runeworkingActionIds,
+  runeworkingRecipeForActionId,
   skillLevelThresholds,
   tinkeringActionIds,
 } from "@/game/config/balance";
@@ -51,12 +54,16 @@ const TRACKED_ACTIVITY_ACTION_IDS: Record<TrackedMissionActivity, () => readonly
   work_order: () => [ACTION_IDS.workOrderWelding],
   fabrication: () => fabricationActionIds(),
   tinkering: () => tinkeringActionIds(),
+  // A family like Fabrication (#391): one action per authored recipe.
+  runeworking: () => runeworkingActionIds(),
 };
 
 /**
- * Each activity's one honest metric. Only Fabrication and Tinkering count
- * `completions`, because only they have a unit that can be started and then
- * not succeed — a busted workpiece is never a fabricated item (#232).
+ * Each activity's one honest metric. Fabrication and Tinkering count
+ * `completions`, because they have a unit that can be started and then not
+ * succeed — a busted workpiece is never a fabricated item (#232). Runeworking
+ * (#391) counts `completions` too: a cycle is credited only once it has
+ * actually made its output, never at its start.
  */
 const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "completions"> = {
   mining: "attempts",
@@ -65,6 +72,7 @@ const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "com
   work_order: "attempts",
   fabrication: "completions",
   tinkering: "completions",
+  runeworking: "completions",
 };
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
@@ -281,6 +289,14 @@ export type MissionRequirementStatus = {
   repairTargetId?: string;
   /** The tracked activity this requirement counts, when it counts one (#232). */
   activity?: TrackedMissionActivity;
+  /**
+   * What a tracked craft's recipe makes, while it is unmet, when the Mission
+   * offers that item's Sources beside the objective (#391,
+   * `presentsOutputSources`). A presentation reference only: unlike `itemId`
+   * the requirement does not observe this item, and holding it satisfies
+   * nothing.
+   */
+  sourcesItemId?: string;
   /**
    * The optional leads of a conversation requirement (#369): the NPCs whose
    * lead conversation points at this requirement's contact, and whether one has
@@ -1087,6 +1103,16 @@ function reactiveFactHolds(
   return (observation?.trackedProgress?.get(key) ?? 0) >= 1;
 }
 
+/**
+ * The one item an authored crafting recipe makes, by its action ID (#391): a
+ * Fabrication or Runeworking recipe. Undefined for any other action, so a
+ * tracked requirement can only point at the output of a real recipe.
+ */
+export function craftedOutputItemId(actionId: string): string | undefined {
+  return (fabricationRecipeForActionId(actionId) ?? runeworkingRecipeForActionId(actionId))
+    ?.outputItemId;
+}
+
 /** Projects one authored requirement with live satisfaction/progress. */
 function projectRequirement(
   requirement: MissionRequirement,
@@ -1116,12 +1142,17 @@ function projectRequirement(
       observation?.trackedProgress?.get(requirement.progressKey) ?? 0,
       requirement.target,
     );
+    const sourcesItemId =
+      requirement.presentsOutputSources && requirement.actionId && !satisfied
+        ? craftedOutputItemId(requirement.actionId)
+        : undefined;
     return {
       kind: requirement.kind,
       objective: renderRequirementObjective(requirement, observation),
       satisfied,
       progress: { current, target: requirement.target },
       activity: requirement.activity,
+      ...(sourcesItemId ? { sourcesItemId } : {}),
     };
   }
   if (requirement.kind === "carried_unique_item") {
@@ -1693,6 +1724,16 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         const activityActionIds = TRACKED_ACTIVITY_ACTION_IDS[requirement.activity]();
         if (requirement.actionId && !activityActionIds.includes(requirement.actionId)) {
           throw new Error(`${where} tracked activity names an action outside its activity.`);
+        }
+        if (
+          requirement.presentsOutputSources &&
+          (requirement.metric !== "completions" ||
+            !requirement.actionId ||
+            !craftedOutputItemId(requirement.actionId))
+        ) {
+          throw new Error(
+            `${where} presents output Sources but does not count one crafting recipe's completions.`,
+          );
         }
         if (requirement.recommendedActionId) {
           if (

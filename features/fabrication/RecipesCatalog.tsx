@@ -1,7 +1,8 @@
 "use client";
 
 import { RecipeTile } from "@/features/shared/RecipeTile";
-import { recipeLine, seconds, unmetRequirements } from "@/features/fabrication/station-copy";
+import { recipeLine, unmetRequirements } from "@/features/fabrication/station-copy";
+import { seconds } from "@/features/shared/duration-copy";
 import { learnedRecipes } from "@/features/fabrication/station-lists";
 import { usePlay } from "@/features/play/PlayContext";
 import { GAME_TICK_MS } from "@/game/config/foundations";

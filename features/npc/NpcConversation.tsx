@@ -14,7 +14,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
 import { usePlay } from "@/features/play/PlayContext";
-import { getDialogue } from "@/game/content/dialogue";
+import { resolvePresentedDialogue } from "@/game/domain/skill-level-dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
@@ -90,7 +90,11 @@ export function NpcConversation({
   const content = useRef<HTMLDivElement>(null);
   const previousView = useRef<string | undefined>(undefined);
 
-  const sequence = open ? getDialogue(open.dialogueId) : undefined;
+  // A sequence that closes with skill-level-dependent dialogue (#391) plays the
+  // variant the server selected for this character's current level.
+  const sequence = open
+    ? resolvePresentedDialogue(open.dialogueId, state.skillLevelDialogue)
+    : undefined;
   // Where this person is standing now, for the sequences authored as a
   // present-tense local conversation rather than a scene (#190).
   const venueBackgroundId = resolveNpcVenueBackgroundId(

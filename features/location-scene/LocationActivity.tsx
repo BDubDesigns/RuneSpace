@@ -8,6 +8,7 @@ import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
 import { LastLegTerminal } from "@/features/trade/LastLegTerminal";
@@ -139,6 +140,10 @@ function primaryActivity(
       // authoritative Workbench occupancy (#207) — and, once Tansy opens it,
       // the Fabrication Station beside it (#232).
       return <RuskRecoveryWorkAreas />;
+    case LOCATION_IDS.hilltopWorkshop:
+      // The Wise Old Enby's Resonance Rig (#391), once Not From Around Here is
+      // complete. Talking to the Enby stays in their own card above it.
+      return <ResonanceRig />;
     default:
       return null;
   }

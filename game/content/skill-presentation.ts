@@ -2,7 +2,7 @@ import { SKILL_IDS, type SkillId } from "@/game/config/foundations";
 
 /**
  * Player-facing skill presentation is content, not a UI concern (issue #64).
- * The four display names are the approved stable identities from
+ * The display names are the approved stable identities from
  * `docs/gameplay-foundations.md` ("Approved identities and boundaries");
  * this registry supplies player-facing names for stable skill IDs so profile
  * and progression surfaces never embed per-skill conditionals.
@@ -15,7 +15,7 @@ import { SKILL_IDS, type SkillId } from "@/game/config/foundations";
  * never names a color. A skill with no approved accent yet (a future skill
  * before its owner picks one) has no tone and presents neutrally.
  */
-export type SkillAccentTone = "mining" | "refining" | "welding" | "fabrication";
+export type SkillAccentTone = "mining" | "refining" | "welding" | "fabrication" | "runeworking";
 
 export type SkillPresentation = {
   displayName: string;
@@ -28,6 +28,8 @@ const skillPresentations = {
   [SKILL_IDS.welding]: { displayName: "Welding", accentTone: "welding" },
   [SKILL_IDS.strength]: { displayName: "Strength" },
   [SKILL_IDS.fabrication]: { displayName: "Fabrication", accentTone: "fabrication" },
+  // Electric Rose (#391), the fifth distinct skill accent.
+  [SKILL_IDS.runeworking]: { displayName: "Runeworking", accentTone: "runeworking" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;
 
 /** Canonical selectable skill identities for skill-XP presentation beats. */

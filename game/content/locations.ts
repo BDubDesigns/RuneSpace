@@ -671,7 +671,11 @@ const locationDefinitions = [
     description:
       "A patched metal workshop sits above the misty highlands, warm light spilling from its windows and a low hum carrying from inside. Its resident researcher, the Wise Old Enby, lives and works here among benches, instruments and boxes of strange stone.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theLowHum],
-    availableActionIds: [],
+    // The Wise Old Enby's Resonance Rig (#391). Listing its recipe here is what
+    // lets Mission guidance and Item Sources find the one place a Beginner Echo
+    // Seeker is attuned; who may use it is the Rig's own completed-Mission gate
+    // (`game/content/hilltop-workshop.ts`), checked by the server on every Start.
+    availableActionIds: [ACTION_IDS.beginnerEchoSeekerRuneworking],
     dormantActivities: [],
     presentation: {
       mapIconKey: "hilltop_workshop" as const,

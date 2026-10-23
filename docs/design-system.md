@@ -18,18 +18,25 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 Each player-facing skill has exactly one accent identity, defined once at
 `game/content/skill-presentation.ts` as a stable semantic `accentTone`
-(`"mining"`, `"refining"`, `"welding"`, `"fabrication"`) — content names the
-tone, never a CSS value. `app/globals.css` owns the tone → underlying accent
-redirection (`--rs-skill-mining`, `--rs-skill-refining`, `--rs-skill-welding`,
-`--rs-skill-fabrication`, aliasing `--rs-accent-*` tokens), and
+(`"mining"`, `"refining"`, `"welding"`, `"fabrication"`, `"runeworking"`) —
+content names the tone, never a CSS value. `app/globals.css` owns the tone →
+underlying accent redirection (`--rs-skill-mining`, `--rs-skill-refining`,
+`--rs-skill-welding`, `--rs-skill-fabrication`, `--rs-skill-runeworking`,
+aliasing `--rs-accent-*` tokens), and
 `components/ui/skill-accent.ts`'s `skillAccentColor` is the one place a tone resolves to a color. A skill with no
 approved tone (Strength; a future skill before its owner picks one) presents
 neutrally rather than guessing. Fabrication's (#232) approved accent is Shop
-Olive, `#7FA347` (`--rs-accent-shop-olive`).
+Olive, `#7FA347` (`--rs-accent-shop-olive`). Runeworking's (#391) is
+**Electric Rose**, `#FF5FA8` (`--rs-accent-electric-rose`): the fifth distinct
+skill color beside Mining amber, Refining purple, Welding cyan and Fabrication
+olive. Like the others it is used for accent text and fills on the dark panel
+surfaces, where it clears WCAG AA for normal text; the Resonance Rig's
+activity panel and progress read it through the same `skillAccentColor` path.
 
 Every progression surface consumes this through the same path instead of its
 own mapping: `features/shared/activity-context.tsx`'s `SkillProgressRow`
-(Mining/Refining/Welding activity screens and the Fabrication Station) and
+(Mining/Refining/Welding activity screens, the Fabrication Station and the
+Resonance Rig) and
 `features/shared/CharacterSkillList.tsx` (the Character modal and Nearby
 Player profiles) both call `skillAccentColor`, so a skill's name/level text and
 XP fill carry the same identity everywhere it appears. Do not add a

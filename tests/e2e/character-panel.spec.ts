@@ -74,6 +74,7 @@ test("the Character destination shows identity, canonical level, Credits, and ev
     SKILL_IDS.fabrication,
     SKILL_IDS.mining,
     SKILL_IDS.refining,
+    SKILL_IDS.runeworking,
     SKILL_IDS.welding,
   ].map((skillId) => getSkillPresentation(skillId)!.displayName);
   const skillRows = dialog.locator("[data-character-skill]");
@@ -138,6 +139,19 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   await expect(fabricationRow.getByRole("progressbar").locator("> div")).toHaveCSS(
     "background-color",
     fabricationColor,
+  );
+
+  // Runeworking (#391) carries its approved Electric Rose, the fifth distinct accent.
+  const runeworkingColor = await resolvedCssVarColor(page, "--rs-skill-runeworking");
+  expect(runeworkingColor).toBe("rgb(255, 95, 168)");
+  expect([miningColor, refiningColor, weldingColor, fabricationColor]).not.toContain(
+    runeworkingColor,
+  );
+  const runeworkingRow = skillRows.filter({ hasText: /^Runeworking — Level 1/ });
+  await expect(runeworkingRow.locator("p").first()).toHaveCSS("color", runeworkingColor);
+  await expect(runeworkingRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+    "background-color",
+    runeworkingColor,
   );
 
   await captureReviewScreenshot(page, "character-panel-mobile.png");

@@ -7,6 +7,7 @@ import {
   refiningRecipeIsDeterministic,
   refiningRecipes,
   repairTargetBalances,
+  runeworkingRecipes,
   tinkeringTargets,
   type EffectiveGameBalance,
   type EquipmentDefinition,
@@ -19,6 +20,7 @@ import { LOCATIONS } from "@/game/content/locations";
 import { MERCHANTS } from "@/game/content/merchants";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
+import { HILLTOP_WORKSHOP_CONTENT } from "@/game/content/hilltop-workshop";
 import { REPAIR_TARGETS, type RepairTargetDefinition } from "@/game/content/repair-targets";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
 import { isItemTransferable } from "@/game/domain/player-trade";
@@ -105,11 +107,28 @@ export type ItemReferenceRecipe =
             returned?: readonly ItemReferenceInput[];
           }
         | { kind: "one_input_returned" };
+    }
+  | {
+      /** Runeworking at the Wise Old Enby's Resonance Rig (#391). It never fails. */
+      kind: "runework";
+      actionId: string;
+      outputItemId: string;
+      skillId: string;
+      minimumLevel: number;
+      /**
+       * The Mission whose COMPLETION puts the player on the Resonance Rig. A
+       * separate requirement from `minimumLevel`: both must hold, independently.
+       */
+      stationOpensAfterCompletedMissionId: string;
+      locations: readonly ItemReferenceLocation[];
+      inputs: readonly ItemReferenceInput[];
+      outputQuantity: number;
     };
 
 export type ItemReferenceSource =
   | { kind: "fabricate"; recipe: Extract<ItemReferenceRecipe, { kind: "fabricate" }> }
   | { kind: "refine"; recipe: Extract<ItemReferenceRecipe, { kind: "refine" }> }
+  | { kind: "runework"; recipe: Extract<ItemReferenceRecipe, { kind: "runework" }> }
   | {
       kind: "mine";
       actionId: string;
@@ -200,7 +219,7 @@ export type ItemReferenceByproduct = {
 export type ItemReferenceUse =
   | {
       kind: "recipe_input";
-      recipeKind: "fabricate" | "refine";
+      recipeKind: "fabricate" | "refine" | "runework";
       actionId: string;
       outputItemId: string;
       quantity: number;
@@ -252,7 +271,9 @@ export type ItemReferenceRegistries = {
     | "fabricationAuthorizingMissionId"
     | "tinkeringAuthorizingMissionId"
     | "practiceAuthorizingMissionId"
-  >;
+  > &
+    /** Which Mission's completion opens the Wise Old Enby's Resonance Rig (#391). */
+    Pick<typeof HILLTOP_WORKSHOP_CONTENT, "resonanceRigUnlockMissionId">;
 };
 
 export function defaultItemReferenceRegistries(): ItemReferenceRegistries {
@@ -265,7 +286,7 @@ export function defaultItemReferenceRegistries(): ItemReferenceRegistries {
     fixedClaims: [POWER_ANNEX_CLAIM],
     repairTargets: REPAIR_TARGETS,
     missions: MISSIONS,
-    workstations: RUSK_RECOVERY_CONTENT,
+    workstations: { ...RUSK_RECOVERY_CONTENT, ...HILLTOP_WORKSHOP_CONTENT },
   };
 }
 
@@ -307,7 +328,7 @@ function inputsOf(inputs: readonly ItemReferenceInput[]): ItemReferenceInput[] {
   return inputs.map(({ itemId, quantity }) => ({ itemId, quantity }));
 }
 
-/** Every Fabrication and Refining recipe, as a public recipe record, in authored order. */
+/** Every Fabrication, Refining and Runeworking recipe, as a public recipe record, in authored order. */
 export function publicRecipes(registries: ItemReferenceRegistries): readonly ItemReferenceRecipe[] {
   const { balance, locations } = registries;
   const recipes: ItemReferenceRecipe[] = [];
@@ -359,6 +380,20 @@ export function publicRecipes(registries: ItemReferenceRegistries): readonly Ite
           : recipe.failure.kind === "one_input_returned"
             ? { failure: { kind: "one_input_returned" as const } }
             : {}),
+    });
+  }
+  // Runeworking (#391): each recipe is hosted by its own action at the Rig.
+  for (const recipe of runeworkingRecipes(balance)) {
+    recipes.push({
+      kind: "runework",
+      actionId: recipe.actionId,
+      outputItemId: recipe.outputItemId,
+      skillId: balance.runeworking.skillId,
+      minimumLevel: recipe.minimumLevel,
+      stationOpensAfterCompletedMissionId: registries.workstations.resonanceRigUnlockMissionId,
+      locations: locationsHostingAction(recipe.actionId, locations),
+      inputs: inputsOf(recipe.inputs),
+      outputQuantity: recipe.outputQuantity,
     });
   }
   return recipes;
@@ -464,7 +499,9 @@ export function buildItemReference(
   const sources: ItemReferenceSource[] = recipes.map((recipe) =>
     recipe.kind === "fabricate"
       ? { kind: "fabricate" as const, recipe }
-      : { kind: "refine" as const, recipe },
+      : recipe.kind === "refine"
+        ? { kind: "refine" as const, recipe }
+        : { kind: "runework" as const, recipe },
   );
 
   for (const source of miningSources(balance)) {

@@ -410,7 +410,9 @@ const authoredWikiArticles = [
           [
             "Materials set aside for a piece on the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
-            " can't be dropped until that piece is finished.",
+            " can't be dropped until that piece is finished, and neither can the Rune Fragment set aside for an attunement on the ",
+            { text: "Resonance Rig", articleSlug: "runeworking" },
+            ".",
           ],
         ],
       },
@@ -1104,6 +1106,55 @@ const authoredWikiArticles = [
     ],
   },
   {
+    // Issue #391 — the fifth skill and its one station.
+    slug: "runeworking",
+    title: "Runeworking",
+    category: "work",
+    summary:
+      "Attuning rune material at the Wise Old Enby's Resonance Rig on Hilltop Workshop, Stillreach — the Beginner Echo Seeker, how a run works, and when the Rig opens.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Runeworking is attuning rune material into something useful. It is its own skill with its own level, starting at 1, and it happens at the Resonance Rig: the Wise Old Enby's own machine at Hilltop Workshop on Stillreach. The Rig sits below the Wise Old Enby themselves, and using it never means talking to them first.",
+          ],
+          [
+            "The Rig opens once you have finished ",
+            { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+            " and stays yours from then on, whatever you do with ",
+            {
+              text: "First Runeworking Lesson",
+              articleSlug: "mission-first-runeworking-lesson",
+            },
+            ". Before that there is nothing to use there.",
+          ],
+        ],
+      },
+      {
+        heading: "What you can attune",
+        list: [
+          [
+            "Beginner Echo Seeker — 1 ",
+            { text: "Rune Fragment", articleSlug: "mining-and-refining" },
+            ". 20.4 seconds, 25 Runeworking XP, Runeworking 1. It always succeeds. It weighs 200g, the same as the Fragment it was made from, and stacks five to a slot.",
+          ],
+        ],
+        paragraphs: [
+          "A Beginner Echo Seeker is attuned to detect hidden disturbances in RuneSpace. There is nothing to do with one yet beyond keeping, trading or storing it.",
+          "The Rig has two modes: Attune, where you start and watch a run, and Recipes, a list of every Runeworking recipe you know. A recipe stays listed in both even when you are not carrying what it needs, and in Attune, Sources beside its ingredient shows where to get more.",
+        ],
+      },
+      {
+        heading: "Runs",
+        paragraphs: [
+          "Choose how many to make with − and +, or Max to keep going until the next one cannot start. Each one is checked when it starts: that you still have the Rune Fragment, and that the finished Seeker will fit once the Fragment is gone — a part-full Seeker stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
+          "A started attunement is committed. Its Rune Fragment stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the Fragments for later ones are still yours until each one starts.",
+          "When an attunement finishes, the Fragment is used up and the Seeker lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "missions",
     title: "Missions",
     category: "getting-started",
@@ -1211,6 +1262,10 @@ const authoredWikiArticles = [
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
             " — offered by a Rune Fragment or intact Runestone you carry (through Inventory Inspect), or in person by the Wise Old Enby on Stillreach (Show strange mineral). Ask around about it on Skatboll, or go straight to the Wise Old Enby at Hilltop Workshop on Stillreach, who finishes it. Nothing is needed first, and it pays nothing.",
           ],
+          [
+            { text: "First Runeworking Lesson", articleSlug: "mission-first-runeworking-lesson" },
+            " — starts by itself when you finish Not From Around Here (or ask the Wise Old Enby for it if you finished that before the lesson existed). Attune three Beginner Echo Seekers at the Resonance Rig and return to them for 150 Runeworking XP.",
+          ],
         ],
       },
       {
@@ -1220,7 +1275,7 @@ const authoredWikiArticles = [
           "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
           "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
-          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it.",
+          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you First Runeworking Lesson.",
         ],
       },
       {
@@ -1380,11 +1435,11 @@ const authoredWikiArticles = [
     title: "Skills & Progression",
     category: "getting-started",
     summary:
-      "How Mining, Refining, Welding, and Fabrication track your progress, what your Character Level means, and what leveling up gets you.",
+      "How Mining, Refining, Welding, Fabrication, and Runeworking track your progress, what your Character Level means, and what leveling up gets you.",
     sections: [
       {
         paragraphs: [
-          "Four skills currently track your progress: Mining, Refining, Welding, and Fabrication. Each has its own experience (XP) total and level, earned separately.",
+          "Five skills currently track your progress: Mining, Refining, Welding, Fabrication, and Runeworking. Each has its own experience (XP) total and level, earned separately.",
         ],
       },
       {
@@ -1413,6 +1468,11 @@ const authoredWikiArticles = [
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
             " grants Fabrication XP, more if you pushed it with Manual Override, and taking a finished piece apart by Tinkering grants the same XP making it did. A piece wrecked by Manual Override grants none.",
           ],
+          [
+            "Runeworking — each finished attunement at the ",
+            { text: "Resonance Rig", articleSlug: "runeworking" },
+            " grants Runeworking XP. Runeworking never fails.",
+          ],
         ],
       },
       {
@@ -1435,7 +1495,9 @@ const authoredWikiArticles = [
             { text: "A Cut Above", articleSlug: "mission-a-cut-above" },
             " +500. Not every mission pays in XP — ",
             { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
-            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them, Renn pays 500 Credits for the Loadsteel Cutter in ",
+            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them. ",
+            { text: "First Runeworking Lesson", articleSlug: "mission-first-runeworking-lesson" },
+            " grants +150 Runeworking XP. Renn pays 500 Credits for the Loadsteel Cutter in ",
             { text: "Cutting Costs", articleSlug: "mission-cutting-costs" },
             ", and Curly pays 150 Credits when you take on ",
             { text: "Curly Must-Stash", articleSlug: "mission-curly-must-stash" },
@@ -1789,7 +1851,22 @@ const authoredWikiArticles = [
           [
             "They are the person ",
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
-            " leads to. Bring them a Rune Fragment or an intact Runestone and they can tell you what it is; afterwards, About RuneSpace is something you can ask them about again whenever you like.",
+            " leads to. Bring them a Rune Fragment or an intact Runestone and they can tell you what it is; afterwards, About RuneSpace and Where to Find Fragments are things you can ask them about again whenever you like.",
+          ],
+        ],
+      },
+      {
+        heading: "The Resonance Rig",
+        paragraphs: [
+          [
+            "Once they have explained RuneSpace, their Resonance Rig is yours to use, and they teach you ",
+            { text: "Runeworking", articleSlug: "runeworking" },
+            " in ",
+            {
+              text: "First Runeworking Lesson",
+              articleSlug: "mission-first-runeworking-lesson",
+            },
+            ". You can hear the lesson again under First lesson, and once it is done, About the Seekers.",
           ],
         ],
       },

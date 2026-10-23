@@ -644,6 +644,15 @@ Current production conventions:
   trimmed, scaled to a 576 px long edge, centred on a 640x640 transparent canvas,
   lossless WebP; the Stone content is 576x450, the Boulder 576x516). Neither bakes
   in the Ultra Rare shimmer; both were checked at the 80 px inventory tile
+- the Beginner Echo Seeker (#391): the approved master (1312x1199 transparent
+  RGBA PNG, kept unaltered in `assets/item-art/`, SHA-256 checked) and its
+  derivative in `public/item-art/`, prepared by
+  `scripts/prepare-beginner-echo-seeker-art.mjs` with the same recipe (content
+  531x576 on the 640x640 canvas). It is a Rune Fragment after attunement, so it
+  keeps the Fragment's shard family and is told apart by its concentric resonant
+  glyph and bright central point; it was compared with the approved 80 px
+  preview at the inventory tile. The Resonance Rig has no illustration of its
+  own: the Hilltop Workshop panorama, interior and the Enby's portraits carry it
 - Holo Hollow Landing and Last Leg Trading (#357): the empty Landing panorama
   (`holo-hollow-landing.webp`, 1536x384 lossy WebP q80, from the approved
   1536x384 master), the Last Leg Trading exterior (2508x627) and interior (1717x916)

@@ -103,6 +103,7 @@ describe("Wiki item catalog", () => {
       ],
       ["Galvaferrite", "Galvanic Stock", "Refined Ferrite", "Scrap Metal", "Slag"],
       [
+        "Beginner Echo Seeker",
         "Drive Mount",
         "Empty Small Fuel Canister",
         "Full Small Fuel Canister",
@@ -260,6 +261,7 @@ describe("public reference versus the in-game resolver (#326)", () => {
     acceptedMissionIds: new Set(),
     completedMissionIds: new Set(),
     fabricationStationUnlocked: false,
+    resonanceRigUnlocked: false,
     locationStates: {},
   };
 
@@ -523,6 +525,7 @@ describe("source gating is unchanged for the in-game resolver", () => {
       acceptedMissionIds: new Set(Object.values(MISSION_IDS)),
       completedMissionIds: new Set(Object.values(MISSION_IDS)),
       fabricationStationUnlocked: true,
+      resonanceRigUnlocked: true,
       locationStates: Object.fromEntries(
         defaultItemReferenceRegistries().locations.map((location) => [
           location.id,

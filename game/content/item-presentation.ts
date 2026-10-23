@@ -205,6 +205,17 @@ const itemPresentations = {
     description:
       "An intact stone with an unusually strong resonance. Valuable for advanced Runeworking, but can be broken into five Rune Fragments.",
   },
+  // The first Runeworking output (#391). An ordinary stack with no Use yet.
+  [ITEM_IDS.beginnerEchoSeeker]: {
+    displayName: "Beginner Echo Seeker",
+    pluralName: "Beginner Echo Seekers",
+    accessibleDescription:
+      "A dark, chipped triangular shard of rune stone with glowing violet and cyan grooves and a concentric resonant glyph around a small bright central point",
+    textFallback: "ES",
+    artworkSrc: "/item-art/beginner-echo-seeker.webp",
+    description:
+      "A fragment attuned to detect hidden disturbances in RuneSpace. Consume one to sense the direction of a hidden Resonance Echo on your current planet.",
+  },
   // Stillreach Prospecting Quarry Mining (#379). Stone is the ordinary primary
   // resource; the Boulder is its single Ultra Rare find. Neither's art bakes in
   // a sparkle: the Ultra Rare shimmer belongs to the shared item visuals, keyed

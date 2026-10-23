@@ -90,7 +90,14 @@ export const runespaceDialogueAdapter: DialogueAdapter = {
   backgrounds: studioBackgrounds,
   items: studioItems,
   skills: studioSkills,
-  sequences: DIALOGUE_SEQUENCES.map(toStudioSequence),
+  // A sequence that is nothing but a skill-level-dependent choice (#391) has no
+  // beats of its own to edit: its lines are its variant sequences, which are
+  // ordinary sequences listed here like any other. A sequence with beats of its
+  // own that closes with such a choice is listed with those beats; the choice's
+  // variants are edited separately (`docs/qc-studio.md`).
+  sequences: DIALOGUE_SEQUENCES.filter((sequence) => sequence.beats.length > 0).map(
+    toStudioSequence,
+  ),
   isValidStableId: (value) => ContentId.safeParse(value).success,
 };
 

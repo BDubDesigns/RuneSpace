@@ -150,8 +150,8 @@ profileTest(
     await expect(panel.getByText(`Player: ${radaOwnerName}`)).toBeVisible();
     await expect(panel.getByText("Character level 2")).toBeVisible();
     const skillRow = panel.locator("[data-character-skill]");
-    // Mining, Refining, Welding, and Fabrication (#232) all publish.
-    await expect(skillRow).toHaveCount(4);
+    // Mining, Refining, Welding, Fabrication (#232) and Runeworking (#391) all publish.
+    await expect(skillRow).toHaveCount(5);
     await expect(skillRow.getByText(/^Mining — Level 2$/)).toBeVisible();
     await expect(skillRow.getByText("500 total XP")).toBeVisible();
     await expect(skillRow.getByText("550 XP to next level")).toBeVisible();
@@ -161,6 +161,7 @@ profileTest(
     await expect(skillRow.getByText(/^Refining — Level 1$/)).toBeVisible();
     await expect(skillRow.getByText(/^Welding — Level 1$/)).toBeVisible();
     await expect(skillRow.getByText(/^Fabrication — Level 1$/)).toBeVisible();
+    await expect(skillRow.getByText(/^Runeworking — Level 1$/)).toBeVisible();
 
     // Nearby Player profiles share CharacterSkillList with the Character modal
     // (#215): the same canonical accent identity applies here too, on both the

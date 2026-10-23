@@ -448,6 +448,17 @@ describe("Stillreach is scenery-only (#373)", () => {
         expect(location.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
         continue;
       }
+      // Hilltop Workshop hosts the Wise Old Enby's Resonance Rig (#391): its one
+      // Runeworking recipe action, with no Map status, variant or new hex. Who
+      // may use it is the Rig's own completed-Mission gate, not the location.
+      if (location.id === LOCATION_IDS.hilltopWorkshop) {
+        expect(location.availableActionIds).toEqual([ACTION_IDS.beginnerEchoSeekerRuneworking]);
+        expect(location.mapStatus).toBeUndefined();
+        expect(location.dormantActivities).toEqual([]);
+        expect(location.merchantId).toBeUndefined();
+        expect(location.stateVariants).toEqual([]);
+        continue;
+      }
       expect(location.availableActionIds).toEqual([]);
       expect(location.dormantActivities).toEqual([]);
       expect(location.mapStatus).toBeUndefined();

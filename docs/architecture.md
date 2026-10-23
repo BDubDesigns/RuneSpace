@@ -58,7 +58,7 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
 
 - **Generic transaction/action lifecycle:** `server/action-resolution.ts` owns `withResolvedOwnedCharacter` / `withLockedOwnedCharacter`, the durable action cursor, locking, lazy resolution, and transition (continue/stop/replace) semantics. It knows nothing about Mining, Refining, Travel, or Welding.
 - **Generic Play state assembly:** `server/play.ts` owns `createPlayResolver`, `PlayGameplayState`, and shared state assembly/refresh; `server/play-state.ts` owns the shared `loadPlaySnapshot` read. Play dispatches persistence by the original `context.action.actionId`, hands authoritative resolved Mining/Refining attempt counts to generic mission progress before the action cursor advances, and refuses composed persistence when the original action context is absent.
-- **Activity-specific resolvers:** Mining (`server/mining.ts`), Refining (`server/refining.ts`), Travel (`server/travel.ts`), the Rivet's flight (`server/ship-state.ts`, #358 — registered in the Play resolver under its own `ship_flight` action; its commands, refuel, launch and landing-notice dismissal, are `server/ship-commands.ts`), Welding (`server/welding.ts`), Fabrication (`server/fabrication.ts`), and Tinkering (`server/tinkering.ts`) each retain their own resolver implementation. Fabrication and Tinkering (#232) are deliberately their own authored boundaries — `game/domain/fabrication.ts`, `game/domain/manual-override.ts`, `game/domain/tinkering.ts`, with the shared hypothetical-inventory helper in `game/domain/working-inventory.ts` — not a generic crafting engine and not Refining variants; they reuse the one-active-action boundary, the shared bounded-run selection, the inventory planners, and the Mission framework rather than forking them. A started Fabrication workpiece's reservation is enforced by `server/fabrication-reservation.ts`, which every carried-item command that runs alongside an action calls. Leaf command modules (`server/mining-commands.ts`, `server/refining-commands.ts`, etc.) may depend on both their activity owner and the generic Play layer without creating cycles.
+- **Activity-specific resolvers:** Mining (`server/mining.ts`), Refining (`server/refining.ts`), Travel (`server/travel.ts`), the Rivet's flight (`server/ship-state.ts`, #358 — registered in the Play resolver under its own `ship_flight` action; its commands, refuel, launch and landing-notice dismissal, are `server/ship-commands.ts`), Welding (`server/welding.ts`), Fabrication (`server/fabrication.ts`), Tinkering (`server/tinkering.ts`), and Runeworking (`server/runeworking.ts`, #391) each retain their own resolver implementation. Fabrication and Tinkering (#232) are deliberately their own authored boundaries — `game/domain/fabrication.ts`, `game/domain/manual-override.ts`, `game/domain/tinkering.ts`, with the shared hypothetical-inventory helper in `game/domain/working-inventory.ts` — not a generic crafting engine and not Refining variants; they reuse the one-active-action boundary, the shared bounded-run selection, the inventory planners, and the Mission framework rather than forking them. A started Fabrication workpiece's reservation is enforced by `server/fabrication-reservation.ts`, which every carried-item command that runs alongside an action calls. Runeworking (#391) follows the same shape at the Resonance Rig — `game/domain/runeworking.ts` (pure capacity, per-cycle checks and resolution over the shared working inventory), `server/runeworking.ts` (snapshot, resolver, one-transaction persistence of Fragment, Seeker, XP and tracked Mission credit), `server/runeworking-commands.ts` (Start, Finish Current), run state in `character_runeworking_state` — with Fabrication's run shape minus Manual Override and failure: a binding single-cycle reservation that the same reservation guard enforces (`RuneworkingReservationError`), never travel-replaceable, the next cycle decided from post-cycle inventory. It is not a Refining variant and shares no table with Fabrication. Leaf command modules (`server/mining-commands.ts`, `server/refining-commands.ts`, etc.) may depend on both their activity owner and the generic Play layer without creating cycles.
 - **Accepted-trade command gate (#266):** the owned-character boundaries
   (`lockPlayableOwnedCharacter` in `server/action-resolution.ts`) refuse a
   trade-engaged character right after locking its row and before any
@@ -500,7 +500,7 @@ and nothing to reply to, Block, Report, or open a profile for.
 
 - **Derivation:** `game/domain/recipe-unlocks.ts`. A crossing from
   `previousLevel` to `level` unlocks every recipe in the skill's canonical
-  registry (Refining and Fabrication today) whose `minimumLevel` lies in
+  registry (Refining, Fabrication and Runeworking today) whose `minimumLevel` lies in
   `(previousLevel, level]`. There is no notification-specific list: authoring
   a recipe normally is all a future recipe needs. A notice names a recipe by
   its output's item presentation, adding its inputs only when another recipe
@@ -763,6 +763,7 @@ the content that already owns each way of getting an item.
 | Source | Derived from |
 | --- | --- |
 | Fabricate / Refine | `fabricationRecipes()` / `refiningRecipes()` in `game/config/balance.ts` |
+| Runework (#391) | `runeworkingRecipes()` in `game/config/balance.ts`; hidden until the Resonance Rig is open (`resonanceRigUnlocked`, from Not From Around Here's completion), listed locked above the character's Runeworking level, and noted as never failing |
 | Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds`; access from `requiredMiningLevel` via `miningSourceUnlocked` |
 | Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source), one entry per venue of the business (`merchantVenues`, `game/domain/merchant-venues.ts`, #375) |
 | Daily claim | `POWER_ANNEX_CLAIM` in `game/domain/power-annex.ts`, which `server/power-annex.ts` also reads |
@@ -781,7 +782,8 @@ the content that already owns each way of getting an item.
   character's already-resolved `locationStates`, joined by action ID. Refining
   is hosted by its console action, so every recipe takes that location.
 - **Discovery versus capability.** A source the character has not been shown
-  (the Fabrication Station before its Mission is accepted, a merchant before
+  (the Fabrication Station before its Mission is accepted, the Resonance Rig
+  before Not From Around Here is complete, a merchant before
   theirs, a mine that exists only in a location's opened state) is **omitted**,
   never hinted at. A source they know of but cannot use (a recipe or a mine
   above their skill level, the mine gated by the same `requiredMiningLevel` the
@@ -803,7 +805,9 @@ the content that already owns each way of getting an item.
   persistence or per-item payload. Recipe ingredients drill down through the same
   surface, and an item already on the drill-down path is not offered again.
 - **Entry point.** The Mission Log (`docs/missions.md`, "Item sources in the
-  Mission Log"). Inventory details, recipe rows and Wiki links can reuse
+  Mission Log"), including a tracked craft's output where the requirement opts
+  in with `presentsOutputSources` (#391), and the Resonance Rig's ingredient
+  rows. Inventory details, recipe rows and Wiki links can reuse
   `ItemSourcesButton` later. The public Wiki keeps its hand-written tables.
 
 ## Where minigames fit

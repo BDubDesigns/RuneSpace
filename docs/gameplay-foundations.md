@@ -41,8 +41,9 @@ unfinished balance values or future activities.
   it unlocked, skipped levels included, in the award's own transaction (#274;
   `docs/architecture.md`). The operator's SET TOTAL XP repair sends none.
 - The initial Mining, Refining, and Welding curves and their awards are
-  approved in the slices below; other skills and activities remain deliberately
-  undecided.
+  approved in the slices below, as are Fabrication (#232) and Runeworking
+  (#391) on the same standard curve; other skills and activities remain
+  deliberately undecided.
 
 ## Mining slice
 
@@ -294,7 +295,8 @@ design and system term, "Secondary Find Chance" the stat/modifier term, and
 
 The first, self-contained slice of the Beginner Runeworking work: two ordinary
 physical materials and one Inventory action. There is **no** Runeworking skill,
-recipe, Echo Seeker, Mission, merchant price or new location here.
+recipe, Echo Seeker, Mission, merchant price or new location here; those arrive
+with Slice H ("Runeworking at the Resonance Rig", #391).
 
 | Item | Unit mass | Stack limit | Where from |
 | --- | ---: | ---: | --- |
@@ -1705,6 +1707,67 @@ State lives in `character_tinkering_state` (migration 0030): the preference, the
 committed cycle's target and worked ticks, the Finish Current intent, and the
 run.
 
+## Runeworking at the Resonance Rig (issue #391)
+
+Runeworking (`RW`) is the fifth persistent skill: an ordinary skill that starts
+at Level 1 on the standard curve (Level 2 at 500 XP), shown wherever skills
+are, with its own accent, **Electric Rose** (`--rs-skill-runeworking`,
+`docs/design-system.md`). It is practised at one place: the Wise Old Enby's
+prebuilt **Resonance Rig** at Hilltop Workshop on Stillreach — the existing
+World Location, with no new hex or Local Place. The Enby's card stays above the
+Rig; talking is never needed to use it.
+
+**Access.** The Rig opens when *Not From Around Here* is complete, read from
+that Mission's completion stamp (`HILLTOP_WORKSHOP_CONTENT` in
+`game/content/hilltop-workshop.ts`) whether or not *First Runeworking Lesson* is
+ever accepted. Hilltop Workshop lists the recipe action statically; the server
+refuses Start elsewhere, before the mystery is complete, or while another
+activity runs.
+
+**The one recipe.** Authored in `balance.runeworking.recipes`:
+
+| Recipe | Level | Input | Output | Time | XP |
+| --- | ---: | --- | --- | --- | ---: |
+| Beginner Echo Seeker | RW 1 | 1 Rune Fragment | 1 Beginner Echo Seeker | 34 ticks (20.4 s) | 25 |
+
+Every cycle succeeds: no chance, failure, Manual Override, minigame, slag or
+byproduct. The Seeker is an ordinary *Components & Supplies* stack (200 g,
+stack limit 5) with the approved description and art
+(`assets/item-art/beginner-echo-seeker.png` → `public/item-art/beginner-echo-seeker.webp`).
+It has **no Use action yet**; sensing an Echo arrives with a later slice.
+
+**Runs.** The Rig reuses the shared bounded-run contract ("Bounded runs"): a
+number counts completed cycles; Max keeps going until the next cycle cannot
+legally start and never states a total. Each cycle is bound when it begins, its
+one Fragment reserved in place (dropping it, or an operator removing it, is
+refused by the shared reservation guard; spare Fragments are not reserved).
+When the cycle completes it consumes the Fragment, adds the Seeker (topping up
+a partial stack before taking a slot), awards 25 RW XP and credits any accepted
+Mission counting Seeker attunements — all in one transaction under the
+character lock and the action cursor. The next cycle is decided from the
+inventory that cycle actually left: the Fragment's slot frees only when it was
+the last, the Seeker weighs what the Fragment did, so a run ends with
+`insufficient_inputs` or `inventory_slots_full`, never with a fake cycle.
+**Finish Current** is the only stop: the cycle on the Rig completes and pays,
+and no other begins; there is no cancel. A cycle is binding: Travel is refused
+while it runs, not replaced. An operator Stop clears it without consuming
+anything. Offline and reconnect resolution is the ordinary Play resolver.
+
+**Surfaces.** `features/runeworking/` presents the Rig with the station
+scaffolding Fabrication uses: **Attune** (recipe tiles, the 1/−/+/Max selector,
+the ingredient's Sources, the running cycle, This Run) and **Recipes** (a
+read-only catalog of learned recipes, shown even without Fragments).
+
+**Authority.** `game/domain/runeworking.ts` (pure capacity, cycle checks and
+resolution), `server/runeworking.ts` (snapshot, resolver, persistence),
+`server/runeworking-commands.ts` (Start, Finish Current), run state in
+`character_runeworking_state` (migration `0047_runeworking_state`). See
+`docs/architecture.md`, "Runeworking".
+
+**The lesson.** *First Runeworking Lesson* teaches it — three Seekers attuned
+after acceptance, then the Enby's turn-in for 150 RW XP (`docs/missions.md`).
+Later attunements are always allowed and pay their ordinary XP.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are
@@ -2001,8 +2064,8 @@ a second geography.
 
 ## Approved identities and boundaries
 
-Near-term stable skills are Mining, Refining, Welding, Fabrication (#232), and
-Strength. Stable
+Near-term stable skills are Mining, Refining, Welding, Fabrication (#232),
+Runeworking (#391), and Strength. Stable
 opening item identities are Ferrite Shale, Refined Ferrite, Slag, Crash-Grade
 Structural Alloy, Salvage Cutter, and Power Cell. These identities establish no
 weights, capacities, charge behavior, rewards, starter loadout, or action beyond
@@ -2424,7 +2487,8 @@ that is used wherever the character is publicly presented.
 
 When Travel replaces an active travel-replaceable work action (Mining, Refining,
 Welding, Practice Welding, a Work Order, or Tinkering — never a Fabrication
-workpiece, which is binding until it resolves, #232):
+workpiece, which is binding until it resolves, #232, and never a Runeworking
+cycle, #391):
 
 1. The character and active-action state is locked.
 2. Only attempts already completed before the command are resolved,

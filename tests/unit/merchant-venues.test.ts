@@ -35,6 +35,7 @@ function facts(completed: readonly string[] = [MISSION_IDS.thrustIssues]): ItemS
     acceptedMissionIds: new Set(),
     completedMissionIds: new Set(completed),
     fabricationStationUnlocked: true,
+    resonanceRigUnlocked: true,
     locationStates: Object.fromEntries(
       LOCATIONS.map((location) => [
         location.id,

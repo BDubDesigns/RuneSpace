@@ -86,6 +86,7 @@ export const FOCUSED_PHASES = [
   "rune-materials",
   "last-leg-trading",
   "not-from-around-here",
+  "first-runeworking-lesson",
   "ship-first-flight",
   "scroll-affordances",
   "stillreach",

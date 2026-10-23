@@ -109,6 +109,18 @@ export function describeItemSource(
         inputs: inputLines(source.inputs),
         yields: `Makes ${itemQuantityLabel(itemId, source.outputQuantity, itemName(itemId))}`,
       };
+    case "runework":
+      return {
+        ...base,
+        key: source.recipeActionId,
+        kind: source.kind,
+        title: "Runeworking",
+        where: locationNames(source.locationIds),
+        requirement: skillRequirement(source.skillId, source.minimumLevel),
+        notes: ["Never fails"],
+        inputs: inputLines(source.inputs),
+        yields: `Makes ${itemQuantityLabel(itemId, source.outputQuantity, itemName(itemId))}`,
+      };
     case "mine":
       return {
         ...base,

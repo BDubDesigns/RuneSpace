@@ -6,6 +6,7 @@ Start with [AGENTS.md](../AGENTS.md) and the approved issue. Use [`game/config/b
 | --- | --- | --- |
 | **Inventory item** | `ITEM_IDS`, balance item schema **and** defaults, Wiki category, item presentation | Approved art, equipment/charge/use fields, acquisition sources |
 | **Fabrication/Refining recipe** for existing items | Recipe `ACTION_IDS`, balance recipe schema **and** defaults | Tinkering, station/location changes if explicitly approved |
+| **Runeworking recipe** (#391) | Recipe `ACTION_IDS`, `balance.runeworking.recipes` schema **and** defaults, the action in Hilltop Workshop's `availableActionIds` | Nothing else: the Rig, runs, Sources, Wiki and unlock notices derive from the registry |
 | **Item + recipe** | Both rows above | No third catalog |
 | **New source** for an existing item | Author the real Mining/merchant/Mission/etc. source | Source action/location/gates; **no new item definition** |
 
@@ -26,10 +27,17 @@ Start with [AGENTS.md](../AGENTS.md) and the approved issue. Use [`game/config/b
 - [ ] **Read-only boundaries for normal content:** [Fabrication domain](../game/domain/fabrication.ts), [Refining domain](../game/domain/refining.ts), [recipe unlocks](../game/domain/recipe-unlocks.ts), and server [Fabrication](../server/fabrication-commands.ts) / [Refining](../server/refining-commands.ts) commands already enforce access, selection, bounded runs, resolution and capacity. Check input consumption, slot/mass preflight, success/failure/XP, and concurrent/replayed commands; **don't move rules into React or duplicate recipe catalogs**.
 - [ ] **Failure/Auto-discard trap:** Returned ingredients in Refining `fixed_outputs` aren't byproducts; `partitionFailureAwards()` in [`game/domain/refining.ts`](../game/domain/refining.ts) classifies returned vs made outputs. The shared Refining preflight and Auto-discard Slag logic protect capacity and returns. Verify both possible outcomes, especially at full inventory. Do not reimplement this in Wiki or UI.
 
+## Runeworking recipe (#391)
+
+- [ ] **Required:** A stable `ACTION_IDS` entry, then a typed entry under `balanceSchema.runeworking.recipes` **and** the matching `defaults` entry: output item and quantity, inputs, `minimumLevel`, `durationTicks` and `baseXp`. Every cycle succeeds; there is no failure kind, chance curve, byproduct or Manual Override to author. `runeworkingRecipes()` exposes them in order.
+- [ ] **Required:** Add the action to Hilltop Workshop's `availableActionIds` in [`game/content/locations.ts`](../game/content/locations.ts), so location guidance and item Sources find the Rig. The Rig's unlock (Not From Around Here's completion) is owned by [`game/content/hilltop-workshop.ts`](../game/content/hilltop-workshop.ts).
+- [ ] **Read-only boundaries:** [Runeworking domain](../game/domain/runeworking.ts) and server [Runeworking](../server/runeworking.ts) / [commands](../server/runeworking-commands.ts) already enforce access, level, bounded runs, the single-cycle reservation, post-cycle capacity and tracked Mission credit. `validateRuneworkingRecipes` checks the recipe at module load.
+
 ## Already derived — don't add copied entries
 
 - [`game/domain/item-sources.ts`](../game/domain/item-sources.ts) gives **character-aware repeatable** acquisition from canonical registries; one-time Mission rewards are deliberately excluded.
 - [`game/domain/item-reference.ts`](../game/domain/item-reference.ts) builds **public/spoiler-complete** sources, one-time Mission rewards, byproducts, recipe inputs/outputs and item properties. [`features/public-site/public-item-wiki.ts`](../features/public-site/public-item-wiki.ts) generates `/wiki/items` from `inventoryItemDefinitions()` and the category map, not separate articles or hard-coded recipes. See [public Wiki policy](public-wiki.md).
+- A Mission counting crafts of one recipe can show that recipe's output Sources with `presentsOutputSources` ([missions](missions.md), "Item sources in the Mission Log"); the output is derived from the action, never authored on the Mission.
 - [`game/domain/recipe-unlocks.ts`](../game/domain/recipe-unlocks.ts) derives notices from recipe registries and `minimumLevel`: **no hand-maintained unlock list**.
 
 ## Focused review sweep
