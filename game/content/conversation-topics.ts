@@ -13,7 +13,8 @@ import {
  * The closed availability vocabulary for a replayable conversation topic.
  *
  * Deliberately narrow: an ordinary topic is always available, it becomes
- * visible once one authored Mission is completed, or it reads one other
+ * visible once one authored Mission is completed — or, for a Mission's
+ * replayable instructions, once it is accepted (#391) — or it reads one other
  * already-authoritative server-computed fact. `work_orders_refresh_unlocked`
  * is that last kind's only member (#217's Wade ForceSales topic, gated on
  * Work Orders being unlocked AND Refining 5 — a combination the Mission-state
@@ -25,6 +26,11 @@ import {
 export type ConversationTopicAvailability =
   | { kind: "always" }
   | { kind: "mission_completed"; missionId: MissionId }
+  /**
+   * Accepted, finished or not (#391): the Wise Old Enby's first lesson stays
+   * replayable from the moment it is taken on, by either route.
+   */
+  | { kind: "mission_accepted"; missionId: MissionId }
   | { kind: "work_orders_refresh_unlocked" };
 
 /**
@@ -223,6 +229,33 @@ export const CONVERSATION_TOPICS = [
     label: "About RuneSpace",
     dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutRuneSpaceTopic,
     availability: { kind: "mission_completed", missionId: MISSION_IDS.notFromAroundHere },
+  },
+  {
+    // First Runeworking Lesson (#391): the lesson's instructions, replayable from
+    // the moment it is accepted — by the mystery's continuation or by the
+    // in-person offer — and after it is finished. Ends with the same Mining-level
+    // advice as "Where to Find Fragments".
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyFirstLesson,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "First lesson",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonTopic,
+    availability: { kind: "mission_accepted", missionId: MISSION_IDS.firstRuneworkingLesson },
+  },
+  {
+    // The Enby's advice on Rune Fragments by current Mining level, once RuneSpace
+    // has been explained. Reopening it after more Mining plays the other variant.
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyWhereToFindFragments,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "Where to Find Fragments",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.notFromAroundHere },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyAboutTheSeekers,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "About the Seekers",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutTheSeekersTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.firstRuneworkingLesson },
   },
 ] as const satisfies readonly ConversationTopicDefinition[];
 

@@ -11,15 +11,22 @@ import { projectCharacterProgression } from "@/game/domain/character-progression
  * hand-kept list, so it cannot drift from the skills the server command accepts.
  */
 describe("xpSettableSkills", () => {
-  it("offers Mining, Refining, Welding, and Fabrication with canonical display names", () => {
+  it("offers Mining, Refining, Welding, Fabrication, and Runeworking with canonical display names", () => {
     const skills = xpSettableSkills();
     expect(skills.map((skill) => skill.skillId).sort()).toEqual(
-      [SKILL_IDS.fabrication, SKILL_IDS.mining, SKILL_IDS.refining, SKILL_IDS.welding].sort(),
+      [
+        SKILL_IDS.fabrication,
+        SKILL_IDS.mining,
+        SKILL_IDS.refining,
+        SKILL_IDS.runeworking,
+        SKILL_IDS.welding,
+      ].sort(),
     );
     expect(skills.map((skill) => skill.displayName)).toEqual([
       "Fabrication",
       "Mining",
       "Refining",
+      "Runeworking",
       "Welding",
     ]);
   });

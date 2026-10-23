@@ -28,6 +28,8 @@ import { UNSTARTED_REPAIR } from "@/server/welding";
 import { SKILL_IDS } from "@/game/config/foundations";
 import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
+import { validateSkillLevelDialogues } from "@/game/domain/skill-level-dialogue";
+import { DIALOGUE_SEQUENCES } from "@/game/content/dialogue";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import { LOCATIONS } from "@/game/content/locations";
 import { validateLocationStateVariants } from "@/game/domain/location-state";
@@ -55,6 +57,11 @@ validateMissionDefinitions(MISSIONS);
 // gates, and any attempt to reuse a Mission-owned sequence as a replayable
 // social topic all fail here rather than inside a player conversation.
 validateConversationTopics(CONVERSATION_TOPICS, MISSIONS);
+
+// Skill-level-dependent dialogue (#391) on the same boundary: unknown or
+// mismatched variants, thresholds out of order or off the skill's curve, and a
+// sequence invoking an unknown choice or one of another NPC all fail here.
+validateSkillLevelDialogues(DIALOGUE_SEQUENCES);
 
 // Local Place access that derives from Mission completion is validated on the
 // same boundary: a place gating on a Mission that does not exist would stay

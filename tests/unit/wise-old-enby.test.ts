@@ -197,8 +197,11 @@ describe("ordinary conversation", () => {
       "The workshop",
       "Stillreach",
       "About RuneSpace",
+      // #391: the Mining-level Fragment advice, gated on the same completion.
+      "Where to Find Fragments",
     ]);
-    // Nothing Mission-shaped is left: no command, no offer, no follow-up entry.
+    // Nothing of this Mission is left: no command, no offer, no follow-up entry.
+    // (The lesson it hands on to is covered by first-runeworking-lesson.test.ts.)
     expect(missionEntries(done)).toEqual([]);
     expect(done.every((entry) => !("action" in entry) || entry.action === undefined)).toBe(true);
   });

@@ -62,6 +62,14 @@ editing; beat add, duplicate, delete, and keyboard-accessible up/down reorder;
 direct beat inspection and sequential preview; action-affordance preview;
 Undo/Redo; and Reset to Source.
 
+**Skill-level-dependent dialogue (#391).** A sequence may end with a
+skill-level choice (`skillLevelDialogueId`, `docs/npc-conversations.md` §8).
+Studio edits only the sequence's own beats; the choice's variants are ordinary
+sequences listed and edited on their own, and apply leaves the invocation field
+untouched because it rewrites only the `beats` array. A sequence that is nothing
+but the choice (the *Where to Find Fragments* topic) has no beats of its own and
+is not listed.
+
 ### Item presentation beats (schema v2)
 
 A dialogue beat presents exactly one visual subject over the authored

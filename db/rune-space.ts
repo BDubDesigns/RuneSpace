@@ -995,6 +995,59 @@ export const characterTinkeringState = pgTable(
 );
 
 /**
+ * Issue #391 — the Wise Old Enby's Resonance Rig, one row per character.
+ *
+ * Runeworking keeps Fabrication's run shape without its machine: the cycle on
+ * the Rig has no payload of its own — its recipe is the active action's ID, its
+ * start is that action's durable cursor, and its reserved inputs are that
+ * recipe's input set, still in the real `inventory_stacks` rows.
+ *
+ * This row carries only what those cannot: the run's selection and totals, the
+ * player's Finish Current intent, and the last stop reason. There is no chance,
+ * Override or byproduct state, because a Runeworking cycle never fails. A
+ * character who has never used the Rig simply has no row.
+ */
+export const characterRuneworkingState = pgTable(
+  "character_runeworking_state",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    /**
+     * The run's selection (#229): a number of cycles, or NULL for Max — keep
+     * starting cycles while one can begin. `run_cycles` counts the run's
+     * completed cycles, so remaining is the difference.
+     */
+    runSelectedCycles: integer("run_selected_cycles").default(1),
+    runCycles: integer("run_cycles").notNull().default(0),
+    /** This run's totals, as `{ itemId: quantity }` maps. */
+    runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
+    runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
+    runXpGained: integer("run_xp_gained").notNull().default(0),
+    /** Latest ten immutable server-resolved cycle summaries for the current run. */
+    recentCycles: jsonb("recent_cycles").notNull().default([]),
+    /**
+     * Stop, for a run, means Finish Current: the cycle on the Rig completes
+     * normally and no next one begins. There is no cancel. Cleared by the
+     * resolution that honours it and by Start.
+     */
+    finishCurrent: boolean("finish_current").notNull().default(false),
+    lastStopReason: text("last_stop_reason"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_runeworking_state_run_selected_cycles_positive",
+      sql`${table.runSelectedCycles} >= 1`,
+    ),
+    check(
+      "character_runeworking_state_run_counts_non_negative",
+      sql`${table.runCycles} >= 0 AND ${table.runXpGained} >= 0`,
+    ),
+  ],
+);
+
+/**
  * Issue #207 — the durable Work Orders board, one row per posted slot.
  *
  * The board is persistent rather than re-rolled on render, refresh, or login,

@@ -169,6 +169,15 @@ export type MissionRequirement =
       objective: string;
       /** Optional authored action guidance for the activity being taught. */
       recommendedActionId?: ActionId;
+      /**
+       * Offer the Sources reference of what the counted recipe makes beside this
+       * objective while it is unmet (#391) — presentation only. The item is
+       * derived from the recipe `actionId` names, never authored here, and the
+       * requirement still counts completed crafts: holding, trading or receiving
+       * that item never satisfies it. Only a `completions` requirement narrowed
+       * to one recipe with a single output may set it.
+       */
+      presentsOutputSources?: true;
     }
   | {
       /**
@@ -343,8 +352,8 @@ export type MissionConversationLead = {
 export type MissionRequirementKind = MissionRequirement["kind"];
 
 /**
- * The closed tracked-activity vocabulary. Fabrication and Tinkering (#232)
- * count only what genuinely completed.
+ * The closed tracked-activity vocabulary. Fabrication and Tinkering (#232) and
+ * Runeworking (#391) count only what genuinely completed.
  */
 export type TrackedMissionActivity =
   | "mining"
@@ -352,7 +361,8 @@ export type TrackedMissionActivity =
   | "practice_welding"
   | "work_order"
   | "fabrication"
-  | "tinkering";
+  | "tinkering"
+  | "runeworking";
 
 /**
  * A narrow Mission-local story fact (#232): a boolean the Mission remembers
@@ -1868,6 +1878,10 @@ export const NOT_FROM_AROUND_HERE: MissionDefinition = {
     dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHere,
     actionLabel: "I UNDERSTAND",
   },
+  // The next chapter (#391). A completion from here on accepts the lesson in the
+  // same transaction; a character who finished the mystery before the lesson
+  // existed is offered it by the Enby instead (the lesson's own offer).
+  continuationMissionId: MISSION_IDS.firstRuneworkingLesson,
   reactiveFacts: [
     {
       key: "toll-sent",
@@ -1882,16 +1896,93 @@ export const NOT_FROM_AROUND_HERE: MissionDefinition = {
         dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereTollSent,
       },
     ],
+    // It grants nothing; its completion flows straight into the lesson it has
+    // just accepted (#391), which picks up from "One step at a time".
+    completionPresentationDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLesson,
     omitted: [
       {
         moment: "busy",
         reason:
-          "Hilltop Workshop hosts no activity, so nothing keeps a character busy in front of the Enby.",
+          "Hilltop Workshop's only activity, the Resonance Rig, opens only once this Mission is complete, so nothing keeps a character busy in front of the Enby.",
       },
+    ],
+  },
+};
+
+/** The Runeworking XP the Wise Old Enby's first lesson pays, once, at its turn-in (#391). */
+export const FIRST_RUNEWORKING_LESSON_REWARD_XP = 150;
+
+/**
+ * Seeker? I Hardly Know Her! — the Wise Old Enby teaches the first real
+ * Runeworking recipe (#391).
+ *
+ * Two routes lead to the same lesson. Completing Not From Around Here accepts it
+ * in the same transaction (that Mission's continuation), and the mystery's
+ * completion scene is the lesson itself. A character who finished the mystery
+ * before the lesson existed meets the ordinary prerequisite-gated offer from the
+ * Enby instead ("Begin Lesson" / "Not Now"), whose accepted continuation is the
+ * same lesson. Once accepted by either route the offer is gone, so it is never
+ * made twice. No backfill, login scan or repair exists for either cohort.
+ *
+ * The objective is three genuine Beginner Echo Seeker attunements at the
+ * Resonance Rig after acceptance, counted by the ordinary tracked-activity path
+ * from each completed cycle — any mix of single runs, numbers, Max, offline
+ * catch-up and sessions. Earlier crafts, and Seekers owned, traded or received,
+ * never count. At three the player returns to the Enby for the explicit
+ * turn-in, which pays 150 Runeworking XP once; the crafts paid their own 25
+ * each. The Rig stays theirs throughout and after, and nothing about the next
+ * chapter is authored until it ships.
+ */
+export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
+  id: MISSION_IDS.firstRuneworkingLesson,
+  title: "Seeker? I Hardly Know Her!",
+  summary:
+    "The Wise Old Enby will teach you to attune Rune Fragments into Beginner Echo Seekers at the Resonance Rig on Hilltop Workshop.",
+  prerequisiteMissionId: MISSION_IDS.notFromAroundHere,
+  offers: [
+    {
+      npcId: NPC_IDS.wiseOldEnby,
+      locationId: LOCATION_IDS.hilltopWorkshop,
+      dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonOffer,
+      actionLabel: "Begin Lesson",
+      declineLabel: "Not Now",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLesson },
+    },
+  ],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "seekers-attuned",
+      activity: "runeworking",
+      metric: "completions",
+      actionId: ACTION_IDS.beginnerEchoSeekerRuneworking,
+      target: 3,
+      objective: "Attune Beginner Echo Seekers at the Resonance Rig — {current} / {target}",
+      recommendedActionId: ACTION_IDS.beginnerEchoSeekerRuneworking,
+      presentsOutputSources: true,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wiseOldEnby,
+    locationId: LOCATION_IDS.hilltopWorkshop,
+    requiresStationary: true,
+    objective: "Return to the Wise Old Enby at Hilltop Workshop",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn,
+    actionLabel: "Complete Seeker? I Hardly Know Her!",
+  },
+  reward: {
+    kind: "skill_xp",
+    skillId: SKILL_IDS.runeworking,
+    amount: FIRST_RUNEWORKING_LESSON_REWARD_XP,
+  },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonReminder,
+    completionPresentationDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonCompletion,
+    omitted: [
       {
-        moment: "completion_presentation",
+        moment: "busy",
         reason:
-          "The Mission grants nothing and the Enby's explanation ends the scene, so success returns to their hub, where About RuneSpace is now listed.",
+          "The approved script authors no busy beat (#391): a character still running the Rig hears the Enby's turn-in, whose completion the server refuses until the run has stopped.",
       },
     ],
   },
@@ -1934,6 +2025,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // The first Mission offered by a carried item (#369): standalone, no
   // prerequisite, solved by the Wise Old Enby on Stillreach (#389).
   NOT_FROM_AROUND_HERE,
+  // Its continuation, and the Enby's in-person offer to those who finished the
+  // mystery before it existed (#391).
+  FIRST_RUNEWORKING_LESSON,
 ];
 
 const missions = new Map<string, MissionDefinition>(

@@ -26,6 +26,9 @@ const skillIds = {
   strength: asContentId("strength"),
   // Tier-1 Fabrication (#232): a standard skill on the shared level curve.
   fabrication: asContentId("fabrication"),
+  // Runeworking (#391): a standard skill on the shared level curve, worked at
+  // the Wise Old Enby's Resonance Rig.
+  runeworking: asContentId("runeworking"),
 } as const satisfies Record<string, ContentId>;
 
 const itemIds = {
@@ -85,6 +88,9 @@ const itemIds = {
   // the intact Runestone breaks apart into Fragments from Inventory Item Details.
   runeFragment: asContentId("rune_fragment"),
   runestone: asContentId("runestone"),
+  // The first Runeworking output (#391): one Rune Fragment attuned at the
+  // Resonance Rig. An ordinary stack; it has no Use until a later slice.
+  beginnerEchoSeeker: asContentId("beginner_echo_seeker"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -145,6 +151,9 @@ const missionIds = {
   // inspected, offers the mystery, and leads through three Skatboll contacts to
   // Toll's lead about a researcher on Stillreach. Intentionally unfinished.
   notFromAroundHere: asContentId("not_from_around_here"),
+  // The Wise Old Enby's first lesson (#391): three real Beginner Echo Seekers
+  // attuned at the Resonance Rig. Not From Around Here continues into it.
+  firstRuneworkingLesson: asContentId("first_runeworking_lesson"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -358,6 +367,31 @@ const dialogueIds = {
   wiseOldEnbyNotFromAroundHereOffer: asContentId("wise_old_enby_not_from_around_here_offer"),
   wiseOldEnbyNotFromAroundHere: asContentId("wise_old_enby_not_from_around_here"),
   wiseOldEnbyNotFromAroundHereTollSent: asContentId("wise_old_enby_not_from_around_here_toll_sent"),
+  // First Runeworking Lesson (#391): the in-person offer for a character who
+  // finished the mystery before the lesson existed, the lesson itself (also the
+  // mystery's completion scene), its reminder, turn-in and completion, the
+  // Mining-level material advice, and the replayable topics.
+  wiseOldEnbyFirstLessonOffer: asContentId("wise_old_enby_first_lesson_offer"),
+  wiseOldEnbyFirstLesson: asContentId("wise_old_enby_first_lesson"),
+  wiseOldEnbyFirstLessonReminder: asContentId("wise_old_enby_first_lesson_reminder"),
+  wiseOldEnbyFirstLessonTurnIn: asContentId("wise_old_enby_first_lesson_turn_in"),
+  wiseOldEnbyFirstLessonCompletion: asContentId("wise_old_enby_first_lesson_completion"),
+  wiseOldEnbyFragmentAdviceNovice: asContentId("wise_old_enby_fragment_advice_novice"),
+  wiseOldEnbyFragmentAdviceExperienced: asContentId("wise_old_enby_fragment_advice_experienced"),
+  wiseOldEnbyFirstLessonTopic: asContentId("wise_old_enby_topic_first_lesson"),
+  wiseOldEnbyWhereToFindFragmentsTopic: asContentId("wise_old_enby_topic_where_to_find_fragments"),
+  wiseOldEnbyAboutTheSeekersTopic: asContentId("wise_old_enby_topic_about_the_seekers"),
+} as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for skill-level-dependent dialogue (#391): one authored
+ * choice between ordinary sequences by a character's level in one skill. See
+ * `SKILL_LEVEL_DIALOGUES` in game/content/dialogue and
+ * `docs/npc-conversations.md`, "Skill-level-dependent dialogue".
+ */
+const skillLevelDialogueIds = {
+  // Where the Wise Old Enby sends a player for Rune Fragments, by Mining level.
+  wiseOldEnbyFragmentAdvice: asContentId("wise_old_enby_fragment_advice"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -388,6 +422,9 @@ const conversationTopicIds = {
   wiseOldEnbyWorkshop: asContentId("wise_old_enby_workshop"),
   wiseOldEnbyStillreach: asContentId("wise_old_enby_stillreach"),
   wiseOldEnbyAboutRuneSpace: asContentId("wise_old_enby_about_runespace"),
+  wiseOldEnbyFirstLesson: asContentId("wise_old_enby_first_lesson"),
+  wiseOldEnbyWhereToFindFragments: asContentId("wise_old_enby_where_to_find_fragments"),
+  wiseOldEnbyAboutTheSeekers: asContentId("wise_old_enby_about_the_seekers"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -519,6 +556,10 @@ export const ACTION_IDS = {
   // The Fabrication 8 Empty Small Fuel Canister (#343). A direct 1:1 packaging
   // recipe, not a Tinkering target.
   emptySmallFuelCanisterFabrication: asContentId("empty_small_fuel_canister_fabrication"),
+  // Runeworking recipes (#391), one action per authored recipe for the same
+  // durable-identity reason Fabrication recipes have one: the active action IS
+  // the recipe of the cycle on the Resonance Rig.
+  beginnerEchoSeekerRuneworking: asContentId("beginner_echo_seeker_runeworking"),
   galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
   powerCellTinkering: asContentId("power_cell_tinkering"),
   loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),
@@ -757,6 +798,7 @@ export const ITEM_IDS = itemIds;
 export const NPC_IDS = npcIds;
 export const MISSION_IDS = missionIds;
 export const DIALOGUE_IDS = dialogueIds;
+export const SKILL_LEVEL_DIALOGUE_IDS = skillLevelDialogueIds;
 export const CONVERSATION_TOPIC_IDS = conversationTopicIds;
 export const EXPRESSION_IDS = expressionIds;
 export const CONVERSATION_BACKGROUND_IDS = conversationBackgroundIds;
@@ -767,6 +809,8 @@ export type ItemId = (typeof ITEM_IDS)[keyof typeof ITEM_IDS];
 export type NpcId = (typeof NPC_IDS)[keyof typeof NPC_IDS];
 export type MissionId = (typeof MISSION_IDS)[keyof typeof MISSION_IDS];
 export type DialogueId = (typeof DIALOGUE_IDS)[keyof typeof DIALOGUE_IDS];
+export type SkillLevelDialogueId =
+  (typeof SKILL_LEVEL_DIALOGUE_IDS)[keyof typeof SKILL_LEVEL_DIALOGUE_IDS];
 export type ConversationTopicId =
   (typeof CONVERSATION_TOPIC_IDS)[keyof typeof CONVERSATION_TOPIC_IDS];
 export type ExpressionId = (typeof EXPRESSION_IDS)[keyof typeof EXPRESSION_IDS];

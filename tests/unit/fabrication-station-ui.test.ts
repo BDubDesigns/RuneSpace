@@ -6,7 +6,7 @@ import {
   learnedRecipes,
   tinkerVisibleTargets,
 } from "@/features/fabrication/station-lists";
-import { seconds } from "@/features/fabrication/station-copy";
+import { seconds } from "@/features/shared/duration-copy";
 import {
   fabricationResultBeat,
   observeFabricationRun,

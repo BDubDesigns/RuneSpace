@@ -4,6 +4,7 @@ import {
   miningSources,
   refiningRecipeIsDeterministic,
   refiningRecipes,
+  runeworkingRecipes,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
@@ -20,6 +21,7 @@ import { miningSourceUnlocked } from "@/game/domain/mining";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import { refiningRecipeUnlocked } from "@/game/domain/refining";
+import { runeworkingRecipeUnlocked } from "@/game/domain/runeworking";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
@@ -30,8 +32,8 @@ import type { MerchantDefinition } from "@/game/schemas/merchants";
  *
  * Missions say what they need; items expose how they can be obtained. This
  * module is a projection, not a registry. It holds no recipe, price, location
- * or chance of its own — it reads the Fabrication and Refining recipe
- * registries, the Mining source registry, the merchant registry, the location
+ * or chance of its own — it reads the Fabrication, Refining and Runeworking
+ * recipe registries, the Mining source registry, the merchant registry, the location
  * registry, the Scavenge table, and the one fixed claim that exists, and joins
  * them by stable ID. Changing an authored recipe, price or source therefore
  * changes what this reports with no second edit.
@@ -47,7 +49,7 @@ import type { MerchantDefinition } from "@/game/schemas/merchants";
  *
  * - A DISCOVERY gate is existing story or state progression that has not yet
  *   revealed a system or place (the Fabrication Station before its Mission is
- *   accepted, a merchant before the Mission that opens them, a mine that only
+ *   accepted, the Resonance Rig before Not From Around Here is complete, a merchant before the Mission that opens them, a mine that only
  *   exists in a location's opened state). An undiscovered source is omitted
  *   entirely — it is never listed, and never hinted at.
  * - A CAPABILITY gate is something the character already knows exists but
@@ -86,6 +88,16 @@ export type ItemSourceBody =
       outputQuantity: number;
       /** Always succeeds: the recipe has no failure and rolls nothing. */
       deterministic: boolean;
+    }
+  | {
+      /** Runeworking at the Resonance Rig (#391). It never fails. */
+      kind: "runework";
+      recipeActionId: string;
+      skillId: string;
+      minimumLevel: number;
+      locationIds: readonly string[];
+      inputs: readonly ItemSourceInput[];
+      outputQuantity: number;
     }
   | {
       kind: "mine";
@@ -154,6 +166,12 @@ export type ItemSourceFacts = {
    * rule belongs to the station, so it is carried in, never re-derived here.
    */
   fabricationStationUnlocked: boolean;
+  /**
+   * Whether the Resonance Rig is the character's to use, exactly as the server
+   * projects it (`PlayGameplayState.resonanceRig.unlocked`, #391). Carried in,
+   * never re-derived here.
+   */
+  resonanceRigUnlocked: boolean;
   /**
    * Each World Location's actions as THIS character's state resolves them
    * (`PlayGameplayState.locationStates`), so a source that exists only in an
@@ -255,6 +273,42 @@ export function resolveItemSources(
             recipe,
           ),
           balance.fabrication.skillId,
+          recipe.minimumLevel,
+        ),
+      });
+    }
+  }
+
+  // Runeworking (#391): the Enby's Rig is theirs to show, so the whole kind is
+  // hidden until Not From Around Here is complete — a character who has not been
+  // told about RuneSpace is not told the Rig exists. Each recipe is placed by its
+  // own action, which Hilltop Workshop hosts.
+  if (facts.resonanceRigUnlocked) {
+    for (const recipe of runeworkingRecipes(balance)) {
+      if (recipe.outputItemId !== itemId) continue;
+      const locationIds = locationsOfferingAction(
+        recipe.actionId,
+        facts.locationStates,
+        registries.locations,
+      );
+      if (locationIds.length === 0) continue;
+      sources.push({
+        kind: "runework",
+        recipeActionId: recipe.actionId,
+        skillId: balance.runeworking.skillId,
+        minimumLevel: recipe.minimumLevel,
+        locationIds,
+        inputs: recipe.inputs.map(({ itemId: inputId, quantity }) => ({
+          itemId: inputId,
+          quantity,
+        })),
+        outputQuantity: recipe.outputQuantity,
+        access: skillGateAccess(
+          runeworkingRecipeUnlocked(
+            itemSourceSkillLevel(facts, balance.runeworking.skillId),
+            recipe,
+          ),
+          balance.runeworking.skillId,
           recipe.minimumLevel,
         ),
       });

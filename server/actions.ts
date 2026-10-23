@@ -43,6 +43,7 @@ import {
   setManualOverride,
   startFabrication,
 } from "@/server/fabrication-commands";
+import { finishCurrentRuneworking, startRuneworking } from "@/server/runeworking-commands";
 import {
   finishCurrentTinkering,
   setTinkeringScrapPreference,
@@ -200,6 +201,8 @@ import {
   ManualOverrideToggleRequestSchema,
   ManualOverridePushRequestSchema,
   ManualOverrideLockInRequestSchema,
+  StartRuneworkingRequestSchema,
+  RuneworkingCommandRequestSchema,
   StartTinkeringRequestSchema,
   TinkeringCommandRequestSchema,
   TinkeringScrapPreferenceRequestSchema,
@@ -546,6 +549,23 @@ export async function lockInManualOverrideAction(input: unknown): Promise<PlayAc
   if (!request.success) return { error: "Invalid Manual Override command." };
   return runPlayAction(request.data.characterId, (userId, characterId) =>
     lockInFabricationOverride(userId, characterId, request.data.expectedWorkpiece),
+  );
+}
+
+export async function startRuneworkingAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartRuneworkingRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Runeworking command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startRuneworking(userId, characterId, request.data.recipeActionId, request.data.quantity),
+  );
+}
+
+/** Stop, for a Runeworking run, is Finish Current: there is no cancel (#391). */
+export async function finishCurrentRuneworkingAction(input: unknown): Promise<PlayActionResult> {
+  const request = RuneworkingCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Runeworking command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    finishCurrentRuneworking(userId, characterId),
   );
 }
 

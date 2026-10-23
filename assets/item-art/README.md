@@ -62,6 +62,16 @@ clients.
   640×640 transparent canvas and saved as lossless WebP. Neither carries a baked
   sparkle: the Boulder's Ultra Rare shimmer is the UI's. Nothing was regenerated,
   recomposed or recoloured.
+- `beginner-echo-seeker.png` is the approved 1312×1199 transparent RGBA render of
+  the Beginner Echo Seeker (#391), byte-identical to the owner-supplied master
+  and checked by SHA-256
+  (`f03cd4816a90bf183f7e85fe592c895b58546cd75c6a2248828f91711d00027d`).
+  `scripts/prepare-beginner-echo-seeker-art.mjs` produces the derivative with
+  the Wheel Assembly convention — alpha noise below 4 cleared, near-opaque alpha
+  (252 and above) snapped to 255, trimmed to content (978×1061), scaled to a
+  576 px long edge (531×576), centred on a 640×640 transparent canvas and saved
+  as lossless WebP — and was compared with the approved 80 px preview at the
+  Inventory tile size. Nothing was regenerated, recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

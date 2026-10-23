@@ -102,7 +102,9 @@ describe("issue #324 reachable lifecycle moments", () => {
       "walk_it_off:busy",
       "curly_must_stash:busy",
       "not_from_around_here:busy",
-      "not_from_around_here:completion_presentation",
+      // #391: the lesson's approved script authors no busy beat; the mystery now
+      // authors its completion scene, which is the lesson it hands on to.
+      "first_runeworking_lesson:busy",
     ]);
   });
 });

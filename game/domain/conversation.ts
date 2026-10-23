@@ -455,8 +455,11 @@ export function topicAvailable(
     return context?.workOrdersRefreshUnlocked ?? false;
   }
   const gate = topic.availability.missionId;
+  const accepted = topic.availability.kind === "mission_accepted";
   return projections.some(
-    (projection) => projection.missionId === gate && projection.state === "completed",
+    (projection) =>
+      projection.missionId === gate &&
+      (accepted ? projection.state !== "not_accepted" : projection.state === "completed"),
   );
 }
 
@@ -694,7 +697,8 @@ export function validateConversationTopics(
     }
     seenDialogueIds.add(topic.dialogueId);
     if (
-      topic.availability.kind === "mission_completed" &&
+      (topic.availability.kind === "mission_completed" ||
+        topic.availability.kind === "mission_accepted") &&
       !knownMissionIds.has(topic.availability.missionId)
     ) {
       throw new Error(`${where} gates on unknown mission "${topic.availability.missionId}".`);

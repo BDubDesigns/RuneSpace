@@ -6,12 +6,14 @@ import {
   MERCHANT_IDS,
   NPC_IDS,
   SKILL_IDS,
+  SKILL_LEVEL_DIALOGUE_IDS,
   type ConversationBackgroundId,
   type DialogueId,
   type ExpressionId,
   type ItemId,
   type NpcId,
   type SkillId,
+  type SkillLevelDialogueId,
 } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { tinkeringScrapYield } from "@/game/domain/tinkering";
@@ -99,7 +101,40 @@ export type DialogueSequence = {
    * his first line, so his tile follows it.
    */
   creditsReceiptAfterBeats?: number;
+  /**
+   * Skill-level-dependent dialogue (#391): after this sequence's own beats, the
+   * conversation continues with the one variant of this authored choice that the
+   * character's current level selects (`SKILL_LEVEL_DIALOGUES`). Presentation
+   * only. A sequence that is nothing but the choice — a topic whose whole subject
+   * is the level-dependent advice — authors no beats of its own.
+   */
+  skillLevelDialogueId?: SkillLevelDialogueId;
   beats: readonly DialogueBeat[];
+};
+
+/**
+ * Skill-level-dependent dialogue (#391): one authored choice between ordinary
+ * sequences by the character's level in one skill. It is a content decision,
+ * not a scripting language — one skill, ascending thresholds, nothing else — and
+ * it changes no game state: it only picks which already-authored lines are
+ * spoken. `docs/npc-conversations.md` ("Skill-level-dependent dialogue") is the
+ * authoring recipe.
+ *
+ * - `variants` are ordinary sequences of the same NPC, lowest threshold first.
+ *   The first is `minimumLevel: 1`: the fallback for every level, including a
+ *   character with no XP row in the skill (which is Level 1).
+ * - A variant applies from its `minimumLevel` up to the next variant's.
+ * - Any sequence invokes the choice with `skillLevelDialogueId`; several may
+ *   invoke the same one, so the lines are authored once.
+ * - The server selects the variant from the character's authoritative level on
+ *   every Play state (`PlayGameplayState.skillLevelDialogue`), so reopening the
+ *   conversation after levelling up plays the new variant.
+ */
+export type SkillLevelDialogue = {
+  id: SkillLevelDialogueId;
+  npcId: NpcId;
+  skillId: SkillId;
+  variants: readonly { minimumLevel: number; dialogueId: DialogueId }[];
 };
 
 // Tansy's Tinkering demonstration (#232) shows what one Salvage Cutter breaks
@@ -2916,10 +2951,269 @@ const dialogue = {
       ),
     ],
   },
+  // First Runeworking Lesson (#391). The owner-approved script, verbatim: one
+  // beat per passage in the Enby's own expressions, the player silent throughout.
+  //
+  // The offer is made in person only to a character who finished Not From Around
+  // Here before the lesson existed; everyone else arrives already accepted, by
+  // the mystery's continuation.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLessonOffer]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLessonOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah, there you are! I was hoping you'd come back. There's only so much conversation one can have with a machine, and this one is a terrible listener.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Well, that's not entirely fair. Listening is precisely what I built it for.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "You know what RuneSpace is now. Would you like to learn how to do something useful with it? I promise the equipment is considerably more reliable than it looks.",
+      ),
+    ],
+  },
+  // The lesson itself: the mystery's completion scene for a character whose
+  // turn-in accepts the lesson, the accepted continuation of the in-person offer,
+  // and — written out again in the replayable topic below so QC Studio can edit
+  // each — the instructions. It closes with the Enby's Mining-level material
+  // advice, the shared skill-level dialogue the "Where to Find Fragments" topic
+  // also uses (`SKILL_LEVEL_DIALOGUES`). tests/unit/first-runeworking-lesson.test.ts
+  // keeps the two copies identical.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLesson]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLesson,
+    npcId: NPC_IDS.wiseOldEnby,
+    skillLevelDialogueId: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "One step at a time, as promised. Now, you may have noticed that rather impressive collection of questionable engineering over there.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "That's my Resonance Rig. I built it after following the disturbances in RuneSpace to this very hill. The signal was stronger here than anywhere else I'd been.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I wasn't trying to build a doorway into RuneSpace. I was trying to build an ear. The distinction has saved me a considerable amount of property damage.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Rune Fragments already resonate with that space between worlds. With a little careful attunement, we can persuade one to listen for something specific.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "A Resonance Echo. A disturbance hidden somewhere out there, waiting to be discovered.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "One Rune Fragment, properly attuned in the Rig, becomes what I call a Beginner Echo Seeker. Rather a grand name for a little piece of stone, but accuracy is important.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "I'd like you to make three. Not because three is a particularly magical number, mind you. It's just enough practice to make sure you've got the hang of it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And please, use the Rig as often as you like. I built it to be used. Not admired from a safe distance, as the instruction manual recommends.",
+      ),
+    ],
+  },
+  // The two variants of the Enby's advice on Rune Fragments, chosen by the
+  // character's current Mining level (`SKILL_LEVEL_DIALOGUES`). Only the one that
+  // applies is ever played.
+  [DIALOGUE_IDS.wiseOldEnbyFragmentAdviceNovice]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceNovice,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "If you're short on Fragments, try the Prospecting Quarry. They turn up among the ordinary stone from time to time.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "There's a place called Harmonic Workings where the fragments are much more plentiful. Tougher digging, though. I'd get a little more Mining experience before trying your luck there.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyFragmentAdviceExperienced]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceExperienced,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You look like you've done your share of Mining. I'd recommend Harmonic Workings. The rune material runs right through the rock there. Far better than hoping to turn up the odd Fragment at the Quarry.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Do be careful. The stones have a peculiar habit of humming back when you disturb them. Quite rude, really.",
+      ),
+    ],
+  },
+  // While fewer than three Seekers have been attuned since the lesson began.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLessonReminder]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLessonReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "How's the attunement coming along? Don't rush it. RuneSpace has been there a very long time. I doubt it's going anywhere before supper.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Three successful Seekers, remember. The Rig will take care of the delicate work, so long as you give it a Fragment to work with.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And don't worry about wearing the machine out. I've been trying for years. It appears to be winning.",
+      ),
+    ],
+  },
+  // Three attunements done: the turn-in, whose explicit control completes the lesson.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah! Look at you! Three successful attunements, and the workshop is still standing!",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "You're already ahead of my first attempt. We don't discuss that one. Particularly not with the neighbors.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Let me tell you what you've made. Each Seeker is attuned to detect Resonance Echoes — little disturbances where RuneSpace brushes against the world we know.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "They won't tell you exactly where an Echo is hiding. But they can point you in the right direction. Sometimes that's all you need.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "You've learned how to make them. Next, we'll learn how to listen. Keep those Seekers handy.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And well done, genuinely. It's rather nice having someone else around who can operate the equipment without setting anything on fire.",
+      ),
+    ],
+  },
+  // The reward the turn-in already granted, presented once after it succeeds.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLessonCompletion]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLessonCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.runeworking,
+        amount: 150,
+        backgroundId: hilltopWorkshop,
+        text: "",
+      },
+    ],
+  },
+  // The lesson again, as a replayable topic while it is accepted and after.
+  [DIALOGUE_IDS.wiseOldEnbyFirstLessonTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstLessonTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    skillLevelDialogueId: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "One step at a time, as promised. Now, you may have noticed that rather impressive collection of questionable engineering over there.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "That's my Resonance Rig. I built it after following the disturbances in RuneSpace to this very hill. The signal was stronger here than anywhere else I'd been.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I wasn't trying to build a doorway into RuneSpace. I was trying to build an ear. The distinction has saved me a considerable amount of property damage.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Rune Fragments already resonate with that space between worlds. With a little careful attunement, we can persuade one to listen for something specific.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "A Resonance Echo. A disturbance hidden somewhere out there, waiting to be discovered.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "One Rune Fragment, properly attuned in the Rig, becomes what I call a Beginner Echo Seeker. Rather a grand name for a little piece of stone, but accuracy is important.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "I'd like you to make three. Not because three is a particularly magical number, mind you. It's just enough practice to make sure you've got the hang of it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And please, use the Rig as often as you like. I built it to be used. Not admired from a safe distance, as the instruction manual recommends.",
+      ),
+    ],
+  },
+  // Nothing but the Mining-level advice: the topic is the skill-level dialogue,
+  // so a player who comes back after more Mining hears the other variant.
+  [DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyWhereToFindFragmentsTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    skillLevelDialogueId: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+    beats: [],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyAboutTheSeekersTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyAboutTheSeekersTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You've learned how to make Seekers. The next challenge is learning what they're telling you.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Keep a few handy. There are things worth finding out there, and I suspect you've only scratched the surface.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "The Rig is yours to use whenever you need it. Just leave the roof attached, would you? It's already doing the bare minimum.",
+      ),
+    ],
+  },
 } as const satisfies Record<DialogueId, DialogueSequence>;
 
 /** Ordered authoritative dialogue catalog consumed by the RuneSpace adapter. */
 export const DIALOGUE_SEQUENCES = Object.values(dialogue);
+
+/**
+ * Every authored skill-level-dependent dialogue (#391). See `SkillLevelDialogue`.
+ */
+export const SKILL_LEVEL_DIALOGUES = [
+  {
+    // Where the Wise Old Enby sends a player for Rune Fragments. The threshold is
+    // the level Harmonic Workings itself requires, read from its Mining source,
+    // so the advice moves with the mine (Mining 8 today): below it they point to
+    // the Prospecting Quarry and mention the Workings as a future source; at or
+    // above it they recommend the Workings. Played after the first lesson and as
+    // the "Where to Find Fragments" topic.
+    id: SKILL_LEVEL_DIALOGUE_IDS.wiseOldEnbyFragmentAdvice,
+    npcId: NPC_IDS.wiseOldEnby,
+    skillId: SKILL_IDS.mining,
+    variants: [
+      { minimumLevel: 1, dialogueId: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceNovice },
+      {
+        minimumLevel: getEffectiveGameBalance().mining.sources.harmonicMining.requiredMiningLevel,
+        dialogueId: DIALOGUE_IDS.wiseOldEnbyFragmentAdviceExperienced,
+      },
+    ],
+  },
+] as const satisfies readonly SkillLevelDialogue[];
+
+export function getSkillLevelDialogue(id: string): SkillLevelDialogue | undefined {
+  return SKILL_LEVEL_DIALOGUES.find((candidate) => candidate.id === id);
+}
 
 export function getDialogue(dialogueId: string): DialogueSequence | undefined {
   return dialogue[dialogueId as DialogueId];

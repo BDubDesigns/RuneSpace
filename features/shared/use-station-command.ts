@@ -6,10 +6,11 @@ import type { PlayActionResult } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 
 /**
- * One foreground command at the Fabrication Station (#232), queued through the
- * shared Play command gate exactly as the Workbench's commands are, so a
- * station click can never race a refresh or another surface's command.
- * `describe` turns the server's answer into the one message to show.
+ * One foreground command at a crafting station — the Fabrication Station
+ * (#232) and the Resonance Rig (#391) — queued through the shared Play command
+ * gate exactly as the Workbench's commands are, so a station click can never
+ * race a refresh or another surface's command. `describe` turns the server's
+ * answer into the one message to show.
  */
 export function useStationCommand(describe: (state: PlayGameplayState) => string | undefined) {
   const { acceptState, enqueueForeground, releaseCommand } = usePlay();

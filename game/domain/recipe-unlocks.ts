@@ -2,6 +2,7 @@ import {
   fabricationRecipes,
   getEffectiveGameBalance,
   refiningRecipes,
+  runeworkingRecipes,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
 
@@ -38,6 +39,7 @@ export function skillRecipes(
   const registries: readonly { skillId: string; recipes: readonly UnlockableRecipe[] }[] = [
     { skillId: balance.refining.skillId, recipes: refiningRecipes(balance) },
     { skillId: balance.fabrication.skillId, recipes: fabricationRecipes(balance) },
+    { skillId: balance.runeworking.skillId, recipes: runeworkingRecipes(balance) },
   ];
   return registries
     .filter((registry) => registry.skillId === skillId)

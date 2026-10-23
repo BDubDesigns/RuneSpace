@@ -861,6 +861,33 @@ const balanceSchema = z.object({
     }),
   }),
   /**
+   * Runeworking (#391): attuning rune material at the Wise Old Enby's Resonance
+   * Rig on Hilltop Workshop.
+   *
+   * Its own authored recipe boundary, like Fabrication and deliberately not a
+   * Refining variant: a recipe is inputs, one authored output batch, a duration
+   * and base XP, and it never fails — there is no chance, Manual Override,
+   * minigame or byproduct. Each recipe carries its own action ID for the
+   * durable-identity reason every recipe does. The Beginner Echo Seeker is the
+   * one shipped recipe: one Rune Fragment in, one Seeker out (200 g either way).
+   */
+  runeworking: z.object({
+    skillId: z.literal(SKILL_IDS.runeworking),
+    recipes: z.object({
+      beginnerEchoSeeker: z.object({
+        actionId: z.literal(ACTION_IDS.beginnerEchoSeekerRuneworking),
+        outputItemId: z.literal(ITEM_IDS.beginnerEchoSeeker),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(34),
+        baseXp: z.literal(25),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), quantity: z.literal(1) }),
+        ]),
+      }),
+    }),
+  }),
+  /**
    * Work Orders (#190, made playable by #207) — the paying client jobs that
    * arrive through Wade's terminal.
    *
@@ -1192,6 +1219,15 @@ const balanceSchema = z.object({
       massGrams: z.literal(1_000),
       stackLimit: z.literal(5),
       secondaryFindMiningXp: z.literal(130),
+    }),
+    /**
+     * The Beginner Echo Seeker (#391): a Rune Fragment attuned at the Resonance
+     * Rig, so it keeps the Fragment's 200 g. Five to a stack.
+     */
+    beginnerEchoSeeker: z.object({
+      itemId: z.literal(ITEM_IDS.beginnerEchoSeeker),
+      massGrams: z.literal(200),
+      stackLimit: z.literal(5),
     }),
     /**
      * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
@@ -1759,6 +1795,20 @@ const defaults = balanceSchema.parse({
       },
     },
   },
+  runeworking: {
+    skillId: SKILL_IDS.runeworking,
+    recipes: {
+      beginnerEchoSeeker: {
+        actionId: ACTION_IDS.beginnerEchoSeekerRuneworking,
+        outputItemId: ITEM_IDS.beginnerEchoSeeker,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 34,
+        baseXp: 25,
+        inputs: [{ itemId: ITEM_IDS.runeFragment, quantity: 1 }],
+      },
+    },
+  },
   workOrders: {
     actionId: ACTION_IDS.workOrderWelding,
     skillId: SKILL_IDS.welding,
@@ -1903,6 +1953,7 @@ const defaults = balanceSchema.parse({
       stackLimit: 5,
       secondaryFindMiningXp: 130,
     },
+    beginnerEchoSeeker: { itemId: ITEM_IDS.beginnerEchoSeeker, massGrams: 200, stackLimit: 5 },
     stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
     boulder: {
       itemId: ITEM_IDS.boulder,
@@ -2077,6 +2128,34 @@ export function fabricationRecipeForActionId(
 /** Every Fabrication action ID the recipe registry authors. */
 export function fabricationActionIds(balance = getEffectiveGameBalance()): readonly string[] {
   return fabricationRecipes(balance).map((recipe) => recipe.actionId);
+}
+
+/** One authored Runeworking recipe (#391). */
+export type RuneworkingRecipeBalance =
+  EffectiveGameBalance["runeworking"]["recipes"][keyof EffectiveGameBalance["runeworking"]["recipes"]];
+
+/** Every authored Runeworking recipe, in a stable authored order. */
+export function runeworkingRecipes(
+  balance = getEffectiveGameBalance(),
+): readonly RuneworkingRecipeBalance[] {
+  return Object.values(balance.runeworking.recipes);
+}
+
+/**
+ * The authoritative recipe on the Resonance Rig, by its own action ID — the
+ * durable-identity rule every recipe follows, so a refreshed or lazily resolved
+ * cycle is always the recipe the player actually started.
+ */
+export function runeworkingRecipeForActionId(
+  actionId: string,
+  balance = getEffectiveGameBalance(),
+): RuneworkingRecipeBalance | undefined {
+  return runeworkingRecipes(balance).find((recipe) => recipe.actionId === actionId);
+}
+
+/** Every Runeworking action ID the recipe registry authors. */
+export function runeworkingActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return runeworkingRecipes(balance).map((recipe) => recipe.actionId);
 }
 
 /**
@@ -2259,6 +2338,8 @@ const skillLevelCurves = {
   [SKILL_IDS.welding]: standardSkillLevelThresholds,
   // A standard skill on the shared curve (#232): no special hidden state.
   [SKILL_IDS.fabrication]: standardSkillLevelThresholds,
+  // A standard skill on the shared curve (#391): Level 2 at the usual 500 XP.
+  [SKILL_IDS.runeworking]: standardSkillLevelThresholds,
 } as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
 
 /** The approved level-curve source for a skill, or undefined when none exists. */

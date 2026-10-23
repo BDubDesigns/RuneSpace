@@ -55,6 +55,7 @@ function cargoState(): PlayGameplayState {
     characterId: "character-1",
     progression: { characterLevel: 1, skills: [] },
     skillTotalXp: {},
+    skillLevelDialogue: {},
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},
@@ -99,6 +100,19 @@ function cargoState(): PlayGameplayState {
     refining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     welding: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     fabrication: { totalXp: 0, level: 1, xpIntoLevel: 0 },
+    runeworking: { totalXp: 0, level: 1, xpIntoLevel: 0 },
+    resonanceRig: {
+      unlocked: false,
+      recipes: [],
+      run: {
+        selection: 1,
+        cycles: 0,
+        inputsConsumed: {},
+        outputsGained: {},
+        xpGained: 0,
+        recentCycles: [],
+      },
+    },
     fabricationStation: {
       unlocked: false,
       recipes: [],

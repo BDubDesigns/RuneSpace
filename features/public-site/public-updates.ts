@@ -9,6 +9,63 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #391 — Stillreach Slice H: Runeworking, the Resonance Rig and the Seeker? I Hardly Know Her!.
+    slug: "first-runeworking-lesson",
+    title: "Seeker? I Hardly Know Her!",
+    publishedAt: "2026-10-23T09:00:00-07:00",
+    summary:
+      "A new skill, Runeworking, at the Wise Old Enby's Resonance Rig on Stillreach. Attune Rune Fragments into Beginner Echo Seekers, and learn how from the Enby in Seeker? I Hardly Know Her!.",
+    hero: {
+      src: "/location-scenes/hilltop-workshop.webp",
+      alt: "A small metal-roofed workshop with lit windows and a canvas awning on a rocky hilltop covered in violet and teal scrub and tiny glowing mushrooms, misty valleys and an aurora sky beyond",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.beginnerEchoSeeker },
+        side: "right",
+      },
+      [
+        "Hilltop Workshop has a second reason to visit. Once ",
+        { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+        " is complete, the Wise Old Enby's Resonance Rig is yours to use: a new skill, ",
+        { text: "Runeworking", articleSlug: "runeworking" },
+        ", that attunes one Rune Fragment into one Beginner Echo Seeker. Every attunement works, takes about twenty seconds and pays Runeworking XP. Run one, a number, or Max, and Finish Current stops after the one on the Rig.",
+      ],
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.wiseOldEnby, expressionId: "friendly" },
+        side: "left",
+      },
+      [
+        "The Enby would like to show you how. ",
+        { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
+        " starts as soon as you finish the mystery with them, or, if you finished it before today, the next time you talk to them. Attune three Seekers, then go back to them for some Runeworking XP. They will also tell you where to find more Fragments, and the advice depends on how much Mining you have done.",
+      ],
+      "Seekers are ordinary items you can carry, stash and trade. They cannot be used yet.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Runeworking, a new skill, practised at the Resonance Rig at Hilltop Workshop once Not From Around Here is complete.",
+          "Beginner Echo Seeker: 1 Rune Fragment at Runeworking 1, 20.4 seconds, 25 Runeworking XP, never fails.",
+          "Seeker? I Hardly Know Her!, from the Wise Old Enby: attune three Beginner Echo Seekers after accepting it, then return to them for 150 Runeworking XP.",
+          "Where to Find Fragments, First lesson and About the Seekers, three new conversations with the Wise Old Enby.",
+          "Sources for Beginner Echo Seeker beside the lesson's objective in the Mission Log, which leads on to Rune Fragment's own Sources.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Completing Not From Around Here now continues straight into Seeker? I Hardly Know Her!.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #389 — Stillreach Slice G: the Wise Old Enby, and the end of Not From Around Here.
     slug: "the-wise-old-enby",
     title: "The Wise Old Enby",

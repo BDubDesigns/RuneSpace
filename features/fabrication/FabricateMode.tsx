@@ -17,9 +17,9 @@ import {
   fabricationRunSummary,
   fabricationStopIsExpected,
   fabricationStopMessage,
-  seconds,
 } from "@/features/fabrication/station-copy";
-import { useStationCommand } from "@/features/fabrication/use-station-command";
+import { seconds } from "@/features/shared/duration-copy";
+import { useStationCommand } from "@/features/shared/use-station-command";
 import { usePlay } from "@/features/play/PlayContext";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import {

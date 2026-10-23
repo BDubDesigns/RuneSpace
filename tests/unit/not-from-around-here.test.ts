@@ -11,6 +11,7 @@ import {
 import { getDialogue } from "@/game/content/dialogue";
 import {
   MISSIONS,
+  FIRST_RUNEWORKING_LESSON,
   NOT_FROM_AROUND_HERE,
   getMission,
   type MissionDefinition,
@@ -409,7 +410,7 @@ describe("on Stillreach: the Wise Old Enby is the one objective (#389)", () => {
 });
 
 describe("completion and after (#389)", () => {
-  it("completes at the Enby with no reward, consumption or continuation", () => {
+  it("completes at the Enby with no reward or consumption, and continues into the lesson", () => {
     expect(NOT_FROM_AROUND_HERE.turnIn).toEqual({
       npcId: NPC_IDS.wiseOldEnby,
       locationId: LOCATION_IDS.hilltopWorkshop,
@@ -420,7 +421,8 @@ describe("completion and after (#389)", () => {
     });
     expect(NOT_FROM_AROUND_HERE.autoCompletion).toBeUndefined();
     expect(NOT_FROM_AROUND_HERE.reward).toBeUndefined();
-    expect(NOT_FROM_AROUND_HERE.continuationMissionId).toBeUndefined();
+    // #391: the next chapter is accepted in the same completion transaction.
+    expect(NOT_FROM_AROUND_HERE.continuationMissionId).toBe(MISSION_IDS.firstRuneworkingLesson);
     expect(NOT_FROM_AROUND_HERE.completedNpcDialogue).toBeUndefined();
     expect(
       NOT_FROM_AROUND_HERE.requirements.some(
@@ -430,15 +432,16 @@ describe("completion and after (#389)", () => {
     ).toBe(false);
   });
 
-  it("reaches only the busy and completion moments, both declared", () => {
+  it("reaches only the busy and completion moments: busy declared, completion the lesson", () => {
     expect([...missionLifecycleMoments(NOT_FROM_AROUND_HERE)].sort()).toEqual([
       "busy",
       "completion_presentation",
     ]);
-    expect(NOT_FROM_AROUND_HERE.dialogue.omitted?.map((entry) => entry.moment).sort()).toEqual([
-      "busy",
-      "completion_presentation",
-    ]);
+    expect(NOT_FROM_AROUND_HERE.dialogue.omitted?.map((entry) => entry.moment)).toEqual(["busy"]);
+    // Its completion flows straight into the lesson it has just accepted (#391).
+    expect(NOT_FROM_AROUND_HERE.dialogue.completionPresentationDialogueId).toBe(
+      DIALOGUE_IDS.wiseOldEnbyFirstLesson,
+    );
   });
 
   it("is truly Completed afterwards: no objective, guidance, offer or pin, anywhere", () => {
@@ -454,16 +457,23 @@ describe("completion and after (#389)", () => {
     }
   });
 
-  it("leaves a durable seam for the next story Mission and ships no phantom one", () => {
-    // The next slice reads the completion stamp itself, which every character
-    // who finished this Mission has — before or after that slice ships.
+  it("hands on to exactly one next chapter, by continuation and by prerequisite, and no phantom", () => {
+    // #391 used the seam this Mission left: future completions accept the lesson
+    // (continuation), and the completion stamp every earlier finisher already has
+    // is what the lesson's own offer reads (prerequisite).
     const done = project(completedAt(), LOCATION_IDS.hilltopWorkshop);
     expect(deriveCompletedMissionIds([done]).has(MISSION_IDS.notFromAroundHere)).toBe(true);
-    for (const mission of MISSIONS) {
-      expect(mission.prerequisiteMissionId).not.toBe(MISSION_IDS.notFromAroundHere);
-    }
-    expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Runeworking Lesson");
+    expect(
+      MISSIONS.filter(
+        (mission) => mission.prerequisiteMissionId === MISSION_IDS.notFromAroundHere,
+      ).map((mission) => mission.id),
+    ).toEqual([MISSION_IDS.firstRuneworkingLesson]);
+    // The chapter after the lesson is not shipped, so nothing names it yet.
     expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Resonance Echo");
+    expect(
+      MISSIONS.find((mission) => mission.id === MISSION_IDS.firstRuneworkingLesson)
+        ?.continuationMissionId,
+    ).toBeUndefined();
   });
 });
 
@@ -637,8 +647,10 @@ describe("authored content", () => {
 });
 
 describe("registry validation", () => {
+  // Validated beside the lesson it continues into (#391), which is the one other
+  // Mission the shipped definition names.
   const validate = (definition: MissionDefinition) => () =>
-    validateMissionDefinitions([definition]);
+    validateMissionDefinitions([definition, FIRST_RUNEWORKING_LESSON]);
   const conversation = NOT_FROM_AROUND_HERE.requirements[0]! as Extract<
     MissionDefinition["requirements"][number],
     { kind: "npc_conversation" }
@@ -661,11 +673,12 @@ describe("registry validation", () => {
     offers: [],
     requirements: [skatbollOnly, deferred],
     turnIn: undefined,
+    continuationMissionId: undefined,
     reactiveFacts: undefined,
     dialogue: {},
   };
 
-  it("accepts the shipped Mission standing alone", () => {
+  it("accepts the shipped Mission beside the lesson it continues into", () => {
     expect(validate(NOT_FROM_AROUND_HERE)).not.toThrow();
   });
 

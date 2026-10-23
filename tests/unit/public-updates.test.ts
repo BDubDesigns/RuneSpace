@@ -118,10 +118,24 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes The Wise Old Enby Update as the newest (#389)", () => {
+  it("publishes the Seeker? I Hardly Know Her! Update as the newest (#391)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("the-wise-old-enby");
+    expect(latest.slug).toBe("first-runeworking-lesson");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("the-wise-old-enby")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    expect(text).toContain("Runeworking");
+    expect(text).toContain("150 Runeworking XP");
+    expect(text).toContain("cannot be used yet");
+    // Nothing unshipped is announced as playable.
+    expect(text).not.toMatch(/Resonance Echo|First Resonance Echo|hunt/i);
+  });
+
+  it("keeps The Wise Old Enby Update published beneath it (#389)", () => {
+    const latest = getPublicUpdate("the-wise-old-enby")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("harmonic-workings-opens")!.publishedAt),
     );

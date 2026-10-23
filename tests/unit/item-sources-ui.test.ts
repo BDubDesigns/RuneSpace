@@ -32,6 +32,7 @@ function facts(fabricationLevel = 5, miningLevel = 8): ItemSourceFacts {
     acceptedMissionIds: new Set([MISSION_IDS.returnTheFavor, MISSION_IDS.tenThousandHours]),
     completedMissionIds: new Set(),
     fabricationStationUnlocked: true,
+    resonanceRigUnlocked: true,
     locationStates: Object.fromEntries(
       LOCATIONS.map((location) => [
         location.id,
@@ -204,6 +205,7 @@ describe("facts from the Play projection", () => {
         [SKILL_IDS.fabrication]: xpFor(SKILL_IDS.fabrication, 6),
       },
       fabricationStation: { unlocked: true },
+      resonanceRig: { unlocked: true },
       missions: [
         { missionId: "a", state: "active" },
         { missionId: "b", state: "completed" },
@@ -219,6 +221,7 @@ describe("facts from the Play projection", () => {
     expect([...built.acceptedMissionIds].sort()).toEqual(["a", "b"]);
     expect([...built.completedMissionIds]).toEqual(["b"]);
     expect(built.fabricationStationUnlocked).toBe(true);
+    expect(built.resonanceRigUnlocked).toBe(true);
     expect(built.locationStates).toBe(state.locationStates);
   });
 
@@ -226,6 +229,7 @@ describe("facts from the Play projection", () => {
     const built = itemSourceFactsFromState({
       skillTotalXp: {},
       fabricationStation: { unlocked: false },
+      resonanceRig: { unlocked: false },
       missions: [],
       locationStates: {},
     } as unknown as PlayGameplayState);

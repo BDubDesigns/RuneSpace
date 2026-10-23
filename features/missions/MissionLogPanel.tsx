@@ -195,6 +195,11 @@ function MissionEntry({
                       {requirement.itemId && !requirement.satisfied ? (
                         <ItemSourcesButton itemId={requirement.itemId} state={state} />
                       ) : null}
+                      {/* A tracked craft counts crafts, never items held; it may
+                            still offer what the craft makes as a reference (#391). */}
+                      {requirement.sourcesItemId && !requirement.satisfied ? (
+                        <ItemSourcesButton itemId={requirement.sourcesItemId} state={state} />
+                      ) : null}
                       {/* Secondary context (what is carried, for instance) is its
                             own subordinate line so it can never read as progress. */}
                       {requirement.detail ? (

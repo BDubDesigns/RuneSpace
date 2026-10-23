@@ -276,6 +276,22 @@ export const FabricationCommandRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/**
+ * Runeworking at the Resonance Rig (#391). Starting names the character, one
+ * authored recipe by its stable action ID, and the run selection; everything
+ * the recipe costs, makes and pays is resolved server-side.
+ */
+export const StartRuneworkingRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  recipeActionId: ContentId,
+  quantity: BoundedRunSelectionSchema,
+});
+
+/** Finish Current at the Rig names only the character. */
+export const RuneworkingCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** The station's Manual Override toggle. */
 export const ManualOverrideToggleRequestSchema = z.object({
   characterId: z.string().uuid(),

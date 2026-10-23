@@ -141,8 +141,10 @@ describe("canonical article art", () => {
     expect(index).toContain("Refiner-To-Go");
     expect(index).toContain("Harmonic Workings Opens");
     expect(index).toContain("The Wise Old Enby");
-    // The homepage shows only the newest Update's summary (#389).
-    expect(landing).toContain("The Wise Old Enby");
+    expect(index).toContain("Seeker? I Hardly Know Her!");
+    // The homepage shows only the newest Update's summary (#391).
+    expect(landing).toContain("Seeker? I Hardly Know Her!");
+    expect(landing).not.toContain("The Wise Old Enby<");
     expect(landing).not.toContain("Harmonic Workings Opens");
     expect(landing).not.toContain("Refiner-To-Go");
     expect(landing).not.toContain("The Dry Seam Opens");
@@ -150,6 +152,8 @@ describe("canonical article art", () => {
       expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");
       expect(markup).not.toContain("wise-old-enby-amused.png");
+      expect(markup).not.toContain("wise-old-enby-friendly.png");
+      expect(markup).not.toContain("beginner-echo-seeker.webp");
       expect(markup).not.toContain("rs-update-figure");
       expect(markup).not.toContain("empty-small-fuel-canister.webp");
       expect(markup).not.toContain("full-small-fuel-canister.webp");
