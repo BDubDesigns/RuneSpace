@@ -54,7 +54,7 @@ const toCuttingCosts = link("Cutting Costs", "mission-cutting-costs");
 const toCurlyMustStash = link("Curly Must-Stash", "mission-curly-must-stash");
 const toNotFromAroundHere = link("Not From Around Here", "mission-not-from-around-here");
 const toFirstRuneworkingLesson = link(
-  "First Runeworking Lesson",
+  "Seeker? I Hardly Know Her!",
   "mission-first-runeworking-lesson",
 );
 const runeworking = (text: string) => link(text, "runeworking");
@@ -1244,7 +1244,7 @@ export const missionGuideArticles = [
   },
   {
     slug: "mission-first-runeworking-lesson",
-    title: "First Runeworking Lesson",
+    title: "Seeker? I Hardly Know Her!",
     category: "getting-started",
     showInIndex: false,
     summary:
@@ -1274,7 +1274,7 @@ export const missionGuideArticles = [
           [
             "If you finished Not From Around Here before this lesson existed, talk to ",
             enby,
-            " instead. Their Talk glows blue and First Runeworking Lesson is in their list; choose Begin Lesson at the end, or Not Now to leave it for later. It is the same lesson either way, and once you have it the offer is gone.",
+            " instead. Their Talk glows blue and Seeker? I Hardly Know Her! is in their list; choose Begin Lesson at the end, or Not Now to leave it for later. It is the same lesson either way, and once you have it the offer is gone.",
           ],
         ],
       },
@@ -1296,7 +1296,7 @@ export const missionGuideArticles = [
           [
             "Once the Mission Log shows 3 / 3, go back to ",
             enby,
-            " and choose Complete First Runeworking Lesson at the end of what they have to say. Reaching three never finishes the lesson by itself, and if the Rig is still running you need to let it stop first.",
+            " and choose Complete Seeker? I Hardly Know Her! at the end of what they have to say. Reaching three never finishes the lesson by itself, and if the Rig is still running you need to let it stop first.",
           ],
         ],
       },

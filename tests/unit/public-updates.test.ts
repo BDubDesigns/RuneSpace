@@ -118,7 +118,7 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the First Runeworking Lesson Update as the newest (#391)", () => {
+  it("publishes the Seeker? I Hardly Know Her! Update as the newest (#391)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
     expect(latest.slug).toBe("first-runeworking-lesson");

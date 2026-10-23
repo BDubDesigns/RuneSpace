@@ -141,9 +141,9 @@ describe("canonical article art", () => {
     expect(index).toContain("Refiner-To-Go");
     expect(index).toContain("Harmonic Workings Opens");
     expect(index).toContain("The Wise Old Enby");
-    expect(index).toContain("First Runeworking Lesson");
+    expect(index).toContain("Seeker? I Hardly Know Her!");
     // The homepage shows only the newest Update's summary (#391).
-    expect(landing).toContain("First Runeworking Lesson");
+    expect(landing).toContain("Seeker? I Hardly Know Her!");
     expect(landing).not.toContain("The Wise Old Enby<");
     expect(landing).not.toContain("Harmonic Workings Opens");
     expect(landing).not.toContain("Refiner-To-Go");

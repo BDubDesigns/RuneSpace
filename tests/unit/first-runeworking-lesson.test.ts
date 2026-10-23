@@ -39,7 +39,7 @@ import {
 import { cargoRepaired } from "./repair-observation";
 
 /**
- * First Runeworking Lesson (#391), without PostgreSQL or a browser: the Mission
+ * Seeker? I Hardly Know Her! (#391), without PostgreSQL or a browser: the Mission
  * as authored, both routes to it, its objective and guidance at every count,
  * the Wise Old Enby's verbatim script routed to each moment, the replayable
  * topics, and the skill-level-dependent dialogue seam that both the lesson and
@@ -157,7 +157,7 @@ describe("the Mission as authored", () => {
       requiresStationary: true,
       objective: "Return to the Wise Old Enby at Hilltop Workshop",
       dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn,
-      actionLabel: "Complete First Runeworking Lesson",
+      actionLabel: "Complete Seeker? I Hardly Know Her!",
     });
     expect(FIRST_RUNEWORKING_LESSON.autoCompletion).toBeUndefined();
     expect(FIRST_RUNEWORKING_LESSON.reward).toEqual({
@@ -215,7 +215,7 @@ describe("both routes to the same lesson", () => {
       kind: "mission",
       missionId: MISSION_IDS.firstRuneworkingLesson,
       role: "offer",
-      label: "First Runeworking Lesson",
+      label: "Seeker? I Hardly Know Her!",
       dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonOffer,
       guidance: "available",
       action: { kind: "accept_mission", label: "Begin Lesson", declineLabel: "Not Now" },
@@ -342,7 +342,7 @@ describe("the Enby's conversation at each moment", () => {
     expect(entry).toMatchObject({
       role: "turn_in",
       dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn,
-      action: { kind: "complete_mission", label: "Complete First Runeworking Lesson" },
+      action: { kind: "complete_mission", label: "Complete Seeker? I Hardly Know Her!" },
       guidance: "turn_in",
     });
   });

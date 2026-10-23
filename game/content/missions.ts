@@ -1913,7 +1913,7 @@ export const NOT_FROM_AROUND_HERE: MissionDefinition = {
 export const FIRST_RUNEWORKING_LESSON_REWARD_XP = 150;
 
 /**
- * First Runeworking Lesson — the Wise Old Enby teaches the first real
+ * Seeker? I Hardly Know Her! — the Wise Old Enby teaches the first real
  * Runeworking recipe (#391).
  *
  * Two routes lead to the same lesson. Completing Not From Around Here accepts it
@@ -1935,7 +1935,7 @@ export const FIRST_RUNEWORKING_LESSON_REWARD_XP = 150;
  */
 export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
   id: MISSION_IDS.firstRuneworkingLesson,
-  title: "First Runeworking Lesson",
+  title: "Seeker? I Hardly Know Her!",
   summary:
     "The Wise Old Enby will teach you to attune Rune Fragments into Beginner Echo Seekers at the Resonance Rig on Hilltop Workshop.",
   prerequisiteMissionId: MISSION_IDS.notFromAroundHere,
@@ -1968,7 +1968,7 @@ export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
     requiresStationary: true,
     objective: "Return to the Wise Old Enby at Hilltop Workshop",
     dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstLessonTurnIn,
-    actionLabel: "Complete First Runeworking Lesson",
+    actionLabel: "Complete Seeker? I Hardly Know Her!",
   },
   reward: {
     kind: "skill_xp",

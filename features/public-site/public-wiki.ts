@@ -1123,7 +1123,7 @@ const authoredWikiArticles = [
             { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
             " and stays yours from then on, whatever you do with ",
             {
-              text: "First Runeworking Lesson",
+              text: "Seeker? I Hardly Know Her!",
               articleSlug: "mission-first-runeworking-lesson",
             },
             ". Before that there is nothing to use there.",
@@ -1263,7 +1263,7 @@ const authoredWikiArticles = [
             " — offered by a Rune Fragment or intact Runestone you carry (through Inventory Inspect), or in person by the Wise Old Enby on Stillreach (Show strange mineral). Ask around about it on Skatboll, or go straight to the Wise Old Enby at Hilltop Workshop on Stillreach, who finishes it. Nothing is needed first, and it pays nothing.",
           ],
           [
-            { text: "First Runeworking Lesson", articleSlug: "mission-first-runeworking-lesson" },
+            { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
             " — starts by itself when you finish Not From Around Here (or ask the Wise Old Enby for it if you finished that before the lesson existed). Attune three Beginner Echo Seekers at the Resonance Rig and return to them for 150 Runeworking XP.",
           ],
         ],
@@ -1275,7 +1275,7 @@ const authoredWikiArticles = [
           "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
           "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
-          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you First Runeworking Lesson.",
+          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you Seeker? I Hardly Know Her!.",
         ],
       },
       {
@@ -1496,7 +1496,7 @@ const authoredWikiArticles = [
             " +500. Not every mission pays in XP — ",
             { text: "10,000 Hours", articleSlug: "mission-10000-hours" },
             " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them. ",
-            { text: "First Runeworking Lesson", articleSlug: "mission-first-runeworking-lesson" },
+            { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
             " grants +150 Runeworking XP. Renn pays 500 Credits for the Loadsteel Cutter in ",
             { text: "Cutting Costs", articleSlug: "mission-cutting-costs" },
             ", and Curly pays 150 Credits when you take on ",
@@ -1863,7 +1863,7 @@ const authoredWikiArticles = [
             { text: "Runeworking", articleSlug: "runeworking" },
             " in ",
             {
-              text: "First Runeworking Lesson",
+              text: "Seeker? I Hardly Know Her!",
               articleSlug: "mission-first-runeworking-lesson",
             },
             ". You can hear the lesson again under First lesson, and once it is done, About the Seekers.",

@@ -34,7 +34,7 @@ const MISSION_GUIDE_SLUGS = {
   "Cutting Costs": "mission-cutting-costs",
   "Curly Must-Stash": "mission-curly-must-stash",
   "Not From Around Here": "mission-not-from-around-here",
-  "First Runeworking Lesson": "mission-first-runeworking-lesson",
+  "Seeker? I Hardly Know Her!": "mission-first-runeworking-lesson",
 } as const;
 
 const missionGuideSlugs: readonly string[] = Object.values(MISSION_GUIDE_SLUGS);

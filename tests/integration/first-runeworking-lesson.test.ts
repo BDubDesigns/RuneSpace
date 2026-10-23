@@ -19,7 +19,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
 
 /**
- * Issue #391 — First Runeworking Lesson, against real PostgreSQL.
+ * Issue #391 — Seeker? I Hardly Know Her!, against real PostgreSQL.
  *
  * What only the database proves: that completing Not From Around Here accepts
  * the lesson in the same transaction and a character who finished the mystery
@@ -29,7 +29,7 @@ const suite = DATABASE_URL ? describe : describe.skip;
  * concurrency and consumes nothing; and that which Fragment advice the Enby
  * gives follows the character's persisted Mining level.
  */
-suite("issue #391 First Runeworking Lesson (real PostgreSQL)", () => {
+suite("issue #391 Seeker? I Hardly Know Her! (real PostgreSQL)", () => {
   let db: (typeof import("@/db"))["db"];
   let authSchema: typeof import("@/db/auth-schema");
   let rune: typeof import("@/db/rune-space");

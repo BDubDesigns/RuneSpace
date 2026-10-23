@@ -28,7 +28,7 @@ import {
 } from "./fixtures";
 
 /**
- * First Runeworking Lesson and the Resonance Rig (#391) at the 390 px portrait
+ * Seeker? I Hardly Know Her! and the Resonance Rig (#391) at the 390 px portrait
  * width: the mystery's completion flowing straight into the lesson, the Enby's
  * Begin Lesson / Not Now offer to a character who finished the mystery earlier,
  * the Fragment advice following the character's Mining level, three real
@@ -233,7 +233,7 @@ test("a character who solved the mystery earlier is offered the lesson, and advi
   await expect(offer).toHaveAttribute("data-mission-guidance", "available");
 
   // Not Now changes nothing.
-  await openConversationEntry(conversation, /First Runeworking Lesson/);
+  await openConversationEntry(conversation, /Seeker\? I Hardly Know Her!/);
   await expect(conversation.locator("[data-dialogue-text]")).toContainText(/terrible listener/);
   await playDialogueToText(conversation, /considerably more reliable than it looks/);
   await expect(conversation.locator("[data-dialogue-action]")).toHaveText("Begin Lesson");
@@ -248,7 +248,7 @@ test("a character who solved the mystery earlier is offered the lesson, and advi
   await finishScene(conversation, /a little more Mining experience/);
 
   // Begin Lesson accepts and flows into the lesson.
-  await openConversationEntry(conversation, /First Runeworking Lesson/);
+  await openConversationEntry(conversation, /Seeker\? I Hardly Know Her!/);
   await playDialogueToText(conversation, /considerably more reliable than it looks/);
   await conversation.locator("[data-dialogue-action]").click();
   await expect(conversation.locator("[data-dialogue-text]")).toContainText(/as promised/);
@@ -326,13 +326,13 @@ test("three attunements, the Seeker's Sources, and the Enby's turn-in", async ({
 
   // The explicit turn-in.
   const conversation = await openNpcConversation(page, ENBY);
-  await openConversationEntry(conversation, /First Runeworking Lesson/);
+  await openConversationEntry(conversation, /Seeker\? I Hardly Know Her!/);
   await expect(conversation.locator("[data-dialogue-text]")).toContainText(
     /workshop is still standing/,
   );
   await playDialogueToText(conversation, /without setting anything on fire/);
   await expect(conversation.locator("[data-dialogue-action]")).toHaveText(
-    "Complete First Runeworking Lesson",
+    "Complete Seeker? I Hardly Know Her!",
   );
   expect((await lessonRows(testCharacter.id))[0]?.completedAt).toBeNull();
   await conversation.locator("[data-dialogue-action]").click();

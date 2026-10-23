@@ -111,7 +111,7 @@ const tile = (inventory: Locator, name: string) =>
 const litHexes = (page: Page) => page.locator("[data-map-location][data-mission-guidance]");
 
 /**
- * Since #391 completing the mystery plays First Runeworking Lesson's opening
+ * Since #391 completing the mystery plays Seeker? I Hardly Know Her!'s opening
  * scene as its completion presentation, and accepts that lesson. Play it to its
  * end and back to the hub, which now lists the lesson.
  */
