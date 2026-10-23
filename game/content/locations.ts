@@ -669,7 +669,7 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Hilltop Workshop",
     description:
-      "A patched metal workshop sits above the misty highlands, warm light spilling from its windows. A worn path climbs through exposed stone and low alien scrub beneath the aurora.",
+      "A patched metal workshop sits above the misty highlands, warm light spilling from its windows and a low hum carrying from inside. Its resident researcher, the Wise Old Enby, lives and works here among benches, instruments and boxes of strange stone.",
     adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theLowHum],
     availableActionIds: [],
     dormantActivities: [],

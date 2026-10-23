@@ -35,6 +35,10 @@ const CHARACTER_REVEAL_MS = 20;
  * set there, replayable topics included. It is applied after the venue, so
  * the two never undo each other.
  *
+ * `declineLabel` adds an explicit decline control beside the terminal command
+ * (#389: "Not now" on an offer). Declining is `onFinish`: it returns to the
+ * hub and runs nothing.
+ *
  * `receipt` is the confirmed Credits payout the server just reported for the
  * command that opened this sequence (#290). It is presented as a runtime-only
  * reward tile in front of the authored beats (`leads`, after the sequence's
@@ -47,6 +51,7 @@ export function DialoguePlayer({
   sequence,
   actionLabel,
   onAction,
+  declineLabel,
   actionBusy = false,
   actionMessage,
   onBack,
@@ -59,6 +64,8 @@ export function DialoguePlayer({
   /** Present only when this conversation genuinely drives a Mission command now. */
   actionLabel?: string;
   onAction?: () => void;
+  /** Authored copy for a decline control shown beside the terminal command. */
+  declineLabel?: string;
   actionBusy?: boolean;
   actionMessage?: string;
   onBack: () => void;
@@ -210,6 +217,16 @@ export function DialoguePlayer({
               >
                 Back
               </ActionButton>
+              {declineLabel && actionLabel && isLastBeat && isComplete ? (
+                <ActionButton
+                  data-dialogue-decline
+                  disabled={actionBusy}
+                  intent="secondary"
+                  onClick={onFinish}
+                >
+                  {declineLabel}
+                </ActionButton>
+              ) : null}
               {actionLabel && isLastBeat && isComplete ? (
                 <ActionButton
                   data-dialogue-action

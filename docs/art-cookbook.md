@@ -670,6 +670,19 @@ Current production conventions:
   (The Survey Line), `0764c48935cf` (The Dry Seam), `428f36776f69` (Harmonic Workings);
   identifiers `a7816f2669b8`, `d92f7acdcfcf`, `74ebffa72732` and the rest of the
   owner's manifest. See `docs/travel-map-design.md` and `docs/location-scenes.md`
+- the Wise Old Enby (#389): four approved 1122x1402 transparent knee-cropped
+  portrait masters (`assets/npc-art/wise-old-enby/wise-old-enby-{neutral,friendly,
+  thoughtful,amused}-master.png`) and the approved empty 1717x916 workshop interior
+  (`assets/location-scenes/hilltop-workshop-dialogue-interior-master.png`), all kept
+  unaltered and SHA-256 checked by `scripts/prepare-wise-old-enby-art.mjs`. The script
+  scales each portrait uniformly to the 400x500 portrait contract
+  (`public/npc-art/wise-old-enby-*.png`, one shared canvas, nothing cropped) and takes
+  the largest exact 15:8 rectangle centred in the interior, 1710x912, with no resampling
+  (`public/location-scenes/hilltop-workshop-interior.webp`, lossy WebP q80). The interior
+  is the Enby's DialogueScene background only; Hilltop Workshop's 4:1 panorama and map
+  identifier are unchanged. Master SHA-256 (first 12 hex): neutral `eca3c7f8595e`,
+  friendly `668a7776f3f8`, thoughtful `c4755d09b6be`, amused `21503b65f0cc`, interior
+  `e98599a6c092`
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

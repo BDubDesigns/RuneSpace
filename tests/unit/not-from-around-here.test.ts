@@ -6,6 +6,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  PLANET_IDS,
 } from "@/game/config/foundations";
 import { getDialogue } from "@/game/content/dialogue";
 import {
@@ -17,11 +18,15 @@ import {
 import { getNpc } from "@/game/content/npcs";
 import { getNpcConversationTopics } from "@/game/content/conversation-topics";
 import { resolveNpcConversation } from "@/game/domain/conversation";
+import { getLocationPlanetId } from "@/game/content/locations";
 import {
+  deriveCompletedMissionIds,
   deriveMissionGuidanceTargets,
   itemOfferAvailable,
   missionGuidancePhase,
+  missionLifecycleMoments,
   projectMission,
+  requirementWaived,
   validateMissionDefinitions,
   type MissionObservation,
   type MissionProjection,
@@ -35,14 +40,15 @@ import type { PlayGameplayState } from "@/server/play";
 import { cargoRepaired } from "./repair-observation";
 
 /**
- * Issue #369 — Not From Around Here.
+ * Issues #369 and #389 — Not From Around Here.
  *
  * Everything derivable without PostgreSQL or a browser lives here: the item
  * offer's eligibility, who the player is guided to at every stage (including
- * relocated Wade and Tansy), how a hint narrows guidance, the deferred stage
- * with no false turn-in, conversation routing, and registry validation. Server
- * authority (atomic and idempotent acceptance, the lead command, durable
- * progress across a content extension) is proven against real PostgreSQL in
+ * relocated Wade and Tansy), how a hint narrows guidance on Skatboll, the
+ * Stillreach route straight to the Wise Old Enby, conversation routing at every
+ * contact, and registry validation. Server authority (atomic and idempotent
+ * acceptance by item and in person, the lead command, waived-but-never-recorded
+ * Toll progress, exactly-once completion) is proven against real PostgreSQL in
  * tests/integration/not-from-around-here.test.ts.
  */
 
@@ -80,9 +86,24 @@ function project(
   record: ReturnType<typeof accepted> | ReturnType<typeof completedAt> | undefined,
   locationId: string,
   input: Input = {},
+  stationary = true,
 ): MissionProjection {
-  return projectMission(NOT_FROM_AROUND_HERE, record, locationId, true, observation(input), true);
+  return projectMission(
+    NOT_FROM_AROUND_HERE,
+    record,
+    locationId,
+    stationary,
+    observation(input),
+    true,
+  );
 }
+
+const SKATBOLL_LOCATIONS = Object.values(LOCATION_IDS).filter(
+  (id) => getLocationPlanetId(id) === PLANET_IDS.skatboll,
+);
+const STILLREACH_LOCATIONS = Object.values(LOCATION_IDS).filter(
+  (id) => getLocationPlanetId(id) === PLANET_IDS.stillreach,
+);
 
 const targets = (projection: MissionProjection) => deriveMissionGuidanceTargets([projection]);
 
@@ -92,7 +113,17 @@ describe("the item offer", () => {
     expect(offer.itemIds).toEqual([ITEM_IDS.runeFragment, ITEM_IDS.runestone]);
     expect(offer.inspectLabel).toBe("Inspect");
     expect(offer.description).toContain("resonate beyond ordinary space");
-    expect(NOT_FROM_AROUND_HERE.offers).toEqual([]);
+    // The one NPC route is the same offer made in person by the Enby (#389).
+    expect(NOT_FROM_AROUND_HERE.offers).toEqual([
+      expect.objectContaining({
+        npcId: NPC_IDS.wiseOldEnby,
+        locationId: LOCATION_IDS.hilltopWorkshop,
+        requiresCarriedOfferItem: true,
+        subject: "Show strange mineral",
+        declineLabel: "Not now",
+      }),
+    ]);
+    expect(NOT_FROM_AROUND_HERE.offers[0]!.acceptEffect).toBeUndefined();
   });
 
   it("is made by a carried Fragment, wherever the player is", () => {
@@ -100,6 +131,9 @@ describe("the item offer", () => {
       LOCATION_IDS.crashSite,
       LOCATION_IDS.theJag,
       LOCATION_IDS.holoHollow,
+      // Inventory Inspect works on Stillreach too (#389).
+      LOCATION_IDS.stillreachLandingStation,
+      LOCATION_IDS.hilltopWorkshop,
     ]) {
       const projection = project(undefined, locationId, { fragments: 1 });
       expect(projection.itemOffer).toEqual({ itemIds: [ITEM_IDS.runeFragment] });
@@ -182,14 +216,14 @@ describe("the investigation: three contacts, one required", () => {
     expect(projection.currentObjective).toBe(
       "Find someone who might recognize the unusual fragment",
     );
-    const [contacts, deferred] = projection.requirements!;
+    const [contacts, ...rest] = projection.requirements!;
+    expect(rest).toEqual([]);
     expect(contacts!.detail).toBe("Possible contacts: Wade Rusk, Tansy Rusk, Tolliver “Toll” Kade");
     expect(contacts!.leads).toEqual({
       npcIds: [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk],
       followed: false,
     });
-    expect(deferred!.objective).toBe("Find the researcher at Hilltop Workshop on Stillreach");
-    expect(deferred!.satisfied).toBe(false);
+    expect(missionGuidancePhase(projection)).toBe("work");
   });
 
   it("lights all three contacts' hexes at once and deduplicates a shared hex", () => {
@@ -261,6 +295,7 @@ describe("the investigation: three contacts, one required", () => {
     const direct = project(accepted(), LOCATION_IDS.holoHollowLanding, { toll: true });
     expect(direct.requirements![0]!.satisfied).toBe(true);
     expect(direct.currentObjective).toBe("Find the researcher at Hilltop Workshop on Stillreach");
+    expect(direct.stage?.requirementsSatisfied).toBe(true);
     // A hint without Toll is not progress toward the requirement itself.
     const onlyHint = project(accepted(), LOCATION_IDS.holoHollow, { hint: true });
     expect(onlyHint.requirements![0]!.satisfied).toBe(false);
@@ -268,31 +303,34 @@ describe("the investigation: three contacts, one required", () => {
   });
 });
 
-describe("the deferred Stillreach stage", () => {
+describe("after Toll, back on Skatboll", () => {
   const afterToll = (location: string, extra: Input = {}) =>
     project(accepted(), location, { toll: true, ...extra });
 
-  it("stays Active with the authored objective and no false Turn In or Completed", () => {
-    for (const locationId of Object.values(LOCATION_IDS)) {
-      const projection = afterToll(locationId);
-      expect(projection.state).toBe("active");
-      expect(projection.currentObjective).toBe(
-        "Find the researcher at Hilltop Workshop on Stillreach",
-      );
-      expect(projection.stage?.turnInAvailable).toBe(false);
-      expect(projection.stage?.requirementsSatisfied).toBe(false);
-      expect(missionGuidancePhase(projection)).toBe("work");
-      expect(projection.completedAt).toBeUndefined();
-      expect(projection.earnedReward).toBeUndefined();
-    }
-  });
-
-  it("projects no guidance target of any kind, anywhere", () => {
-    for (const locationId of Object.values(LOCATION_IDS)) {
-      const projection = afterToll(locationId, { hint: true });
-      expect(projection.guidance).toBeUndefined();
-      const sets = targets(projection);
-      for (const set of Object.values(sets)) expect(set.size).toBe(0);
+  it("points at the researcher on Stillreach and pins no Skatboll contact", () => {
+    for (const locationId of SKATBOLL_LOCATIONS) {
+      for (const extra of [{}, { hint: true }]) {
+        const projection = afterToll(locationId, extra);
+        expect(projection.state).toBe("active");
+        expect(projection.currentObjective).toBe(
+          "Find the researcher at Hilltop Workshop on Stillreach",
+        );
+        // The Toll row is still listed, as done.
+        expect(projection.requirements).toEqual([
+          expect.objectContaining({ kind: "npc_conversation", satisfied: true }),
+        ]);
+        const sets = targets(projection);
+        // Nothing on Skatboll's own map: no hex, entrance or person to walk to.
+        for (const id of [...sets.locationIds, ...sets.turnInLocationIds]) {
+          expect(getLocationPlanetId(id)).toBe(PLANET_IDS.stillreach);
+        }
+        expect(sets.localPlaceIds.size + sets.turnInLocalPlaceIds.size).toBe(0);
+        for (const npcId of [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk, NPC_IDS.tollKade]) {
+          expect(sets.npcIds.has(npcId)).toBe(false);
+          expect(sets.turnInNpcIds.has(npcId)).toBe(false);
+        }
+        expect(projection.stage?.turnInAvailable).toBe(false);
+      }
     }
   });
 
@@ -301,50 +339,131 @@ describe("the deferred Stillreach stage", () => {
     const reloaded = afterToll(LOCATION_IDS.holoHollowLanding, { hint: true });
     expect(reloaded).toEqual(first);
   });
+});
 
-  it("pays nothing and authors no turn-in, automatic completion, reward or finish", () => {
-    expect(NOT_FROM_AROUND_HERE.turnIn).toBeUndefined();
+describe("on Stillreach: the Wise Old Enby is the one objective (#389)", () => {
+  const states: readonly [string, Input][] = [
+    ["accepted with no contact", {}],
+    ["after a Wade or Tansy hint", { hint: true }],
+    ["after Toll", { toll: true }],
+    ["after both", { hint: true, toll: true }],
+    ["with no rune material left", { fragments: 0, runestones: 0 }],
+  ];
+
+  it("waives Toll's Skatboll conversation there and only there", () => {
+    const [toll] = NOT_FROM_AROUND_HERE.requirements;
+    for (const id of STILLREACH_LOCATIONS) expect(requirementWaived(toll!, id)).toBe(true);
+    for (const id of SKATBOLL_LOCATIONS) expect(requirementWaived(toll!, id)).toBe(false);
+  });
+
+  it.each(states)("%s: one Hilltop pin, then the Enby, whether or not Toll was met", (_, input) => {
+    for (const locationId of STILLREACH_LOCATIONS) {
+      const projection = project(accepted(), locationId, input);
+      expect(projection.currentObjective).toBe(
+        "Find the researcher at Hilltop Workshop on Stillreach",
+      );
+      // The waived conversation is not listed: not done, not outstanding.
+      expect(projection.requirements).toEqual([]);
+      expect(projection.stage?.requirementsSatisfied).toBe(true);
+      expect(missionGuidancePhase(projection)).toBe("turn_in");
+      const sets = targets(projection);
+      expect(sets.locationIds.size + sets.npcIds.size + sets.localPlaceIds.size).toBe(0);
+      if (locationId === LOCATION_IDS.hilltopWorkshop) {
+        expect(sets.turnInLocationIds.size).toBe(0);
+        expect([...sets.turnInNpcIds]).toEqual([NPC_IDS.wiseOldEnby]);
+        expect(projection.state).toBe("ready_for_completion");
+        expect(projection.stage?.turnInAvailable).toBe(true);
+      } else {
+        expect([...sets.turnInLocationIds]).toEqual([LOCATION_IDS.hilltopWorkshop]);
+        expect(projection.state).toBe("active");
+      }
+    }
+  });
+
+  it("is not ready while the character is busy at the hill", () => {
+    const busy = project(accepted(), LOCATION_IDS.hilltopWorkshop, {}, false);
+    expect(busy.state).toBe("active");
+    expect(busy.stage?.turnInAvailable).toBe(false);
+    expect(busy.stage?.requirementsSatisfied).toBe(true);
+  });
+
+  it("restores the unfinished Skatboll investigation exactly on the way back", () => {
+    // Flying back changes only where the character is; nothing was recorded.
+    const away = project(accepted(), LOCATION_IDS.hilltopWorkshop, { hint: true });
+    const back = project(accepted(), LOCATION_IDS.holoHollow, { hint: true });
+    expect(away.requirements).toEqual([]);
+    expect(back.currentObjective).toBe("Ask Tolliver Kade at Last Leg Trading about the fragment");
+    expect(back.requirements![0]).toMatchObject({ satisfied: false, leads: { followed: true } });
+    expect([...targets(back).npcIds]).toEqual([NPC_IDS.tollKade]);
+    const fresh = project(accepted(), LOCATION_IDS.holoHollow);
+    expect(targets(fresh).npcIds.size).toBe(3);
+  });
+
+  it("reports the Toll fact only when Toll's own marker holds", () => {
+    expect(project(accepted(), LOCATION_IDS.hilltopWorkshop, {}).facts).toEqual([]);
+    expect(project(accepted(), LOCATION_IDS.hilltopWorkshop, { hint: true }).facts).toEqual([]);
+    expect(project(accepted(), LOCATION_IDS.hilltopWorkshop, { toll: true }).facts).toEqual([
+      "toll-sent",
+    ]);
+  });
+});
+
+describe("completion and after (#389)", () => {
+  it("completes at the Enby with no reward, consumption or continuation", () => {
+    expect(NOT_FROM_AROUND_HERE.turnIn).toEqual({
+      npcId: NPC_IDS.wiseOldEnby,
+      locationId: LOCATION_IDS.hilltopWorkshop,
+      requiresStationary: true,
+      objective: "Find the researcher at Hilltop Workshop on Stillreach",
+      dialogueId: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHere,
+      actionLabel: "I UNDERSTAND",
+    });
     expect(NOT_FROM_AROUND_HERE.autoCompletion).toBeUndefined();
     expect(NOT_FROM_AROUND_HERE.reward).toBeUndefined();
     expect(NOT_FROM_AROUND_HERE.continuationMissionId).toBeUndefined();
     expect(NOT_FROM_AROUND_HERE.completedNpcDialogue).toBeUndefined();
-    for (const offer of NOT_FROM_AROUND_HERE.offers) expect(offer.acceptEffect).toBeUndefined();
-    expect(NOT_FROM_AROUND_HERE.dialogue).toEqual({});
+    expect(
+      NOT_FROM_AROUND_HERE.requirements.some(
+        (requirement) =>
+          requirement.kind === "carried_stack" || requirement.kind === "deferred_stage",
+      ),
+    ).toBe(false);
   });
 
-  it("can be extended later without resetting what a character already earned", () => {
-    // The seam the Enby slice uses: swap the deferred stage for real requirements.
-    const extended: MissionDefinition = {
-      ...NOT_FROM_AROUND_HERE,
-      requirements: [
-        NOT_FROM_AROUND_HERE.requirements[0]!,
-        {
-          kind: "at_location",
-          locationId: LOCATION_IDS.theJag,
-          objective: "A later slice's real stage",
-        },
-      ],
-      turnIn: {
-        npcId: NPC_IDS.tansyRusk,
-        locationId: LOCATION_IDS.theJag,
-        requiresStationary: true,
-        objective: "Later hand-in",
-        dialogueId: DIALOGUE_IDS.tansyMiningTopic,
-      },
-    };
-    const reprojected = projectMission(
-      extended,
-      accepted(),
-      LOCATION_IDS.holoHollow,
-      true,
-      observation({ toll: true, hint: true }),
-      true,
-    );
-    // The earlier requirement is still satisfied from the SAME persisted keys,
-    // and the Mission was never reset.
-    expect(reprojected.state).toBe("active");
-    expect(reprojected.requirements![0]!.satisfied).toBe(true);
-    expect(reprojected.currentObjective).toBe("A later slice's real stage");
+  it("reaches only the busy and completion moments, both declared", () => {
+    expect([...missionLifecycleMoments(NOT_FROM_AROUND_HERE)].sort()).toEqual([
+      "busy",
+      "completion_presentation",
+    ]);
+    expect(NOT_FROM_AROUND_HERE.dialogue.omitted?.map((entry) => entry.moment).sort()).toEqual([
+      "busy",
+      "completion_presentation",
+    ]);
+  });
+
+  it("is truly Completed afterwards: no objective, guidance, offer or pin, anywhere", () => {
+    for (const locationId of [...SKATBOLL_LOCATIONS, ...STILLREACH_LOCATIONS]) {
+      const done = project(completedAt(), locationId, { fragments: 3, runestones: 1, hint: true });
+      expect(done.state).toBe("completed");
+      expect(done.completedAt).toEqual(NOW);
+      expect(done.earnedReward).toBeUndefined();
+      expect(done.currentObjective).toBeUndefined();
+      expect(done.requirements).toBeUndefined();
+      expect(done.itemOffer).toBeUndefined();
+      expect(done.guidance).toBeUndefined();
+    }
+  });
+
+  it("leaves a durable seam for the next story Mission and ships no phantom one", () => {
+    // The next slice reads the completion stamp itself, which every character
+    // who finished this Mission has — before or after that slice ships.
+    const done = project(completedAt(), LOCATION_IDS.hilltopWorkshop);
+    expect(deriveCompletedMissionIds([done]).has(MISSION_IDS.notFromAroundHere)).toBe(true);
+    for (const mission of MISSIONS) {
+      expect(mission.prerequisiteMissionId).not.toBe(MISSION_IDS.notFromAroundHere);
+    }
+    expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Runeworking Lesson");
+    expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Resonance Echo");
   });
 });
 
@@ -409,6 +528,16 @@ describe("conversation routing", () => {
       );
       expect(topics.map((topic) => topic.id)).toEqual(
         getNpcConversationTopics(NPC_IDS.tollKade).map((topic) => topic.id),
+      );
+    }
+  });
+
+  it("offers nothing to Toll, Wade or Tansy on the direct Stillreach route", () => {
+    // They are on Skatboll; a projection made on Stillreach routes nothing to them.
+    const onStillreach = project(accepted(), LOCATION_IDS.hilltopWorkshop);
+    for (const npcId of [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk, NPC_IDS.tollKade]) {
+      expect(entries(npcId, onStillreach).every((entry) => entry.guidance === undefined)).toBe(
+        true,
       );
     }
   });
@@ -520,16 +649,80 @@ describe("registry validation", () => {
     ...NOT_FROM_AROUND_HERE,
     requirements,
   });
-  const deferred = NOT_FROM_AROUND_HERE.requirements[1]!;
+  // The deferred stage stays framework vocabulary (#369) after this Mission
+  // stopped using it (#389), so it is still proven here on a synthetic shape.
+  const deferred = {
+    kind: "deferred_stage",
+    objective: "Find the researcher at Hilltop Workshop on Stillreach",
+  } as const;
+  const skatbollOnly = { ...conversation, appliesOnPlanetId: undefined };
+  const deferredShape: MissionDefinition = {
+    ...NOT_FROM_AROUND_HERE,
+    offers: [],
+    requirements: [skatbollOnly, deferred],
+    turnIn: undefined,
+    reactiveFacts: undefined,
+    dialogue: {},
+  };
 
   it("accepts the shipped Mission standing alone", () => {
     expect(validate(NOT_FROM_AROUND_HERE)).not.toThrow();
   });
 
   it("requires an item offer, an NPC offer, or a continuation", () => {
-    expect(validate({ ...NOT_FROM_AROUND_HERE, itemOffer: undefined })).toThrow(
+    expect(validate({ ...deferredShape, itemOffer: undefined })).toThrow(
       /at least one offer interaction/,
     );
+  });
+
+  it("requires an item offer for an in-person item offer, and real labels", () => {
+    const [offer] = NOT_FROM_AROUND_HERE.offers;
+    expect(validate({ ...NOT_FROM_AROUND_HERE, itemOffer: undefined })).toThrow(
+      /requires a carried offer item but authors no item offer/,
+    );
+    expect(validate({ ...NOT_FROM_AROUND_HERE, offers: [{ ...offer!, subject: " " }] })).toThrow(
+      /subject/,
+    );
+    expect(
+      validate({ ...NOT_FROM_AROUND_HERE, offers: [{ ...offer!, declineLabel: "" }] }),
+    ).toThrow(/decline label/);
+  });
+
+  it("holds a planet-local conversation to its own planet and a turn-in elsewhere", () => {
+    expect(
+      validate(withRequirements([{ ...conversation, appliesOnPlanetId: PLANET_IDS.stillreach }])),
+    ).toThrow(/applies on planet "stillreach" but is met on another/);
+    expect(
+      validate({
+        ...NOT_FROM_AROUND_HERE,
+        turnIn: { ...NOT_FROM_AROUND_HERE.turnIn!, locationId: LOCATION_IDS.holoHollowLanding },
+      }),
+    ).toThrow(/needs a turn-in on another planet/);
+  });
+
+  it("holds a conversation fact to one of the Mission's own conversations", () => {
+    expect(
+      validate({
+        ...NOT_FROM_AROUND_HERE,
+        reactiveFacts: [
+          {
+            key: "toll-sent",
+            observes: { kind: "conversation_acknowledged", requirementProgressKey: "toll-hint" },
+          },
+        ],
+      }),
+    ).toThrow(/must name one of its own conversation requirements/);
+    expect(
+      validate({
+        ...NOT_FROM_AROUND_HERE,
+        reactiveFacts: [
+          {
+            key: "toll-lead",
+            observes: { kind: "conversation_acknowledged", requirementProgressKey: "toll-lead" },
+          },
+        ],
+      }),
+    ).toThrow(/is not unique/);
   });
 
   it("rejects an item offer on a non-stackable or unknown item, or with missing copy", () => {
@@ -568,36 +761,32 @@ describe("registry validation", () => {
   });
 
   it("requires the deferred stage to be last, unique, and alone in having no finish", () => {
-    expect(validate(withRequirements([deferred, conversation]))).toThrow(/must be its last/);
-    expect(validate(withRequirements([conversation, deferred, deferred]))).toThrow(/at most one/);
+    const shape = (requirements: MissionDefinition["requirements"]) =>
+      validate({ ...deferredShape, requirements });
+    expect(validate(deferredShape)).not.toThrow();
+    expect(shape([deferred, skatbollOnly])).toThrow(/must be its last/);
+    expect(shape([skatbollOnly, deferred, deferred])).toThrow(/at most one/);
+    expect(validate({ ...deferredShape, reward: { kind: "credits", amount: 5 } })).toThrow(
+      /cannot author a turn-in, an auto-completion or a reward/,
+    );
     expect(
       validate({
-        ...NOT_FROM_AROUND_HERE,
-        reward: { kind: "credits", amount: 5 },
-      }),
-    ).toThrow(/cannot author a turn-in, an auto-completion or a reward/);
-    expect(
-      validate({
-        ...NOT_FROM_AROUND_HERE,
+        ...deferredShape,
         turnIn: MISSIONS.find((m) => m.turnIn?.npcId === NPC_IDS.rennCalder)!.turnIn,
       }),
     ).toThrow(/cannot author a turn-in/);
     expect(
-      validate({
-        ...NOT_FROM_AROUND_HERE,
-        dialogue: { busyDialogueId: DIALOGUE_IDS.tollFuelTopic },
-      }),
+      validate({ ...deferredShape, dialogue: { busyDialogueId: DIALOGUE_IDS.tollFuelTopic } }),
     ).toThrow(/no turn-in/);
-    expect(
-      validate(withRequirements([conversation, { kind: "deferred_stage", objective: " " }])),
-    ).toThrow(/objective copy/);
+    expect(shape([skatbollOnly, { kind: "deferred_stage", objective: " " }])).toThrow(
+      /objective copy/,
+    );
   });
 
   it("rejects malformed leads", () => {
     const leads = conversation.leads!;
     const lead = leads.conversations[0]!;
-    const withLeads = (next: typeof leads) =>
-      withRequirements([{ ...conversation, leads: next }, deferred]);
+    const withLeads = (next: typeof leads) => withRequirements([{ ...conversation, leads: next }]);
     expect(validate(withLeads({ ...leads, conversations: [] }))).toThrow(/at least one lead/);
     expect(validate(withLeads({ ...leads, progressKey: "Not Valid" }))).toThrow(
       /lowercase hyphenated/,

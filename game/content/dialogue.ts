@@ -123,6 +123,7 @@ const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterI
 const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
 const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
 const lastLegShop = CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior;
+const hilltopWorkshop = CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior;
 // Curly's room before and after his mount is installed (#292). The unfinished
 // room resolves to the finished one from the mount's own completion, so a beat
 // authored against it always shows the room as it currently is.
@@ -186,6 +187,17 @@ function tollLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.tollKade,
     expressionId,
     backgroundId: lastLegShop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function enbyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.wiseOldEnby,
+    expressionId,
+    backgroundId: hilltopWorkshop,
     presentationMode: "local",
     text,
   };
@@ -2712,6 +2724,196 @@ const dialogue = {
         "Hilltop Workshop. If anyone can tell you what that is, it's whoever's up that hill.",
       ),
       tollLocal(EXPRESSION_IDS.friendly, "No rush. The hill isn't going anywhere. Probably."),
+    ],
+  },
+  // The Wise Old Enby at Hilltop Workshop (#389). First-pass owner-direction
+  // script, authored for owner preview. Every line is the Enby's: the player
+  // stays silent. They are "the Wise Old Enby" and they/them wherever anyone
+  // refers to them; nothing here explains their identity or their past. The three
+  // ordinary topics say nothing about how runes work.
+  [DIALOGUE_IDS.wiseOldEnbyGreetingTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyGreetingTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Oh! A visitor. I was beginning to think only the wind knew the path up here.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Come in. Mind that cable by your feet. It bites, but only when it's feeling neglected.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "I came to this hill for the quiet. Then I built a machine that hums all night. Research does enjoy the last word.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "The Wise Old Enby, at your service. ‘Old’ I can prove. ‘Wise’ is still under review.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyWorkshopTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyWorkshopTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "It's part home, part laboratory, and part collection of things I'm absolutely going to put away someday.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The ground on this hill behaves differently. I followed an odd signal here, and decided staying close was better than guessing from a distance.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "The roof leaks. The equipment works. On balance, I'd say I've done rather well.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyStillreachTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyStillreachTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Stillreach is quiet, as worlds go. I like that. Gives you room to notice the small things.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "The people at the landing station keep the supplies moving. I keep the instruments running. A decent arrangement.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Whatever brought you here, don't rush past the hills. There's more to this place than the sky.",
+      ),
+    ],
+  },
+  // The in-person offer of Not From Around Here: a visitor who has not started the
+  // mystery shows the Enby a carried Fragment or Runestone. Not in the issue's
+  // script; a short placeholder for owner review that leaves the explanation to
+  // the revelation itself, and works whichever stone is shown.
+  [DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereOffer]: {
+    id: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Now that's an interesting thing to be carrying around.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "If you'd like to find out what it is, I may be able to help. Fair warning: it's a longer story than it looks.",
+      ),
+    ],
+  },
+  // The revelation that completes Not From Around Here. The ordinary opening is
+  // the direct Stillreach route; the Toll opening plays only when Toll's lead was
+  // genuinely acknowledged. After their two opening beats both sequences continue
+  // into the same eight-beat explanation, written out in each so QC Studio can
+  // edit them; tests/unit/wise-old-enby.test.ts keeps the two copies identical.
+  [DIALOGUE_IDS.wiseOldEnbyNotFromAroundHere]: {
+    id: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHere,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "You've come looking for someone who understands unusual minerals. Well, you've found a rather well-equipped fool for the job.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Tell me what you found. Was there a hum you could feel more than hear?",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "That wasn't ordinary stone. You noticed it, didn't you? A vibration with no sensible source.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "What you found was rune material. Fragments and intact Runestones both resonate with something we call RuneSpace.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Not another planet. Not somewhere you'll find on a flight chart. Think of it as the space between worlds.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Most of the time we barely know it's there. Sometimes something on this side answers something on the other.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "I followed traces of it to Stillreach. They were strongest on this hill, so I built a workshop and made myself comfortable.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Some of the useful things around here? Pulled straight out of RuneSpace. Better than ordering replacements. Slightly worse for the laws of physics.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "These fragments give us a way to listen. With the right equipment, you can do rather more than listen.",
+      ),
+      enbyLocal(EXPRESSION_IDS.friendly, "When you're ready, I'll show you. One step at a time."),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereTollSent]: {
+    id: DIALOGUE_IDS.wiseOldEnbyNotFromAroundHereTollSent,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Toll sent you, did they? That hauler has an excellent eye for someone else's problem.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Strange mineral, odd vibrations. Yes. I think I know why you made the trip.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "That wasn't ordinary stone. You noticed it, didn't you? A vibration with no sensible source.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "What you found was rune material. Fragments and intact Runestones both resonate with something we call RuneSpace.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Not another planet. Not somewhere you'll find on a flight chart. Think of it as the space between worlds.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Most of the time we barely know it's there. Sometimes something on this side answers something on the other.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "I followed traces of it to Stillreach. They were strongest on this hill, so I built a workshop and made myself comfortable.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Some of the useful things around here? Pulled straight out of RuneSpace. Better than ordering replacements. Slightly worse for the laws of physics.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "These fragments give us a way to listen. With the right equipment, you can do rather more than listen.",
+      ),
+      enbyLocal(EXPRESSION_IDS.friendly, "When you're ready, I'll show you. One step at a time."),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyAboutRuneSpaceTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyAboutRuneSpaceTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "RuneSpace is the space between. I've spent years learning where it touches our world.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "I know enough to use some of its patterns. Not enough to pretend I've solved it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Anyone who says they've figured out the entire universe probably needs a longer measuring tape.",
+      ),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;

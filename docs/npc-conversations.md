@@ -265,6 +265,24 @@ the same except for when it stops being offered:
 Not From Around Here is the production example: Wade or Tansy points to Toll, and
 visiting Toll directly needs neither.
 
+### 4.3 An item offer made in person (#389)
+
+An offer route may author `requiresCarriedOfferItem` (`docs/missions.md` §4.1):
+it is listed only while the projection carries an `itemOffer` — the character
+genuinely carries a stack of one of the Mission's offering items — and the
+acceptance command rechecks that carried stack. Two presentation fields go with
+it, both optional and usable by any offer:
+
+- `subject` — the hub entry's short UI subject instead of the Mission title
+  ("Show strange mineral"). It is an interface label, never a player line.
+- `declineLabel` — an explicit decline control ("Not now") beside the acceptance
+  control on the offer's last beat. It is `onFinish`: back to the hub, no
+  command, nothing written. Back and the drawer's Close behave as ever.
+
+After a successful acceptance with no authored continuation the surface returns
+to the same hub, which re-derives from the new state and now lists the Mission's
+turn-in at that NPC, so the player never leaves the conversation.
+
 ## 5. Replayable topics
 
 ```ts
@@ -316,6 +334,21 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Toll Kade | Skatboll | always |
 | Toll Kade | Stillreach | always |
 | Toll Kade | Fuel | always |
+| The Wise Old Enby | Introductions | always |
+| The Wise Old Enby | The workshop | always |
+| The Wise Old Enby | Stillreach | always |
+| The Wise Old Enby | About RuneSpace | after **Not From Around Here** is completed |
+
+The Wise Old Enby (#389) stands at Hilltop Workshop itself (no Local Place), so
+their first three topics are there for anyone who reaches the hill, with or
+without a Rune Fragment or the Mission, and say nothing about how runes work.
+"Introductions" is their greeting: a replayable topic like any other, with no
+first-meeting state. They are "the Wise Old Enby" and they/them wherever they
+are referred to; the player stays silent. Every sequence is authored against
+their own approved 15:8 workshop interior with the four portraits (neutral,
+friendly, thoughtful, amused) separate from it. *About RuneSpace* is an ordinary
+`mission_completed` topic: replaying it runs no command, pays nothing and records
+nothing.
 
 Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,

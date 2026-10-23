@@ -196,6 +196,23 @@ export const NPCS: readonly NpcDefinition[] = [
       [EXPRESSION_IDS.skeptical]: "/npc-art/toll-kade-skeptical.png",
     },
   },
+  {
+    // The Wise Old Enby (#389) lives and works at Hilltop Workshop on Stillreach,
+    // standing at the World Location itself (it has no Local Place). Anyone who
+    // reaches the hill can talk to them: no Mission, item or first-meeting state
+    // decides whether they are there. Four approved expressions, shared vocabulary.
+    id: NPC_IDS.wiseOldEnby,
+    displayName: "The Wise Old Enby",
+    role: "Researcher at Hilltop Workshop",
+    homeLocationId: LOCATION_IDS.hilltopWorkshop,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/wise-old-enby-neutral.png",
+      [EXPRESSION_IDS.friendly]: "/npc-art/wise-old-enby-friendly.png",
+      [EXPRESSION_IDS.thoughtful]: "/npc-art/wise-old-enby-thoughtful.png",
+      [EXPRESSION_IDS.amused]: "/npc-art/wise-old-enby-amused.png",
+    },
+  },
 ] as const satisfies readonly NpcDefinition[];
 
 const npcById = new Map<string, NpcDefinition>(NPCS.map((npc) => [npc.id, npc]));

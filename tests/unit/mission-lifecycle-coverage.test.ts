@@ -98,7 +98,12 @@ describe("issue #324 reachable lifecycle moments", () => {
       (mission.dialogue.omitted ?? []).map((omission) => `${mission.id}:${omission.moment}`),
     );
     // A new entry here is a product decision a reviewer should see, not churn.
-    expect(omissions).toEqual(["walk_it_off:busy", "curly_must_stash:busy"]);
+    expect(omissions).toEqual([
+      "walk_it_off:busy",
+      "curly_must_stash:busy",
+      "not_from_around_here:busy",
+      "not_from_around_here:completion_presentation",
+    ]);
   });
 });
 

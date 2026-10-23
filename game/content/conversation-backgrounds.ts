@@ -161,6 +161,15 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/last-leg-trading-interior.webp",
     alt: "A fuel, freight and salvage trading counter under a lit Last Leg Trading sign, shelves and crates to the left, red and white fuel canisters to the right, wet floor reflecting warm overhead lights",
   },
+  {
+    // The Wise Old Enby's workshop (#389): approved empty 15:8 interior, the Enby
+    // always the separate portrait over it. Hilltop Workshop has no Local Place,
+    // so it is labelled by its World Location; the 4:1 panorama is not reused.
+    id: CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior,
+    locationId: LOCATION_IDS.hilltopWorkshop,
+    asset: "/location-scenes/hilltop-workshop-interior.webp",
+    alt: "A cluttered, lamplit workshop interior: map-covered walls, shelves of glowing crystals and books, workbenches and crates, a caged machine humming with blue light at the back, and a wide window onto aurora-lit hills",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

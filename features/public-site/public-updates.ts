@@ -9,6 +9,56 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #389 — Stillreach Slice G: the Wise Old Enby, and the end of Not From Around Here.
+    slug: "the-wise-old-enby",
+    title: "The Wise Old Enby",
+    publishedAt: "2026-10-22T13:00:00-07:00",
+    summary:
+      "Hilltop Workshop on Stillreach has a resident researcher: the Wise Old Enby. Anyone can stop by and talk, and Not From Around Here finally has an answer — whether or not Tolliver sent you.",
+    hero: {
+      src: "/location-scenes/hilltop-workshop.webp",
+      alt: "A small metal-roofed workshop with lit windows and a canvas awning on a rocky hilltop covered in violet and teal scrub and tiny glowing mushrooms, misty valleys and an aurora sky beyond",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.wiseOldEnby, expressionId: "amused" },
+        side: "right",
+      },
+      [
+        "The lights are on at Hilltop Workshop. ",
+        { text: "The Wise Old Enby", articleSlug: "the-wise-old-enby" },
+        ", a researcher who followed something odd in the ground to that hill and stayed, now lives and works there. Walk up from Stillreach Landing Station and you can talk to them about the workshop and about Stillreach. No Mission or item is needed.",
+      ],
+      [
+        "If you have been carrying a strange mineral around, they are the person ",
+        { text: "Not From Around Here", articleSlug: "mission-not-from-around-here" },
+        " was leading you to, and the Mission now finishes with them. You do not have to go through Tolliver first: on Stillreach the Mission points straight to Hilltop Workshop. If you reach them carrying a Rune Fragment or an intact Runestone without having started it, Show strange mineral starts the same Mission right there. And if you started it long ago and the stone has gone since, that is fine too.",
+      ],
+      "Finishing pays nothing and takes nothing. What you get is an answer, and something new to ask them about afterwards.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "The Wise Old Enby at Hilltop Workshop on Stillreach, with Introductions, The workshop and Stillreach to talk about.",
+          "Show strange mineral: the Wise Old Enby offers Not From Around Here in person to anyone carrying a Rune Fragment or an intact Runestone who has not started it.",
+          "About RuneSpace, a conversation with the Wise Old Enby that opens once Not From Around Here is complete.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Not From Around Here can now be completed, by talking to the Wise Old Enby at Hilltop Workshop and choosing I understand. Characters who had already reached the end of Tolliver's lead carry straight on from where they were.",
+          "On Stillreach, Not From Around Here points only to Hilltop Workshop, whether or not you spoke to Wade, Tansy or Tolliver. Back on Skatboll, anything you had not done there is still waiting.",
+          "Hilltop Workshop's description now mentions who lives there.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #383 — Stillreach Slice F: Harmonic Workings' Rune Fragment Mining.
     slug: "harmonic-workings-opens",
     title: "Harmonic Workings Opens",
