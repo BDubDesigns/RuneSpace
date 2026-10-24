@@ -2003,7 +2003,7 @@ body {
 /* Beginner Echo compass: the needle briefly searches, then settles on the
    authoritative clue direction. Motion-free for reduced-motion preferences. */
 .rs-echo-compass-needle {
-  transform-origin: 60px 60px;
+  transform-origin: center;
   animation: rs-echo-needle-wobble 4.8s ease-in-out infinite;
 }
 
