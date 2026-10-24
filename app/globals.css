@@ -2008,12 +2008,25 @@ body {
 }
 
 @keyframes rs-echo-needle-wobble {
-  0%, 69%, 87%, 100% { transform: rotate(0deg); }
-  74% { transform: rotate(-4deg); }
-  78% { transform: rotate(3deg); }
-  82% { transform: rotate(-2deg); }
+  0%,
+  69%,
+  87%,
+  100% {
+    transform: rotate(0deg);
+  }
+  74% {
+    transform: rotate(-4deg);
+  }
+  78% {
+    transform: rotate(3deg);
+  }
+  82% {
+    transform: rotate(-2deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rs-echo-compass-needle { animation: none; }
+  .rs-echo-compass-needle {
+    animation: none;
+  }
 }
