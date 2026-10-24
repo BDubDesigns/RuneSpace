@@ -129,8 +129,7 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
         </p>
       )}
       <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]" data-echo-notice-where>
-        Reading taken at {notice.locationName}, {notice.planetName}. 1 Seeker consumed
-        {found ? "." : " · 0 Runeworking XP."}
+        Reading taken at {notice.locationName}, {notice.planetName}.
       </p>
       {found ? (
         <div className="mt-3 flex flex-wrap items-start gap-3">
