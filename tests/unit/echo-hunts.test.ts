@@ -21,6 +21,7 @@ import { resolveItemSources, type ItemSourceFacts } from "@/game/domain/item-sou
 import { axialToPixel } from "@/features/travel/local-map-layout";
 import {
   echoClueVerdict,
+  echoCompassDegrees,
   echoDirectionsCopy,
   echoRewardLostLine,
   echoWrongReadingLine,
@@ -51,6 +52,21 @@ function draws(...values: number[]): EchoRandom {
     },
   };
 }
+
+describe("the eight-way reading compass", () => {
+  it.each([
+    ["aligned", "north", 0],
+    ["east", "north", 45],
+    ["east", "aligned", 90],
+    ["east", "south", 135],
+    ["aligned", "south", 180],
+    ["west", "south", 225],
+    ["west", "aligned", 270],
+    ["west", "north", 315],
+  ] as const)("%s / %s points to %s degrees", (eastWest, northSouth, angle) => {
+    expect(echoCompassDegrees(eastWest, northSouth)).toBe(angle);
+  });
+});
 
 const noDraws: EchoRandom = {
   nextInteger: () => {
