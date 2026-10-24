@@ -12,7 +12,12 @@ import { SKILL_IDS } from "@/game/config/foundations";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { acknowledgeEchoReadingAction } from "@/server/actions";
-import { echoCompassDegrees, echoDirectionsCopy, echoRewardLostLine, echoWrongReadingLine } from "./echo-copy";
+import {
+  echoCompassDegrees,
+  echoDirectionsCopy,
+  echoRewardLostLine,
+  echoWrongReadingLine,
+} from "./echo-copy";
 
 /**
  * The result of a Seeker reading (#393), as a stored receipt rather than a
@@ -91,75 +96,86 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
         role="status"
         tone="raised"
       >
-      <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-skill-runeworking)]">
-        {found ? "Runeworking · Echo recovered" : "Runeworking · Resonance reading"}
-      </p>
-      <p className="mt-2 font-display text-lg font-bold tracking-wide" data-echo-notice-title id="echo-reading-result-heading">
-        {found ? "Resonance Echo discovered!" : "The Seeker trembles, then goes still."}
-      </p>
-      {hasClue ? (
-        <div className="mt-3 flex items-center gap-3" data-echo-compass={echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}>
-          <EchoCompass eastWest={notice.eastWest!} northSouth={notice.northSouth!} />
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-              Signal direction
-            </p>
-            <p className="mt-1 font-display text-xl font-bold uppercase text-[color:var(--rs-skill-runeworking)]" data-echo-compass-direction>
-              {echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
-            </p>
-            <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-              {echoWrongReadingLine(notice.eastWest!, notice.northSouth!)}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-          The Seeker flares with impossible light. For an instant, something slips through the boundary between worlds.
+        <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-skill-runeworking)]">
+          {found ? "Runeworking · Echo recovered" : "Runeworking · Resonance reading"}
         </p>
-      )}
-      <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]" data-echo-notice-where>
-        Reading taken at {notice.locationName}, {notice.planetName}. 1 Seeker consumed
-        {found ? "." : " · 0 Runeworking XP."}
-      </p>
-      {found ? (
-        <div className="mt-3 flex flex-wrap items-start gap-3">
-          <SkillXpTile
-            amount={notice.xpAwarded}
-            className="h-28 w-28"
-            skillId={SKILL_IDS.runeworking}
-            skillName={runeworkingName}
-          />
-          {reward && notice.rewardKept ? (
-            <div className="h-28 w-28" data-echo-notice-reward={reward}>
-              <StackItemVisual
-                itemId={reward}
-                name={resolveItemPresentation(reward, reward).displayName}
-                quantity={1}
-                stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-      {found && reward && notice.rewardKept === false ? (
         <p
-          className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
-          data-echo-notice-lost={reward}
+          className="mt-2 font-display text-lg font-bold tracking-wide"
+          data-echo-notice-title
+          id="echo-reading-result-heading"
         >
-          {echoRewardLostLine(reward)}
+          {found ? "Resonance Echo discovered!" : "The Seeker trembles, then goes still."}
         </p>
-      ) : null}
-      <div className="mt-3">
-        <ActionButton
-          data-echo-notice-dismiss
-          intent={found ? "success" : "secondary"}
-          loading={foregroundBusy && dismissing}
-          onClick={dismiss}
-        >
-          DISMISS
-        </ActionButton>
-      </div>
-      {message ? <Feedback tone="danger">{message}</Feedback> : null}
+        {hasClue ? (
+          <div
+            className="mt-3 flex items-center gap-3"
+            data-echo-compass={echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
+          >
+            <EchoCompass eastWest={notice.eastWest!} northSouth={notice.northSouth!} />
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                Signal direction
+              </p>
+              <p
+                className="mt-1 font-display text-xl font-bold uppercase text-[color:var(--rs-skill-runeworking)]"
+                data-echo-compass-direction
+              >
+                {echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
+              </p>
+              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                {echoWrongReadingLine(notice.eastWest!, notice.northSouth!)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            The Seeker flares with impossible light. For an instant, something slips through the
+            boundary between worlds.
+          </p>
+        )}
+        <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]" data-echo-notice-where>
+          Reading taken at {notice.locationName}, {notice.planetName}. 1 Seeker consumed
+          {found ? "." : " · 0 Runeworking XP."}
+        </p>
+        {found ? (
+          <div className="mt-3 flex flex-wrap items-start gap-3">
+            <SkillXpTile
+              amount={notice.xpAwarded}
+              className="h-28 w-28"
+              skillId={SKILL_IDS.runeworking}
+              skillName={runeworkingName}
+            />
+            {reward && notice.rewardKept ? (
+              <div className="h-28 w-28" data-echo-notice-reward={reward}>
+                <StackItemVisual
+                  itemId={reward}
+                  name={resolveItemPresentation(reward, reward).displayName}
+                  quantity={1}
+                  stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {found && reward && notice.rewardKept === false ? (
+          <p
+            className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
+            data-echo-notice-lost={reward}
+          >
+            {echoRewardLostLine(reward)}
+          </p>
+        ) : null}
+        <div className="mt-3">
+          <ActionButton
+            data-echo-notice-dismiss
+            intent={found ? "success" : "secondary"}
+            loading={foregroundBusy && dismissing}
+            onClick={dismiss}
+          >
+            DISMISS
+          </ActionButton>
+        </div>
+        {message ? <Feedback tone="danger">{message}</Feedback> : null}
       </Panel>
     </div>
   );
@@ -181,9 +197,30 @@ function EchoCompass({
       data-echo-compass-angle={angle}
       viewBox="0 0 120 120"
     >
-      <circle cx="60" cy="60" r="44" fill="none" stroke="var(--rs-skill-runeworking)" strokeOpacity="0.45" strokeWidth="1.5" />
-      <circle cx="60" cy="60" r="31" fill="none" stroke="var(--rs-skill-runeworking)" strokeOpacity="0.17" />
-      <path d="M60 10v8 M60 102v8 M10 60h8 M102 60h8" fill="none" stroke="var(--rs-skill-runeworking)" strokeOpacity="0.65" strokeWidth="2" />
+      <circle
+        cx="60"
+        cy="60"
+        r="44"
+        fill="none"
+        stroke="var(--rs-skill-runeworking)"
+        strokeOpacity="0.45"
+        strokeWidth="1.5"
+      />
+      <circle
+        cx="60"
+        cy="60"
+        r="31"
+        fill="none"
+        stroke="var(--rs-skill-runeworking)"
+        strokeOpacity="0.17"
+      />
+      <path
+        d="M60 10v8 M60 102v8 M10 60h8 M102 60h8"
+        fill="none"
+        stroke="var(--rs-skill-runeworking)"
+        strokeOpacity="0.65"
+        strokeWidth="2"
+      />
       <g fill="var(--rs-text-secondary)" fontFamily="monospace" fontSize="9" textAnchor="middle">
         <text x="60" y="8">N</text>
         <text x="60" y="119">S</text>
@@ -196,7 +233,14 @@ function EchoCompass({
           <path d="M60 96 L51 55 L60 63 L69 55 Z" fill="var(--rs-border-structural)" />
         </g>
       </g>
-      <circle cx="60" cy="60" r="4.5" fill="var(--rs-surface-raised)" stroke="var(--rs-skill-runeworking)" strokeWidth="1.8" />
+      <circle
+        cx="60"
+        cy="60"
+        r="4.5"
+        fill="var(--rs-surface-raised)"
+        stroke="var(--rs-skill-runeworking)"
+        strokeWidth="1.8"
+      />
     </svg>
   );
 }
