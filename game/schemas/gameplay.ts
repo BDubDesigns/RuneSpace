@@ -292,6 +292,17 @@ export const RuneworkingCommandRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/** Reading a Beginner Echo Seeker names only the character (#393). */
+export const StartEchoReadingRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** Dismissing one Echo reading result (#393). */
+export const AcknowledgeEchoReadingRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  noticeId: z.string().uuid(),
+});
+
 /** The station's Manual Override toggle. */
 export const ManualOverrideToggleRequestSchema = z.object({
   characterId: z.string().uuid(),

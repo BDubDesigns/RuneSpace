@@ -15,6 +15,7 @@ import {
 } from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
 import {
+  continuationGiftOffer,
   lifecycleDialogueId,
   MISSION_STANDING_LABELS,
   missionOmitsMoment,
@@ -589,7 +590,49 @@ export type MissionSuccessView =
       dialogueId: DialogueId;
       action?: MissionConversationAction;
       creditsReceipt?: CreditsReceipt;
+      /**
+       * Sequences that continue the same scene after `dialogueId`, in order
+       * (#393): what a completion's automatic continuation actually did — the
+       * next Mission's gift scene when it was accepted, or its capacity refusal
+       * when the gift would not fit. Presentation only.
+       */
+      then?: readonly DialogueId[];
     };
+
+/**
+ * The scenes that present a completion's continuation outcome (#393), read from
+ * the server's receipt alone. An accepted continuation whose offer route hands
+ * over a gift plays that route's offer and accepted-continuation scenes — the
+ * same scenes the in-person offer plays — so the gift's item beat appears only
+ * when the gift was actually given. A refused one plays the continuation
+ * Mission's own capacity refusal. Any other continuation has nothing to add.
+ */
+function continuationScenes(
+  missionId: string,
+  continuation: MissionContinuationReceipt | undefined,
+): DialogueId[] {
+  if (!continuation) return [];
+  if (continuation.status === "capacity_refused") {
+    const refusal = getMissionCapacityRefusalDialogue(
+      continuation.missionId,
+      continuation.capacityReason,
+    );
+    return refusal ? [refusal.id] : [];
+  }
+  const predecessor = getMission(missionId);
+  const target = getMission(continuation.missionId);
+  const gift = predecessor && target ? continuationGiftOffer(predecessor, target) : undefined;
+  if (!gift) return [];
+  return [
+    gift.dialogueId,
+    ...(gift.acceptedContinuation ? [gift.acceptedContinuation.dialogueId] : []),
+  ];
+}
+
+/** The continuation part of a completion receipt (`server/missions.ts`). */
+export type MissionContinuationReceipt =
+  | { missionId: string; status: "accepted" }
+  | { missionId: string; status: "capacity_refused"; capacityReason: "slots" | "mass" };
 
 /**
  * Decides what the conversation presents after the server reported a Mission
@@ -610,7 +653,7 @@ export function resolveMissionSuccessView(input: {
   /** The sequence the command was run from. */
   dialogueId: DialogueId;
   acceptedContinuation?: MissionConversationContinuation;
-  mission: { status: string; creditsPaid?: number };
+  mission: { status: string; creditsPaid?: number; continuation?: MissionContinuationReceipt };
 }): MissionSuccessView {
   const { mission } = input;
   const paid =
@@ -640,11 +683,26 @@ export function resolveMissionSuccessView(input: {
     // authored continuation mission is already accepted server-side, so the hub
     // behind this presentation already reflects the next assignment.
     const presentation = getMissionCompletionPresentation(input.missionId);
+    const then = continuationScenes(input.missionId, mission.continuation);
     if (presentation) {
-      return { kind: "dialogue", dialogueId: presentation.id, ...receipt("leads") };
+      return {
+        kind: "dialogue",
+        dialogueId: presentation.id,
+        ...receipt("leads"),
+        ...(then.length > 0 ? { then } : {}),
+      };
     }
     if (paid) {
-      return { kind: "dialogue", dialogueId: input.dialogueId, ...receipt("stands_alone") };
+      return {
+        kind: "dialogue",
+        dialogueId: input.dialogueId,
+        ...receipt("stands_alone"),
+        ...(then.length > 0 ? { then } : {}),
+      };
+    }
+    const [first, ...rest] = then;
+    if (first) {
+      return { kind: "dialogue", dialogueId: first, ...(rest.length > 0 ? { then: rest } : {}) };
     }
   }
   return { kind: "hub" };

@@ -1048,6 +1048,78 @@ export const characterRuneworkingState = pgTable(
 );
 
 /**
+ * Beginner Resonance Echo hunts (#393): at most one active hunt per character,
+ * planet and tier. The row exists exactly while the hunt is active: the first
+ * reading on a planet with no row creates it with its hidden target, and the
+ * discovery deletes it, which ends the hunt and clears its last clue together.
+ * The target never leaves the server; travel, logins and Inventory changes
+ * never touch the row, so each planet's search waits where it was left.
+ *
+ * The last wrong reading belongs to the hunt, not to a physical Seeker: where
+ * it was taken, both axis directions from that source hex, and when.
+ */
+export const characterEchoHunts = pgTable(
+  "character_echo_hunts",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    planetId: text("planet_id").notNull(),
+    tier: text("tier").notNull(),
+    targetLocationId: text("target_location_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    lastReadingLocationId: text("last_reading_location_id"),
+    lastReadingEastWest: text("last_reading_east_west"),
+    lastReadingNorthSouth: text("last_reading_north_south"),
+    lastReadingAt: timestamp("last_reading_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.characterId, table.planetId, table.tier] }),
+    check(
+      "character_echo_hunts_last_reading_directions",
+      sql`(${table.lastReadingEastWest} IS NULL OR ${table.lastReadingEastWest} IN ('east', 'west', 'aligned')) AND (${table.lastReadingNorthSouth} IS NULL OR ${table.lastReadingNorthSouth} IN ('north', 'south', 'aligned'))`,
+    ),
+  ],
+);
+
+/**
+ * The durable result of one resolved Echo reading (#393), so a reading that
+ * finished while the player was away, or across a refresh, still reports what
+ * happened: a wrong reading's directions, or a discovery's XP and the item it
+ * gave — or lost for want of room. A stored receipt like the ship's landing
+ * notice, not an inbox; dismissing it changes nothing else. `read_at` is the
+ * reading's own completion instant, so a retried resolution cannot mint two.
+ */
+export const echoReadingNotices = pgTable(
+  "echo_reading_notices",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    outcome: text("outcome").notNull(),
+    planetId: text("planet_id").notNull(),
+    sourceLocationId: text("source_location_id").notNull(),
+    eastWest: text("east_west"),
+    northSouth: text("north_south"),
+    rewardItemId: text("reward_item_id"),
+    rewardKept: boolean("reward_kept"),
+    xpAwarded: integer("xp_awarded").notNull().default(0),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull(),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("echo_reading_notices_character_read_at_unique").on(
+      table.characterId,
+      table.readAt,
+    ),
+    check("echo_reading_notices_outcome", sql`${table.outcome} IN ('wrong', 'found')`),
+  ],
+);
+
+/**
  * Issue #207 — the durable Work Orders board, one row per posted slot.
  *
  * The board is persistent rather than re-rolled on render, refresh, or login,
@@ -2448,6 +2520,8 @@ export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
 export type CharacterShip = typeof characterShips.$inferSelect;
 export type ShipArrivalNotice = typeof shipArrivalNotices.$inferSelect;
+export type CharacterEchoHunt = typeof characterEchoHunts.$inferSelect;
+export type EchoReadingNotice = typeof echoReadingNotices.$inferSelect;
 export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;

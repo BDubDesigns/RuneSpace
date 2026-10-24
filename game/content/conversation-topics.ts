@@ -257,6 +257,23 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutTheSeekersTopic,
     availability: { kind: "mission_completed", missionId: MISSION_IDS.firstRuneworkingLesson },
   },
+  {
+    // First Resonance Echo (#393): how to use a Seeker, replayable from the
+    // moment the Mission is accepted and after it is finished. It never gives
+    // the Seekers again and never touches the Mission.
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyHowToListen,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "How to Listen",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyHowToListenTopic,
+    availability: { kind: "mission_accepted", missionId: MISSION_IDS.firstResonanceEcho },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wiseOldEnbyAboutResonanceEchoes,
+    npcId: NPC_IDS.wiseOldEnby,
+    label: "About Resonance Echoes",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutResonanceEchoesTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.firstResonanceEcho },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(

@@ -1,3 +1,5 @@
+import { getPlanetPresentation } from "@/game/content/planets";
+import type { PlanetId } from "@/game/config/foundations";
 import { itemQuantityLabel, resolveItemPresentation } from "@/game/content/item-presentation";
 import { getLocalPlace } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
@@ -160,6 +162,18 @@ export function describeItemSource(
         title: "Daily claim",
         where: getLocation(source.locationId)?.displayName ?? source.locationId,
         notes: [`${itemQuantityLabel(itemId, source.quantity, itemName(itemId))} once a day`],
+      };
+    case "echo_hunt":
+      return {
+        ...base,
+        key: "echo_hunt",
+        kind: source.kind,
+        title: "Resonance Echo",
+        notes: [
+          `Sometimes given up by a Resonance Echo on ${source.planetIds
+            .map((planetId) => getPlanetPresentation(planetId as PlanetId).displayName)
+            .join(" or ")}`,
+        ],
       };
     case "scavenge":
       return {

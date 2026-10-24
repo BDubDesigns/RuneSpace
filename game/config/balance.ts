@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   ACTION_IDS,
   ITEM_IDS,
+  PLANET_IDS,
   REPAIR_TARGET_IDS,
   SHIP_ROUTE_IDS,
   SKILL_IDS,
@@ -1260,6 +1261,51 @@ const balanceSchema = z.object({
       outputQuantity: z.literal(5),
     }),
   }),
+  /**
+   * Beginner Resonance Echo hunts (#393): reading a Beginner Echo Seeker from
+   * Inventory. One stationary reading takes 8 ticks (4.8 s) and consumes exactly
+   * one Seeker, found or not. A wrong reading pays nothing; a discovery pays the
+   * fixed 50 Runeworking XP and rolls exactly one ordinary item from the
+   * current planet's table.
+   *
+   * Each table is integer weights out of `rewardWeightTotal` (per mille). The
+   * approved full tables reserve 0.2% for a Legendary that is not shipped yet
+   * (Slice J); until then that 0.2 point sits on Rune Fragment (30.2%), so each
+   * table is a complete ordinary-only roll. Where each planet's hidden targets
+   * may be is content (`game/content/echo-hunts`), not balance.
+   */
+  echoHunts: z.object({
+    beginner: z.object({
+      readingActionId: z.literal(ACTION_IDS.beginnerEchoReading),
+      seekerItemId: z.literal(ITEM_IDS.beginnerEchoSeeker),
+      readingDurationTicks: z.literal(8),
+      seekersPerReading: z.literal(1),
+      discoveryXp: z.literal(50),
+      rewardWeightTotal: z.literal(1_000),
+      rewardTables: z.object({
+        [PLANET_IDS.skatboll]: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(302) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(240) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(160) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), weight: z.literal(120) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), weight: z.literal(50) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(28) }),
+        ]),
+        [PLANET_IDS.stillreach]: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(302) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(260) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(200) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
+          z.object({
+            itemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
+            weight: z.literal(100),
+          }),
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(38) }),
+        ]),
+      }),
+    }),
+  }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
     /**
@@ -1967,6 +2013,35 @@ const defaults = balanceSchema.parse({
       inputItemId: ITEM_IDS.runestone,
       outputItemId: ITEM_IDS.runeFragment,
       outputQuantity: 5,
+    },
+  },
+  echoHunts: {
+    beginner: {
+      readingActionId: ACTION_IDS.beginnerEchoReading,
+      seekerItemId: ITEM_IDS.beginnerEchoSeeker,
+      readingDurationTicks: 8,
+      seekersPerReading: 1,
+      discoveryXp: 50,
+      rewardWeightTotal: 1_000,
+      rewardTables: {
+        [PLANET_IDS.skatboll]: [
+          { itemId: ITEM_IDS.runeFragment, weight: 302 },
+          { itemId: ITEM_IDS.uncutQuartz, weight: 240 },
+          { itemId: ITEM_IDS.uncutTopaz, weight: 160 },
+          { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
+          { itemId: ITEM_IDS.refinedFerrite, weight: 120 },
+          { itemId: ITEM_IDS.galvanicStock, weight: 50 },
+          { itemId: ITEM_IDS.runestone, weight: 28 },
+        ],
+        [PLANET_IDS.stillreach]: [
+          { itemId: ITEM_IDS.runeFragment, weight: 302 },
+          { itemId: ITEM_IDS.uncutQuartz, weight: 260 },
+          { itemId: ITEM_IDS.uncutTopaz, weight: 200 },
+          { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
+          { itemId: ITEM_IDS.emptySmallFuelCanister, weight: 100 },
+          { itemId: ITEM_IDS.runestone, weight: 38 },
+        ],
+      },
     },
   },
   carrying: {

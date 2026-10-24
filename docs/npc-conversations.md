@@ -346,6 +346,8 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | The Wise Old Enby | First lesson | once **First Runeworking Lesson** is accepted |
 | The Wise Old Enby | Where to Find Fragments | after **Not From Around Here** is completed |
 | The Wise Old Enby | About the Seekers | after **First Runeworking Lesson** is completed |
+| The Wise Old Enby | How to Listen | once **First Resonance Echo** is accepted |
+| The Wise Old Enby | About Resonance Echoes | after **First Resonance Echo** is completed |
 
 The Wise Old Enby (#389) stands at Hilltop Workshop itself (no Local Place), so
 their first three topics are there for anyone who reaches the hill, with or
@@ -363,7 +365,11 @@ own: the same verbatim beats, authored in a topic-owned sequence because a topic
 may never reuse a Mission-owned one. *Where to Find Fragments* is nothing but
 the Enby's skill-level-dependent Fragment advice (§8), and *First lesson* ends
 with it too, so both always give the advice the character's current Mining level
-earns. *About the Seekers* is the lesson's aftercare. None of them carries a
+earns. *About the Seekers* is the lesson's aftercare. *How to Listen* (#393)
+replays First Resonance Echo's instructions — never its gift — and *About
+Resonance Echoes* is that Mission's aftercare. *Stillreach* carries the Enby's
+three owner-approved personal beats (#393) before its unchanged closing line;
+it stays `always`, before and after any Mission, and changes nothing. None of them carries a
 Mission command; the Resonance Rig is a separate control below the Enby's card
 and is never reached through Talk.
 

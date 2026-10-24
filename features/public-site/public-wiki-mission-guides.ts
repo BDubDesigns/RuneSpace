@@ -57,6 +57,7 @@ const toFirstRuneworkingLesson = link(
   "Seeker? I Hardly Know Her!",
   "mission-first-runeworking-lesson",
 );
+const toFirstResonanceEcho = link("First Resonance Echo", "mission-first-resonance-echo");
 const runeworking = (text: string) => link(text, "runeworking");
 
 export const missionGuideArticles = [
@@ -1309,10 +1310,94 @@ export const missionGuideArticles = [
         ],
       },
       {
+        heading: "What comes next",
+        paragraphs: [
+          [
+            "Completing the lesson goes straight on into ",
+            toFirstResonanceEcho,
+            ", and the Wise Old Enby hands you two more Seekers with it. They need room for both: if your Inventory has no space or carrying capacity for two Seekers, the lesson still completes and pays, and you can make room and ask them for the next Mission later.",
+          ],
+        ],
+      },
+      {
         heading: "Good to know",
         list: [
           "The Rig is yours whether or not you have the lesson. Keep making Seekers as often as you like, before, during and after it; each one pays its own XP.",
-          "A Seeker cannot be used yet. Its description says what it is for; there is nothing to do with it today beyond keeping, trading or storing it.",
+          [
+            "Seekers are used from Inventory to hunt for Resonance Echoes; ",
+            toFirstResonanceEcho,
+            " teaches how.",
+          ],
+        ],
+      },
+      { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
+  {
+    slug: "mission-first-resonance-echo",
+    title: "First Resonance Echo",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "The Wise Old Enby gives you two Beginner Echo Seekers and sends you to find your first Resonance Echo. It pays 300 Runeworking XP.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Your second lesson in ",
+            runeworking("Runeworking"),
+            ", from ",
+            enby,
+            " at Hilltop Workshop on Stillreach: use a Beginner Echo Seeker, follow what it tells you, and find one Resonance Echo. ",
+            toFirstRuneworkingLesson,
+            " has to be finished first.",
+          ],
+        ],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "It starts by itself when you complete ",
+            toFirstRuneworkingLesson,
+            ", and the Wise Old Enby hands you two Beginner Echo Seekers with it, on top of any you kept.",
+          ],
+          [
+            "The two Seekers need two Seekers' worth of room in your Inventory, both slots and carrying capacity. If they will not fit, the lesson still completes and pays, but this Mission does not start yet. Make room, talk to ",
+            enby,
+            " again, and choose Take the Seekers. The same offer is there if you finished the lesson before this Mission existed. You only ever get the two Seekers once.",
+          ],
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          "Open your Inventory, select a Beginner Echo Seeker and choose Use. You stand still for 4.8 seconds while it listens, and one Seeker is used up whatever it finds.",
+          "A Seeker searches the planet you are standing on. Skatboll and Stillreach each have their own hidden Echo and their own search: leave one world and come back, and its search and last reading are still there.",
+          "If the Echo is somewhere else, the reading says which way it lies from where you took it: east or west, and north or south. Sometimes you are already lined up in one direction, and it says due north or due east instead.",
+          "Your last reading on the current planet stays in the Seeker's details. Standing somewhere that reading has already ruled out, the details say so, and why; anywhere else they say the spot is not ruled out. You can still take a reading anywhere.",
+          "Your first reading on a planet may find the Echo right where you are.",
+          [
+            "One Echo on either planet completes the objective. Then go back to ",
+            enby,
+            " and choose Complete First Resonance Echo at the end of what they have to say. Finding the Echo never finishes the Mission by itself.",
+          ],
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "Every Echo you find pays 50 Runeworking XP and gives up one item, such as a Rune Fragment or an uncut gem. A wrong reading pays nothing.",
+          "300 Runeworking XP when you complete the Mission, once. A fresh character who made exactly the three lesson Seekers reaches 575 Runeworking XP here: Level 2.",
+          "Something new to ask the Wise Old Enby about: About Resonance Echoes. How to Listen stays there from the moment you have the Mission, so you can hear the instructions again.",
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "Leave room in your Inventory before you look. If the item an Echo gives up does not fit, it is lost, though the Echo still counts and still pays its XP.",
+          "Run out of Seekers? Make more at the Resonance Rig. The Echo stays where it is until you find it, and finding one starts a new search on that planet next time.",
+          "Echoes found before you had this Mission do not count toward it. Hunting stays open after it, for as long as you have Seekers.",
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },

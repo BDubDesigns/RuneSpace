@@ -44,6 +44,7 @@ import {
   startFabrication,
 } from "@/server/fabrication-commands";
 import { finishCurrentRuneworking, startRuneworking } from "@/server/runeworking-commands";
+import { acknowledgeEchoReading, startEchoReading } from "@/server/echo-hunt-commands";
 import {
   finishCurrentTinkering,
   setTinkeringScrapPreference,
@@ -203,6 +204,8 @@ import {
   ManualOverrideLockInRequestSchema,
   StartRuneworkingRequestSchema,
   RuneworkingCommandRequestSchema,
+  StartEchoReadingRequestSchema,
+  AcknowledgeEchoReadingRequestSchema,
   StartTinkeringRequestSchema,
   TinkeringCommandRequestSchema,
   TinkeringScrapPreferenceRequestSchema,
@@ -566,6 +569,24 @@ export async function finishCurrentRuneworkingAction(input: unknown): Promise<Pl
   if (!request.success) return { error: "Invalid Runeworking command." };
   return runPlayAction(request.data.characterId, (userId, characterId) =>
     finishCurrentRuneworking(userId, characterId),
+  );
+}
+
+/** Use a Beginner Echo Seeker from Inventory: one stationary reading (#393). */
+export async function startEchoReadingAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartEchoReadingRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Seeker command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startEchoReading(userId, characterId),
+  );
+}
+
+/** Dismiss one Echo reading result (#393). Presentation only. */
+export async function acknowledgeEchoReadingAction(input: unknown): Promise<PlayActionResult> {
+  const request = AcknowledgeEchoReadingRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid reading acknowledgment." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    acknowledgeEchoReading(userId, characterId, request.data.noticeId),
   );
 }
 

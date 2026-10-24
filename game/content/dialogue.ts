@@ -19,7 +19,11 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { getItemPresentation } from "./item-presentation";
 import { merchantBuybackPrice, merchantRetailPrice } from "./merchants";
-import { KEEP_THE_CHANGE_BUDGET_CREDITS } from "./missions";
+import {
+  FIRST_RESONANCE_ECHO_GIFT_SEEKERS,
+  FIRST_RESONANCE_ECHO_REWARD_XP,
+  KEEP_THE_CHANGE_BUDGET_CREDITS,
+} from "./missions";
 import { spelledNumber, spelledNumberCapitalized } from "./spelled-numbers";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
@@ -236,6 +240,11 @@ function enbyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     presentationMode: "local",
     text,
   };
+}
+
+/** Something the Enby hands over, shown at their workshop (#393). Presentation only. */
+function enbyItem(itemId: ItemId, quantity: number): DialogueBeat {
+  return { kind: "item", itemId, quantity, backgroundId: hilltopWorkshop, text: "" };
 }
 
 function tansyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
@@ -2818,6 +2827,20 @@ const dialogue = {
         EXPRESSION_IDS.friendly,
         "The people at the landing station keep the supplies moving. I keep the instruments running. A decent arrangement.",
       ),
+      // The Enby's own reason for staying (#393), owner-approved and verbatim,
+      // before the topic's unchanged closing line.
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The resonance brought me to Stillreach. That's true, but it's only half an answer.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Where I lived before, people took an exhausting interest in telling me who I ought to be. Here, I've found room to be myself.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "The neighbors still complain, mind you. These days it's about the noise coming from my workshop. A much more reasonable grievance.",
+      ),
       enbyLocal(
         EXPRESSION_IDS.thoughtful,
         "Whatever brought you here, don't rush past the hills. There's more to this place than the sky.",
@@ -3179,6 +3202,267 @@ const dialogue = {
       enbyLocal(
         EXPRESSION_IDS.amused,
         "The Rig is yours to use whenever you need it. Just leave the roof attached, would you? It's already doing the bare minimum.",
+      ),
+    ],
+  },
+  // First Resonance Echo (#393). The owner-approved script, verbatim: one beat
+  // per line in the Enby's own expressions, the player silent throughout.
+  //
+  // The gift scene's opening line is the offer (the in-person route, for a
+  // character who finished the lesson earlier or had no room at its turn-in);
+  // the rest — the two Seekers handed over, then how to listen — is the offer's
+  // accepted continuation. A lesson turn-in that accepts the Mission plays both
+  // after its own reward, and only when the Seekers were actually given.
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoOffer]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Well! You've learned to make Seekers. Now comes the interesting part. Finding out whether they have anything worthwhile to say.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoInstructions]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoInstructions,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "I've set two more aside for you. Consider them a little encouragement. Or insurance against an uncooperative universe.",
+      ),
+      enbyItem(ITEM_IDS.beginnerEchoSeeker, FIRST_RESONANCE_ECHO_GIFT_SEEKERS),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I recommend carrying a few. It can be terribly embarrassing to discover something remarkable just as you've run out of ways to look for it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "An Echo is a disturbance where RuneSpace brushes against our own. Usually quite faint. The sort of thing you'd walk past a thousand times without knowing it was there.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "But your Seekers have been attuned to recognize one. Take a Seeker from your Inventory, find yourself a place to stand, and use it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Give it a few moments. If there's an Echo at your location, the Seeker will resonate with it. And you may find that RuneSpace has left you something rather interesting.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Do keep your expectations reasonable. The universe is under no obligation to give you anything useful. I've reminded it of this several times.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "If the Echo is elsewhere, the Seeker will tell you which way to look. East or west. North or south. Sometimes you'll already be lined up in one direction.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Remember that the directions are measured from where you took the reading. You can check your last reading in the Seeker's details whenever you need a reminder.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "One important detail: a Seeker listens for Echoes on the planet you're standing on. Stillreach has its own disturbances. Skatboll has others.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "And if you leave one world before you've finished searching, don't worry. Come back and your last reading will still be there. Those Echoes can be patient things.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Each reading uses up a Seeker, I'm afraid. Rather like a match. An extraordinarily expensive match that points toward mysteries instead of setting your curtains on fire.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "And if you run out? Make some more. The Echo won't wander off simply because you've exhausted your supplies.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Oh, and do leave some room in your Inventory before you go looking. Sometimes an Echo gives up an item, and you'll need somewhere to put it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Otherwise, it slips straight back into RuneSpace, perhaps to be found by a better-prepared traveler. Rather judgmental, coming from a place that hasn't invented pockets.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Find one. Just one, for now. Then come back and tell me how it went.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And don't assume you need to travel halfway across Stillreach. For all we know, there's one under your feet. The universe does enjoy making fools of people with elaborate travel plans.",
+      ),
+    ],
+  },
+  // Both Seekers would not fit (slots or mass alike): nothing was given and the
+  // Mission was not accepted. The lesson before it stays complete and paid.
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoCapacity]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoCapacity,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Ah. A small logistical complication. I've got two more Seekers for you, but your pockets appear to have lodged a formal complaint.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Make a little room and come back. I'll keep them here for you. The universe has waited this long to be explored. Another few minutes won't hurt.",
+      ),
+    ],
+  },
+  // While no Echo has been found since the Mission began.
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoReminder]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(EXPRESSION_IDS.friendly, "Back already? Any promising readings?"),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Try to narrow things down. Every reading tells you something, even when it doesn't find what you're looking for.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I once spent an entire afternoon following a particularly interesting resonance, only to discover I'd been listening to my own equipment.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Well, mostly my equipment. I'm still not entirely certain about the last reading.",
+      ),
+    ],
+  },
+  // One Echo found: the debrief, whose explicit control completes the Mission.
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoTurnIn]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "You're back! And judging by that look on your face, I'd say you've found something.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Remarkable, isn't it? One moment, you're standing in an ordinary place on an ordinary planet. The next, you've reached into something we barely understand.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I remember my first successful Echo. Nearly fell out of my chair. Which was particularly impressive, considering I was standing.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You see, that's what makes RuneSpace so fascinating. We can measure its disturbances. We can learn to follow them. And sometimes, we can even retrieve something from the other side.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "But we still don't know why those things are there. Or what decides where they turn up.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "You've done something wonderful today. You've learned that a mystery doesn't have to remain a mystery forever.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Of course, solving one question tends to produce three more. Terrible habit. I've been putting up with it for years.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Keep exploring. Keep listening. And do come back now and then. It's nice having someone to share the strange bits of the universe with.",
+      ),
+    ],
+  },
+  // The reward the turn-in already granted, presented once after it succeeds.
+  [DIALOGUE_IDS.wiseOldEnbyFirstEchoCompletion]: {
+    id: DIALOGUE_IDS.wiseOldEnbyFirstEchoCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.runeworking,
+        amount: FIRST_RESONANCE_ECHO_REWARD_XP,
+        backgroundId: hilltopWorkshop,
+        text: "",
+      },
+    ],
+  },
+  // How to listen again, as a replayable topic while the Mission is accepted and
+  // after: no gift, no command. tests/unit/first-resonance-echo.test.ts keeps it
+  // identical to the instructions above.
+  [DIALOGUE_IDS.wiseOldEnbyHowToListenTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHowToListenTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "An Echo is a disturbance where RuneSpace brushes against our own. Usually quite faint. The sort of thing you'd walk past a thousand times without knowing it was there.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "But your Seekers have been attuned to recognize one. Take a Seeker from your Inventory, find yourself a place to stand, and use it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Give it a few moments. If there's an Echo at your location, the Seeker will resonate with it. And you may find that RuneSpace has left you something rather interesting.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Do keep your expectations reasonable. The universe is under no obligation to give you anything useful. I've reminded it of this several times.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "If the Echo is elsewhere, the Seeker will tell you which way to look. East or west. North or south. Sometimes you'll already be lined up in one direction.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Remember that the directions are measured from where you took the reading. You can check your last reading in the Seeker's details whenever you need a reminder.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "One important detail: a Seeker listens for Echoes on the planet you're standing on. Stillreach has its own disturbances. Skatboll has others.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "And if you leave one world before you've finished searching, don't worry. Come back and your last reading will still be there. Those Echoes can be patient things.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Each reading uses up a Seeker, I'm afraid. Rather like a match. An extraordinarily expensive match that points toward mysteries instead of setting your curtains on fire.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "And if you run out? Make some more. The Echo won't wander off simply because you've exhausted your supplies.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Oh, and do leave some room in your Inventory before you go looking. Sometimes an Echo gives up an item, and you'll need somewhere to put it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Otherwise, it slips straight back into RuneSpace, perhaps to be found by a better-prepared traveler. Rather judgmental, coming from a place that hasn't invented pockets.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Find one. Just one, for now. Then come back and tell me how it went.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And don't assume you need to travel halfway across Stillreach. For all we know, there's one under your feet. The universe does enjoy making fools of people with elaborate travel plans.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wiseOldEnbyAboutResonanceEchoesTopic]: {
+    id: DIALOGUE_IDS.wiseOldEnbyAboutResonanceEchoesTopic,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "There are Echoes all over the place, if you know how to listen. And every world has its own peculiar relationship with RuneSpace.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Your Seekers will keep working long after your first discovery. There's no reason to stop looking.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I certainly haven't. At my age, a good mystery is one of the few things guaranteed to get me out of bed before noon.",
       ),
     ],
   },

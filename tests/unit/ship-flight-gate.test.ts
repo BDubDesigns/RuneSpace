@@ -40,6 +40,8 @@ function optOuts(): string[] {
 describe("in-flight gate", () => {
   it("lets only the Play read and the two presentation dismissals run in flight", () => {
     expect(optOuts()).toEqual([
+      // A Seeker reading's result notice: dismissal only, nothing else changes (#393).
+      "server/echo-hunt-commands.ts#acknowledgeEchoReading",
       "server/play.ts#acknowledgeScavengeReveal",
       "server/play.ts#getPlayGameplayState",
       "server/ship-commands.ts#acknowledgeShipArrival",

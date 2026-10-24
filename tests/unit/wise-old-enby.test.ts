@@ -239,6 +239,9 @@ describe("ordinary conversation", () => {
     ]
       .flatMap((id) => getDialogue(id)!.beats)
       .map((beat) => (beat.kind === "npc" ? beat.text : ""))
+      // The owner-approved personal Stillreach beat (#393) names "the resonance"
+      // as half of why the Enby came; it teaches nothing about runes.
+      .filter((line) => line !== STILLREACH_RESONANCE_LINE)
       .join(" ");
     expect(text).not.toMatch(/runespace|rune\b|runework|fragment|resonan|echo|seeker/i);
   });
@@ -256,6 +259,9 @@ describe("ordinary conversation", () => {
     expect(text).not.toMatch(/wise old man|gielinor|nonbinary|gender|pronoun|crash/i);
   });
 });
+
+const STILLREACH_RESONANCE_LINE =
+  "The resonance brought me to Stillreach. That's true, but it's only half an answer.";
 
 describe("Not From Around Here at the Enby", () => {
   it("offers the same Mission in person to a visitor carrying either stone", () => {

@@ -333,7 +333,13 @@ suite("issue #391 Seeker? I Hardly Know Her! (real PostgreSQL)", () => {
         "completed",
       ]);
       expect(await runeworkingXp(character.id)).toBe(xpBefore + FIRST_RUNEWORKING_LESSON_REWARD_XP);
-      expect(await carried(character.id, ITEM_IDS.beginnerEchoSeeker)).toBe(seekersBefore);
+      // The lesson consumes no Seeker; its continuation (#393) adds exactly two.
+      expect(await carried(character.id, ITEM_IDS.beginnerEchoSeeker)).toBe(seekersBefore + 2);
+      expect(
+        results.find((result) => result.mission.status === "completed")?.mission,
+      ).toMatchObject({
+        continuation: { missionId: MISSION_IDS.firstResonanceEcho, status: "accepted" },
+      });
       const [row] = await lessonRows(character.id);
       expect(row?.completedAt).toEqual(end);
 

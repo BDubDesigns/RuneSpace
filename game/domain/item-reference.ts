@@ -23,6 +23,7 @@ import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { HILLTOP_WORKSHOP_CONTENT } from "@/game/content/hilltop-workshop";
 import { REPAIR_TARGETS, type RepairTargetDefinition } from "@/game/content/repair-targets";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
+import { beginnerEchoRewardPlanets } from "@/game/domain/echo-hunts";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { partitionFailureAwards } from "@/game/domain/refining";
 import { tinkeringScrapYield } from "@/game/domain/tinkering";
@@ -201,6 +202,16 @@ export type ItemReferenceSource =
       slagPerWeld: number;
       sectionsPerWeld: number;
     }
+  | {
+      /**
+       * A Beginner Resonance Echo can give it up (#393): the chance, per
+       * discovery, on each planet whose table names it.
+       */
+      kind: "echo_hunt";
+      planets: readonly { planetId: string; percent: number }[];
+      /** The Mission whose completion opens the Resonance Rig, where Seekers are made. */
+      seekersFromMissionId: string;
+    }
   | { kind: "scavenge" }
   | { kind: "player_trade" };
 
@@ -217,6 +228,8 @@ export type ItemReferenceByproduct = {
 };
 
 export type ItemReferenceUse =
+  /** Used up by one Resonance Echo reading (#393). */
+  | { kind: "echo_reading"; quantity: number }
   | {
       kind: "recipe_input";
       recipeKind: "fabricate" | "refine" | "runework";
@@ -600,6 +613,14 @@ export function buildItemReference(
     });
   }
 
+  const echoPlanets = beginnerEchoRewardPlanets(itemId, balance);
+  if (echoPlanets.length > 0) {
+    sources.push({
+      kind: "echo_hunt",
+      planets: echoPlanets,
+      seekersFromMissionId: registries.workstations.resonanceRigUnlockMissionId,
+    });
+  }
   if (registries.scavengeOutcomes.some((outcome) => outcome.itemId === itemId)) {
     sources.push({ kind: "scavenge" });
   }
@@ -645,6 +666,9 @@ export function buildItemReference(
     }
   }
   uses.push(...missionItemUses(itemId, registries.missions, balance));
+  if (itemId === balance.echoHunts.beginner.seekerItemId) {
+    uses.push({ kind: "echo_reading", quantity: balance.echoHunts.beginner.seekersPerReading });
+  }
 
   return {
     itemId,

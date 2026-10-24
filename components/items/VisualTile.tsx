@@ -121,13 +121,12 @@ export function VisualTile({
       {/* Ultra Rare and above shimmer over the artwork zone (#342), under the
           nameplate and plates so labels stay fully legible. */}
       <RarityShimmer rarity={rarity} />
-      {/* One reserved two-line label band for every item tile (#199): the band
-          is the same height whether the name needs one line or two, so tiles
-          stay aligned, and `line-clamp-2` spends the ellipsis only on a name
-          that cannot fit the two lines it is given. */}
+      {/* One reserved two-line label band for every tile (#199). Skill XP uses
+          accentColor and has no left stack-fill track, so its nameplate spans
+          the full width; item tiles keep their stack-track clearance. */}
       <span
         data-nameplate
-        className="absolute bottom-0 left-3 right-0 z-20 flex min-h-[var(--rs-item-label-block)] items-center border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 font-display text-xs uppercase leading-[var(--rs-item-label-line-height)] tracking-wide"
+        className={`absolute bottom-0 right-0 z-20 flex min-h-[var(--rs-item-label-block)] items-center border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 font-display text-xs uppercase leading-[var(--rs-item-label-line-height)] tracking-wide ${accentColor ? "left-0" : "left-3"}`}
       >
         <span className="line-clamp-2 break-words">{name}</span>
       </span>

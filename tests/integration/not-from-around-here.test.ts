@@ -564,7 +564,11 @@ suite("issues #369 and #389 Not From Around Here (real PostgreSQL)", () => {
       expect(ready.requirements).toEqual([]);
 
       const result = await finish(userId, characterId);
-      expect(result.mission).toEqual({ status: "completed" });
+      // Nothing paid; its continuation (the lesson) is accepted, which grants nothing.
+      expect(result.mission).toEqual({
+        status: "completed",
+        continuation: { missionId: MISSION_IDS.firstRuneworkingLesson, status: "accepted" },
+      });
       const [row] = await missionRows(characterId);
       expect(row?.completedAt).toEqual(now);
       // Nothing paid, granted, consumed or recorded beyond the completion stamp.

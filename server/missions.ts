@@ -38,6 +38,7 @@ import {
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
 import {
+  continuationGiftOffer,
   leadContactLocationId,
   requirementWaived,
   uniqueItemRequirementHolds,
@@ -102,9 +103,20 @@ export type MissionConversationAcknowledgement =
   | { status: "acknowledged" | "already_acknowledged" }
   | { status: "refused"; message: string };
 
+/**
+ * What a completion did about its authored continuation (#393): accepted it
+ * (with its offer's item gift, when one is authored), or left it unaccepted
+ * because that gift would not fit. Absent when there is no continuation or it
+ * was already accepted, so a replay never presents it again.
+ */
+export type MissionContinuationOutcome =
+  | { missionId: string; status: "accepted" }
+  | { missionId: string; status: "capacity_refused"; capacityReason: "slots" | "mass" };
+
 export type MissionCompletion =
   | {
       status: "completed" | "already_completed";
+      continuation?: MissionContinuationOutcome;
       reward?: { itemId: string; quantity: 1; itemInstanceId?: string };
       /**
        * The Credits this completion transaction actually paid (#290). Present
@@ -1246,6 +1258,7 @@ async function completeMissionForDefinition(input: {
         isNull(characterMissions.completedAt),
       ),
     );
+  let continuationOutcome: MissionContinuationOutcome | undefined;
   if (definition.continuationMissionId) {
     const continuation = getMission(definition.continuationMissionId);
     if (!continuation) {
@@ -1255,21 +1268,56 @@ async function completeMissionForDefinition(input: {
     }
     const existingContinuation = missionRow(rows, continuation.id);
     if (!existingContinuation?.completedAt) {
-      await transaction
-        .insert(characterMissions)
-        .values({
-          characterId: context.character.id,
+      // A continuation whose offer hands over an item gift hands over the same
+      // gift here (#393), through the same all-or-nothing preflight and grant
+      // the in-person offer uses, planned against the inventory this completion
+      // has just left. Only a genuinely fresh acceptance grants anything.
+      const giftOffer = existingContinuation
+        ? undefined
+        : continuationGiftOffer(definition, continuation);
+      const gift =
+        giftOffer?.acceptEffect?.kind === "stack_item"
+          ? await planAcceptanceItemGrant(transaction, context.character.id, giftOffer.acceptEffect)
+          : undefined;
+      if (gift && !gift.ok) {
+        // No room for the gift: skip ONLY the next Mission's acceptance and its
+        // gift. This completion, its reward and its stamp stand. The ordinary
+        // prerequisite-gated offer stays open for a deliberate return.
+        continuationOutcome = {
           missionId: continuation.id,
-          acceptedAt: now,
-        })
-        .onConflictDoNothing();
-      await ensureMissionProgressRows(transaction, context.character.id, continuation, now);
+          status: "capacity_refused",
+          capacityReason: gift.reason,
+        };
+      } else {
+        await transaction
+          .insert(characterMissions)
+          .values({
+            characterId: context.character.id,
+            missionId: continuation.id,
+            acceptedAt: now,
+          })
+          .onConflictDoNothing();
+        await ensureMissionProgressRows(transaction, context.character.id, continuation, now);
+        if (gift?.ok) {
+          // The preflight locked these inventory rows inside this transaction,
+          // so its plan still describes the inventory it lands on.
+          await addStackableItem(transaction, {
+            characterId: context.character.id,
+            plan: gift.plan,
+            now,
+          });
+        }
+        if (!existingContinuation) {
+          continuationOutcome = { missionId: continuation.id, status: "accepted" };
+        }
+      }
     }
   }
   return stateFor({
     status: "completed",
     reward: rewardInfo,
     ...(creditsPaid !== undefined ? { creditsPaid } : {}),
+    ...(continuationOutcome ? { continuation: continuationOutcome } : {}),
   });
 }
 

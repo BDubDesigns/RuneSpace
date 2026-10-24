@@ -170,6 +170,13 @@ export type MissionRequirement =
       /** Optional authored action guidance for the activity being taught. */
       recommendedActionId?: ActionId;
       /**
+       * Carried item the player should select to perform the recommended action.
+       * Presentation-only: the tracked activity still counts the server-resolved
+       * outcome, never merely holding or using an item. Valid only alongside a
+       * real recommended action; projected through shared Mission guidance.
+       */
+      recommendedItemId?: ItemId;
+      /**
        * Offer the Sources reference of what the counted recipe makes beside this
        * objective while it is unmet (#391) — presentation only. The item is
        * derived from the recipe `actionId` names, never authored here, and the
@@ -353,7 +360,8 @@ export type MissionRequirementKind = MissionRequirement["kind"];
 
 /**
  * The closed tracked-activity vocabulary. Fabrication and Tinkering (#232) and
- * Runeworking (#391) count only what genuinely completed.
+ * Runeworking (#391) count only what genuinely completed, and so does an Echo
+ * hunt (#393): a server-resolved discovery, never a wrong reading.
  */
 export type TrackedMissionActivity =
   | "mining"
@@ -362,7 +370,8 @@ export type TrackedMissionActivity =
   | "work_order"
   | "fabrication"
   | "tinkering"
-  | "runeworking";
+  | "runeworking"
+  | "echo_hunt";
 
 /**
  * A narrow Mission-local story fact (#232): a boolean the Mission remembers
@@ -1930,8 +1939,9 @@ export const FIRST_RUNEWORKING_LESSON_REWARD_XP = 150;
  * catch-up and sessions. Earlier crafts, and Seekers owned, traded or received,
  * never count. At three the player returns to the Enby for the explicit
  * turn-in, which pays 150 Runeworking XP once; the crafts paid their own 25
- * each. The Rig stays theirs throughout and after, and nothing about the next
- * chapter is authored until it ships.
+ * each. The Rig stays theirs throughout and after. The turn-in continues into
+ * First Resonance Echo (#393) — with its two-Seeker gift when that fits, and
+ * otherwise not at all, leaving this lesson complete and paid either way.
  */
 export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
   id: MISSION_IDS.firstRuneworkingLesson,
@@ -1939,6 +1949,7 @@ export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
   summary:
     "The Wise Old Enby will teach you to attune Rune Fragments into Beginner Echo Seekers at the Resonance Rig on Hilltop Workshop.",
   prerequisiteMissionId: MISSION_IDS.notFromAroundHere,
+  continuationMissionId: MISSION_IDS.firstResonanceEcho,
   offers: [
     {
       npcId: NPC_IDS.wiseOldEnby,
@@ -1988,6 +1999,93 @@ export const FIRST_RUNEWORKING_LESSON: MissionDefinition = {
   },
 };
 
+/** The Beginner Echo Seekers the Wise Old Enby hands over with First Resonance Echo (#393). */
+export const FIRST_RESONANCE_ECHO_GIFT_SEEKERS = 2;
+
+/** The Runeworking XP First Resonance Echo pays, once, at its turn-in (#393). */
+export const FIRST_RESONANCE_ECHO_REWARD_XP = 300;
+
+/**
+ * First Resonance Echo — the Wise Old Enby's second lesson: use a Seeker, follow
+ * its directions, and find one Echo (#393).
+ *
+ * Two routes lead in, and both hand over the same two Beginner Echo Seekers,
+ * authored once on the Enby's offer below. Turning in Seeker? I Hardly Know Her!
+ * continues into it, giving that offer's gift in the same transaction when both
+ * Seekers fit carried slots and mass; when they do not, the lesson still
+ * completes and pays, and this Mission is simply not accepted yet. The ordinary
+ * prerequisite-gated offer then serves that player on a deliberate return, and
+ * anyone who finished the lesson before this shipped. Acceptance by either route
+ * removes the offer, so the gift is given exactly once and never topped up.
+ *
+ * The objective is one genuine, server-resolved discovery on either planet after
+ * acceptance, counted by the ordinary tracked-activity path in the reading's own
+ * transaction. Wrong readings, carried Seekers, conversations and discoveries
+ * before acceptance count for nothing. Then the Enby's explicit turn-in pays
+ * 300 Runeworking XP once; each discovery already paid its own 50.
+ */
+export const FIRST_RESONANCE_ECHO: MissionDefinition = {
+  id: MISSION_IDS.firstResonanceEcho,
+  title: "First Resonance Echo",
+  summary:
+    "The Wise Old Enby wants you to use a Beginner Echo Seeker, follow its directions, and find your first Resonance Echo.",
+  prerequisiteMissionId: MISSION_IDS.firstRuneworkingLesson,
+  offers: [
+    {
+      npcId: NPC_IDS.wiseOldEnby,
+      locationId: LOCATION_IDS.hilltopWorkshop,
+      dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoOffer,
+      actionLabel: "Take the Seekers",
+      declineLabel: "Not Now",
+      acceptEffect: {
+        kind: "stack_item",
+        itemId: ITEM_IDS.beginnerEchoSeeker,
+        quantity: FIRST_RESONANCE_ECHO_GIFT_SEEKERS,
+      },
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoInstructions },
+    },
+  ],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "echoes-found",
+      activity: "echo_hunt",
+      metric: "completions",
+      target: 1,
+      objective:
+        "Find one Resonance Echo using a Beginner Echo Seeker ({current}/{target}). Seekers search your current planet; each planet's search is separate. Leave room in Inventory for anything you find.",
+      recommendedActionId: ACTION_IDS.beginnerEchoReading,
+      recommendedItemId: ITEM_IDS.beginnerEchoSeeker,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wiseOldEnby,
+    locationId: LOCATION_IDS.hilltopWorkshop,
+    requiresStationary: true,
+    objective: "Return to the Wise Old Enby at Hilltop Workshop",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoTurnIn,
+    actionLabel: "Complete First Resonance Echo",
+  },
+  reward: {
+    kind: "skill_xp",
+    skillId: SKILL_IDS.runeworking,
+    amount: FIRST_RESONANCE_ECHO_REWARD_XP,
+  },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoReminder,
+    completionPresentationDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoCompletion,
+    capacitySlotsDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoCapacity,
+    capacityMassDialogueId: DIALOGUE_IDS.wiseOldEnbyFirstEchoCapacity,
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "The approved script authors no busy beat (#393): a character mid-reading at Hilltop Workshop hears the Enby's debrief, whose completion the server refuses until the reading resolves.",
+      },
+    ],
+  },
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -2028,6 +2126,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Its continuation, and the Enby's in-person offer to those who finished the
   // mystery before it existed (#391).
   FIRST_RUNEWORKING_LESSON,
+  // Its continuation, with the Enby's two-Seeker gift, and the same offer in
+  // person for those who finished the lesson earlier or had no room (#393).
+  FIRST_RESONANCE_ECHO,
 ];
 
 const missions = new Map<string, MissionDefinition>(

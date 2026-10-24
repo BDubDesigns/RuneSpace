@@ -337,11 +337,16 @@ test("three attunements, the Seeker's Sources, and the Enby's turn-in", async ({
   expect((await lessonRows(testCharacter.id))[0]?.completedAt).toBeNull();
   await conversation.locator("[data-dialogue-action]").click();
   await expect(conversation.locator("[data-dialogue-skill-xp-tile]")).toContainText("150");
+  // The lesson continues into First Resonance Echo (#393): two more Seekers fit,
+  // so the same scene goes on into the gift and the instructions.
   await conversation.locator("[data-dialogue-next]").click();
-  await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+  await expect(conversation.locator("[data-dialogue-text]")).toContainText(
+    /You've learned to make Seekers/,
+  );
+  await finishScene(conversation, /elaborate travel plans/);
   expect((await lessonRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
   expect(await runeworkingXp(testCharacter.id)).toBe(3 * seeker.baseXp + 150);
-  expect(await carried(testCharacter.id, ITEM_IDS.beginnerEchoSeeker)).toBe(3);
+  expect(await carried(testCharacter.id, ITEM_IDS.beginnerEchoSeeker)).toBe(5);
 
   // Completed: no command left, and the aftercare topic appears.
   await expect(conversation.locator(`[data-conversation-entry^="${LESSON}:"]`)).toHaveCount(0);
@@ -349,8 +354,11 @@ test("three attunements, the Seeker's Sources, and the Enby's turn-in", async ({
   await finishScene(conversation, /bare minimum/);
   await closeConversation(page);
 
-  // The Rig stays the player's.
+  // The Rig stays the player's, and the next lesson is under way.
   await page.reload();
   await expect(page.locator(`[data-mission-strip="${LESSON}"]`)).toHaveCount(0);
+  await expect(
+    page.locator(`[data-mission-strip="${MISSION_IDS.firstResonanceEcho}"]`),
+  ).toBeVisible();
   await expect(page.locator("[data-attune-start]")).toBeEnabled();
 });

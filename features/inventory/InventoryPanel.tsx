@@ -35,6 +35,7 @@ import {
   type RowDetailsTile,
 } from "@/features/shared/RowDetailsGrid";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
+import { EchoSeekerDetails } from "@/features/echo-hunts/EchoSeekerDetails";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
@@ -340,14 +341,20 @@ export function InventoryPanel({
       node: (
         <StackItemVisual
           className={
-            missionGuidanceTargets.availableItemIds.has(stack.itemId)
-              ? "rs-mission-available"
-              : undefined
+            missionGuidanceTargets.actionItemIds.has(stack.itemId)
+              ? "rs-mission-guidance"
+              : missionGuidanceTargets.availableItemIds.has(stack.itemId)
+                ? "rs-mission-available"
+                : undefined
           }
           interactive
           itemId={stack.itemId}
           missionGuidance={
-            missionGuidanceTargets.availableItemIds.has(stack.itemId) ? "available" : undefined
+            missionGuidanceTargets.actionItemIds.has(stack.itemId)
+              ? "active"
+              : missionGuidanceTargets.availableItemIds.has(stack.itemId)
+                ? "available"
+                : undefined
           }
           name={stack.name}
           onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
@@ -498,6 +505,11 @@ export function InventoryPanel({
                     {selectedItemOffer.offer.inspectLabel}
                   </MissionActionButton>
                 </div>
+              ) : null}
+              {resolvedSelection.kind === "stack" &&
+              resolvedSelection.entry.itemId === state.echoHunt.seekerItemId ? (
+                // A Seeker's Use and its current-planet reading (#393).
+                <EchoSeekerDetails />
               ) : null}
               {selectedIsPowerCell ? (
                 <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">

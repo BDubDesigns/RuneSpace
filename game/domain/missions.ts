@@ -1,6 +1,7 @@
 import {
   fabricationActionIds,
   fabricationRecipeForActionId,
+  getEffectiveGameBalance,
   getItemDefinition,
   getShipFlightBalance,
   runeworkingActionIds,
@@ -27,6 +28,7 @@ import type {
   MissionDefinition,
   MissionDialogue,
   MissionLifecycleMoment,
+  MissionOffer,
   MissionReactiveFact,
   MissionRequirement,
   MissionRequirementKind,
@@ -56,6 +58,8 @@ const TRACKED_ACTIVITY_ACTION_IDS: Record<TrackedMissionActivity, () => readonly
   tinkering: () => tinkeringActionIds(),
   // A family like Fabrication (#391): one action per authored recipe.
   runeworking: () => runeworkingActionIds(),
+  // A Beginner Echo discovery (#393), made only by reading a Seeker.
+  echo_hunt: () => [getEffectiveGameBalance().echoHunts.beginner.readingActionId],
 };
 
 /**
@@ -73,6 +77,8 @@ const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "com
   fabrication: "completions",
   tinkering: "completions",
   runeworking: "completions",
+  // Only a discovery the server resolved counts; a wrong reading is not one.
+  echo_hunt: "completions",
 };
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
@@ -203,6 +209,8 @@ export type MissionGuidance = {
   localPlaceId?: string;
   /** The item whose equipped state is the first unmet requirement. */
   equipmentItemId?: string;
+  /** A carried item's own action is the next Mission step (distinct from an offer). */
+  actionItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
@@ -747,6 +755,9 @@ function deriveGuidance(
   ) {
     return {
       actionId: firstUnsatisfied.recommendedActionId,
+      ...(firstUnsatisfied.kind === "tracked_activity" && firstUnsatisfied.recommendedItemId
+        ? { actionItemId: firstUnsatisfied.recommendedItemId }
+        : {}),
       ...actionDestination(firstUnsatisfied.recommendedActionId, currentLocationId),
     };
   }
@@ -1342,6 +1353,8 @@ export type MissionGuidanceTargets = {
   /** World Location(s) elsewhere where a Mission's final handoff is (TURN IN). */
   turnInLocationIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
+  /** Carried items whose own action advances active pinned Mission work. */
+  actionItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
   /** Tracked activities an accepted Mission's current objective counts (#232). */
   activities: ReadonlySet<string>;
@@ -1480,6 +1493,7 @@ export function deriveMissionGuidanceTargets(
   const locationIds = new Set<string>();
   const turnInLocationIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
+  const actionItemIds = new Set<string>();
   const actionIds = new Set<string>();
   const activities = new Set<string>();
   const repairTargetIds = new Set<string>();
@@ -1503,6 +1517,7 @@ export function deriveMissionGuidanceTargets(
       if (target.locationId) (turnIn ? turnInLocationIds : locationIds).add(target.locationId);
     }
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
+    if (guidance.actionItemId) actionItemIds.add(guidance.actionItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);
     if (guidance.activity) activities.add(guidance.activity);
     if (guidance.repairTargetId) repairTargetIds.add(guidance.repairTargetId);
@@ -1517,6 +1532,7 @@ export function deriveMissionGuidanceTargets(
     locationIds,
     turnInLocationIds,
     equipmentItemIds,
+    actionItemIds,
     actionIds,
     activities,
     repairTargetIds,
@@ -1743,6 +1759,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           ) {
             throw new Error(
               `${where} tracked activity guidance must target its authoritative activity action.`,
+            );
+          }
+        }
+        if (requirement.recommendedItemId) {
+          const guidedItem = getItemDefinition(requirement.recommendedItemId);
+          if (!requirement.recommendedActionId || !guidedItem || guidedItem.kind !== "stack") {
+            throw new Error(
+              `${where} tracked activity item guidance needs a real stack item and recommended action.`,
             );
           }
         }
@@ -2328,6 +2352,25 @@ function assertReactiveContent(
 }
 
 /**
+ * The offer route whose authored item gift an automatic continuation hands over
+ * (#393): the continuation Mission's own offer made by the person the
+ * predecessor is turned in to, when that offer grants something. It is the same
+ * gift, from the same person, that accepting the offer in person would give —
+ * one authored definition, never a second copy on the predecessor. Validation
+ * allows only a `stack_item` gift here.
+ */
+export function continuationGiftOffer(
+  predecessor: Pick<MissionDefinition, "turnIn">,
+  continuation: Pick<MissionDefinition, "offers">,
+): MissionOffer | undefined {
+  const npcId = predecessor.turnIn?.npcId;
+  if (!npcId) return undefined;
+  return continuation.offers.find(
+    (offer) => offer.npcId === npcId && offer.acceptEffect?.kind === "stack_item",
+  );
+}
+
+/**
  * Validates the authored continuation graph across all definitions: no
  * cycles, and no continuation that contradicts the target's prerequisite
  * semantics. A continuation auto-accepts its target, so the target must be
@@ -2340,6 +2383,17 @@ function assertContinuationGraph(definitions: readonly MissionDefinition[]): voi
     if (!definition.continuationMissionId) continue;
     const where = `Mission "${definition.id}"`;
     const target = byId.get(definition.continuationMissionId);
+    // The continuation hands over the gift of the target's offer at this
+    // Mission's turn-in NPC (#393). Only an item grant has a capacity-safe
+    // continuation path; a Credits gift would need a receipt it cannot show.
+    const giftRoute = target?.offers.find(
+      (offer) => offer.npcId === definition.turnIn?.npcId && offer.acceptEffect !== undefined,
+    );
+    if (giftRoute && giftRoute.acceptEffect?.kind !== "stack_item") {
+      throw new Error(
+        `${where} continues into "${target!.id}", whose offer at the turn-in NPC grants something a continuation cannot hand over.`,
+      );
+    }
     if (
       target?.prerequisiteMissionId !== undefined &&
       target.prerequisiteMissionId !== definition.id

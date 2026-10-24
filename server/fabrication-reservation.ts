@@ -2,9 +2,12 @@ import { eq } from "drizzle-orm";
 import { activeActions } from "@/db/rune-space";
 import { fabricationRecipeForActionId, runeworkingRecipeForActionId } from "@/game/config/balance";
 import { fabricationStartCheck } from "@/game/domain/fabrication";
+import { canBeginEchoReading } from "@/game/domain/echo-hunts";
 import { runeworkingStartCheck } from "@/game/domain/runeworking";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { loadFabricationCapacity } from "@/server/fabrication";
+import { isEchoReadingAction } from "@/server/echo-hunts";
+import { loadPlaySnapshot } from "@/server/play-state";
 import { loadRuneworkingCapacity } from "@/server/runeworking";
 
 /**
@@ -47,6 +50,19 @@ export class RuneworkingReservationError extends FabricationReservationError {
   }
 }
 
+/**
+ * The same refusal for a Beginner Echo reading (#393): the Seeker a started
+ * reading will consume stays in the Inventory until the reading resolves.
+ */
+export class EchoReadingReservationError extends FabricationReservationError {
+  constructor() {
+    super(
+      "That would take the Beginner Echo Seeker your reading is using. Let the reading finish first.",
+    );
+    this.name = "EchoReadingReservationError";
+  }
+}
+
 export async function assertActiveWorkpieceResolvable(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -63,6 +79,11 @@ export async function assertActiveWorkpieceResolvable(
       recipe,
     );
     if (!check.ok) throw new FabricationReservationError();
+    return;
+  }
+  if (isEchoReadingAction(action.actionId)) {
+    const { stacks } = await loadPlaySnapshot(transaction, characterId);
+    if (!canBeginEchoReading(stacks)) throw new EchoReadingReservationError();
     return;
   }
   const runeworkingRecipe = runeworkingRecipeForActionId(action.actionId);

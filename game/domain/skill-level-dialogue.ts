@@ -68,6 +68,29 @@ export function resolvePresentedDialogue(
 }
 
 /**
+ * Several sequences presented as one continuous scene (#393), each resolved as
+ * `resolvePresentedDialogue` would. One sequence is returned unchanged; more are
+ * joined beat for beat under the first one's identity. Every beat carries its
+ * own speaker and background, so nothing about a beat changes by joining.
+ */
+export function composePresentedDialogue(
+  dialogueIds: readonly string[],
+  selections: Readonly<Record<string, string>>,
+): DialogueSequence | undefined {
+  const parts = dialogueIds.flatMap((id) => {
+    const resolved = resolvePresentedDialogue(id, selections);
+    return resolved ? [resolved] : [];
+  });
+  const [first, ...rest] = parts;
+  if (!first || rest.length === 0) return first;
+  return {
+    ...first,
+    id: parts.map((part) => part.id).join("+") as DialogueSequence["id"],
+    beats: parts.flatMap((part) => part.beats),
+  };
+}
+
+/**
  * Startup validation: fail fast at module load so an authoring mistake never
  * reaches a player as a silent or wrong branch.
  */

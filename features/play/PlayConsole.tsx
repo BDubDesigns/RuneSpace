@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
+import { EchoReadingNotice } from "@/features/echo-hunts/EchoReadingNotice";
 import { isShipInFlight } from "@/features/ship/flight";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
@@ -47,11 +48,50 @@ export function PlayConsole({
   surface?: PlaySurface;
   onMapExit: () => void;
 }) {
-  const { acquireCommand, acceptState, releaseCommand, setRefreshCallback, state } = usePlay();
+  const {
+    acquireCommand,
+    acceptState,
+    closeUtilityPanel,
+    inventoryOpen,
+    releaseCommand,
+    setRefreshCallback,
+    state,
+  } = usePlay();
   const desktop = useDesktopWorkspace();
   const inTransit = Boolean(state.travelState);
   const inFlight = isShipInFlight(state);
   const [, startTransition] = useTransition();
+  const [spotlightNoticeId, setSpotlightNoticeId] = useState<string>();
+  const readingInInventory = useRef<{ previousNoticeId?: string } | undefined>(undefined);
+
+  const readingActive = state.activeAction?.actionId === state.echoHunt.readingActionId;
+  const readingBoundary = readingActive ? state.activeAction?.nextAttemptAt : undefined;
+  const noticeId = state.echoHunt.notice?.noticeId;
+
+  // Only a reading observed in an open mobile Inventory owns this transition.
+  // Wait for the authoritative result (not the visual clock reaching zero),
+  // then return to Play and spotlight its durable receipt. A player who closed
+  // Inventory or navigated away independently is never pulled back.
+  useEffect(() => {
+    if (readingBoundary) {
+      if (desktop === false && inventoryOpen && !readingInInventory.current) {
+        readingInInventory.current = { previousNoticeId: noticeId };
+      }
+      return;
+    }
+    const started = readingInInventory.current;
+    readingInInventory.current = undefined;
+    if (
+      started &&
+      desktop === false &&
+      inventoryOpen &&
+      noticeId &&
+      noticeId !== started.previousNoticeId
+    ) {
+      closeUtilityPanel("inventory");
+      setSpotlightNoticeId(noticeId);
+    }
+  }, [readingBoundary, desktop, inventoryOpen, noticeId, closeUtilityPanel]);
 
   function applyReconciliation(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
     if (result.error) {
@@ -103,6 +143,8 @@ export function PlayConsole({
       <ScavengeSuppressedNotice />
       {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
       <ShipArrivalNotice />
+      {/* A Seeker reading's durable result, wherever the player is (#393). */}
+      <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (
         // The return control is the desktop main-column header's while docked
         // (#286), so the panel does not carry a second one beside it.

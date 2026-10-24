@@ -9,6 +9,64 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #393 — Stillreach Slice I: First Resonance Echo and Beginner Echo hunts.
+    slug: "first-resonance-echo",
+    title: "First Resonance Echo",
+    publishedAt: "2026-10-23T16:30:00-07:00",
+    summary:
+      "Beginner Echo Seekers work now. Use one from your Inventory to hunt for a hidden Resonance Echo on Skatboll or Stillreach, and let the Wise Old Enby show you how in First Resonance Echo.",
+    hero: {
+      src: "/location-scenes/hilltop-workshop.webp",
+      alt: "A small metal-roofed workshop with lit windows and a canvas awning on a rocky hilltop covered in violet and teal scrub and tiny glowing mushrooms, misty valleys and an aurora sky beyond",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.beginnerEchoSeeker },
+        side: "right",
+      },
+      [
+        "Select a Beginner Echo Seeker in your Inventory and choose Use. It listens for a few seconds and is used up, and it either finds a Resonance Echo where you stand or tells you which way to go: east or west, north or south, from the spot you took the reading. Skatboll and Stillreach each hide their own Echo and keep their own search, so you can leave a world and pick up where you left off. ",
+        { text: "Runeworking", articleSlug: "runeworking" },
+        " has the details.",
+      ],
+      "A found Echo pays Runeworking XP and gives up one item, from a Rune Fragment to an intact Runestone. Leave room in your Inventory: an item that will not fit slips back into RuneSpace, though you keep the XP.",
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.wiseOldEnby, expressionId: "amused" },
+        side: "left",
+      },
+      [
+        "Finishing ",
+        { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
+        " now carries straight on into ",
+        { text: "First Resonance Echo", articleSlug: "mission-first-resonance-echo" },
+        ", and the Wise Old Enby hands you two more Seekers to start with. If you finished the lesson before today, or had no room for them, ask the Enby. They also have a little more to say about Stillreach.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Use on a Beginner Echo Seeker in Inventory: a 4.8-second reading that uses one Seeker and searches the planet you are on.",
+          "Beginner Resonance Echo hunts on Skatboll and Stillreach, each with its own hidden Echo and its own saved last reading. A wrong reading points east or west and north or south from where you took it; a found Echo pays 50 Runeworking XP and one item.",
+          "The Seeker's details show the planet you are searching, your last reading there, and whether where you stand has been ruled out.",
+          "First Resonance Echo, from the Wise Old Enby: two Beginner Echo Seekers when it starts, one Echo found on either planet, then 300 Runeworking XP at their workshop.",
+          "How to Listen and About Resonance Echoes, two new conversations with the Wise Old Enby.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Completing Seeker? I Hardly Know Her! now continues into First Resonance Echo when you have room for the two Seekers it comes with.",
+          "The Wise Old Enby's Stillreach conversation is a little longer.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #391 — Stillreach Slice H: Runeworking, the Resonance Rig and the Seeker? I Hardly Know Her!.
     slug: "first-runeworking-lesson",
     title: "Seeker? I Hardly Know Her!",
