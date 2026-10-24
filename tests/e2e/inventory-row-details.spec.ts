@@ -96,14 +96,17 @@ test("an action from the inserted details panel works: Drop 1 with confirmation"
   // Inventory keeps its own richer content, not the storage transfer summary.
   await expect(panel.getByRole("heading", { name: "Item details" })).toBeVisible();
   await panel.getByRole("button", { name: "Drop 1" }).click();
-  await expect(inventory.getByRole("alert")).toContainText("Drop 1 Slag?");
-  await inventory.getByRole("button", { name: "Cancel" }).click();
-  await expect(slag).toBeFocused();
-  await panel.getByRole("button", { name: "Drop 1" }).click();
-  await inventory
-    .getByRole("button", { name: /^Drop 1$/ })
-    .last()
-    .click();
+  // The confirmation is inline in the panel, replacing the Drop buttons.
+  await expect(panel.getByRole("alert")).toContainText("Drop 1 Slag?");
+  await expect(inventory.getByRole("alert")).toHaveCount(1);
+  await expect(panel.getByRole("button", { name: "Drop 1", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await panel.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.getByRole("button", { name: "Drop 1", exact: true })).toBeFocused();
+  await panel.getByRole("button", { name: "Drop 1", exact: true }).click();
+  await panel.getByRole("button", { name: "Confirm drop" }).click();
   await expect(inventory.getByText("Dropped 1 Slag.")).toBeVisible();
   // Power Cells keep their Load affordance in the inserted panel.
   await inventory

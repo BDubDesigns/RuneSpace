@@ -972,7 +972,10 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(refinedDetails.locator('[data-stat="quantity"] dd')).toHaveText("1");
   await expect(refinedDetails.getByRole("button", { name: "Drop item" })).toBeVisible();
   await refinedDetails.getByRole("button", { name: "Drop item" }).click();
-  const refinedConfirmation = inventory.getByRole("alert");
+  // Inline in the selected details panel, replacing the Drop button.
+  const refinedConfirmation = refinedDetails.getByRole("alert");
+  await expect(inventory.getByRole("alert")).toHaveCount(1);
+  await expect(refinedDetails.getByRole("button", { name: "Drop item" })).toHaveCount(0);
   await expect(refinedConfirmation).toContainText("Drop 1 Refined Ferrite?");
   await expect(refinedConfirmation).toContainText(
     "Dropped items are permanently destroyed in the current development build.",
@@ -980,8 +983,8 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await refinedConfirmation.getByRole("button", { name: "Cancel" }).click();
   await expect(refinedConfirmation).toHaveCount(0);
   await expect(refinedTile).toHaveAttribute("aria-pressed", "true");
-  // Cancel returns keyboard focus to the grid (the still-selected tile).
-  await expect(refinedTile).toBeFocused();
+  // Cancel restores the Drop action in place and returns keyboard focus to it.
+  await expect(refinedDetails.getByRole("button", { name: "Drop item" })).toBeFocused();
 
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(5);
 
