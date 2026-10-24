@@ -75,6 +75,7 @@ export function PublicLandingPage({
     currentBuild,
     gameplayState,
     hero,
+    mobileShowcase,
     showcase,
     status,
   } = publicLandingContent;
@@ -163,21 +164,36 @@ export function PublicLandingPage({
             {showcase.map((view, index) => (
               <figure
                 className={`min-w-0 overflow-hidden border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] shadow-[var(--rs-shadow-panel)] ${index === 0 ? "lg:col-span-2" : ""}`}
-                key={view.src}
+                key={`${view.label}-${view.detail}`}
               >
                 <div className="relative overflow-hidden border-b border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-page)]">
-                  <Image
-                    alt={view.alt}
-                    className="block h-auto w-full"
-                    height={view.height}
-                    sizes={
-                      index === 0
-                        ? "(max-width: 1024px) 100vw, 1152px"
-                        : "(max-width: 1024px) 100vw, 576px"
-                    }
-                    src={view.src}
-                    width={view.width}
-                  />
+                  {"video" in view ? (
+                    <video
+                      aria-label={view.alt}
+                      autoPlay
+                      className="block h-auto w-full"
+                      height={view.height}
+                      loop
+                      muted
+                      playsInline
+                      poster={view.poster}
+                      src={view.video}
+                      width={view.width}
+                    />
+                  ) : (
+                    <Image
+                      alt={view.alt}
+                      className="block h-auto w-full"
+                      height={view.height}
+                      sizes={
+                        index === 0
+                          ? "(max-width: 1024px) 100vw, 1152px"
+                          : "(max-width: 1024px) 100vw, 576px"
+                      }
+                      src={view.src}
+                      width={view.width}
+                    />
+                  )}
                 </div>
                 <figcaption className="flex items-center justify-between gap-4 px-4 py-3">
                   <span className="font-display text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--rs-accent-primary)]">
@@ -246,6 +262,42 @@ export function PublicLandingPage({
                   </div>
                 </div>
               </article>
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="mobile-heading" className="pt-20 sm:pt-28">
+          <PublicSectionHeader eyebrow={mobileShowcase.eyebrow} id="mobile-heading">
+            {mobileShowcase.title}
+          </PublicSectionHeader>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
+            {mobileShowcase.description}
+          </p>
+          <div className="mt-8 grid min-w-0 grid-cols-2 gap-5 lg:grid-cols-4">
+            {mobileShowcase.views.map((view) => (
+              <figure
+                className="min-w-0 overflow-hidden border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] shadow-[var(--rs-shadow-panel)]"
+                key={view.src}
+              >
+                <div className="relative overflow-hidden border-b border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-page)]">
+                  <Image
+                    alt={view.alt}
+                    className="block h-auto w-full"
+                    height={view.height}
+                    sizes="(max-width: 1024px) 50vw, 288px"
+                    src={view.src}
+                    width={view.width}
+                  />
+                </div>
+                <figcaption className="flex items-center justify-between gap-4 px-4 py-3">
+                  <span className="font-display text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--rs-accent-primary)]">
+                    {view.label}
+                  </span>
+                  <span className="text-right text-sm text-[color:var(--rs-text-secondary)]">
+                    {view.detail}
+                  </span>
+                </figcaption>
+              </figure>
             ))}
           </div>
         </section>
