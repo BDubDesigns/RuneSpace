@@ -170,6 +170,13 @@ export type MissionRequirement =
       /** Optional authored action guidance for the activity being taught. */
       recommendedActionId?: ActionId;
       /**
+       * Carried item the player should select to perform the recommended action.
+       * Presentation-only: the tracked activity still counts the server-resolved
+       * outcome, never merely holding or using an item. Valid only alongside a
+       * real recommended action; projected through shared Mission guidance.
+       */
+      recommendedItemId?: ItemId;
+      /**
        * Offer the Sources reference of what the counted recipe makes beside this
        * objective while it is unmet (#391) — presentation only. The item is
        * derived from the recipe `actionId` names, never authored here, and the
@@ -2048,6 +2055,7 @@ export const FIRST_RESONANCE_ECHO: MissionDefinition = {
       objective:
         "Find one Resonance Echo using a Beginner Echo Seeker ({current}/{target}). Seekers search your current planet; each planet's search is separate. Leave room in Inventory for anything you find.",
       recommendedActionId: ACTION_IDS.beginnerEchoReading,
+      recommendedItemId: ITEM_IDS.beginnerEchoSeeker,
     },
   ],
   turnIn: {
