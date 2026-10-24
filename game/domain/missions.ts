@@ -209,6 +209,8 @@ export type MissionGuidance = {
   localPlaceId?: string;
   /** The item whose equipped state is the first unmet requirement. */
   equipmentItemId?: string;
+  /** A carried item's own action is the next Mission step (distinct from an offer). */
+  actionItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
@@ -753,6 +755,9 @@ function deriveGuidance(
   ) {
     return {
       actionId: firstUnsatisfied.recommendedActionId,
+      ...(firstUnsatisfied.kind === "tracked_activity" && firstUnsatisfied.recommendedItemId
+        ? { actionItemId: firstUnsatisfied.recommendedItemId }
+        : {}),
       ...actionDestination(firstUnsatisfied.recommendedActionId, currentLocationId),
     };
   }
@@ -1348,6 +1353,8 @@ export type MissionGuidanceTargets = {
   /** World Location(s) elsewhere where a Mission's final handoff is (TURN IN). */
   turnInLocationIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
+  /** Carried items whose own action advances active pinned Mission work. */
+  actionItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
   /** Tracked activities an accepted Mission's current objective counts (#232). */
   activities: ReadonlySet<string>;
@@ -1486,6 +1493,7 @@ export function deriveMissionGuidanceTargets(
   const locationIds = new Set<string>();
   const turnInLocationIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
+  const actionItemIds = new Set<string>();
   const actionIds = new Set<string>();
   const activities = new Set<string>();
   const repairTargetIds = new Set<string>();
@@ -1509,6 +1517,7 @@ export function deriveMissionGuidanceTargets(
       if (target.locationId) (turnIn ? turnInLocationIds : locationIds).add(target.locationId);
     }
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
+    if (guidance.actionItemId) actionItemIds.add(guidance.actionItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);
     if (guidance.activity) activities.add(guidance.activity);
     if (guidance.repairTargetId) repairTargetIds.add(guidance.repairTargetId);
@@ -1523,6 +1532,7 @@ export function deriveMissionGuidanceTargets(
     locationIds,
     turnInLocationIds,
     equipmentItemIds,
+    actionItemIds,
     actionIds,
     activities,
     repairTargetIds,
@@ -1749,6 +1759,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           ) {
             throw new Error(
               `${where} tracked activity guidance must target its authoritative activity action.`,
+            );
+          }
+        }
+        if (requirement.recommendedItemId) {
+          const guidedItem = getItemDefinition(requirement.recommendedItemId);
+          if (!requirement.recommendedActionId || !guidedItem || guidedItem.kind !== "stack") {
+            throw new Error(
+              `${where} tracked activity item guidance needs a real stack item and recommended action.`,
             );
           }
         }
