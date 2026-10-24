@@ -178,8 +178,14 @@ test("the Enby's two Seekers, a wrong reading, a discovery, and the debrief", as
   await expect(inventory).toHaveCount(0);
   await expect(page.locator("[data-echo-result-focus]")).toBeFocused();
   await expect(notice).toBeInViewport();
-  await expect(notice.locator("[data-echo-compass]")).toHaveAttribute("data-echo-compass", "northeast");
-  await expect(notice.locator("[data-echo-compass-angle]")).toHaveAttribute("data-echo-compass-angle", "45");
+  await expect(notice.locator("[data-echo-compass]")).toHaveAttribute(
+    "data-echo-compass",
+    "northeast",
+  );
+  await expect(notice.locator("[data-echo-compass-angle]")).toHaveAttribute(
+    "data-echo-compass-angle",
+    "45",
+  );
   expect(await carried(testCharacter.id, ITEM_IDS.beginnerEchoSeeker)).toBe(1);
   ({ inventory, details } = await seekerDetails(page));
   await expect(details.locator("[data-echo-last-reading]")).toContainText(
