@@ -247,6 +247,14 @@ import {
   type RuneworkingRunState,
 } from "@/server/runeworking";
 import type { RuneworkingCommandError } from "@/server/runeworking-commands";
+import type { EchoReadingCommandError } from "@/server/echo-hunt-commands";
+import {
+  createEchoReadingResolver,
+  echoRandomFrom,
+  isEchoReadingAction,
+  loadEchoHuntProjection,
+  type EchoHuntProjection,
+} from "@/server/echo-hunts";
 import {
   runeworkingAffordableCycles,
   runeworkingRecipeUnlocked,
@@ -974,6 +982,14 @@ export type PlayGameplayState = {
   /** One current Runeworking refusal, for the Rig (#391). */
   runeworkingError?: RuneworkingCommandError;
   /**
+   * The character's Beginner Resonance Echo hunts as a player may know them
+   * (#393): the planet a Seeker would search here, that planet's last wrong
+   * reading and the newest undismissed reading result. Never a hidden target.
+   */
+  echoHunt: EchoHuntProjection;
+  /** One current Seeker reading refusal, for its Item Details (#393). */
+  echoReadingError?: EchoReadingCommandError;
+  /**
    * The Mining source reachable where the character is standing, or undefined
    * where none is (#209). Replaces the old global `successChanceBps`, which
    * could only ever describe Ferrite Shale.
@@ -1346,6 +1362,13 @@ export function createPlayResolver(
       actionId: recipe.actionId,
       resolver: createRuneworkingResolver() as PlayResolver,
     })),
+    {
+      // Reading a Beginner Echo Seeker (#393): one timed, stationary reading that
+      // resolves once, with its Mission credit, in the transaction that consumes
+      // the Seeker.
+      actionId: getEffectiveGameBalance().echoHunts.beginner.readingActionId,
+      resolver: createEchoReadingResolver(echoRandomFrom(random)) as PlayResolver,
+    },
   ];
   return composePlayResolvers(entries);
 }
@@ -2145,7 +2168,7 @@ export async function stateFromTransaction(
   practiceError?: PlayGameplayState["practiceError"],
   stationErrors?: Pick<
     PlayGameplayState,
-    "fabricationError" | "tinkeringError" | "miningError" | "runeworkingError"
+    "fabricationError" | "tinkeringError" | "miningError" | "runeworkingError" | "echoReadingError"
   >,
 ): Promise<PlayGameplayState> {
   const balance = getEffectiveGameBalance();
@@ -2491,26 +2514,29 @@ export async function stateFromTransaction(
   const activeRuneworkingRecipe = action
     ? runeworkingRecipeForActionId(action.actionId, balance)
     : undefined;
-  const nextAttemptDurationTicks = isWeldingCadenceAction
-    ? balance.welding.attemptDurationTicks
-    : activeRefiningRecipe
-      ? // The run's own persisted venue prices it (#381), never the route.
-        activeRefiningRecipe.attemptDurationTicks *
-        refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
-      : activeFabricationRecipe
-        ? activeFabricationRecipe.durationTicks
-        : activeRuneworkingRecipe
-          ? activeRuneworkingRecipe.durationTicks
-          : activeTinkeringTarget
-            ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
-            : activeMiningSource
-              ? miningAttemptDurationTicks(
-                  balance,
-                  activeMiningSource,
-                  equippedTool?.definition,
-                  nextAttemptBoosted,
-                )
-              : balance.welding.attemptDurationTicks;
+  const activeEchoReading = isEchoReadingAction(action?.actionId);
+  const nextAttemptDurationTicks = activeEchoReading
+    ? balance.echoHunts.beginner.readingDurationTicks
+    : isWeldingCadenceAction
+      ? balance.welding.attemptDurationTicks
+      : activeRefiningRecipe
+        ? // The run's own persisted venue prices it (#381), never the route.
+          activeRefiningRecipe.attemptDurationTicks *
+          refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
+        : activeFabricationRecipe
+          ? activeFabricationRecipe.durationTicks
+          : activeRuneworkingRecipe
+            ? activeRuneworkingRecipe.durationTicks
+            : activeTinkeringTarget
+              ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
+              : activeMiningSource
+                ? miningAttemptDurationTicks(
+                    balance,
+                    activeMiningSource,
+                    equippedTool?.definition,
+                    nextAttemptBoosted,
+                  )
+                : balance.welding.attemptDurationTicks;
   // A workpiece's timer runs from the cursor, which always stands at its start.
   // A Tinkering cycle's cursor moves with every resolution, so its timer runs
   // from the ticks it has already had.
@@ -2569,9 +2595,11 @@ export async function stateFromTransaction(
   const locationMiningSource = miningSources(balance).find((source) =>
     locationStates[currentLocationId]?.availableActionIds.includes(source.actionId),
   );
+  const echoHunt = await loadEchoHuntProjection(transaction, characterId, currentLocationId);
   return {
     characterId,
     missions,
+    echoHunt,
     location: { currentLocationId },
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
@@ -2590,6 +2618,7 @@ export async function stateFromTransaction(
         activeFabricationRecipe !== undefined ||
         activeTinkeringTarget !== undefined ||
         activeRuneworkingRecipe !== undefined ||
+        activeEchoReading ||
         isWeldingCadenceAction)
         ? {
             actionId: action.actionId,
@@ -2646,6 +2675,9 @@ export async function stateFromTransaction(
       xpIntoLevel: runeworkingProgress.xpIntoLevel,
     },
     resonanceRig,
+    ...(stationErrors?.echoReadingError
+      ? { echoReadingError: stationErrors.echoReadingError }
+      : {}),
     ...(stationErrors?.runeworkingError
       ? { runeworkingError: stationErrors.runeworkingError }
       : {}),

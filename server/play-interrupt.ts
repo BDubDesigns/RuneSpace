@@ -18,6 +18,7 @@ import { interruptPracticeWelding } from "@/server/practice-welding";
 import { clearFabricationWorkpiece, isFabricationAction } from "@/server/fabrication";
 import { interruptTinkering, isTinkeringAction } from "@/server/tinkering";
 import { clearRuneworkingCycle, isRuneworkingAction } from "@/server/runeworking";
+import { isEchoReadingAction } from "@/server/echo-hunts";
 import { clearActiveJourney } from "@/server/travel";
 import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
@@ -49,6 +50,10 @@ import { missOpenRepairCleanPass } from "@/server/welding";
  *             exactly as Fabrication: its reserved Rune Fragment was never
  *             consumed, so nothing is lost and no Seeker, XP or Mission
  *             progress is granted. The player's own Stop is Finish Current.
+ * - Echo reading (#393): delete the action. The reserved Seeker was never
+ *             consumed, no target was chosen and nothing was paid — a reading
+ *             resolves only when its time has passed — so the hunt and its last
+ *             clue are exactly as they were. There is no player path to this.
  * - Tinkering (#232): the shared Tinkering interruption — delete the action,
  *             keeping the committed cycle exactly as the player's own Stop does.
  * - Travel:   delete the remaining active action + `characterTravelState` only;
@@ -139,6 +144,11 @@ export async function forceIdleResolvedAction(
 
   if (isRuneworkingAction(actionId)) {
     await clearRuneworkingCycle(transaction, character.id, "manually_stopped", now);
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  if (isEchoReadingAction(actionId)) {
+    await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
     return { interrupted: true, interruptedActionId: actionId };
   }
 

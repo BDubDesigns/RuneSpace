@@ -14,7 +14,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
 import { usePlay } from "@/features/play/PlayContext";
-import { resolvePresentedDialogue } from "@/game/domain/skill-level-dialogue";
+import { composePresentedDialogue } from "@/game/domain/skill-level-dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
@@ -49,6 +49,11 @@ type OpenConversation = {
    * replaying a topic, or a refused command can never present one.
    */
   creditsReceipt?: CreditsReceipt;
+  /**
+   * Sequences that continue this scene (#393): a completion's continuation
+   * outcome, played on as one scene so Back and Next cross between them.
+   */
+  then?: readonly string[];
 };
 
 function fromEntry(entry: NpcConversationEntry): OpenConversation {
@@ -93,7 +98,7 @@ export function NpcConversation({
   // A sequence that closes with skill-level-dependent dialogue (#391) plays the
   // variant the server selected for this character's current level.
   const sequence = open
-    ? resolvePresentedDialogue(open.dialogueId, state.skillLevelDialogue)
+    ? composePresentedDialogue([open.dialogueId, ...(open.then ?? [])], state.skillLevelDialogue)
     : undefined;
   // Where this person is standing now, for the sequences authored as a
   // present-tense local conversation rather than a scene (#190).
@@ -222,6 +227,7 @@ export function NpcConversation({
             missionId,
             ...(next.action ? { action: next.action } : {}),
             ...(next.creditsReceipt ? { creditsReceipt: next.creditsReceipt } : {}),
+            ...(next.then ? { then: next.then } : {}),
           });
           setMessage(undefined);
           return;

@@ -21,6 +21,7 @@ import { miningSourceUnlocked } from "@/game/domain/mining";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import { POWER_ANNEX_CLAIM } from "@/game/domain/power-annex";
 import { refiningRecipeUnlocked } from "@/game/domain/refining";
+import { beginnerEchoRewardPlanets } from "@/game/domain/echo-hunts";
 import { runeworkingRecipeUnlocked } from "@/game/domain/runeworking";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import type { LocationDefinition } from "@/game/schemas/locations";
@@ -129,6 +130,8 @@ export type ItemSourceBody =
       quantity: number;
       cadence: "daily";
     }
+  /** Sometimes given up by a Beginner Resonance Echo on these planets (#393). */
+  | { kind: "echo_hunt"; planetIds: readonly string[] }
   | { kind: "scavenge" }
   | { kind: "player_trade" };
 
@@ -225,7 +228,7 @@ function skillGateAccess(
 function sourceRank(source: ItemSource): number {
   if (source.kind === "player_trade") return 3;
   if (source.access.state === "locked") return 2;
-  return source.kind === "scavenge" ? 1 : 0;
+  return source.kind === "scavenge" || source.kind === "echo_hunt" ? 1 : 0;
 }
 
 /**
@@ -413,6 +416,16 @@ export function resolveItemSources(
       cadence: claim.cadence,
       access: { state: "available" },
     });
+  }
+
+  // A Resonance Echo's one item (#393). Seekers come from the Enby's Rig, so the
+  // hunt is hidden exactly while the Rig is. Like Scavenge it is luck, so it
+  // reports only where it can happen, never the odds.
+  if (facts.resonanceRigUnlocked) {
+    const planetIds = beginnerEchoRewardPlanets(itemId, balance).map((planet) => planet.planetId);
+    if (planetIds.length > 0) {
+      sources.push({ kind: "echo_hunt", planetIds, access: { state: "available" } });
+    }
   }
 
   // Scavenge is a luck-of-the-walk find. It reports only that it can happen:

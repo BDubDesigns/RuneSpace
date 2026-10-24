@@ -154,6 +154,9 @@ const missionIds = {
   // The Wise Old Enby's first lesson (#391): three real Beginner Echo Seekers
   // attuned at the Resonance Rig. Not From Around Here continues into it.
   firstRuneworkingLesson: asContentId("first_runeworking_lesson"),
+  // The Wise Old Enby's second lesson (#393): find one Resonance Echo with a
+  // Beginner Echo Seeker. First Runeworking Lesson continues into it.
+  firstResonanceEcho: asContentId("first_resonance_echo"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -381,6 +384,15 @@ const dialogueIds = {
   wiseOldEnbyFirstLessonTopic: asContentId("wise_old_enby_topic_first_lesson"),
   wiseOldEnbyWhereToFindFragmentsTopic: asContentId("wise_old_enby_topic_where_to_find_fragments"),
   wiseOldEnbyAboutTheSeekersTopic: asContentId("wise_old_enby_topic_about_the_seekers"),
+  // First Resonance Echo (#393).
+  wiseOldEnbyFirstEchoOffer: asContentId("wise_old_enby_first_echo_offer"),
+  wiseOldEnbyFirstEchoInstructions: asContentId("wise_old_enby_first_echo_instructions"),
+  wiseOldEnbyFirstEchoCapacity: asContentId("wise_old_enby_first_echo_capacity"),
+  wiseOldEnbyFirstEchoReminder: asContentId("wise_old_enby_first_echo_reminder"),
+  wiseOldEnbyFirstEchoTurnIn: asContentId("wise_old_enby_first_echo_turn_in"),
+  wiseOldEnbyFirstEchoCompletion: asContentId("wise_old_enby_first_echo_completion"),
+  wiseOldEnbyHowToListenTopic: asContentId("wise_old_enby_topic_how_to_listen"),
+  wiseOldEnbyAboutResonanceEchoesTopic: asContentId("wise_old_enby_topic_about_resonance_echoes"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -425,6 +437,8 @@ const conversationTopicIds = {
   wiseOldEnbyFirstLesson: asContentId("wise_old_enby_first_lesson"),
   wiseOldEnbyWhereToFindFragments: asContentId("wise_old_enby_where_to_find_fragments"),
   wiseOldEnbyAboutTheSeekers: asContentId("wise_old_enby_about_the_seekers"),
+  wiseOldEnbyHowToListen: asContentId("wise_old_enby_how_to_listen"),
+  wiseOldEnbyAboutResonanceEchoes: asContentId("wise_old_enby_about_resonance_echoes"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -560,6 +574,10 @@ export const ACTION_IDS = {
   // durable-identity reason Fabrication recipes have one: the active action IS
   // the recipe of the cycle on the Resonance Rig.
   beginnerEchoSeekerRuneworking: asContentId("beginner_echo_seeker_runeworking"),
+  // Reading a Beginner Echo Seeker from Inventory (#393): one stationary,
+  // timed reading. Which planet it searches is where the character stands, so
+  // `active_actions` keeps its narrow no-payload shape.
+  beginnerEchoReading: asContentId("beginner_echo_reading"),
   galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
   powerCellTinkering: asContentId("power_cell_tinkering"),
   loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),

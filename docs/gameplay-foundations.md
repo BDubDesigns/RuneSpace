@@ -1734,7 +1734,7 @@ Every cycle succeeds: no chance, failure, Manual Override, minigame, slag or
 byproduct. The Seeker is an ordinary *Components & Supplies* stack (200 g,
 stack limit 5) with the approved description and art
 (`assets/item-art/beginner-echo-seeker.png` → `public/item-art/beginner-echo-seeker.webp`).
-It has **no Use action yet**; sensing an Echo arrives with a later slice.
+Its Use, in ordinary Item Details, takes a Resonance Echo reading (below).
 
 **Runs.** The Rig reuses the shared bounded-run contract ("Bounded runs"): a
 number counts completed cycles; Max keeps going until the next cycle cannot
@@ -1767,6 +1767,78 @@ resolution), `server/runeworking.ts` (snapshot, resolver, persistence),
 **The lesson.** *First Runeworking Lesson* teaches it — three Seekers attuned
 after acceptance, then the Enby's turn-in for 150 RW XP (`docs/missions.md`).
 Later attunements are always allowed and pay their ordinary XP.
+
+## Beginner Resonance Echo hunts (issue #393)
+
+A **Beginner Echo Seeker** is used from its ordinary Inventory Item Details —
+no Inspect control, hunt screen or map marker. Any legitimately held Seeker
+works, crafted, traded or given.
+
+**The reading.** Use starts one stationary timed action, 8 ticks (4.8 s), under
+the ordinary active-action boundary: refused while any other action runs,
+never travel-replaceable, and resolved lazily — live, on refresh, or in the
+ordinary offline catch-up — exactly once, by its own cursor. It needs one
+carried Seeker at Start and reserves it until it resolves (the shared
+reservation guard refuses a drop or equipment change that would take it). A
+resolved reading consumes **exactly one** Seeker, found or not. An operator
+force-idle deletes the action and changes nothing else.
+
+**Which planet.** A reading searches the planet the character stands on.
+Each character has at most one active Beginner hunt per planet
+(`character_echo_hunts`, keyed by character, planet and tier). The first
+reading on a planet with no active hunt chooses a hidden target uniformly from
+that planet's **fixed** pool (`game/content/echo-hunts.ts`) and resolves against
+it at once, so the first reading may succeed where the player stands. Pools
+never grow with progression: **Skatboll** — its ten ordinary World Locations,
+Deep Jag permanently excluded; **Stillreach** — all eight. The target never
+leaves the server; travel, flights, logins, trades and acquiring Seekers never
+touch a hunt, and each planet's hunt and clue are independent.
+
+**A wrong reading** pays nothing and records the hunt's last clue: the source
+hex, both axis directions from it — `east`/`west`/`aligned` on the map's x axis
+and `north`/`south`/`aligned` on its y axis, using the flat-top layout's own
+screen axes (`echoScreenAxes`: x ∝ q, y ∝ 2r + q) — and the time. A new
+reading replaces that planet's clue. Item Details show the planet being
+searched, that planet's last reading (or "No reading on this planet yet"),
+and a read-only check of the current hex against it: **ruled out** naming the
+contradicting axis, or **not ruled out** — never "the Echo is here". Use stays
+available on a ruled-out hex.
+
+**A discovery** deletes the planet's hunt row (ending the hunt and its clue
+together; the next reading there starts a new hunt), pays a fixed **50
+Runeworking XP**, credits any accepted Mission counting `echo_hunt`
+completions, and rolls **exactly one** item from the current planet's table.
+The item's fit is planned against the inventory left after the Seeker is
+consumed (partial stacks, a freed slot, freed mass). If it does not fit by
+slots or mass it is lost — named in the result as having slipped back into
+RuneSpace — with no reroll, mail or ground drop; the XP and Mission credit
+stand. Use is never blocked because the inventory looks full.
+
+**Interim tables (Slice I).** Integer weights out of 1,000
+(`balance.echoHunts.beginner.rewardTables`). The approved tables reserve 0.2%
+for a Legendary that is not shipped; until it is, that 0.2 point is on Rune
+Fragment.
+
+| Item | Skatboll | Stillreach |
+| --- | ---: | ---: |
+| Rune Fragment | 30.2% | 30.2% |
+| Uncut Quartz | 24% | 26% |
+| Uncut Topaz | 16% | 20% |
+| Uncut Sapphire | 10% | 10% |
+| Refined Ferrite | 12% | — |
+| Galvanic Stock | 5% | — |
+| Empty Small Fuel Canister | — | 10% |
+| Intact Runestone | 2.8% | 3.8% |
+
+**The result is durable.** Each resolved reading writes one
+`echo_reading_notices` row keyed by its own completion instant, shown as a
+dismissible receipt at the top of Play until dismissed (starting a new reading
+dismisses it too). Item Sources list "Resonance Echo" for every table item once
+the Resonance Rig is the character's.
+
+**Authority.** `game/domain/echo-hunts.ts`, `server/echo-hunts.ts`,
+`server/echo-hunt-commands.ts`; migration `0048_echo_hunts`. The Mission that
+teaches it is *First Resonance Echo* (`docs/missions.md`).
 
 ## Inventory and equipment
 

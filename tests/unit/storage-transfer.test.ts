@@ -101,6 +101,12 @@ function cargoState(): PlayGameplayState {
     welding: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     fabrication: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     runeworking: { totalXp: 0, level: 1, xpIntoLevel: 0 },
+    echoHunt: {
+      seekerItemId: "beginner_echo_seeker",
+      readingActionId: "beginner_echo_reading",
+      readingDurationTicks: 8,
+      discoveryXp: 50,
+    },
     resonanceRig: {
       unlocked: false,
       recipes: [],

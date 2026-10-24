@@ -20,7 +20,12 @@ import {
   type DialogueBeat,
   type SkillLevelDialogue,
 } from "@/game/content/dialogue";
-import { FIRST_RUNEWORKING_LESSON, MISSIONS, NOT_FROM_AROUND_HERE } from "@/game/content/missions";
+import {
+  FIRST_RESONANCE_ECHO,
+  FIRST_RUNEWORKING_LESSON,
+  MISSIONS,
+  NOT_FROM_AROUND_HERE,
+} from "@/game/content/missions";
 import { resolveNpcConversation, type NpcConversationEntry } from "@/game/domain/conversation";
 import {
   deriveMissionGuidanceTargets,
@@ -106,14 +111,14 @@ describe("the Mission as authored", () => {
   it("follows Not From Around Here, by continuation and by prerequisite", () => {
     expect(NOT_FROM_AROUND_HERE.continuationMissionId).toBe(MISSION_IDS.firstRuneworkingLesson);
     expect(FIRST_RUNEWORKING_LESSON.prerequisiteMissionId).toBe(MISSION_IDS.notFromAroundHere);
-    // Nothing after it is shipped: no continuation and no placeholder Mission.
-    expect(FIRST_RUNEWORKING_LESSON.continuationMissionId).toBeUndefined();
-    expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Resonance Echo");
+    // It hands on to exactly one next chapter (#393), by continuation and by
+    // that chapter's own prerequisite-gated offer.
+    expect(FIRST_RUNEWORKING_LESSON.continuationMissionId).toBe(MISSION_IDS.firstResonanceEcho);
     expect(
       MISSIONS.filter(
         (mission) => mission.prerequisiteMissionId === MISSION_IDS.firstRuneworkingLesson,
-      ),
-    ).toEqual([]);
+      ).map((mission) => mission.id),
+    ).toEqual([MISSION_IDS.firstResonanceEcho]);
   });
 
   it("offers itself in person at the Enby with Begin Lesson / Not Now, flowing into the lesson", () => {
@@ -200,6 +205,7 @@ describe("the Mission as authored", () => {
       validateMissionDefinitions([
         NOT_FROM_AROUND_HERE,
         { ...FIRST_RUNEWORKING_LESSON, requirements: [{ ...requirement, ...changes } as never] },
+        FIRST_RESONANCE_ECHO,
       ]);
     expect(withRequirement({ actionId: undefined, recommendedActionId: undefined })).toThrow(
       /presents output Sources/,

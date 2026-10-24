@@ -12,6 +12,7 @@ import { getDialogue } from "@/game/content/dialogue";
 import {
   MISSIONS,
   FIRST_RUNEWORKING_LESSON,
+  FIRST_RESONANCE_ECHO,
   NOT_FROM_AROUND_HERE,
   getMission,
   type MissionDefinition,
@@ -468,12 +469,11 @@ describe("completion and after (#389)", () => {
         (mission) => mission.prerequisiteMissionId === MISSION_IDS.notFromAroundHere,
       ).map((mission) => mission.id),
     ).toEqual([MISSION_IDS.firstRuneworkingLesson]);
-    // The chapter after the lesson is not shipped, so nothing names it yet.
-    expect(MISSIONS.map((mission) => mission.title)).not.toContain("First Resonance Echo");
+    // The lesson hands on to the next chapter in turn (#393), never back here.
     expect(
       MISSIONS.find((mission) => mission.id === MISSION_IDS.firstRuneworkingLesson)
         ?.continuationMissionId,
-    ).toBeUndefined();
+    ).toBe(MISSION_IDS.firstResonanceEcho);
   });
 });
 
@@ -650,7 +650,7 @@ describe("registry validation", () => {
   // Validated beside the lesson it continues into (#391), which is the one other
   // Mission the shipped definition names.
   const validate = (definition: MissionDefinition) => () =>
-    validateMissionDefinitions([definition, FIRST_RUNEWORKING_LESSON]);
+    validateMissionDefinitions([definition, FIRST_RUNEWORKING_LESSON, FIRST_RESONANCE_ECHO]);
   const conversation = NOT_FROM_AROUND_HERE.requirements[0]! as Extract<
     MissionDefinition["requirements"][number],
     { kind: "npc_conversation" }

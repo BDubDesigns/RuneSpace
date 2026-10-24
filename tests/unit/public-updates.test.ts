@@ -118,10 +118,26 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Seeker? I Hardly Know Her! Update as the newest (#391)", () => {
+  it("publishes the First Resonance Echo Update as the newest (#393)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("first-runeworking-lesson");
+    expect(latest.slug).toBe("first-resonance-echo");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("first-runeworking-lesson")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    expect(text).toContain("First Resonance Echo");
+    expect(text).toContain("300 Runeworking XP");
+    expect(text).toContain("50 Runeworking XP");
+    // Slice J's Legendary rewards are not shipped, so nothing claims them.
+    expect(text).not.toMatch(/legendary|boots|gloves|mail/i);
+    // The Enby's personal reason for staying is for players to hear, not a headline.
+    expect(text).not.toMatch(/room to be myself|who I ought to be/i);
+  });
+
+  it("keeps the Seeker? I Hardly Know Her! Update published beneath it (#391)", () => {
+    const latest = getPublicUpdate("first-runeworking-lesson")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("the-wise-old-enby")!.publishedAt),
     );

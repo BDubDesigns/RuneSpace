@@ -6,6 +6,7 @@ import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
+import { EchoReadingNotice } from "@/features/echo-hunts/EchoReadingNotice";
 import { isShipInFlight } from "@/features/ship/flight";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
@@ -103,6 +104,8 @@ export function PlayConsole({
       <ScavengeSuppressedNotice />
       {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
       <ShipArrivalNotice />
+      {/* A Seeker reading's durable result, wherever the player is (#393). */}
+      <EchoReadingNotice />
       {surface === "map" ? (
         // The return control is the desktop main-column header's while docked
         // (#286), so the panel does not carry a second one beside it.

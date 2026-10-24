@@ -1,3 +1,5 @@
+import { getPlanetPresentation } from "@/game/content/planets";
+import type { PlanetId } from "@/game/config/foundations";
 import { getItemDefinition, inventoryItemDefinitions } from "@/game/config/balance";
 import { ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
@@ -352,6 +354,21 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
       return [
         `Claim ${itemQuantityLabel(itemId, source.quantity, itemName(itemId))} once a day at ${getLocation(source.locationId)?.displayName ?? source.locationId}.`,
       ];
+    case "echo_hunt":
+      return [
+        "Resonance Echo — a discovered Echo gives up one item: ",
+        source.planets
+          .map(
+            (planet) =>
+              `${getPlanetPresentation(planet.planetId as PlanetId).displayName} ${planet.percent}%`,
+          )
+          .join(", "),
+        " per Echo. Hunting needs Beginner Echo Seekers, made at the Resonance Rig once you have completed ",
+        missionLink(source.seekersFromMissionId),
+        ", and ",
+        { text: "Runeworking", href: "/wiki/runeworking" },
+        " explains how.",
+      ];
     case "scavenge":
       return ["Scavenge — occasionally found while walking between locations."];
     case "player_trade":
@@ -398,6 +415,15 @@ function sourceLines(itemId: string, source: ItemReferenceSource): readonly Wiki
 
 function useLine(itemId: string, use: ItemReferenceUse): { group: string; line: WikiItemLine } {
   switch (use.kind) {
+    case "echo_reading":
+      return {
+        group: "Echo hunting",
+        line: [
+          `Using it takes one Resonance Echo reading on the planet you are on — uses ${use.quantity}. See `,
+          { text: "Runeworking", href: "/wiki/runeworking" },
+          ".",
+        ],
+      };
     case "recipe_input":
       return {
         group: "Recipes",
@@ -549,7 +575,7 @@ export function buildWikiItemPage(
     oneTime,
     byproducts,
     recipes: reference.recipes.map(recipeView),
-    usedIn: ["Recipes", "Repairs", "Missions"].flatMap((heading) => {
+    usedIn: ["Echo hunting", "Recipes", "Repairs", "Missions"].flatMap((heading) => {
       const lines = usedIn.get(heading);
       return lines ? [{ heading, lines }] : [];
     }),

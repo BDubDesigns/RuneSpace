@@ -105,6 +105,8 @@ describe("issue #324 reachable lifecycle moments", () => {
       // #391: the lesson's approved script authors no busy beat; the mystery now
       // authors its completion scene, which is the lesson it hands on to.
       "first_runeworking_lesson:busy",
+      // #393: the approved script authors no busy beat for the Echo debrief either.
+      "first_resonance_echo:busy",
     ]);
   });
 });

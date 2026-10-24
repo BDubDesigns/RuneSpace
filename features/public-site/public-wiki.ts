@@ -1111,7 +1111,7 @@ const authoredWikiArticles = [
     title: "Runeworking",
     category: "work",
     summary:
-      "Attuning rune material at the Wise Old Enby's Resonance Rig on Hilltop Workshop, Stillreach — the Beginner Echo Seeker, how a run works, and when the Rig opens.",
+      "Attuning rune material at the Wise Old Enby's Resonance Rig on Hilltop Workshop, Stillreach — the Beginner Echo Seeker, how a run works, when the Rig opens, and hunting Resonance Echoes with Seekers.",
     sections: [
       {
         paragraphs: [
@@ -1140,7 +1140,7 @@ const authoredWikiArticles = [
           ],
         ],
         paragraphs: [
-          "A Beginner Echo Seeker is attuned to detect hidden disturbances in RuneSpace. There is nothing to do with one yet beyond keeping, trading or storing it.",
+          "A Beginner Echo Seeker is attuned to detect hidden disturbances in RuneSpace. Use one from your Inventory to hunt for a Resonance Echo (below).",
           "The Rig has two modes: Attune, where you start and watch a run, and Recipes, a list of every Runeworking recipe you know. A recipe stays listed in both even when you are not carrying what it needs, and in Attune, Sources beside its ingredient shows where to get more.",
         ],
       },
@@ -1150,6 +1150,29 @@ const authoredWikiArticles = [
           "Choose how many to make with − and +, or Max to keep going until the next one cannot start. Each one is checked when it starts: that you still have the Rune Fragment, and that the finished Seeker will fit once the Fragment is gone — a part-full Seeker stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
           "A started attunement is committed. Its Rune Fragment stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the Fragments for later ones are still yours until each one starts.",
           "When an attunement finishes, the Fragment is used up and the Seeker lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
+        ],
+      },
+      {
+        // Issue #393 — Beginner Resonance Echo hunts.
+        heading: "Hunting Resonance Echoes",
+        paragraphs: [
+          [
+            "Select a Beginner Echo Seeker in your Inventory and choose Use. You stand still for 4.8 seconds while it listens, and one Seeker is used up, whatever it finds. ",
+            { text: "First Resonance Echo", articleSlug: "mission-first-resonance-echo" },
+            " is the Wise Old Enby's lesson in it, but any Seeker you hold works, however you came by it.",
+          ],
+          "A Seeker searches the planet you are standing on. Skatboll and Stillreach each hide their own Echo, and each keeps its own search: your last reading there stays put while you are away. On Skatboll the Echo is somewhere among its ordinary places, never in Deep Jag; on Stillreach, anywhere on its map.",
+          "If the Echo is not where you stand, the reading says which way it lies from that spot: east or west, and north or south, or due north (say) when you are already lined up. A wrong reading pays no XP. The Seeker's details show the planet you are searching and your last reading there, and whether the spot you are standing on now has been ruled out by it. Not ruled out does not mean the Echo is there.",
+          "Finding the Echo pays 50 Runeworking XP and gives up one item, and your next reading on that planet starts a new search. Your very first reading on a planet can find it right where you are.",
+          "Leave room before you look. The item is checked against your Inventory after the Seeker is used up, so the Seeker's own slot and weight count; if it still does not fit, it slips back into RuneSpace and is gone, though you keep the XP.",
+        ],
+      },
+      {
+        heading: "What an Echo can give",
+        paragraphs: ["Exactly one item per Echo, rolled from the planet you found it on:"],
+        list: [
+          "Skatboll: Rune Fragment 30.2%, Uncut Quartz 24%, Uncut Topaz 16%, Refined Ferrite 12%, Uncut Sapphire 10%, Galvanic Stock 5%, intact Runestone 2.8%.",
+          "Stillreach: Rune Fragment 30.2%, Uncut Quartz 26%, Uncut Topaz 20%, Uncut Sapphire 10%, Empty Small Fuel Canister 10%, intact Runestone 3.8%.",
         ],
       },
     ],
@@ -1266,6 +1289,10 @@ const authoredWikiArticles = [
             { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
             " — starts by itself when you finish Not From Around Here (or ask the Wise Old Enby for it if you finished that before the lesson existed). Attune three Beginner Echo Seekers at the Resonance Rig and return to them for 150 Runeworking XP.",
           ],
+          [
+            { text: "First Resonance Echo", articleSlug: "mission-first-resonance-echo" },
+            " — starts by itself when you complete Seeker? I Hardly Know Her!, with two Seekers from the Wise Old Enby if you have room for them (otherwise ask them for it once you do). Find one Resonance Echo on either planet and return to them for 300 Runeworking XP.",
+          ],
         ],
       },
       {
@@ -1275,7 +1302,7 @@ const authoredWikiArticles = [
           "After Hold It Together, Out of the Weather is open to you whether or not you have started Keep the Change.",
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
           "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
-          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you Seeker? I Hardly Know Her!.",
+          "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you Seeker? I Hardly Know Her!, and finishing that hands you First Resonance Echo.",
         ],
       },
       {
@@ -1866,7 +1893,9 @@ const authoredWikiArticles = [
               text: "Seeker? I Hardly Know Her!",
               articleSlug: "mission-first-runeworking-lesson",
             },
-            ". You can hear the lesson again under First lesson, and once it is done, About the Seekers.",
+            ", then send you looking for your first Resonance Echo in ",
+            { text: "First Resonance Echo", articleSlug: "mission-first-resonance-echo" },
+            ". You can hear each lesson again — First lesson, and How to Listen — and once they are done, About the Seekers and About Resonance Echoes.",
           ],
         ],
       },

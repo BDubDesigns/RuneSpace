@@ -87,6 +87,7 @@ export const FOCUSED_PHASES = [
   "last-leg-trading",
   "not-from-around-here",
   "first-runeworking-lesson",
+  "first-resonance-echo",
   "ship-first-flight",
   "scroll-affordances",
   "stillreach",
