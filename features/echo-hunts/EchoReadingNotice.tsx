@@ -47,7 +47,6 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   }, [spotlight, noticeId]);
 
   if (!notice) return null;
-  const noticeId = notice.noticeId;
 
   function dismiss() {
     if (dismissing) return;
