@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { ArrowUp, Circle } from "lucide-react";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -174,7 +175,7 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   );
 }
 
-/** One lightweight SVG: a fixed eight-direction clue with an occasional tiny wobble. */
+/** Two existing Lucide SVG primitives, not a bitmap or new art asset. */
 function EchoCompass({
   eastWest,
   northSouth,
@@ -184,56 +185,29 @@ function EchoCompass({
 }) {
   const angle = echoCompassDegrees(eastWest, northSouth);
   return (
-    <svg
-      aria-hidden="true"
-      className="h-28 w-28 shrink-0"
-      data-echo-compass-angle={angle}
-      viewBox="0 0 120 120"
-    >
-      <circle
-        cx="60"
-        cy="60"
-        r="44"
-        fill="none"
-        stroke="var(--rs-skill-runeworking)"
-        strokeOpacity="0.45"
-        strokeWidth="1.5"
+    <div aria-hidden="true" className="relative h-28 w-28 shrink-0" data-echo-compass-angle={angle}>
+      <Circle
+        className="absolute left-2 top-2 h-24 w-24 text-[color:var(--rs-skill-runeworking)] opacity-50"
+        strokeWidth={1}
       />
-      <circle
-        cx="60"
-        cy="60"
-        r="31"
-        fill="none"
-        stroke="var(--rs-skill-runeworking)"
-        strokeOpacity="0.17"
-      />
-      <path
-        d="M60 10v8 M60 102v8 M10 60h8 M102 60h8"
-        fill="none"
-        stroke="var(--rs-skill-runeworking)"
-        strokeOpacity="0.65"
-        strokeWidth="2"
-      />
-      <g fill="var(--rs-text-secondary)" fontFamily="monospace" fontSize="9" textAnchor="middle">
-        <text x="60" y="8">N</text>
-        <text x="60" y="119">S</text>
-        <text x="114" y="63">E</text>
-        <text x="6" y="63">W</text>
-      </g>
-      <g transform={`rotate(${angle} 60 60)`}>
-        <g className="rs-echo-compass-needle">
-          <path d="M60 24 L69 65 L60 57 L51 65 Z" fill="var(--rs-skill-runeworking)" />
-          <path d="M60 96 L51 55 L60 63 L69 55 Z" fill="var(--rs-border-structural)" />
-        </g>
-      </g>
-      <circle
-        cx="60"
-        cy="60"
-        r="4.5"
-        fill="var(--rs-surface-raised)"
-        stroke="var(--rs-skill-runeworking)"
-        strokeWidth="1.8"
-      />
-    </svg>
+      <span className="absolute inset-0 grid place-items-center" style={{ rotate: `${angle}deg` }}>
+        <ArrowUp
+          className="rs-echo-compass-needle h-14 w-14 text-[color:var(--rs-skill-runeworking)]"
+          strokeWidth={2.8}
+        />
+      </span>
+      <span className="absolute left-1/2 top-0 -translate-x-1/2 text-[10px] text-[color:var(--rs-text-secondary)]">
+        N
+      </span>
+      <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] text-[color:var(--rs-text-secondary)]">
+        S
+      </span>
+      <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-[color:var(--rs-text-secondary)]">
+        E
+      </span>
+      <span className="absolute left-0 top-1/2 -translate-y-1/2 text-[10px] text-[color:var(--rs-text-secondary)]">
+        W
+      </span>
+    </div>
   );
 }
