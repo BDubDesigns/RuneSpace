@@ -143,13 +143,19 @@ describe("canonical article art", () => {
     expect(index).toContain("The Wise Old Enby");
     expect(index).toContain("Seeker? I Hardly Know Her!");
     expect(index).toContain("First Resonance Echo");
-    // The homepage shows only the newest Update's summary (#393).
-    expect(landing).toContain("First Resonance Echo");
-    expect(landing).not.toContain("Seeker? I Hardly Know Her!<");
-    expect(landing).not.toContain("The Wise Old Enby<");
-    expect(landing).not.toContain("Harmonic Workings Opens");
-    expect(landing).not.toContain("Refiner-To-Go");
-    expect(landing).not.toContain("The Dry Seam Opens");
+    // Only the Latest Update section should render an Update summary. A title
+    // may also legitimately appear elsewhere on the landing page (for example,
+    // the Wise Old Enby's new gameplay screenshot caption).
+    const latestUpdateSection = landing.match(
+      /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
+    )?.[0];
+    expect(latestUpdateSection).toBeDefined();
+    expect(latestUpdateSection).toContain("First Resonance Echo");
+    expect(latestUpdateSection).not.toContain("Seeker? I Hardly Know Her!<");
+    expect(latestUpdateSection).not.toContain("The Wise Old Enby<");
+    expect(latestUpdateSection).not.toContain("Harmonic Workings Opens");
+    expect(latestUpdateSection).not.toContain("Refiner-To-Go");
+    expect(latestUpdateSection).not.toContain("The Dry Seam Opens");
     for (const markup of [index, landing]) {
       expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");
