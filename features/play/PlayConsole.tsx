@@ -62,7 +62,7 @@ export function PlayConsole({
   const inFlight = isShipInFlight(state);
   const [, startTransition] = useTransition();
   const [spotlightNoticeId, setSpotlightNoticeId] = useState<string>();
-  const readingInInventory = useRef<{ previousNoticeId?: string }>();
+  const readingInInventory = useRef<{ previousNoticeId?: string } | undefined>(undefined);
 
   const readingActive = state.activeAction?.actionId === state.echoHunt.readingActionId;
   const readingBoundary = readingActive ? state.activeAction?.nextAttemptAt : undefined;
