@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -33,7 +33,6 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   const [dismissing, setDismissing] = useState(false);
   const [message, setMessage] = useState<string>();
   const [, startTransition] = useTransition();
-  const resultRef = useRef<HTMLDivElement>(null);
   const noticeId = notice?.noticeId;
 
   // Focus and scroll only for a reading the player just finished in the mobile
@@ -42,7 +41,7 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   useEffect(() => {
     if (!spotlight || !noticeId) return;
     const frame = window.requestAnimationFrame(() => {
-      const target = resultRef.current;
+      const target = document.querySelector<HTMLElement>("[data-echo-result-focus]");
       if (!target) return;
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
@@ -82,102 +81,96 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   const reward = notice.rewardItemId;
   const rewardDefinition = reward ? getItemDefinition(reward) : undefined;
   return (
-    <div
+    <Panel
       aria-labelledby="echo-reading-result-heading"
-      className="scroll-mt-24 outline-none"
+      className="scroll-mt-24 !border-[color:var(--rs-skill-runeworking)] !p-4"
+      data-echo-notice={notice.outcome}
       data-echo-result-focus
-      ref={resultRef}
-      role="group"
+      role="status"
       tabIndex={-1}
+      tone="raised"
     >
-      <Panel
-        className="!border-[color:var(--rs-skill-runeworking)] !p-4"
-        data-echo-notice={notice.outcome}
-        role="status"
-        tone="raised"
+      <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-skill-runeworking)]">
+        {found ? "Runeworking · Echo recovered" : "Runeworking · Resonance reading"}
+      </p>
+      <p
+        className="mt-2 font-display text-lg font-bold tracking-wide"
+        data-echo-notice-title
+        id="echo-reading-result-heading"
       >
-        <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-skill-runeworking)]">
-          {found ? "Runeworking · Echo recovered" : "Runeworking · Resonance reading"}
-        </p>
-        <p
-          className="mt-2 font-display text-lg font-bold tracking-wide"
-          data-echo-notice-title
-          id="echo-reading-result-heading"
+        {found ? "Resonance Echo discovered!" : "The Seeker trembles, then goes still."}
+      </p>
+      {hasClue ? (
+        <div
+          className="mt-3 flex items-center gap-3"
+          data-echo-compass={echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
         >
-          {found ? "Resonance Echo discovered!" : "The Seeker trembles, then goes still."}
-        </p>
-        {hasClue ? (
-          <div
-            className="mt-3 flex items-center gap-3"
-            data-echo-compass={echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
-          >
-            <EchoCompass eastWest={notice.eastWest!} northSouth={notice.northSouth!} />
-            <div className="min-w-0 flex-1">
-              <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                Signal direction
-              </p>
-              <p
-                className="mt-1 font-display text-xl font-bold uppercase text-[color:var(--rs-skill-runeworking)]"
-                data-echo-compass-direction
-              >
-                {echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
-              </p>
-              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-                {echoWrongReadingLine(notice.eastWest!, notice.northSouth!)}
-              </p>
-            </div>
+          <EchoCompass eastWest={notice.eastWest!} northSouth={notice.northSouth!} />
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+              Signal direction
+            </p>
+            <p
+              className="mt-1 font-display text-xl font-bold uppercase text-[color:var(--rs-skill-runeworking)]"
+              data-echo-compass-direction
+            >
+              {echoDirectionsCopy(notice.eastWest!, notice.northSouth!)}
+            </p>
+            <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+              {echoWrongReadingLine(notice.eastWest!, notice.northSouth!)}
+            </p>
           </div>
-        ) : (
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            The Seeker flares with impossible light. For an instant, something slips through the
-            boundary between worlds.
-          </p>
-        )}
-        <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]" data-echo-notice-where>
-          Reading taken at {notice.locationName}, {notice.planetName}. 1 Seeker consumed
-          {found ? "." : " · 0 Runeworking XP."}
-        </p>
-        {found ? (
-          <div className="mt-3 flex flex-wrap items-start gap-3">
-            <SkillXpTile
-              amount={notice.xpAwarded}
-              className="h-28 w-28"
-              skillId={SKILL_IDS.runeworking}
-              skillName={runeworkingName}
-            />
-            {reward && notice.rewardKept ? (
-              <div className="h-28 w-28" data-echo-notice-reward={reward}>
-                <StackItemVisual
-                  itemId={reward}
-                  name={resolveItemPresentation(reward, reward).displayName}
-                  quantity={1}
-                  stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-        {found && reward && notice.rewardKept === false ? (
-          <p
-            className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
-            data-echo-notice-lost={reward}
-          >
-            {echoRewardLostLine(reward)}
-          </p>
-        ) : null}
-        <div className="mt-3">
-          <ActionButton
-            data-echo-notice-dismiss
-            intent={found ? "success" : "secondary"}
-            loading={foregroundBusy && dismissing}
-            onClick={dismiss}
-          >
-            DISMISS
-          </ActionButton>
         </div>
-        {message ? <Feedback tone="danger">{message}</Feedback> : null}
-      </Panel>
-    </div>
+      ) : (
+        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+          The Seeker flares with impossible light. For an instant, something slips through the
+          boundary between worlds.
+        </p>
+      )}
+      <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]" data-echo-notice-where>
+        Reading taken at {notice.locationName}, {notice.planetName}. 1 Seeker consumed
+        {found ? "." : " · 0 Runeworking XP."}
+      </p>
+      {found ? (
+        <div className="mt-3 flex flex-wrap items-start gap-3">
+          <SkillXpTile
+            amount={notice.xpAwarded}
+            className="h-28 w-28"
+            skillId={SKILL_IDS.runeworking}
+            skillName={runeworkingName}
+          />
+          {reward && notice.rewardKept ? (
+            <div className="h-28 w-28" data-echo-notice-reward={reward}>
+              <StackItemVisual
+                itemId={reward}
+                name={resolveItemPresentation(reward, reward).displayName}
+                quantity={1}
+                stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {found && reward && notice.rewardKept === false ? (
+        <p
+          className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
+          data-echo-notice-lost={reward}
+        >
+          {echoRewardLostLine(reward)}
+        </p>
+      ) : null}
+      <div className="mt-3">
+        <ActionButton
+          data-echo-notice-dismiss
+          intent={found ? "success" : "secondary"}
+          loading={foregroundBusy && dismissing}
+          onClick={dismiss}
+        >
+          DISMISS
+        </ActionButton>
+      </div>
+      {message ? <Feedback tone="danger">{message}</Feedback> : null}
+    </Panel>
   );
 }
 
