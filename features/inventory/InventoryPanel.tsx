@@ -341,14 +341,20 @@ export function InventoryPanel({
       node: (
         <StackItemVisual
           className={
-            missionGuidanceTargets.availableItemIds.has(stack.itemId)
-              ? "rs-mission-available"
-              : undefined
+            missionGuidanceTargets.actionItemIds.has(stack.itemId)
+              ? "rs-mission-guidance"
+              : missionGuidanceTargets.availableItemIds.has(stack.itemId)
+                ? "rs-mission-available"
+                : undefined
           }
           interactive
           itemId={stack.itemId}
           missionGuidance={
-            missionGuidanceTargets.availableItemIds.has(stack.itemId) ? "available" : undefined
+            missionGuidanceTargets.actionItemIds.has(stack.itemId)
+              ? "active"
+              : missionGuidanceTargets.availableItemIds.has(stack.itemId)
+                ? "available"
+                : undefined
           }
           name={stack.name}
           onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
