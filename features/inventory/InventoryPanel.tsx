@@ -34,6 +34,7 @@ import {
   RowDetailsPanel,
   type RowDetailsTile,
 } from "@/features/shared/RowDetailsGrid";
+import { InlineConfirmation } from "./InlineConfirmation";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { EchoSeekerDetails } from "@/features/echo-hunts/EchoSeekerDetails";
 import { useEquipCommand } from "./useEquipCommand";
@@ -46,7 +47,6 @@ type DropConfirmation = {
   mode: "one" | "stack";
   expectedQuantity: number;
   itemName: string;
-  confirmLabel: string;
 };
 
 /** The irreversible Break Apart confirmation (#367): exactly one stone, the selected stack. */
@@ -118,7 +118,8 @@ export function InventoryPanel({
     },
   );
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const confirmTriggerRef = useRef<HTMLButtonElement>(null);
+  const originSelectorRef = useRef<string>("");
+  const cancelledRef = useRef(false);
   const hasConfirmedRef = useRef(false);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const breakApart = breakApartFacts(getEffectiveGameBalance());
@@ -180,6 +181,11 @@ export function InventoryPanel({
       return;
     }
     if (!hasConfirmedRef.current) return;
+    if (cancelledRef.current) {
+      cancelledRef.current = false;
+      detailsRef.current?.querySelector<HTMLButtonElement>(originSelectorRef.current)?.focus();
+      return;
+    }
     const grid = gridRef.current;
     if (!grid) return;
     const selectedTile = grid.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
@@ -212,17 +218,21 @@ export function InventoryPanel({
   function openConfirmation(
     action: { mode: "one" | "stack"; label: string },
     entry: InventoryStackEntry,
-    trigger: HTMLButtonElement,
   ) {
-    confirmTriggerRef.current = trigger;
+    originSelectorRef.current = `[data-drop-action="${action.mode}"]`;
     setConfirming({
       kind: "drop",
       stackId: entry.id,
       mode: action.mode,
       expectedQuantity: entry.quantity,
       itemName: entry.name,
-      confirmLabel: action.label,
     });
+  }
+
+  // Cancel restores the initiating action in place and returns focus to it.
+  function cancelConfirmation() {
+    cancelledRef.current = true;
+    setConfirming(undefined);
   }
 
   function runEquip() {
@@ -239,8 +249,8 @@ export function InventoryPanel({
     );
   }
 
-  function openBreakApartConfirmation(entry: InventoryStackEntry, trigger: HTMLButtonElement) {
-    confirmTriggerRef.current = trigger;
+  function openBreakApartConfirmation(entry: InventoryStackEntry) {
+    originSelectorRef.current = "[data-break-apart]";
     setConfirming({ kind: "break_apart", stackId: entry.id, expectedQuantity: entry.quantity });
   }
 
@@ -625,16 +635,40 @@ export function InventoryPanel({
               {resolvedSelection.kind === "stack" &&
               canBreakApart(resolvedSelection.entry.itemId, getEffectiveGameBalance()) ? (
                 <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
-                  <ActionButton
-                    data-break-apart
-                    disabled={foregroundBusy}
-                    intent="mining"
-                    onClick={(event) =>
-                      openBreakApartConfirmation(resolvedSelection.entry, event.currentTarget)
-                    }
-                  >
-                    Break Apart
-                  </ActionButton>
+                  {confirming?.kind === "break_apart" ? (
+                    <InlineConfirmation
+                      busy={foregroundBusy}
+                      cancelRef={cancelButtonRef}
+                      confirmLabel="Confirm break apart"
+                      data-break-apart-confirmation
+                      onCancel={cancelConfirmation}
+                      onConfirm={runBreakApart}
+                    >
+                      <p className="font-bold text-[color:var(--rs-text-primary)]">
+                        Destroy {itemQuantityLabel(breakApart.inputItemId, 1, "Runestone")} and
+                        receive exactly{" "}
+                        {itemQuantityLabel(
+                          breakApart.outputItemId,
+                          breakApart.outputQuantity,
+                          "Rune Fragment",
+                        )}
+                        ?
+                      </p>
+                      <p className="mt-1">
+                        This cannot be undone: Rune Fragments cannot be put back together. Only one
+                        stone is broken, even from a larger stack.
+                      </p>
+                    </InlineConfirmation>
+                  ) : (
+                    <ActionButton
+                      data-break-apart
+                      disabled={foregroundBusy}
+                      intent="mining"
+                      onClick={() => openBreakApartConfirmation(resolvedSelection.entry)}
+                    >
+                      Break Apart
+                    </ActionButton>
+                  )}
                 </div>
               ) : null}
               {resolvedSelection.kind === "stack" ? (
@@ -642,20 +676,39 @@ export function InventoryPanel({
                   <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
                     Drop
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
-                      <ActionButton
-                        disabled={foregroundBusy}
-                        intent="danger"
-                        key={action.mode}
-                        onClick={(event) =>
-                          openConfirmation(action, resolvedSelection.entry, event.currentTarget)
-                        }
-                      >
-                        {action.label}
-                      </ActionButton>
-                    ))}
-                  </div>
+                  {confirming?.kind === "drop" ? (
+                    <InlineConfirmation
+                      busy={foregroundBusy}
+                      cancelRef={cancelButtonRef}
+                      confirmLabel="Confirm drop"
+                      data-drop-confirmation
+                      onCancel={cancelConfirmation}
+                      onConfirm={runDiscard}
+                    >
+                      <p className="font-bold text-[color:var(--rs-text-primary)]">
+                        {confirming.mode === "stack"
+                          ? `Drop the full stack of ${confirming.expectedQuantity} ${confirming.itemName}?`
+                          : `Drop 1 ${confirming.itemName}?`}
+                      </p>
+                      <p className="mt-1">
+                        Dropped items are permanently destroyed in the current development build.
+                      </p>
+                    </InlineConfirmation>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
+                        <ActionButton
+                          data-drop-action={action.mode}
+                          disabled={foregroundBusy}
+                          intent="danger"
+                          key={action.mode}
+                          onClick={() => openConfirmation(action, resolvedSelection.entry)}
+                        >
+                          {action.label}
+                        </ActionButton>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : null}
             </RowDetailsPanel>
@@ -685,86 +738,6 @@ export function InventoryPanel({
           stack={offerSession.stack}
           triggerRef={inspectRef}
         />
-      ) : null}
-      {confirming?.kind === "break_apart" ? (
-        <div
-          role="alert"
-          className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"
-          data-break-apart-confirmation
-        >
-          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
-            Confirm Break Apart
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            Destroy {itemQuantityLabel(breakApart.inputItemId, 1, "Runestone")} and receive exactly{" "}
-            {itemQuantityLabel(breakApart.outputItemId, breakApart.outputQuantity, "Rune Fragment")}
-            ?
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            This cannot be undone: Rune Fragments cannot be put back together. Only one stone is
-            broken, even from a larger stack.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <ActionButton
-              disabled={foregroundBusy}
-              intent="secondary"
-              onClick={() => {
-                confirmTriggerRef.current?.focus();
-                setConfirming(undefined);
-              }}
-              ref={cancelButtonRef}
-            >
-              Cancel
-            </ActionButton>
-            <ActionButton
-              disabled={foregroundBusy}
-              intent="danger"
-              loading={foregroundBusy}
-              onClick={runBreakApart}
-            >
-              Break Apart
-            </ActionButton>
-          </div>
-        </div>
-      ) : null}
-      {confirming?.kind === "drop" ? (
-        <div
-          role="alert"
-          className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"
-        >
-          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
-            Confirm drop
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            {confirming.mode === "stack"
-              ? `Drop the full stack of ${confirming.expectedQuantity} ${confirming.itemName}?`
-              : `Drop 1 ${confirming.itemName}?`}
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            Dropped items are permanently destroyed in the current development build.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <ActionButton
-              disabled={foregroundBusy}
-              intent="secondary"
-              onClick={() => {
-                confirmTriggerRef.current?.focus();
-                setConfirming(undefined);
-              }}
-              ref={cancelButtonRef}
-            >
-              Cancel
-            </ActionButton>
-            <ActionButton
-              disabled={foregroundBusy}
-              intent="danger"
-              loading={foregroundBusy}
-              onClick={runDiscard}
-            >
-              {confirming.confirmLabel}
-            </ActionButton>
-          </div>
-        </div>
       ) : null}
     </div>
   );

@@ -86,7 +86,16 @@ test.describe("Runestone Break Apart", () => {
     await expect(inventory.getByRole("button", { name: "Break Apart" })).toBeVisible();
     await captureReviewScreenshot(page, "rune-materials-mobile-runestone-details.png");
     await inventory.getByRole("button", { name: "Break Apart" }).click();
-    const confirmation = inventory.locator("[data-break-apart-confirmation]");
+    const panel = inventory.locator("[data-details-panel]");
+    const confirmation = panel.locator("[data-break-apart-confirmation]");
+    // Inline in the selected details panel, replacing the initiating button.
+    await expect(inventory.locator("[data-break-apart-confirmation]")).toHaveCount(1);
+    await expect(panel.getByRole("button", { name: "Break Apart", exact: true })).toHaveCount(0);
+    await expect(confirmation.getByText("Warning:")).toBeAttached();
+    await expect(confirmation.getByRole("button", { name: "Cancel" })).toBeFocused();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
     await expect(confirmation).toContainText(
       "Destroy 1 Runestone and receive exactly 5 Rune Fragments",
     );
@@ -96,10 +105,11 @@ test.describe("Runestone Break Apart", () => {
     // Cancelling changes nothing.
     await confirmation.getByRole("button", { name: "Cancel" }).click();
     await expect(confirmation).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "Break Apart", exact: true })).toBeFocused();
     expect(total(await rows(testCharacter.id), STONE)).toBe(2);
 
     await inventory.getByRole("button", { name: "Break Apart" }).click();
-    await confirmation.getByRole("button", { name: "Break Apart" }).click();
+    await confirmation.getByRole("button", { name: "Confirm break apart" }).click();
     await expect(
       inventory.getByText("Broke apart 1 Runestone into 5 Rune Fragments."),
     ).toBeVisible();
@@ -125,7 +135,7 @@ test.describe("Runestone Break Apart", () => {
     await inventory.getByRole("button", { name: "Break Apart" }).click();
     await inventory
       .locator("[data-break-apart-confirmation]")
-      .getByRole("button", { name: "Break Apart" })
+      .getByRole("button", { name: "Confirm break apart" })
       .click();
     await expect(
       inventory.getByText("Broke apart 1 Runestone into 5 Rune Fragments."),
@@ -155,7 +165,7 @@ test.describe("Runestone Break Apart", () => {
     await inventory.getByRole("button", { name: "Break Apart" }).click();
     await inventory
       .locator("[data-break-apart-confirmation]")
-      .getByRole("button", { name: "Break Apart" })
+      .getByRole("button", { name: "Confirm break apart" })
       .click();
     await expect(inventory.getByText(/Not enough free Inventory slots/)).toBeVisible();
     await expect(inventory.getByText(/the Runestone is unchanged/)).toBeVisible();
@@ -182,7 +192,7 @@ test.describe("Runestone Break Apart", () => {
       .where(eq(inventoryStacks.characterId, testCharacter.id));
     await inventory
       .locator("[data-break-apart-confirmation]")
-      .getByRole("button", { name: "Break Apart" })
+      .getByRole("button", { name: "Confirm break apart" })
       .click();
 
     await expect(
