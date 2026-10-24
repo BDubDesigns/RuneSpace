@@ -173,7 +173,15 @@ test("the Enby's two Seekers, a wrong reading, a discovery, and the debrief", as
   await expect(notice).toContainText(
     "A faint resonance pulls toward the northeast. The Echo is not here.",
   );
+  // Resolution closes the mobile Inventory and exposes the durable result
+  // without requiring a walk, a tap or a scroll through Inventory.
+  await expect(inventory).toHaveCount(0);
+  await expect(page.locator("[data-echo-result-focus]")).toBeFocused();
+  await expect(notice).toBeInViewport();
+  await expect(notice.locator("[data-echo-compass]")).toHaveAttribute("data-echo-compass", "northeast");
+  await expect(notice.locator("[data-echo-compass-angle]")).toHaveAttribute("data-echo-compass-angle", "45");
   expect(await carried(testCharacter.id, ITEM_IDS.beginnerEchoSeeker)).toBe(1);
+  ({ inventory, details } = await seekerDetails(page));
   await expect(details.locator("[data-echo-last-reading]")).toContainText(
     "Last reading: Hilltop Workshop, northeast,",
   );
@@ -200,6 +208,8 @@ test("the Enby's two Seekers, a wrong reading, a discovery, and the debrief", as
     timeout: 15_000,
   });
   await expect(page.locator("[data-echo-notice-title]")).toHaveText("Resonance Echo discovered!");
+  await expect(inventory).toHaveCount(0);
+  await expect(page.locator("[data-echo-result-focus]")).toBeFocused();
   expect(await runeworkingXp(testCharacter.id)).toBe(50);
   expect(await carried(testCharacter.id, ITEM_IDS.beginnerEchoSeeker)).toBe(0);
   await page.keyboard.press("Escape");
