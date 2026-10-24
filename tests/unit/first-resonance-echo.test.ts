@@ -191,6 +191,7 @@ describe("the Mission as authored", () => {
         objective:
           "Find one Resonance Echo using a Beginner Echo Seeker ({current}/{target}). Seekers search your current planet; each planet's search is separate. Leave room in Inventory for anything you find.",
         recommendedActionId: ACTION_IDS.beginnerEchoReading,
+        recommendedItemId: ITEM_IDS.beginnerEchoSeeker,
       },
     ]);
     expect(FIRST_RESONANCE_ECHO.turnIn).toMatchObject({
@@ -232,10 +233,13 @@ describe("the objective", () => {
     );
     // Carrying five Seekers satisfies nothing.
     expect(zero.state).toBe("active");
-    expect(deriveMissionGuidanceTargets([zero]).actionIds.has(ACTION_IDS.beginnerEchoReading)).toBe(
-      true,
-    );
+    const targets = deriveMissionGuidanceTargets([zero]);
+    expect(targets.actionIds.has(ACTION_IDS.beginnerEchoReading)).toBe(true);
+    expect(targets.actionItemIds.has(ITEM_IDS.beginnerEchoSeeker)).toBe(true);
+    // An unpinned Mission contributes no active item guidance, without changing progress.
+    expect(deriveMissionGuidanceTargets([]).actionItemIds.size).toBe(0);
     const one = echoProjection({ acceptedAt: NOW }, 1, LOCATION_IDS.theJag);
+    expect(deriveMissionGuidanceTargets([one]).actionItemIds.size).toBe(0);
     expect(one.currentObjective).toBe("Return to the Wise Old Enby at Hilltop Workshop");
     expect(one.state).toBe("active");
     expect(echoProjection({ acceptedAt: NOW }, 1).state).toBe("ready_for_completion");
