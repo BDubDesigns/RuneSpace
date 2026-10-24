@@ -31,7 +31,7 @@ export function echoDirectionsCopy(eastWest: EchoEastWest, northSouth: EchoNorth
 export function echoCompassDegrees(eastWest: EchoEastWest, northSouth: EchoNorthSouth): number {
   const x = eastWest === "east" ? 1 : eastWest === "west" ? -1 : 0;
   const y = northSouth === "south" ? 1 : northSouth === "north" ? -1 : 0;
-  return (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360;
+  return (((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360);
 }
 
 /** The wrong-reading line: "A faint resonance pulls toward the northwest. The Echo is not here." */
