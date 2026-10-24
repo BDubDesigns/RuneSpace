@@ -1999,3 +1999,21 @@ body {
     transform: none;
   }
 }
+
+/* Beginner Echo compass: the needle briefly searches, then settles on the
+   authoritative clue direction. Motion-free for reduced-motion preferences. */
+.rs-echo-compass-needle {
+  transform-origin: 60px 60px;
+  animation: rs-echo-needle-wobble 4.8s ease-in-out infinite;
+}
+
+@keyframes rs-echo-needle-wobble {
+  0%, 69%, 87%, 100% { transform: rotate(0deg); }
+  74% { transform: rotate(-4deg); }
+  78% { transform: rotate(3deg); }
+  82% { transform: rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-echo-compass-needle { animation: none; }
+}
