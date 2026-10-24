@@ -40,7 +40,7 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
       const target = resultRef.current;
       if (!target) return;
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      target.scrollIntoView({ behavior: reducedMotion ? "instant" : "smooth", block: "start" });
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
       target.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
