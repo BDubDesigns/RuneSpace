@@ -113,7 +113,9 @@ async function seekerDetails(page: Page) {
   await page.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
-  await inventory.getByRole("button", { name: /^\d+ Beginner Echo Seeker/ }).click();
+  const seekerTile = inventory.getByRole("button", { name: /^\d+ Beginner Echo Seeker/ });
+  await expect(seekerTile).toHaveAttribute("data-mission-guidance", "active");
+  await seekerTile.click();
   const details = inventory.locator("[data-echo-seeker-details]");
   await expect(details).toBeVisible();
   return { inventory, details };
