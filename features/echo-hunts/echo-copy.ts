@@ -77,6 +77,17 @@ export function echoRewardLostLine(itemId: string): string {
   return `${name} slipped back into RuneSpace — not enough Inventory space.`;
 }
 
+/**
+ * Where a Legendary discovery went (#399). Both lines name the item; the mailed
+ * one says it is safe at FedHex and where to claim it. A Legendary is never lost.
+ */
+export function echoLegendaryDeliveryLine(itemId: string, mailed: boolean): string {
+  const name = resolveItemPresentation(itemId, itemId).displayName;
+  return mailed
+    ? `${name} did not fit in your Inventory, so The Wise Old Enby sent it to FedHex for safekeeping. Collect it at the FedHex pickup at Holo Hollow Landing or Stillreach Landing Station once you have room.`
+    : `${name} has been added to your Inventory.`;
+}
+
 export function echoReadingErrorMessage(error: EchoReadingCommandError): string {
   return error === "echo_no_seeker"
     ? "You need a Beginner Echo Seeker in your Inventory to take a reading."
@@ -84,7 +95,7 @@ export function echoReadingErrorMessage(error: EchoReadingCommandError): string 
 }
 
 export const ECHO_CAPACITY_ADVISORY =
-  "Leave room in your Inventory. An ordinary item an Echo gives up is lost if it doesn't fit — the discovery still awards Runeworking XP.";
+  "Leave room in your Inventory. An ordinary item an Echo gives up is lost if it doesn't fit — the discovery still awards Runeworking XP. A Legendary is the exception: it is sent to FedHex for you to collect.";
 
 /** Readable local time for a reading's timestamp. */
 export function echoReadingTime(iso: string): string {

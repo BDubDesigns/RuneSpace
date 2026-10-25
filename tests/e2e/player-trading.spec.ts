@@ -645,6 +645,74 @@ journey(
   },
 );
 
+journey(
+  "an offer holding a Legendary item warns both players while composing and in the frozen review, and blocks nothing",
+  async (page) => {
+    await page.setViewportSize(PHONE);
+    const a = await signIn(page.context().browser()!, page.context(), "Orla");
+    const b = await secondPlayer(page, "Pike");
+    const bName = b.player.character.displayName;
+    await addStack(a, SHALE, 2);
+    const boots = await addUnique(a, "miners_boots");
+    await openPlay(b.page, b.player.character.id);
+    await openPlay(page, a.character.id);
+    await openProfile(page, bName);
+    await requestTrade(page, bName);
+    const bChat = await openChat(b.page);
+    await requestCard(bChat, a.character.displayName)
+      .getByRole("button", { name: "Accept" })
+      .click();
+    const aTrade = surface(page);
+    const bTrade = surface(b.page);
+    await expect(aTrade).toBeVisible();
+    await expect(bTrade).toBeVisible();
+
+    // An ordinary offer carries no warning.
+    await aTrade.getByLabel("Quantity of Ferrite Shale to offer").fill("1");
+    await aTrade.getByRole("button", { name: "Offer 1 Ferrite Shale" }).click();
+    await expect(offer(bTrade, "theirs").locator(`[data-offer-stack="${SHALE}"]`)).toBeVisible();
+    await expect(aTrade.locator("[data-trade-scarcity-warning]")).toHaveCount(0);
+    await expect(bTrade.locator("[data-trade-scarcity-warning]")).toHaveCount(0);
+
+    // Offering a Legendary shows the approved warning to BOTH players, from rarity alone.
+    await aTrade.locator(`[data-trade-offerable-item="${boots}"]`).getByRole("button").click();
+    const warning =
+      "Very rare item! Check recent player-to-player prices in Trade chat before confirming. Trades are final.";
+    for (const trade of [aTrade, bTrade]) {
+      await expect(trade.locator("[data-trade-scarcity-warning]")).toHaveText(warning);
+      await expect(trade.locator("[data-trade-scarcity-warning]")).toHaveAttribute("role", "note");
+      // Nonblocking: no extra dialog, and the Ready control is still there.
+      await expect(trade.getByRole("button", { name: "Ready", exact: true })).toBeEnabled();
+    }
+    await expectNoHorizontalOverflow(page, aTrade);
+    await captureReviewScreenshot(b.page, "issue-399-trade-warning-compose.png");
+
+    // The warning is still on both sides of the frozen final review.
+    await aTrade.getByRole("button", { name: "Ready", exact: true }).click();
+    await bTrade.getByRole("button", { name: "Ready", exact: true }).click();
+    await expectStage(aTrade, "review");
+    await expectStage(bTrade, "review");
+    for (const trade of [aTrade, bTrade]) {
+      await expect(trade.locator("[data-trade-scarcity-warning]")).toHaveText(warning);
+    }
+    await expect(
+      bTrade.getByRole("region", { name: "You Receive" }).locator(`[data-offer-item="${boots}"]`),
+    ).toContainText("Miner's Boots");
+    await expectNoHorizontalOverflow(b.page, bTrade);
+    await expectActionsInView(b.page, bTrade);
+    await captureReviewScreenshot(b.page, "issue-399-trade-warning-review.png");
+
+    // Cancel: nothing moved, and the Legendary is still A's.
+    await aTrade.getByRole("button", { name: "Cancel Trade" }).click();
+    const [row] = await db
+      .select()
+      .from(rune.itemInstances)
+      .where(eq(rune.itemInstances.id, boots));
+    expect(row!.characterId).toBe(a.character.id);
+    await b.context.close();
+  },
+);
+
 // --- public communication -------------------------------------------------------
 
 test.describe("trading on the public site", () => {

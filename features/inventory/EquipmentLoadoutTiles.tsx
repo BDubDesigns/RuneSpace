@@ -71,35 +71,6 @@ export function SlotTile({
   );
 }
 
-/** Gloves/Boots: visual-only "Coming soon" tiles, never a live slot (#364). */
-export function PlaceholderTile({
-  label,
-  icon,
-  selected,
-  onSelect,
-}: {
-  label: string;
-  icon: EquipmentSlotIconKind;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <>
-      <p className={LABEL_CLASS}>{label}</p>
-      <button
-        aria-label={`${label}: coming soon, not yet equippable`}
-        aria-pressed={selected}
-        className={`${DASHED_TILE_CLASS} opacity-80 ${selectedRing(selected)}`}
-        onClick={onSelect}
-        type="button"
-      >
-        <EquipmentSlotIcon kind={icon} />
-        <span className="text-xs uppercase tracking-wide">Coming soon</span>
-      </button>
-    </>
-  );
-}
-
 /**
  * The Power Cell utility (#364): NOT equipment. It reads the authoritative
  * charge and loose-cell total and offers the existing Load command; the server

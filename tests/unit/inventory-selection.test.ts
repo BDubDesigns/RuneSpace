@@ -80,6 +80,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     welding: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     fabrication: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     runeworking: { totalXp: 0, level: 1, xpIntoLevel: 0 },
+    fedhex: { pendingCount: 0, parcels: [] },
     echoHunt: {
       seekerItemId: "beginner_echo_seeker",
       readingActionId: "beginner_echo_reading",
@@ -136,6 +137,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     equipment: {
       aggregateContainerSlots: 8,
       carriedPowerCellQuantity: 0,
+      miningSuccessLevelBonus: 0,
       slots: [],
     },
     run: {

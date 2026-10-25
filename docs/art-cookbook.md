@@ -464,6 +464,15 @@ The Refiner-To-Go Local Place scene (#381) is the owner-approved 2172×543 RGB P
 `assets/location-scenes/refiner-to-go-master.png` and downsampled whole to
 `refiner-to-go.webp`, 1536×384 q80, by `scripts/prepare-refiner-to-go-art.mjs`.
 
+The FedHex parcel pickup interior (#399) is the owner-approved 2508×627 RGB PNG
+(SHA-256 `04b35967e1fe3748…`), kept unaltered as
+`assets/location-scenes/fedhex-parcel-hub-master.png` and downsampled whole to
+`fedhex-parcel-hub.webp`, 1536×384 q80, by `scripts/prepare-fedhex-slice-j-art.mjs`. One scene
+serves both FedHex Local Places. The same script derives the Legendary Miner's Boots and
+Miner's Gloves (approved 1254×1254 transparent RGBA masters, SHA-256 `dba7d2f2…` and
+`bb219b38…`) with the Wheel Assembly convention. Neither item carries a baked sparkle or sweep:
+the Legendary treatment is coded UI.
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.

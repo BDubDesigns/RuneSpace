@@ -14,30 +14,30 @@ import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
 import { EquipmentToolDetails } from "./EquipmentToolDetails";
+import { CandidateThumbnail, PowerCellTile, SlotTile } from "./EquipmentLoadoutTiles";
 import {
-  CandidateThumbnail,
-  PlaceholderTile,
-  PowerCellTile,
-  SlotTile,
-} from "./EquipmentLoadoutTiles";
-import {
-  FUTURE_SLOT_PLACEHOLDERS,
   candidateBlockedReasons,
   deriveLoadoutCells,
   derivePowerCellUtility,
   equipmentSlotKey,
-  placeholderKey,
   resolveSelectedCandidate,
   resolveSelectedSlot,
   type EquipmentCandidate,
   type EquipmentSlotState,
 } from "./equipment-loadout";
 
-function itemFacts(item: { massGrams: number; slotCapacity?: number }) {
+function itemFacts(item: {
+  massGrams: number;
+  slotCapacity?: number;
+  miningSuccessLevelBonus?: number;
+}) {
   return (
     <>
       {formatMassGrams(item.massGrams)}
       {item.slotCapacity !== undefined ? ` · +${item.slotCapacity} Inventory slots` : ""}
+      {item.miningSuccessLevelBonus !== undefined
+        ? ` · +${item.miningSuccessLevelBonus} effective Mining level for success chance`
+        : ""}
     </>
   );
 }
@@ -134,15 +134,19 @@ export function EquipmentPanel({
       setPendingFocusKey(selectedKey);
     },
   );
-  const miningToolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
-  const cells = deriveLoadoutCells(state.equipment.slots, miningToolSlotId);
+  const {
+    miningToolSuitSlotId: miningToolSlotId,
+    handsSuitSlotId,
+    feetSuitSlotId,
+  } = getEffectiveGameBalance().carrying;
+  const cells = deriveLoadoutCells(state.equipment.slots, {
+    miningToolSlotId,
+    handsSlotId: handsSuitSlotId,
+    feetSlotId: feetSuitSlotId,
+  });
   const powerCellUtility = derivePowerCellUtility(state.equipment);
   const slot = resolveSelectedSlot(state.equipment.slots, selectedKey);
   const candidate = resolveSelectedCandidate(slot, candidateId);
-  const placeholder = FUTURE_SLOT_PLACEHOLDERS.map(({ id, label }) => ({
-    key: placeholderKey(id),
-    label,
-  })).find(({ key }) => key === selectedKey);
   const tool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching item's
@@ -152,10 +156,10 @@ export function EquipmentPanel({
   // Opening a slot's details moves focus to them so a keyboard or screen-reader
   // player lands on what they asked for; collapsing leaves focus on the tile.
   useEffect(() => {
-    if (!focusDetailsOnOpen.current || !(slot || placeholder)) return;
+    if (!focusDetailsOnOpen.current || !slot) return;
     focusDetailsOnOpen.current = false;
     detailsRef.current?.focus();
-  }, [slot, placeholder?.key]);
+  }, [slot]);
 
   // Focus returns to the slot tile only after the confirmed state has rendered,
   // so it lands on the new (re-artworked) tile rather than one being replaced.
@@ -203,6 +207,16 @@ export function EquipmentPanel({
           </strong>
         </p>
       </div>
+      {state.equipment.miningSuccessLevelBonus > 0 ? (
+        <p
+          className="mt-3 text-xs text-[color:var(--rs-text-secondary)]"
+          data-mining-success-bonus={state.equipment.miningSuccessLevelBonus}
+        >
+          Worn gear: +{state.equipment.miningSuccessLevelBonus} effective Mining{" "}
+          {state.equipment.miningSuccessLevelBonus === 1 ? "level" : "levels"} for success chance
+          only. Your Mining level and every unlock are unchanged.
+        </p>
+      ) : null}
       <div
         aria-label="Equipment loadout"
         className="mt-4 grid grid-cols-2 gap-3"
@@ -227,13 +241,6 @@ export function EquipmentPanel({
                 shortLabel={cell.shortLabel}
                 slot={cell.slot}
               />
-            ) : cell.kind === "placeholder" ? (
-              <PlaceholderTile
-                icon={cell.icon}
-                label={cell.label}
-                onSelect={() => selectSlot(cell.key)}
-                selected={cell.key === selectedKey}
-              />
             ) : (
               <PowerCellTile
                 busy={foregroundBusy}
@@ -245,24 +252,7 @@ export function EquipmentPanel({
           </div>
         ))}
       </div>
-      {placeholder ? (
-        <section
-          aria-label={`${placeholder.label} details`}
-          className="mt-4 border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-panel)] p-3 outline-none"
-          data-equipment-details={placeholder.key}
-          ref={detailsRef}
-          tabIndex={-1}
-        >
-          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
-            {placeholder.label} · Coming soon
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-muted)]">
-            No {placeholder.label.toLowerCase()} exist yet, so this slot cannot hold or equip
-            anything.
-          </p>
-          {messageNode}
-        </section>
-      ) : slot ? (
+      {slot ? (
         <section
           aria-label={`${slot.label} details`}
           className="mt-4 border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-panel)] p-3 outline-none"

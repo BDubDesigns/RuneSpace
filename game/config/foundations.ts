@@ -91,6 +91,9 @@ const itemIds = {
   // The first Runeworking output (#391): one Rune Fragment attuned at the
   // Resonance Rig. An ordinary stack; it has no Use until a later slice.
   beginnerEchoSeeker: asContentId("beginner_echo_seeker"),
+  // The first Legendary Echo rewards (#399): a matched miner's set, one per planet.
+  minersBoots: asContentId("miners_boots"),
+  minersGloves: asContentId("miners_gloves"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -675,6 +678,10 @@ export const LOCAL_PLACE_IDS = {
   stillreachFuelTerminal: asContentId("stillreach_fuel_terminal"),
   // The shabby shared Refining station beside it (#381).
   stillreachRefinerToGo: asContentId("stillreach_refiner_to_go"),
+  // FedHex (#399): the interplanetary postal brand's two parcel pickup rooms, one
+  // under each landing hub. Both open the same character-owned mailbox.
+  fedhexHoloHollowLanding: asContentId("fedhex_holo_hollow_landing"),
+  fedhexStillreachLandingStation: asContentId("fedhex_stillreach_landing_station"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */

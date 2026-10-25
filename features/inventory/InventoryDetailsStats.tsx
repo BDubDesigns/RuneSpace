@@ -66,6 +66,13 @@ export function InventoryDetailsStats({ selection }: { selection: ResolvedInvent
           value={`+${equipment.slotCapacity}`}
         />
       ) : null}
+      {equipment?.kind === "wearable" ? (
+        <StatRow
+          dataStat="mining-success-bonus"
+          label="Worn"
+          value={`+${equipment.miningSuccessLevelBonus} effective Mining level for success chance only`}
+        />
+      ) : null}
       {equipment?.kind === "mining_tool" && equipment.requiredMiningLevel > 1 ? (
         <StatRow
           dataStat="required-mining-level"

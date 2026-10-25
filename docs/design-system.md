@@ -131,8 +131,9 @@ slightly larger text on `--rs-chat-promoted-surface` with a
 `--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
 "Promoted ad" — brighter than ordinary chat, never an alert.
 
-A System line (#308) — a Mining RARE FIND announcement, or ULTRA RARE FIND for an
-Ultra Rare item (#342) — is RuneSpace's own
+A System line (#308) — a Mining RARE FIND announcement, ULTRA RARE FIND for an
+Ultra Rare item (#342), or LEGENDARY FIND for a Legendary Echo discovery (#399;
+`--rs-legendary-find-accent`) — is RuneSpace's own
 output and reads that way: the sender is the word "System" (never a player
 name), with a "RARE FIND" label in `--rs-rare-find-accent` and a 4px
 `--rs-rare-find-accent` left rim on `--rs-rare-find-surface` (ULTRA RARE FIND uses
@@ -153,19 +154,26 @@ borrows `--rs-accent-success`, and is independent of whether finding the item
 is announced anywhere. A future Secondary Find is not automatically rare; its
 own presentation decides.
 
-**Ultra Rare (#342).** `ItemRarity` is `rare | ultra_rare`; no further tier is
-authored until one is needed. An `ultra_rare` item takes `--rs-item-ultra-rare-accent`
-on its tile border and `--rs-item-ultra-rare-stack-track` on its stack indicator
-and, unlike Rare, carries the **reusable continuous shimmer**: `RarityShimmer`
-(`components/items/RarityShimmer.tsx`) paints `.rs-item-shimmer` over the tile's
-artwork zone, under the nameplate and plates — one slow diagonal sheen every few
-seconds and three small sparkles on staggered, unequal cycles (4.2 s, 5.3 s,
-6.1 s), restrained so it reads at the 80 px tile on a phone without competing
-with the name or quantity. It is a UI treatment keyed off the item's authored
-rarity, **never baked into item art**, aria-hidden, pointer-transparent and
-clipped to the tile. `--rs-shimmer-strength` is the one dial a higher rarity can
-raise later. Under `prefers-reduced-motion` the sweep is dropped and the sparkles
-rest softly lit, so the item stays noticeable without moving. Plain Rare items
+**Ultra Rare and Legendary (#342, #399).** `ItemRarity` is
+`rare | ultra_rare | legendary`, and exactly **two** animated tiers exist, both
+painted by the one shared overlay `RarityShimmer`
+(`components/items/RarityShimmer.tsx`, `.rs-item-shimmer`) over the tile's artwork
+zone, under the nameplate and plates, so Inventory, storage, rewards, trade and
+every other item card agree:
+
+- **Ultra Rare** takes `--rs-item-ultra-rare-accent` on its border and stack
+  indicator and carries **the three small plus sparkles only**, twinkling on
+  staggered, unequal cycles (4.2 s, 5.3 s, 6.1 s). It has no sweeping sheen.
+- **Legendary** takes its own gold `--rs-item-legendary-accent`, clearly apart
+  from Ultra Rare's orange, carries the **same sparkles AND the light sweep** (a
+  thin diagonal sheen travelling across the tile every few seconds,
+  `data-item-shimmer-sweep`), and prints a visible **LEGENDARY** label on the tile
+  (`.rs-item-rarity-label`) so the distinction never rests on colour alone.
+
+Both are UI treatments keyed off the item's authored rarity, **never baked into
+item art**, aria-hidden, pointer-transparent and clipped to the tile. Under
+`prefers-reduced-motion` the sparkles rest softly lit and a Legendary tile's sweep
+is replaced by a soft, static highlight, so neither tier moves. Plain Rare items
 (the gems) are unchanged: outline and stack colour only.
 
 **Stack items and rewards (#308).** `StackItemVisual`

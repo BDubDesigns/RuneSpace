@@ -106,6 +106,8 @@ export type MiningRunState = {
 
 export type MiningSnapshot = {
   miningLevel: number;
+  /** Worn hands and feet gear's success-chance-only bonus (#399). */
+  successLevelBonus: number;
   /** The character's Prioritize primary resources setting (#342). */
   prioritizePrimaryResources: boolean;
   /** The equipped Mining tool's authored definition, or undefined (#233). */
@@ -163,6 +165,7 @@ export async function loadMiningSnapshot(
     : undefined;
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
+    successLevelBonus: play.equipmentLoadout.miningSuccessLevelBonus,
     // Read under the same character lock as everything else the resolution uses,
     // so a lazy or offline attempt resolves under the setting last committed.
     prioritizePrimaryResources: await loadPrioritizePrimaryResources(transaction, characterId),

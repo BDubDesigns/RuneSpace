@@ -42,7 +42,7 @@ export const ITEM_CATEGORIES: readonly {
   {
     id: "tools-and-containers",
     label: "Tools & Containers",
-    description: "Gear you equip: Mining tools and container attachments.",
+    description: "Gear you equip: Mining tools, worn gear and container attachments.",
   },
 ];
 
@@ -73,6 +73,8 @@ const itemCategoryByItemId = {
   [ITEM_IDS.fullSmallFuelCanister]: "components-and-supplies",
   [ITEM_IDS.salvageCutter]: "tools-and-containers",
   [ITEM_IDS.loadsteelCutter]: "tools-and-containers",
+  [ITEM_IDS.minersBoots]: "tools-and-containers",
+  [ITEM_IDS.minersGloves]: "tools-and-containers",
   [ITEM_IDS.scrapBox]: "tools-and-containers",
   [ITEM_IDS.freightHarness]: "tools-and-containers",
   [ITEM_IDS.mykeaSchleppraum8]: "tools-and-containers",

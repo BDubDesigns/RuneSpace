@@ -64,7 +64,7 @@ const ready: MiningSnapshot = {
 };
 
 describe("the canonical equipment-definition boundary", () => {
-  it("authors both Mining tools and all three containers, and nothing else", () => {
+  it("authors both Mining tools, all three containers and the two wearables, and nothing else", () => {
     expect(
       equipmentDefinitions(balance).map((definition) => [definition.itemId, definition.kind]),
     ).toEqual([
@@ -73,6 +73,8 @@ describe("the canonical equipment-definition boundary", () => {
       [ITEM_IDS.mykeaSchleppraum8, "container"],
       [ITEM_IDS.scrapBox, "container"],
       [ITEM_IDS.freightHarness, "container"],
+      [ITEM_IDS.minersBoots, "wearable"],
+      [ITEM_IDS.minersGloves, "wearable"],
     ]);
     expect(getEquipmentDefinition(ITEM_IDS.powerCell, balance)).toBeUndefined();
     expect(getEquipmentDefinition(ITEM_IDS.galvanicWireSpool, balance)).toBeUndefined();

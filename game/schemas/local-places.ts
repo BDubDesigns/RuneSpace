@@ -103,6 +103,12 @@ export const LocalPlaceDefinitionSchema = z
       .object({ attemptDurationMultiplier: z.number().int().min(2) })
       .strict()
       .optional(),
+    /**
+     * Marks this place as a FedHex pickup (#399): its interior hosts the one
+     * character-owned mailbox. Every FedHex place opens the same mailbox, so the
+     * place authors only this marker; parcels live on the character, not here.
+     */
+    fedhexMailbox: z.literal(true).optional(),
     presentation: z
       .object({
         scene: LocalPlaceSceneSchema,

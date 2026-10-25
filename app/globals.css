@@ -152,6 +152,13 @@
   --rs-item-ultra-rare-accent: #ff9f4a;
   --rs-item-ultra-rare-stack-track: rgb(255 159 74 / 0.18);
   --rs-item-ultra-rare-sparkle: #fff1c9;
+  /* Legendary (#399): a gold accent apart from Ultra Rare's orange, on the tile
+     border, stack indicator and the LEGENDARY FIND System line. Its tile also
+     reads LEGENDARY in words. The sheen that goes with it is coded UI. */
+  --rs-item-legendary-accent: #ffd23f;
+  --rs-item-legendary-stack-track: rgb(255 210 63 / 0.2);
+  --rs-legendary-find-accent: var(--rs-item-legendary-accent);
+  --rs-legendary-find-surface: rgb(255 210 63 / 0.12);
   --rs-ultra-rare-find-accent: var(--rs-item-ultra-rare-accent);
   --rs-ultra-rare-find-surface: rgb(255 159 74 / 0.1);
   --rs-chat-mention-other: var(--rs-accent-secondary);
@@ -795,15 +802,14 @@ body {
   }
 }
 
-/* Rarity shimmer (#342): a slow, continuous glint for Ultra Rare and above,
-   painted over an item tile's artwork zone by the shared item visuals. It is a
-   UI treatment, never part of an item's artwork: a thin diagonal sheen drifts
-   across the art every few seconds while three small sparkles twinkle on
-   staggered, unequal cycles so the tile never pulses in unison. Both layers are
-   clipped to the tile, sit under the nameplate, and ignore pointer input.
-   `--rs-shimmer-strength` is the one dial a higher rarity can raise later. */
+/* Rarity effect (#342, #399): exactly two animated tiers, painted over an item
+   tile's artwork zone by the shared item visuals. It is a UI treatment, never
+   part of an item's artwork. Ultra Rare gets three small plus sparkles that
+   twinkle on staggered, unequal cycles so the tile never pulses in unison.
+   Legendary gets those same sparkles AND a thin diagonal sheen that drifts
+   across the art every few seconds (`data-item-shimmer-sweep`). Both layers are
+   clipped to the tile, sit under the nameplate, and ignore pointer input. */
 .rs-item-shimmer {
-  --rs-shimmer-strength: 1;
   pointer-events: none;
   position: absolute;
   inset: 0;
@@ -811,14 +817,14 @@ body {
   overflow: hidden;
 }
 
-.rs-item-shimmer::before {
+.rs-item-shimmer[data-item-shimmer-sweep]::before {
   content: "";
   position: absolute;
   inset: -20% -60%;
   background: linear-gradient(
     105deg,
     transparent 42%,
-    rgb(255 214 140 / calc(0.32 * var(--rs-shimmer-strength))) 50%,
+    rgb(255 226 140 / 0.38) 50%,
     transparent 58%
   );
   transform: translateX(-60%);
@@ -837,6 +843,10 @@ body {
   filter: drop-shadow(0 0 3px var(--rs-item-ultra-rare-accent));
   opacity: 0;
   animation: rs-item-shimmer-twinkle 4.2s ease-in-out infinite;
+}
+
+.rs-item-shimmer[data-item-shimmer="legendary"] .rs-item-shimmer__spark {
+  filter: drop-shadow(0 0 3px var(--rs-item-legendary-accent));
 }
 
 .rs-item-shimmer__spark:nth-child(1) {
@@ -876,17 +886,36 @@ body {
     scale: 0.5;
   }
   28% {
-    opacity: calc(0.95 * var(--rs-shimmer-strength));
+    opacity: 0.95;
     scale: 1;
   }
 }
 
+/* The visible LEGENDARY label (#399) on a tile, beside the gold accent. */
+.rs-item-rarity-label {
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 20;
+  border: 1px solid var(--rs-item-legendary-accent);
+  background: var(--rs-item-plate-surface);
+  color: var(--rs-item-legendary-accent);
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
 /* Reduced motion keeps the item noticeably special without any movement: the
-   sweep is dropped and the sparkles rest softly lit. */
+   sparkles rest softly lit, and a Legendary tile's sweep is replaced by a soft,
+   static diagonal highlight. */
 @media (prefers-reduced-motion: reduce) {
-  .rs-item-shimmer::before {
+  .rs-item-shimmer[data-item-shimmer-sweep]::before {
     animation: none;
-    display: none;
+    transform: none;
+    opacity: 0.55;
   }
 
   .rs-item-shimmer__spark {

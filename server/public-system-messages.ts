@@ -20,7 +20,12 @@ import { publishRealtimeEvent } from "@/server/realtime";
 
 /** A System row as the wire carries it. */
 export function toSystemView(row: ChatMessage): SystemChatMessageView {
-  const treatment = row.kind === "ultra_rare_find" ? "ultra_rare_find" : "rare_find";
+  const treatment =
+    row.kind === "legendary_find"
+      ? "legendary_find"
+      : row.kind === "ultra_rare_find"
+        ? "ultra_rare_find"
+        : "rare_find";
   return {
     redacted: false,
     system: true,
@@ -66,6 +71,43 @@ export async function recordRareFindAnnouncement(
       kind: input.rarity === "ultra_rare" ? "ultra_rare_find" : "rare_find",
       channel: "general",
       body: rareFindAnnouncementBody(input),
+      createdAt: input.now,
+    })
+    .returning();
+  const view = toSystemView(row!);
+  afterCharacterCommandCommits(transaction, () => {
+    publishRealtimeEvent({ kind: "everyone" }, "chat.message", view);
+  });
+  return view;
+}
+
+/** The Legendary announcement's copy: the character's name, never the account's. */
+export function legendaryFindAnnouncementBody(input: {
+  characterName: string;
+  itemName: string;
+  planetName: string;
+}): string {
+  return `${input.characterName} uncovered Legendary ${input.itemName} from a Resonance Echo on ${input.planetName}!`;
+}
+
+/**
+ * Record one LEGENDARY FIND announcement (#399) inside the caller's transaction,
+ * so it commits together with the discovery it announces (the reward or the
+ * FedHex parcel, the XP and the reading's notice) or not at all. The discovery
+ * resolves exactly once under the character lock, so this line is written
+ * exactly once per Legendary find; claiming, re-reading and trading never call
+ * it. Live delivery is queued for after that commit.
+ */
+export async function recordLegendaryFindAnnouncement(
+  transaction: DatabaseTransaction,
+  input: { characterName: string; itemName: string; planetName: string; now: Date },
+): Promise<SystemChatMessageView> {
+  const [row] = await transaction
+    .insert(chatMessages)
+    .values({
+      kind: "legendary_find",
+      channel: "general",
+      body: legendaryFindAnnouncementBody(input),
       createdAt: input.now,
     })
     .returning();

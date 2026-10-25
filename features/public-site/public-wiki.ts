@@ -387,6 +387,17 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Gloves and Boots",
+        paragraphs: [
+          [
+            "Gloves and Boots are real equipment slots beside the Mining tool, one piece each: the Legendary Miner's Gloves go on your hands and the Legendary Miner's Boots on your feet. Each worn piece counts as one extra Mining level for your success chance only, so a full pair is two. Neither needs a Mining level to wear, and your real ",
+            { text: "Mining", articleSlug: "mining-and-refining" },
+            " level does not change: they never unlock a mine, a recipe or a tool, and do not change how long an attempt takes, the XP, the ore or the finds. You can carry spares, swap the worn one, and trade a spare once it is carried and unequipped.",
+          ],
+          "Gloves weigh 1 kg and Boots 2 kg, and like any gear they count toward your weight limit while worn.",
+        ],
+      },
+      {
         heading: "Breaking a Runestone apart",
         paragraphs: [
           "Select a Runestone and Item details shows Break Apart. After you confirm, it destroys one Runestone and gives you exactly five Rune Fragments, with nothing else needed — no tool, no place and no timer. It cannot be undone, and Rune Fragments cannot be put back together. It works on one stone at a time, even from a stack of several.",
@@ -649,6 +660,7 @@ const authoredWikiArticles = [
           "When you're happy with both offers, choose Ready. Your side locks; Change Offer unlocks it. Any change to either offer clears both players' Ready, so nobody can agree to one deal and be held to another.",
           "Once you're both Ready, the offers freeze into a final You Give / You Receive review. Check it, then choose Confirm Trade. The first player to confirm waits for the other, and can still Cancel Trade until the second confirmation goes through.",
           "Nothing moves until both of you have confirmed. Then everything moves at once, for both of you, and the trade screen shows what you gave and received.",
+          "If either offer holds an Ultra Rare or Legendary item, both of you see a note on the trade screen, while you build the offers and again in the final review: Very rare item! Check recent player-to-player prices in Trade chat before confirming. Trades are final. It is only a reminder. It never stops a trade, shows no price and adds no extra step.",
         ],
       },
       {
@@ -1164,15 +1176,15 @@ const authoredWikiArticles = [
           "A Seeker searches the planet you are standing on. Skatboll and Stillreach each hide their own Echo, and each keeps its own search: your last reading there stays put while you are away. On Skatboll the Echo is somewhere among its ordinary places, never in Deep Jag; on Stillreach, anywhere on its map.",
           "If the Echo is not where you stand, the reading says which way it lies from that spot: east or west, and north or south, or due north (say) when you are already lined up. A wrong reading pays no XP. The Seeker's details show the planet you are searching and your last reading there, and whether the spot you are standing on now has been ruled out by it. Not ruled out does not mean the Echo is there.",
           "Finding the Echo pays 50 Runeworking XP and gives up one item, and your next reading on that planet starts a new search. Your very first reading on a planet can find it right where you are.",
-          "Leave room before you look. The item is checked against your Inventory after the Seeker is used up, so the Seeker's own slot and weight count; if it still does not fit, it slips back into RuneSpace and is gone, though you keep the XP.",
+          "Leave room before you look. The item is checked against your Inventory after the Seeker is used up, so the Seeker's own slot and weight count; if it still does not fit, it slips back into RuneSpace and is gone, though you keep the XP. The one exception is a Legendary: it is never lost, and is sent to FedHex for you to collect at the FedHex pickup at Holo Hollow Landing or Stillreach Landing Station.",
         ],
       },
       {
         heading: "What an Echo can give",
         paragraphs: ["Exactly one item per Echo, rolled from the planet you found it on:"],
         list: [
-          "Skatboll: Rune Fragment 30.2%, Uncut Quartz 24%, Uncut Topaz 16%, Refined Ferrite 12%, Uncut Sapphire 10%, Galvanic Stock 5%, intact Runestone 2.8%.",
-          "Stillreach: Rune Fragment 30.2%, Uncut Quartz 26%, Uncut Topaz 20%, Uncut Sapphire 10%, Empty Small Fuel Canister 10%, intact Runestone 3.8%.",
+          "Skatboll: Rune Fragment 30%, Uncut Quartz 24%, Uncut Topaz 16%, Refined Ferrite 12%, Uncut Sapphire 10%, Galvanic Stock 5%, intact Runestone 2.8%, and a Legendary, Miner's Boots, at 0.2% (about one Echo in five hundred).",
+          "Stillreach: Rune Fragment 30%, Uncut Quartz 26%, Uncut Topaz 20%, Uncut Sapphire 10%, Empty Small Fuel Canister 10%, intact Runestone 3.8%, and a Legendary, Miner's Gloves, at 0.2% (about one Echo in five hundred).",
         ],
       },
     ],

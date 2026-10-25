@@ -571,3 +571,37 @@ test("an ULTRA RARE FIND System line is the same senderless line with its own la
     await db.delete(rune.chatMessages).where(eq(rune.chatMessages.body, body));
   }
 });
+
+test("a LEGENDARY FIND System line is the same senderless line with its own label (#399)", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize(WIDTHS[0]);
+  const player = await signInFreshPlayer(context);
+  const tag = randomUUID().slice(0, 8);
+  const body = `Finder ${tag} uncovered Legendary Miner's Gloves from a Resonance Echo on Stillreach!`;
+  await db.insert(rune.chatMessages).values({
+    kind: "legendary_find",
+    channel: "general",
+    body,
+    createdAt: new Date(Date.now() - 5_000),
+  });
+  try {
+    const dialog = await openChat(page, player.character.id);
+    const general = log(dialog, "General");
+    const line = general.locator('[data-chat-system="legendary_find"]', { hasText: tag });
+    await revealGeneralLine(page, dialog, line);
+    await expect(line).toBeVisible();
+    await expect(line).toContainText("System");
+    await expect(line).toContainText("LEGENDARY FIND");
+    await expect(line).toContainText(body);
+    // Excited: it keeps its exclamation mark.
+    await expect(line).toContainText("on Stillreach!");
+    await expect(line.getByRole("button")).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Whisper" })).toHaveCount(0);
+    await expectNoHorizontalOverflow(page, dialog);
+    await captureReviewScreenshot(page, "chat-legendary-find-system-line.png");
+  } finally {
+    await db.delete(rune.chatMessages).where(eq(rune.chatMessages.body, body));
+  }
+});

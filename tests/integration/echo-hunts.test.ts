@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import {
@@ -165,6 +165,43 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
       targetLocationId,
       startedAt: start,
     });
+  }
+
+  async function parcels(characterId: string) {
+    return db
+      .select()
+      .from(rune.fedhexParcels)
+      .where(eq(rune.fedhexParcels.characterId, characterId));
+  }
+
+  async function instancesOf(characterId: string, itemId: string) {
+    return db
+      .select()
+      .from(rune.itemInstances)
+      .where(
+        and(eq(rune.itemInstances.characterId, characterId), eq(rune.itemInstances.itemId, itemId)),
+      );
+  }
+
+  /** The Legendary System lines naming this character (a unique name per test user). */
+  async function legendaryLines(characterName: string) {
+    return db
+      .select()
+      .from(rune.chatMessages)
+      .where(
+        and(
+          eq(rune.chatMessages.kind, "legendary_find"),
+          sql`starts_with(${rune.chatMessages.body}, ${`${characterName} `})`,
+        ),
+      );
+  }
+
+  async function nameOf(characterId: string) {
+    const [row] = await db
+      .select({ name: rune.characters.displayName })
+      .from(rune.characters)
+      .where(eq(rune.characters.id, characterId));
+    return row!.name;
   }
 
   async function runeworkingXp(characterId: string) {
@@ -433,7 +470,8 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
       const { userId, characterId } = await makeCharacter("Found");
       await give(characterId, SEEKER, 3);
       await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
-      const { end, state } = await read(userId, characterId, start, rolls(999));
+      // Draw 970 is the first of Stillreach's Runestone span (960-997).
+      const { end, state } = await read(userId, characterId, start, rolls(970));
       expect(await hunts(characterId)).toEqual([]);
       expect(await runeworkingXp(characterId)).toBe(50);
       expect(await carried(characterId, ITEM_IDS.runestone)).toBe(1);
@@ -443,6 +481,7 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
         outcome: "found",
         rewardItemId: ITEM_IDS.runestone,
         rewardKept: true,
+        rewardMailed: false,
         xpAwarded: 50,
       });
       // Dismissing the result changes nothing else.
@@ -473,7 +512,10 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
         outcome: "found",
         rewardItemId: ITEM_IDS.runeFragment,
         rewardKept: false,
+        // An ordinary prize is never mailed: it is lost exactly as in Slice I.
+        rewardMailed: false,
       });
+      expect(await parcels(characterId)).toEqual([]);
     });
 
     it("keeps the item in the slot the last Seeker freed", async () => {
@@ -484,6 +526,140 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
       await read(userId, characterId, start, rolls(0));
       expect(await carried(characterId, SEEKER)).toBe(0);
       expect(await carried(characterId, ITEM_IDS.runeFragment)).toBe(1);
+    });
+  });
+
+  describe("a Legendary discovery (Slice J)", () => {
+    /** Draw 998 of 1,000 is the current planet's Legendary on both planets. */
+    const LEGENDARY = 998;
+
+    it("creates one unique instance in Inventory, announces it once, and pays the XP", async () => {
+      const { userId, characterId } = await makeCharacter("LegendCarried");
+      await give(characterId, SEEKER, 3);
+      await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
+      const { end, state } = await read(userId, characterId, start, rolls(LEGENDARY));
+      const gloves = await instancesOf(characterId, ITEM_IDS.minersGloves);
+      expect(gloves).toHaveLength(1);
+      expect(await carried(characterId, ITEM_IDS.minersGloves)).toBe(0);
+      expect(await parcels(characterId)).toEqual([]);
+      expect(await carried(characterId, SEEKER)).toBe(2);
+      expect(await runeworkingXp(characterId)).toBe(50);
+      expect(await hunts(characterId)).toEqual([]);
+      expect(state.echoHunt.notice).toMatchObject({
+        outcome: "found",
+        rewardItemId: ITEM_IDS.minersGloves,
+        rewardKept: true,
+        rewardMailed: false,
+      });
+      expect(state.fedhex).toEqual({ pendingCount: 0, parcels: [] });
+      const lines = await legendaryLines(await nameOf(characterId));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]!.body).toMatch(
+        /^.+ uncovered Legendary Miner's Gloves from a Resonance Echo on Stillreach!$/,
+      );
+      // Dismissing, refreshing and reading the state again announce nothing more
+      // and create nothing more.
+      await echo.acknowledgeEchoReading(userId, characterId, state.echoHunt.notice!.noticeId, end);
+      await play.getPlayGameplayState(
+        userId,
+        characterId,
+        new Date(end.getTime() + 60_000),
+        quiet(),
+      );
+      expect(await legendaryLines(await nameOf(characterId))).toHaveLength(1);
+      expect(await instancesOf(characterId, ITEM_IDS.minersGloves)).toHaveLength(1);
+    });
+
+    it("rolls Skatboll's Boots there and never the Gloves", async () => {
+      const { userId, characterId } = await makeCharacter("LegendBoots", LOCATION_IDS.theJag);
+      await give(characterId, SEEKER, 3);
+      await plantHunt(characterId, PLANET_IDS.skatboll, LOCATION_IDS.theJag);
+      const { state } = await read(userId, characterId, start, rolls(LEGENDARY));
+      expect(await instancesOf(characterId, ITEM_IDS.minersBoots)).toHaveLength(1);
+      expect(await instancesOf(characterId, ITEM_IDS.minersGloves)).toHaveLength(0);
+      expect(state.echoHunt.notice).toMatchObject({ rewardItemId: ITEM_IDS.minersBoots });
+      const [line] = await legendaryLines(await nameOf(characterId));
+      expect(line!.body).toMatch(/Legendary Miner's Boots from a Resonance Echo on Skatboll!$/);
+    });
+
+    it("mails exactly one recoverable parcel when no slot is left, once, and announces once", async () => {
+      const { userId, characterId } = await makeCharacter("LegendMailedSlots");
+      await give(characterId, SEEKER, 3);
+      await fill(userId, characterId, { freeSlots: 0 });
+      await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
+      const { end, state } = await read(userId, characterId, start, rolls(LEGENDARY));
+      expect(await instancesOf(characterId, ITEM_IDS.minersGloves)).toHaveLength(0);
+      const rows = await parcels(characterId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        messageType: "echo_legendary_recovery",
+        senderKind: "npc",
+        senderId: NPC_IDS.wiseOldEnby,
+        senderDisplayName: "The Wise Old Enby",
+        subject: "Hey, did you drop this? 😏",
+        attachmentItemId: ITEM_IDS.minersGloves,
+        claimedAt: null,
+        claimedItemInstanceId: null,
+      });
+      expect(rows[0]!.body.length).toBeGreaterThan(0);
+      expect(await runeworkingXp(characterId)).toBe(50);
+      expect(await hunts(characterId)).toEqual([]);
+      expect(state.echoHunt.notice).toMatchObject({
+        outcome: "found",
+        rewardItemId: ITEM_IDS.minersGloves,
+        rewardKept: false,
+        rewardMailed: true,
+        xpAwarded: 50,
+      });
+      expect(state.fedhex.pendingCount).toBe(1);
+      expect(state.fedhex.parcels[0]).toMatchObject({
+        senderDisplayName: "The Wise Old Enby",
+        subject: "Hey, did you drop this? 😏",
+        attachment: { itemId: ITEM_IDS.minersGloves, name: "Miner's Gloves" },
+      });
+      expect(await legendaryLines(await nameOf(characterId))).toHaveLength(1);
+      // A later refresh neither mails a second parcel nor repeats the line.
+      await play.getPlayGameplayState(
+        userId,
+        characterId,
+        new Date(end.getTime() + 60_000),
+        quiet(),
+      );
+      expect(await parcels(characterId)).toHaveLength(1);
+      expect(await legendaryLines(await nameOf(characterId))).toHaveLength(1);
+    });
+
+    it("mails when the Legendary's mass will not fit, counting what the Seeker freed", async () => {
+      const { userId, characterId } = await makeCharacter("LegendMailedMass");
+      await give(characterId, SEEKER, 3);
+      // Under 500 g left; a Seeker frees 200 g, still short of the Gloves' 1 kg.
+      await fill(userId, characterId, { freeSlots: 3, massBelow: 500 });
+      await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
+      const { state } = await read(userId, characterId, start, rolls(LEGENDARY));
+      expect(await instancesOf(characterId, ITEM_IDS.minersGloves)).toHaveLength(0);
+      expect(await parcels(characterId)).toHaveLength(1);
+      expect(state.echoHunt.notice).toMatchObject({ rewardMailed: true });
+    });
+
+    it("carries it in the slot and mass the last Seeker freed", async () => {
+      const { userId, characterId } = await makeCharacter("LegendFreed");
+      await give(characterId, SEEKER, 1);
+      await fill(userId, characterId, { freeSlots: 0 });
+      await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
+      const { state } = await read(userId, characterId, start, rolls(LEGENDARY));
+      expect(await carried(characterId, SEEKER)).toBe(0);
+      expect(await instancesOf(characterId, ITEM_IDS.minersGloves)).toHaveLength(1);
+      expect(await parcels(characterId)).toEqual([]);
+      expect(state.echoHunt.notice).toMatchObject({ rewardKept: true, rewardMailed: false });
+    });
+
+    it("never mails or announces a wrong reading or an ordinary find", async () => {
+      const { userId, characterId } = await makeCharacter("LegendNone");
+      await give(characterId, SEEKER, 3);
+      await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.theLowHum);
+      await read(userId, characterId, start, rolls());
+      expect(await parcels(characterId)).toEqual([]);
+      expect(await legendaryLines(await nameOf(characterId))).toEqual([]);
     });
   });
 

@@ -297,6 +297,17 @@ export const StartEchoReadingRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/**
+ * Claiming one FedHex parcel (#399). The browser names the parcel and the pickup
+ * it is standing in; the server resolves everything else from the character's own
+ * authoritative position and Inventory.
+ */
+export const ClaimFedhexParcelRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  parcelId: z.string().uuid(),
+  localPlaceId: ContentId,
+});
+
 /** Dismissing one Echo reading result (#393). */
 export const AcknowledgeEchoReadingRequestSchema = z.object({
   characterId: z.string().uuid(),

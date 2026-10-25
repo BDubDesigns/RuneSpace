@@ -1810,18 +1810,21 @@ Runeworking XP**, credits any accepted Mission counting `echo_hunt`
 completions, and rolls **exactly one** item from the current planet's table.
 The item's fit is planned against the inventory left after the Seeker is
 consumed (partial stacks, a freed slot, freed mass). If it does not fit by
-slots or mass it is lost — named in the result as having slipped back into
-RuneSpace — with no reroll, mail or ground drop; the XP and Mission credit
-stand. Use is never blocked because the inventory looks full.
+slots or mass an **ordinary** item is lost — named in the result as having
+slipped back into RuneSpace — with no reroll, mail or ground drop; the XP and
+Mission credit stand. A **Legendary** that does not fit is the one exception:
+it is mailed through FedHex instead of lost (see "FedHex and the Legendary
+miner's set" below). Use is never blocked because the inventory looks full.
 
-**Interim tables (Slice I).** Integer weights out of 1,000
-(`balance.echoHunts.beginner.rewardTables`). The approved tables reserve 0.2%
-for a Legendary that is not shipped; until it is, that 0.2 point is on Rune
-Fragment.
+**Reward tables (Slice J).** Integer weights out of 1,000
+(`balance.echoHunts.beginner.rewardTables`). Rune Fragment is **30.0%** on both
+planets and the freed 0.2% is each planet's one Legendary: Skatboll's **Miner's
+Boots** and Stillreach's **Miner's Gloves**, **2/1,000 = 0.2% = 1/500** of
+completed Echoes, never the other planet's. Every other rate is Slice I's.
 
 | Item | Skatboll | Stillreach |
 | --- | ---: | ---: |
-| Rune Fragment | 30.2% | 30.2% |
+| Rune Fragment | 30% | 30% |
 | Uncut Quartz | 24% | 26% |
 | Uncut Topaz | 16% | 20% |
 | Uncut Sapphire | 10% | 10% |
@@ -1829,6 +1832,8 @@ Fragment.
 | Galvanic Stock | 5% | — |
 | Empty Small Fuel Canister | — | 10% |
 | Intact Runestone | 2.8% | 3.8% |
+| **Legendary** Miner's Boots | 0.2% | — |
+| **Legendary** Miner's Gloves | — | 0.2% |
 
 **The result is durable.** Each resolved reading writes one
 `echo_reading_notices` row keyed by its own completion instant, shown as a
@@ -1836,9 +1841,49 @@ dismissible receipt at the top of Play until dismissed (starting a new reading
 dismisses it too). Item Sources list "Resonance Echo" for every table item once
 the Resonance Rig is the character's.
 
+**FedHex and the Legendary miner's set (#399).** Miner's Boots (2 kg) and
+Miner's Gloves (1 kg) are **unique, nonstackable equipment**: each find is its
+own `item_instances` row, duplicates are allowed, and a character equips at most
+one per slot. Equipped, each is worth **+1 effective Mining level for success
+chance only** (+2 together), applied to the server-authoritative Mining roll and
+the projected success chance, capped by the existing curve. It never changes the
+natural Mining level, the access gates, durations, XP, primary yield, charged
+bonuses or secondary rates. They need no Mining level to equip. Equip, swap and
+unequip use the existing equipment evaluator, so a full Inventory refuses an
+unequip like any other item. They trade through the unchanged same-location
+player trade once carried and unequipped; a Legendary or Ultra Rare item in
+either offer shows a nonblocking scarcity warning to both players while
+composing and in the frozen review (derived from rarity, never an item ID).
+
+A Legendary discovery that fits is created in Inventory with the XP. One that
+does not fit (slots or mass, after the Seeker is gone) is written as exactly one
+durable **FedHex parcel** in the same transaction — never destroyed, never
+rerolled, never a second item. Every Legendary discovery posts **exactly one**
+LEGENDARY FIND System line in General at that moment, carried or mailed; claiming
+and trading never announce again.
+
+FedHex is the permanent interplanetary postal brand. Two always-open Local
+Places, *FedHex — Holo Hollow Landing* and *FedHex — Stillreach Landing
+Station*, share one approved 4:1 interior scene and open **one character-owned
+mailbox** (`fedhex_parcels`). A parcel stores recipient, message type and
+source, sender identity and display, subject, body, receipt time, the attachment's
+item definition and claim status; the Echo recovery mail is from The Wise Old
+Enby with the subject "Hey, did you drop this? 😏". **Claim one** parcel at a
+time, at either pickup, only while stationary (not travelling, flying or busy)
+and with both a slot and the mass for the item; a refusal leaves the parcel
+untouched. The claim mints the unique instance and stamps the parcel in one
+transaction under the character lock, so a retry, a second session or a
+concurrent pair can never claim twice. Parcels never expire. This is not
+player-to-player mail, postage or a notification service, and not a replacement
+for the ship Cargo Hold or stashes.
+
 **Authority.** `game/domain/echo-hunts.ts`, `server/echo-hunts.ts`,
 `server/echo-hunt-commands.ts`; migration `0048_echo_hunts`. The Mission that
-teaches it is *First Resonance Echo* (`docs/missions.md`).
+teaches it is *First Resonance Echo* (`docs/missions.md`). FedHex: `game/content/fedhex.ts`,
+`game/domain/fedhex.ts`, `server/fedhex.ts` (parcels, projection),
+`server/fedhex-commands.ts` (Claim), `features/fedhex/`; migration
+`0049_fedhex_mailbox_legendary_echo` (additive: `fedhex_parcels`,
+`echo_reading_notices.reward_mailed`, and the `legendary_find` chat kind).
 
 ## Inventory and equipment
 
@@ -1929,8 +1974,9 @@ Mining as no usable tool.
   refusal is shown as-is.
 - The Equipment tab (#364) is a compact two-column slot grid: the Mining tool
   spans a row and the container attachments pair beneath it, drawn only from
-  the authoritative `equipment.slots` (gloves and boots will pair the same way
-  once real slots exist). Occupied slots show the item's artwork; empty slots
+  the authoritative `equipment.slots`, with Gloves and Boots (#399) pairing as
+  the second row: real hands and feet gear slots, taking only the Miner's Gloves
+  and Boots respectively. Occupied slots show the item's artwork; empty slots
   show a category silhouette. Selecting any slot opens ONE details panel beneath
   the grid: the equipped item with Unequip (and, for the Mining tool, Power Cell
   charge and Load), plus every carried item compatible with that slot, blocked

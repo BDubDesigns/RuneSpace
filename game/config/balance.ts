@@ -1231,6 +1231,30 @@ const balanceSchema = z.object({
       stackLimit: z.literal(5),
     }),
     /**
+     * The Legendary miner's set (#399), the rarest Beginner Echo prizes. Unique,
+     * nonstackable equipment: each find is its own item instance. Equipped, each
+     * piece is worth one effective Mining level for success chance only, from its
+     * `wearable` equipment block — see `EquipmentDefinition`.
+     */
+    minersBoots: z.object({
+      itemId: z.literal(ITEM_IDS.minersBoots),
+      massGrams: z.literal(2_000),
+      equipment: z.object({
+        kind: z.literal("wearable"),
+        slot: z.literal("feet"),
+        miningSuccessLevelBonus: z.literal(1),
+      }),
+    }),
+    minersGloves: z.object({
+      itemId: z.literal(ITEM_IDS.minersGloves),
+      massGrams: z.literal(1_000),
+      equipment: z.object({
+        kind: z.literal("wearable"),
+        slot: z.literal("hands"),
+        miningSuccessLevelBonus: z.literal(1),
+      }),
+    }),
+    /**
      * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
      * 5 kg and the slot count is the real limit. The Boulder is one unbroken 5 kg
      * specimen: it never stacks, and it owns its +150 Mining XP like every other
@@ -1284,16 +1308,17 @@ const balanceSchema = z.object({
       rewardWeightTotal: z.literal(1_000),
       rewardTables: z.object({
         [PLANET_IDS.skatboll]: z.tuple([
-          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(302) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(300) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(240) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(160) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
           z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), weight: z.literal(120) }),
           z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), weight: z.literal(50) }),
           z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(28) }),
+          z.object({ itemId: z.literal(ITEM_IDS.minersBoots), weight: z.literal(2) }),
         ]),
         [PLANET_IDS.stillreach]: z.tuple([
-          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(302) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(300) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(260) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(200) }),
           z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
@@ -1302,6 +1327,7 @@ const balanceSchema = z.object({
             weight: z.literal(100),
           }),
           z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(38) }),
+          z.object({ itemId: z.literal(ITEM_IDS.minersGloves), weight: z.literal(2) }),
         ]),
       }),
     }),
@@ -1318,6 +1344,9 @@ const balanceSchema = z.object({
       z.literal("container_attachment_1"),
       z.literal("container_attachment_2"),
     ]),
+    /** The suit's hands and feet gear slots (#399): one wearable of each. */
+    handsSuitSlotId: z.literal("hands"),
+    feetSuitSlotId: z.literal("feet"),
   }),
   /** Character-scoped currency (issue #159). Merchant prices are content. */
   credits: z.object({
@@ -2000,6 +2029,16 @@ const defaults = balanceSchema.parse({
       secondaryFindMiningXp: 130,
     },
     beginnerEchoSeeker: { itemId: ITEM_IDS.beginnerEchoSeeker, massGrams: 200, stackLimit: 5 },
+    minersBoots: {
+      itemId: ITEM_IDS.minersBoots,
+      massGrams: 2_000,
+      equipment: { kind: "wearable", slot: "feet", miningSuccessLevelBonus: 1 },
+    },
+    minersGloves: {
+      itemId: ITEM_IDS.minersGloves,
+      massGrams: 1_000,
+      equipment: { kind: "wearable", slot: "hands", miningSuccessLevelBonus: 1 },
+    },
     stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
     boulder: {
       itemId: ITEM_IDS.boulder,
@@ -2025,21 +2064,24 @@ const defaults = balanceSchema.parse({
       rewardWeightTotal: 1_000,
       rewardTables: {
         [PLANET_IDS.skatboll]: [
-          { itemId: ITEM_IDS.runeFragment, weight: 302 },
+          { itemId: ITEM_IDS.runeFragment, weight: 300 },
           { itemId: ITEM_IDS.uncutQuartz, weight: 240 },
           { itemId: ITEM_IDS.uncutTopaz, weight: 160 },
           { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
           { itemId: ITEM_IDS.refinedFerrite, weight: 120 },
           { itemId: ITEM_IDS.galvanicStock, weight: 50 },
           { itemId: ITEM_IDS.runestone, weight: 28 },
+          // Legendary (#399): 2/1000 = 0.2% = 1/500, one prize per planet.
+          { itemId: ITEM_IDS.minersBoots, weight: 2 },
         ],
         [PLANET_IDS.stillreach]: [
-          { itemId: ITEM_IDS.runeFragment, weight: 302 },
+          { itemId: ITEM_IDS.runeFragment, weight: 300 },
           { itemId: ITEM_IDS.uncutQuartz, weight: 260 },
           { itemId: ITEM_IDS.uncutTopaz, weight: 200 },
           { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
           { itemId: ITEM_IDS.emptySmallFuelCanister, weight: 100 },
           { itemId: ITEM_IDS.runestone, weight: 38 },
+          { itemId: ITEM_IDS.minersGloves, weight: 2 },
         ],
       },
     },
@@ -2048,6 +2090,8 @@ const defaults = balanceSchema.parse({
     startingCapacityGrams: 50_000,
     miningToolSuitSlotId: "mining_tool",
     containerSuitSlotIds: ["container_attachment_1", "container_attachment_2"],
+    handsSuitSlotId: "hands",
+    feetSuitSlotId: "feet",
   },
   credits: { startingBalance: 10 },
 });
@@ -2472,7 +2516,21 @@ export type ContainerDefinition = {
   slotCapacity: number;
 };
 
-export type EquipmentDefinition = MiningToolDefinition | ContainerDefinition;
+/**
+ * Hands and feet gear (#399). Each worn piece adds its authored bonus to the
+ * Mining level used for SUCCESS CHANCE only: never the character's actual level,
+ * never a gate, a duration, XP or a yield.
+ */
+export type WearableDefinition = {
+  kind: "wearable";
+  itemId: string;
+  assignmentKind: "gear";
+  /** The one suit slot this piece fits: hands or feet. */
+  suitSlotIds: readonly string[];
+  miningSuccessLevelBonus: number;
+};
+
+export type EquipmentDefinition = MiningToolDefinition | ContainerDefinition | WearableDefinition;
 
 /**
  * The equipment definition an item authors, or undefined for an item that is
@@ -2492,6 +2550,19 @@ export function getEquipmentDefinition(
       itemId,
       assignmentKind: "gear",
       suitSlotIds: [balance.carrying.miningToolSuitSlotId],
+    };
+  }
+  if (equipment.kind === "wearable") {
+    return {
+      kind: "wearable",
+      itemId,
+      assignmentKind: "gear",
+      suitSlotIds: [
+        equipment.slot === "hands"
+          ? balance.carrying.handsSuitSlotId
+          : balance.carrying.feetSuitSlotId,
+      ],
+      miningSuccessLevelBonus: equipment.miningSuccessLevelBonus,
     };
   }
   return {

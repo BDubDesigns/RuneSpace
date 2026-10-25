@@ -93,6 +93,7 @@ export const FOCUSED_PHASES = [
   "stillreach",
   "stillreach-flight",
   "refiner-to-go",
+  "fedhex",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

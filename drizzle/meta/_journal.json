@@ -344,6 +344,13 @@
       "when": 1792798889384,
       "tag": "0048_echo_hunts",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792898260592,
+      "tag": "0049_fedhex_mailbox_legendary_echo",
+      "breakpoints": true
     }
   ]
 }

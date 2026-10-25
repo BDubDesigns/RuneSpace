@@ -72,6 +72,19 @@ clients.
   576 px long edge (531×576), centred on a 640×640 transparent canvas and saved
   as lossless WebP — and was compared with the approved 80 px preview at the
   Inventory tile size. Nothing was regenerated, recomposed or recoloured.
+- `miners-boots.png` and `miners-gloves.png` are the approved 1254×1254 transparent RGBA
+  renders of the Legendary Miner's Boots and Miner's Gloves (#399), byte-identical to the
+  owner-supplied masters and checked by SHA-256
+  (`dba7d2f2021f0c452754a4aa3ce88ddd136eae1b2116911449aca89b7bfee9ee` and
+  `bb219b38c4701c7536e4888571e8cdaf017afe1be040e07f02f67f3c14b21a11`). They are one visually
+  matched set: charcoal and gunmetal workwear with steel reinforcements, warm amber accents and
+  a small triple-hex insignia.
+  `scripts/prepare-fedhex-slice-j-art.mjs` produces the derivatives with the Wheel Assembly
+  convention — alpha noise below 4 cleared, near-opaque alpha (252 and above) snapped to 255,
+  trimmed to content (1240×1083 and 1231×1156), scaled to a 576 px long edge (576×503 and
+  576×541), centred on a 640×640 transparent canvas and saved as lossless WebP. Neither carries
+  a baked sparkle or sweep: the Legendary treatment is the UI's. Nothing was regenerated,
+  recomposed or recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

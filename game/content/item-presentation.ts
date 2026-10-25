@@ -14,13 +14,21 @@ const FULL_CANISTER_FUEL_UNITS = getEffectiveGameBalance().items.fullSmallFuelCa
  * item reads as rare on every shared item visual; it is independent of how the
  * item is obtained and of whether finding it is announced anywhere.
  */
-export type ItemRarity = "rare" | "ultra_rare";
+export type ItemRarity = "rare" | "ultra_rare" | "legendary";
 
 /** The player-facing label of each rarity, one place for the Wiki and any tag that names it. */
 export const ITEM_RARITY_LABELS = {
   rare: "Rare",
   ultra_rare: "Ultra Rare",
+  legendary: "Legendary",
 } as const satisfies Record<ItemRarity, string>;
+
+/**
+ * The rarities whose trade offers carry the scarcity/value warning (#399). A
+ * property of rarity, so a future Ultra Rare or Legendary item is covered the
+ * moment it is authored, and no item ID is named.
+ */
+export const TRADE_SCARCITY_RARITIES: readonly ItemRarity[] = ["ultra_rare", "legendary"];
 
 export type ItemPresentation = {
   displayName: string;
@@ -261,6 +269,31 @@ const itemPresentations = {
     textFallback: "FC",
     artworkSrc: "/item-art/full-small-fuel-canister.webp",
     description: `A red-capped canister, locked shut and filled with ${FULL_CANISTER_FUEL_UNITS} Fuel Units. Heavy for its size.`,
+  },
+  // The Legendary miner's set (#399): the rarest Beginner Echo prizes. The art
+  // carries no baked sparkle or sweep: the Legendary treatment belongs to the
+  // shared item visuals, keyed off `rarity`.
+  [ITEM_IDS.minersBoots]: {
+    displayName: "Miner's Boots",
+    pluralName: "Miner's Boots",
+    accessibleDescription:
+      "A pair of rugged charcoal and gunmetal industrial work boots with steel toe and heel reinforcements, warm amber trim and a small triple-hex insignia",
+    textFallback: "MBo",
+    artworkSrc: "/item-art/miners-boots.webp",
+    rarity: "legendary",
+    description:
+      "Steel-reinforced work boots that grip loose rock like they were made for it. Worn on the feet, they add one effective Mining level to your success chance, and nothing else.",
+  },
+  [ITEM_IDS.minersGloves]: {
+    displayName: "Miner's Gloves",
+    pluralName: "Miner's Gloves",
+    accessibleDescription:
+      "A pair of rugged charcoal and gunmetal industrial work gloves with steel knuckle reinforcements, warm amber trim and a small triple-hex insignia",
+    textFallback: "MGl",
+    artworkSrc: "/item-art/miners-gloves.webp",
+    rarity: "legendary",
+    description:
+      "Steel-reinforced work gloves that find the grip in any seam. Worn on the hands, they add one effective Mining level to your success chance, and nothing else.",
   },
   // Mining Secondary Finds (#308).
   [ITEM_IDS.uncutQuartz]: {
