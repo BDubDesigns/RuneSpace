@@ -439,6 +439,16 @@ export function MiningActivity({ characterName }: { characterName: string }) {
       <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
         Success chance: {percentage(source.successChanceBps)}%
       </p>
+      {source.successLevelBonus > 0 ? (
+        <p
+          className="text-xs text-[color:var(--rs-text-secondary)]"
+          data-mining-success-bonus={source.successLevelBonus}
+        >
+          Includes +{source.successLevelBonus} effective Mining{" "}
+          {source.successLevelBonus === 1 ? "level" : "levels"} from your worn gear. It changes this
+          chance only; you are still Mining {state.mining.level}.
+        </p>
+      ) : null}
       {levelLocked ? (
         <div data-mining-level-gate={source.requiredMiningLevel}>
           <Feedback tone="muted">

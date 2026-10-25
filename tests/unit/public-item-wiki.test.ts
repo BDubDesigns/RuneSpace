@@ -112,7 +112,15 @@ describe("Wiki item catalog", () => {
         "Power Cell",
         "Wheel Assembly",
       ],
-      ["Freight Harness", "Loadsteel Cutter", "MYKEA SCHLEPPRAUM-8", "Salvage Cutter", "Scrap Box"],
+      [
+        "Freight Harness",
+        "Loadsteel Cutter",
+        "Miner's Boots",
+        "Miner's Gloves",
+        "MYKEA SCHLEPPRAUM-8",
+        "Salvage Cutter",
+        "Scrap Box",
+      ],
     ]);
   });
 });

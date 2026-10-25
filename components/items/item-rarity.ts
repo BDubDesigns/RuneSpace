@@ -20,4 +20,11 @@ export const ITEM_RARITY_STYLE = {
     accent: "var(--rs-item-ultra-rare-accent)",
     stackTrack: "var(--rs-item-ultra-rare-stack-track)",
   },
+  // Legendary (#399) takes its own gold accent, clearly apart from Ultra Rare's
+  // orange. Its tile also carries a visible text label (VisualTile), so the
+  // distinction never rests on colour alone.
+  legendary: {
+    accent: "var(--rs-item-legendary-accent)",
+    stackTrack: "var(--rs-item-legendary-stack-track)",
+  },
 } as const satisfies Record<ItemRarity, { accent: string; stackTrack: string }>;

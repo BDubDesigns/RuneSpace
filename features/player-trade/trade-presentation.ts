@@ -1,5 +1,9 @@
 import { getItemMaximumCharge } from "@/game/config/balance";
-import { resolveItemPresentation } from "@/game/content/item-presentation";
+import {
+  getItemPresentation,
+  resolveItemPresentation,
+  TRADE_SCARCITY_RARITIES,
+} from "@/game/content/item-presentation";
 import { isItemTransferable } from "@/game/domain/player-trade";
 import type {
   TradeExchangeLines,
@@ -48,6 +52,28 @@ export function itemStateLabel(itemId: string, currentCharge: number | null | un
 
 export function formatCredits(credits: number): string {
   return `${credits.toLocaleString("en-US")} ${credits === 1 ? "Credit" : "Credits"}`;
+}
+
+/**
+ * The nonblocking scarcity/value warning (#399), shown to both players while an
+ * offer is being composed and again in the frozen final review. It changes no
+ * rule: Ready, Confirm and settlement are exactly what they were. It states no
+ * price, because no authoritative market value exists.
+ */
+export const TRADE_SCARCITY_WARNING =
+  "Very rare item! Check recent player-to-player prices in Trade chat before confirming. Trades are final.";
+
+/** Whether either side offers an item whose authored rarity is Ultra Rare or Legendary. */
+export function tradeHasScarcityWarning(...offers: readonly TradeExchangeLines[]): boolean {
+  const scarce = (itemId: string) => {
+    const rarity = getItemPresentation(itemId)?.rarity;
+    return rarity !== undefined && TRADE_SCARCITY_RARITIES.includes(rarity);
+  };
+  return offers.some(
+    (offer) =>
+      offer.stacks.some((stack) => scarce(stack.itemId)) ||
+      offer.items.some((item) => scarce(item.itemId)),
+  );
 }
 
 export function isEmptyOfferLines(offer: TradeExchangeLines): boolean {

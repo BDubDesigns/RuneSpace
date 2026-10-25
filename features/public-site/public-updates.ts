@@ -9,6 +9,67 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #399 — Stillreach Slice J: FedHex mailboxes, Legendary Echo gear and rarity tiers.
+    slug: "fedhex-mailboxes",
+    title: "FedHex Mailboxes",
+    publishedAt: "2026-10-24T22:30:00-07:00",
+    summary:
+      "FedHex pickups are open at Holo Hollow Landing and Stillreach Landing Station, so a Legendary Echo find that will not fit is mailed to you instead of lost. Miner's Gloves and Miner's Boots join Echo rewards as real wearable gear, Legendary items get their own gold presentation, and trading a rare item now carries a scarcity note.",
+    hero: {
+      src: "/location-scenes/fedhex-parcel-hub.webp",
+      alt: "A FedHex parcel hub: a wall of metal parcel lockers under a large purple-and-orange FedHex sign, with a glowing Pick Up Packages terminal in the middle and shelves of parcels and crates to either side",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.minersGloves },
+        side: "right",
+      },
+      [
+        "Echo hunts have a new top end. Each Echo now has a one-in-five-hundred chance of turning up the planet's Legendary: Miner's Gloves on Stillreach, Miner's Boots on Skatboll. See ",
+        { text: "Runeworking", articleSlug: "runeworking" },
+        " for how Echo hunts work and what the odds are.",
+      ],
+      {
+        kind: "figure",
+        art: { kind: "item", itemId: ITEM_IDS.minersBoots },
+        side: "left",
+      },
+      "Both are real gear, not trophies. Gloves take the hands slot and Boots the feet slot, and each one counts as one extra Mining level for success chance only — wear both for +2. Your natural level still gates everything it gated before, and how long an attempt takes, what it pays and what it yields are all unchanged.",
+      "A Legendary is never lost for lack of room. If one does not fit — slots and mass both counted, including room freed by the Seeker being used up — it is mailed instead: exactly one parcel, sent by the Wise Old Enby under the subject “Hey, did you drop this? 😏”. The Echo result tells you straight away whether you are carrying it or it was sent to FedHex for safekeeping, and where to claim it. Anything that is not Legendary still slips back into RuneSpace if it will not fit, as before.",
+      "Claim it at either FedHex pickup — Holo Hollow Landing or Stillreach Landing Station — one parcel at a time, standing still, with room for it in your Inventory. Parcels never expire, and the Directory shows how many are waiting whenever there is anything to collect.",
+      [
+        "Legendary has a look of its own: sparkles and a slow sweep with a gold accent, and a LEGENDARY label on the tile. Ultra Rare keeps its sparkles but loses the sheen, so the two no longer blur together, and Rare and ordinary items look as they did. Finding a Legendary posts a LEGENDARY FIND line in General, and trading one — or an Ultra Rare — now shows a short scarcity note to both players while the offer is being put together and again in the frozen review. See ",
+        { text: "Player Trading", articleSlug: "player-trading" },
+        " for how trading works.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "FedHex pickups at Holo Hollow Landing and Stillreach Landing Station: always-open Local Places with a shared parcel-hub scene and one mailbox per character.",
+          "A Legendary Echo reward that does not fit is mailed as exactly one FedHex parcel instead of lost, sent by the Wise Old Enby; claim it one at a time at either pickup, with no expiry.",
+          "Miner's Boots on Skatboll and Miner's Gloves on Stillreach as Legendary Echo rewards, a one-in-five-hundred chance each on its own planet, with the Echo reward tables still totalling 1,000.",
+          "Miner's Boots and Miner's Gloves as wearable gear: feet and hands slots, each worth one effective Mining level for success chance only, stacking to +2.",
+          "The Legendary rarity tier: sparkles, a sweep and a gold accent with a LEGENDARY tile label, plus a LEGENDARY FIND line in General.",
+          "A nonblocking scarcity note shown to both players while composing a trade and in the frozen review when either offer holds an Ultra Rare or Legendary item.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Ultra Rare items keep their sparkles but lose the sheen, so they no longer read as Legendary.",
+          "An Echo result now says directly whether you are carrying the reward or it was sent to FedHex for safekeeping, and where to claim it.",
+          "Claiming re-validates that you are stationary at a FedHex pickup, that the parcel is yours and unclaimed, and that you have slot and mass room; retries and concurrent claims cannot double-claim.",
+          "The Directory shows a parcels-waiting line only when a parcel is waiting.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #393 — Stillreach Slice I: First Resonance Echo and Beginner Echo hunts.
     slug: "first-resonance-echo",
     title: "First Resonance Echo",

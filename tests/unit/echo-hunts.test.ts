@@ -23,6 +23,7 @@ import {
   echoClueVerdict,
   echoCompassDegrees,
   echoDirectionsCopy,
+  echoLegendaryDeliveryLine,
   echoRewardLostLine,
   echoWrongReadingLine,
 } from "@/features/echo-hunts/echo-copy";
@@ -116,29 +117,31 @@ describe("the fixed Beginner pools", () => {
   });
 });
 
-describe("the interim ordinary-only tables (Slice I)", () => {
-  it("sum to exactly 100% with Rune Fragment at 30.2% on both planets", () => {
+describe("the Beginner Echo reward tables (Slice J)", () => {
+  it("sum to exactly 100%: Rune Fragment 30% and one 0.2% Legendary per planet", () => {
     expect(beginner.rewardWeightTotal).toBe(1_000);
     const percent = (planetId: string) =>
       Object.fromEntries(
         beginnerEchoRewardTable(planetId)!.map((entry) => [entry.itemId, entry.weight / 10]),
       );
     expect(percent(PLANET_IDS.skatboll)).toEqual({
-      [ITEM_IDS.runeFragment]: 30.2,
+      [ITEM_IDS.runeFragment]: 30,
       [ITEM_IDS.uncutQuartz]: 24,
       [ITEM_IDS.uncutTopaz]: 16,
       [ITEM_IDS.uncutSapphire]: 10,
       [ITEM_IDS.refinedFerrite]: 12,
       [ITEM_IDS.galvanicStock]: 5,
       [ITEM_IDS.runestone]: 2.8,
+      [ITEM_IDS.minersBoots]: 0.2,
     });
     expect(percent(PLANET_IDS.stillreach)).toEqual({
-      [ITEM_IDS.runeFragment]: 30.2,
+      [ITEM_IDS.runeFragment]: 30,
       [ITEM_IDS.uncutQuartz]: 26,
       [ITEM_IDS.uncutTopaz]: 20,
       [ITEM_IDS.uncutSapphire]: 10,
       [ITEM_IDS.emptySmallFuelCanister]: 10,
       [ITEM_IDS.runestone]: 3.8,
+      [ITEM_IDS.minersGloves]: 0.2,
     });
     for (const planetId of [PLANET_IDS.skatboll, PLANET_IDS.stillreach]) {
       const total = beginnerEchoRewardTable(planetId)!.reduce((sum, e) => sum + e.weight, 0);
@@ -159,20 +162,48 @@ describe("the interim ordinary-only tables (Slice I)", () => {
     }
     const skatboll = beginnerEchoRewardTable(PLANET_IDS.skatboll)!;
     expect(echoRewardForDraw(skatboll, 0)).toBe(ITEM_IDS.runeFragment);
-    expect(echoRewardForDraw(skatboll, 301)).toBe(ITEM_IDS.runeFragment);
-    expect(echoRewardForDraw(skatboll, 302)).toBe(ITEM_IDS.uncutQuartz);
-    expect(echoRewardForDraw(skatboll, 971)).toBe(ITEM_IDS.galvanicStock);
-    expect(echoRewardForDraw(skatboll, 972)).toBe(ITEM_IDS.runestone);
-    expect(echoRewardForDraw(skatboll, 999)).toBe(ITEM_IDS.runestone);
-    expect(rollEchoReward(skatboll, draws(999))).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(skatboll, 299)).toBe(ITEM_IDS.runeFragment);
+    expect(echoRewardForDraw(skatboll, 300)).toBe(ITEM_IDS.uncutQuartz);
+    expect(echoRewardForDraw(skatboll, 969)).toBe(ITEM_IDS.galvanicStock);
+    expect(echoRewardForDraw(skatboll, 970)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(skatboll, 997)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(skatboll, 998)).toBe(ITEM_IDS.minersBoots);
+    expect(echoRewardForDraw(skatboll, 999)).toBe(ITEM_IDS.minersBoots);
+    expect(rollEchoReward(skatboll, draws(999))).toBe(ITEM_IDS.minersBoots);
+    const stillreach = beginnerEchoRewardTable(PLANET_IDS.stillreach)!;
+    expect(echoRewardForDraw(stillreach, 299)).toBe(ITEM_IDS.runeFragment);
+    expect(echoRewardForDraw(stillreach, 300)).toBe(ITEM_IDS.uncutQuartz);
+    expect(echoRewardForDraw(stillreach, 959)).toBe(ITEM_IDS.emptySmallFuelCanister);
+    expect(echoRewardForDraw(stillreach, 960)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(stillreach, 997)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(stillreach, 998)).toBe(ITEM_IDS.minersGloves);
+    expect(echoRewardForDraw(stillreach, 999)).toBe(ITEM_IDS.minersGloves);
   });
 
-  it("ships no Legendary or unknown reward, and every reward is an ordinary item", () => {
-    const itemIds = Object.values(beginner.rewardTables).flatMap((table) =>
-      table.map((entry) => entry.itemId),
-    );
-    expect(itemIds.join(" ")).not.toMatch(/legendary|boots|gloves/i);
-    for (const itemId of itemIds) expect(getItemDefinition(itemId)?.kind).toBe("stack");
+  it("ships exactly one Legendary per planet, its own, and every other reward is an ordinary stack", () => {
+    const legendaryByPlanet = {
+      [PLANET_IDS.skatboll]: ITEM_IDS.minersBoots,
+      [PLANET_IDS.stillreach]: ITEM_IDS.minersGloves,
+    };
+    for (const [planetId, legendary] of Object.entries(legendaryByPlanet)) {
+      const table = beginnerEchoRewardTable(planetId)!;
+      const unique = table.filter((entry) => getItemDefinition(entry.itemId)?.kind === "unique");
+      // The one planet-specific prize, 2 of 1,000, and never the other planet's.
+      expect(unique).toEqual([{ itemId: legendary, weight: 2 }]);
+      for (const entry of table.filter((candidate) => candidate.itemId !== legendary)) {
+        expect(getItemDefinition(entry.itemId)?.kind).toBe("stack");
+      }
+    }
+    expect(getItemDefinition(ITEM_IDS.minersBoots)).toEqual({
+      itemId: ITEM_IDS.minersBoots,
+      kind: "unique",
+      massGrams: 2_000,
+    });
+    expect(getItemDefinition(ITEM_IDS.minersGloves)).toEqual({
+      itemId: ITEM_IDS.minersGloves,
+      kind: "unique",
+      massGrams: 1_000,
+    });
   });
 
   it("names each planet's chance for an item, and only where the table has it", () => {
@@ -180,8 +211,14 @@ describe("the interim ordinary-only tables (Slice I)", () => {
       { planetId: PLANET_IDS.skatboll, percent: 5 },
     ]);
     expect(beginnerEchoRewardPlanets(ITEM_IDS.runeFragment)).toEqual([
-      { planetId: PLANET_IDS.skatboll, percent: 30.2 },
-      { planetId: PLANET_IDS.stillreach, percent: 30.2 },
+      { planetId: PLANET_IDS.skatboll, percent: 30 },
+      { planetId: PLANET_IDS.stillreach, percent: 30 },
+    ]);
+    expect(beginnerEchoRewardPlanets(ITEM_IDS.minersBoots)).toEqual([
+      { planetId: PLANET_IDS.skatboll, percent: 0.2 },
+    ]);
+    expect(beginnerEchoRewardPlanets(ITEM_IDS.minersGloves)).toEqual([
+      { planetId: PLANET_IDS.stillreach, percent: 0.2 },
     ]);
     expect(beginnerEchoRewardPlanets(SEEKER)).toEqual([]);
   });
@@ -363,7 +400,7 @@ describe("resolving one reading", () => {
         mass: 0,
         target: LOCATION_IDS.theJag,
       }),
-      random: draws(999),
+      random: draws(970),
     });
     expect(mass).toMatchObject({ rewardItemId: ITEM_IDS.runestone, lostReason: "mass" });
   });
@@ -448,4 +485,130 @@ it("keeps every pool location on the planet that owns it", () => {
       expect(getLocationPlanetId(locationId)).toBe(planetId);
     }
   }
+});
+
+describe("a Legendary discovery (Slice J)", () => {
+  const seekers = (quantity: number) => ({ id: "s1", itemId: SEEKER, quantity });
+  /** Draw 998 of 1,000 is each planet's Legendary. */
+  const LEGENDARY_DRAW = 998;
+
+  it("is carried as a unique instance when it fits, never as a stack", () => {
+    for (const [location, itemId] of [
+      [LOCATION_IDS.theJag, ITEM_IDS.minersBoots],
+      [LOCATION_IDS.hilltopWorkshop, ITEM_IDS.minersGloves],
+    ] as const) {
+      const outcome = resolveEchoReading({
+        snapshot: snapshot(location, [seekers(3)], { target: location }),
+        random: draws(LEGENDARY_DRAW),
+      });
+      expect(outcome).toMatchObject({
+        kind: "found",
+        rewardItemId: itemId,
+        rewardKept: true,
+        rewardMailed: false,
+        xpAwarded: 50,
+        // The Seeker is consumed; the unique item is no stack, so no stack is created.
+        stackUpdates: [{ id: "s1", quantity: 2 }],
+        createdStacks: [],
+      });
+    }
+  });
+
+  it("fits into the slot and mass the consumed Seeker freed, then mails when even that is short", () => {
+    // The last Seeker frees its slot and 200 g; Gloves (1 kg) still need mass.
+    const freedSlotOnly = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.hilltopWorkshop, [seekers(1)], {
+        slots: 0,
+        mass: 0,
+        target: LOCATION_IDS.hilltopWorkshop,
+      }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    expect(freedSlotOnly).toMatchObject({
+      kind: "found",
+      rewardItemId: ITEM_IDS.minersGloves,
+      rewardKept: false,
+      rewardMailed: true,
+      lostReason: "mass",
+      xpAwarded: 50,
+      deletedStackIds: ["s1"],
+    });
+    // Enough mass and the freed slot: it is carried, with no FedHex parcel.
+    const fits = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.hilltopWorkshop, [seekers(1)], {
+        slots: 0,
+        mass: 800,
+        target: LOCATION_IDS.hilltopWorkshop,
+      }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    expect(fits).toMatchObject({ rewardKept: true, rewardMailed: false });
+  });
+
+  it("is mailed, with no reroll and no second draw, when slots or mass refuse it", () => {
+    const bySlots = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.theJag, [seekers(3)], {
+        slots: 0,
+        target: LOCATION_IDS.theJag,
+      }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    expect(bySlots).toMatchObject({
+      rewardItemId: ITEM_IDS.minersBoots,
+      rewardKept: false,
+      rewardMailed: true,
+      lostReason: "slots",
+    });
+    const byMass = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.theJag, [seekers(3)], {
+        mass: 1_000,
+        target: LOCATION_IDS.theJag,
+      }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    // 2 kg Boots against 1 kg + 200 g freed.
+    expect(byMass).toMatchObject({ rewardMailed: true, lostReason: "mass" });
+  });
+
+  it("never mails an ordinary reward: it is lost exactly as before", () => {
+    const outcome = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.theJag, [seekers(3)], {
+        slots: 0,
+        target: LOCATION_IDS.theJag,
+      }),
+      random: draws(0),
+    });
+    expect(outcome).toMatchObject({
+      rewardItemId: ITEM_IDS.runeFragment,
+      rewardKept: false,
+      rewardMailed: false,
+      lostReason: "slots",
+    });
+  });
+
+  it("is only ever the current planet's own prize", () => {
+    const stillreach = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.hilltopWorkshop, [seekers(3)], {
+        target: LOCATION_IDS.hilltopWorkshop,
+      }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    const skatboll = resolveEchoReading({
+      snapshot: snapshot(LOCATION_IDS.theJag, [seekers(3)], { target: LOCATION_IDS.theJag }),
+      random: draws(LEGENDARY_DRAW),
+    });
+    expect(stillreach).toMatchObject({ rewardItemId: ITEM_IDS.minersGloves });
+    expect(skatboll).toMatchObject({ rewardItemId: ITEM_IDS.minersBoots });
+  });
+});
+
+it("says where a Legendary went: Inventory, or FedHex with where to claim it", () => {
+  expect(echoLegendaryDeliveryLine(ITEM_IDS.minersGloves, false)).toBe(
+    "Miner's Gloves has been added to your Inventory.",
+  );
+  const mailed = echoLegendaryDeliveryLine(ITEM_IDS.minersBoots, true);
+  expect(mailed).toContain("Miner's Boots");
+  expect(mailed).toContain("FedHex");
+  expect(mailed).toContain("Holo Hollow Landing");
+  expect(mailed).toContain("Stillreach Landing Station");
 });

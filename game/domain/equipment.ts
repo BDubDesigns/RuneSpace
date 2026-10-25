@@ -60,14 +60,23 @@ export type EquipmentLoadout = {
    * Mining level lets them use it is Mining's own question.
    */
   miningTool?: EquippedMiningTool;
+  /**
+   * Effective Mining levels the worn hands and feet gear add to SUCCESS CHANCE
+   * only (#399): the sum of each equipped wearable's authored bonus. It is never
+   * added to the character's actual level, so no gate, duration, XP or yield
+   * reads it.
+   */
+  miningSuccessLevelBonus: number;
 };
 
 /**
- * Every container and Mining tool resolves through the one authored
+ * Every container, Mining tool and wearable resolves through the one authored
  * equipment-definition boundary (`getEquipmentDefinition`, #233): the MYKEA,
  * the Scrap Box and the Freight Harness are ordinary containers there, and the
- * Salvage and Loadsteel Cutters ordinary Mining tools. There is no per-item
- * rule in this module, no third container slot, and no second tool slot.
+ * Salvage and Loadsteel Cutters ordinary Mining tools, and the Legendary
+ * Miner's Gloves and Boots ordinary hands and feet wearables (#399). There is no
+ * per-item rule in this module, no third container slot, and no second tool,
+ * hands or feet slot.
  */
 export function isApprovedEquipmentTarget(
   target: EquipmentTarget,
@@ -75,7 +84,9 @@ export function isApprovedEquipmentTarget(
 ): boolean {
   return (
     (target.assignmentKind === "gear" &&
-      target.suitSlotId === balance.carrying.miningToolSuitSlotId) ||
+      (target.suitSlotId === balance.carrying.miningToolSuitSlotId ||
+        target.suitSlotId === balance.carrying.handsSuitSlotId ||
+        target.suitSlotId === balance.carrying.feetSuitSlotId)) ||
     (target.assignmentKind === "container" &&
       balance.carrying.containerSuitSlotIds.includes(
         target.suitSlotId as (typeof balance.carrying.containerSuitSlotIds)[number],
@@ -172,6 +183,10 @@ export function deriveEquipmentLoadout(input: {
       ? [{ itemInstanceId: instance.id, itemId: instance.itemId, definition }]
       : [];
   })[0];
+  const miningSuccessLevelBonus = assigned.reduce((total, { instance }) => {
+    const definition = getEquipmentDefinition(instance.itemId, balance);
+    return definition?.kind === "wearable" ? total + definition.miningSuccessLevelBonus : total;
+  }, 0);
   return {
     assignments,
     equippedItemInstanceIds,
@@ -182,6 +197,7 @@ export function deriveEquipmentLoadout(input: {
     ),
     carriedMassGrams,
     maximumCarryCapacityGrams: balance.carrying.startingCapacityGrams,
+    miningSuccessLevelBonus,
     ...(miningTool ? { miningTool } : {}),
   };
 }

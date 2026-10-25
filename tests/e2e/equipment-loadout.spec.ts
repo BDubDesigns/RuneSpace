@@ -59,10 +59,10 @@ test.describe("Equipment loadout grid (#364)", () => {
         .locator('[data-equipment-slot="utility:power_cell"]')
         .boundingBox())!;
       const glovesBox = (await equipment
-        .locator('[data-equipment-slot="placeholder:gloves"]')
+        .locator('[data-equipment-slot="gear:hands"]')
         .boundingBox())!;
       const bootsBox = (await equipment
-        .locator('[data-equipment-slot="placeholder:boots"]')
+        .locator('[data-equipment-slot="gear:feet"]')
         .boundingBox())!;
       const firstBox = (await first.boundingBox())!;
       const secondBox = (await second.boundingBox())!;
@@ -86,11 +86,10 @@ test.describe("Equipment loadout grid (#364)", () => {
       // At 390x844 all three rows fit; at 320x640 the Drawer scrolls them instead.
       if (viewportHeight >= 800)
         expect(secondBox.y + secondBox.height).toBeLessThan(viewportHeight);
-      // Gloves and Boots are labelled visual placeholders, not live slots.
+      // Gloves and Boots are real slots (#399): empty here, with their silhouettes.
       for (const name of ["Gloves", "Boots"]) {
-        await expect(
-          equipment.getByRole("button", { name: `${name}: coming soon, not yet equippable` }),
-        ).toBeVisible();
+        await expect(equipment.getByRole("button", { name: `${name}: empty` })).toBeVisible();
+        await expect(equipmentSlotTile(equipment, name).locator("svg")).toBeVisible();
       }
       await expect(equipment.locator("[data-equipment-details]")).toHaveCount(0);
       await expect(second.getByRole("button")).toHaveAccessibleName(/^Container 2: empty/);
@@ -254,16 +253,51 @@ test.describe("Equipment loadout grid (#364)", () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test("Gloves and Boots are informational placeholders that offer no equip actions", async ({
+  test("Gloves and Boots are real slots that equip the Legendary set and show the bonus", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+    await db.insert(itemInstances).values([
+      { characterId, itemId: ITEM_IDS.minersGloves },
+      { characterId, itemId: ITEM_IDS.minersBoots },
+    ]);
+    await page.reload();
     const equipment = await openEquipmentTab(page);
-    await equipment.getByRole("button", { name: /^Gloves: coming soon/ }).click();
-    const details = equipment.getByRole("region", { name: "Gloves details" });
-    await expect(details).toContainText("Coming soon");
-    await expect(details.getByRole("button")).toHaveCount(0);
-    await expect(details.locator("[data-candidate]")).toHaveCount(0);
+    await expect(equipment.locator("[data-mining-success-bonus]")).toHaveCount(0);
+
+    // Each slot lists only its own piece, with the bonus stated plainly.
+    const glovesDetails = await selectEquipmentSlot(equipment, "Gloves");
+    await expect(glovesDetails.locator("[data-candidate]")).toHaveCount(1);
+    await expect(glovesDetails).toContainText("Miner's Gloves");
+    await expect(glovesDetails).not.toContainText("Miner's Boots");
+    await glovesDetails.locator("[data-candidate]").click();
+    await expect(glovesDetails).toContainText("+1 effective Mining level for success chance");
+    await glovesDetails.getByRole("button", { name: "Equip in Gloves" }).click();
+    await expect(equipmentSlotTile(equipment, "Gloves").getByRole("button")).toHaveAccessibleName(
+      "Gloves: Miner's Gloves, equipped",
+    );
+    await expect(equipment.locator("[data-mining-success-bonus]")).toContainText(
+      "+1 effective Mining level for success chance only",
+    );
+
+    const bootsDetails = await selectEquipmentSlot(equipment, "Boots");
+    await bootsDetails.locator("[data-candidate]").click();
+    await bootsDetails.getByRole("button", { name: "Equip in Boots" }).click();
+    await expect(equipment.locator("[data-mining-success-bonus]")).toContainText(
+      "+2 effective Mining levels for success chance only",
+    );
+    // Both stay independently operable: unequipping one leaves the other worn.
+    await bootsDetails.getByRole("button", { name: "Unequip" }).click();
+    await expect(equipment.locator("[data-mining-success-bonus]")).toContainText("+1 effective");
+    await expect(equipmentSlotTile(equipment, "Gloves").getByRole("button")).toHaveAccessibleName(
+      /equipped/,
+    );
+    await expect(equipmentSlotTile(equipment, "Boots").getByRole("button")).toHaveAccessibleName(
+      /^Boots: empty/,
+    );
+    await expectNoHorizontalOverflow(page);
+    await captureReviewScreenshot(page, "equipment-loadout-legendary-gear.png");
   });
 
   test("lays the same grid out on desktop", async ({ page }) => {

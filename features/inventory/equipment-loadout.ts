@@ -10,19 +10,8 @@ import type { PlayGameplayState } from "@/server/play";
 export type EquipmentSlotState = PlayGameplayState["equipment"]["slots"][number];
 export type EquipmentCandidate = EquipmentSlotState["eligibleItems"][number];
 
-/** Silhouette family for an empty slot; gloves and boots wait for real slots. */
+/** Silhouette family for an empty slot. */
 export type EquipmentSlotIconKind = "tool" | "container" | "gloves" | "boots";
-
-/**
- * Gloves and Boots are visual-only "Coming soon" placeholders (#364). They are
- * NOT authoritative slots: never projected by the server, never given
- * candidates, assignments or commands. When real definitions ship, they appear
- * in `state.equipment.slots` and this list loses its entry.
- */
-export const FUTURE_SLOT_PLACEHOLDERS = [
-  { id: "gloves", label: "Gloves", icon: "gloves" },
-  { id: "boots", label: "Boots", icon: "boots" },
-] as const satisfies readonly { id: string; label: string; icon: EquipmentSlotIconKind }[];
 
 export const POWER_CELL_UTILITY_KEY = "utility:power_cell";
 
@@ -35,13 +24,7 @@ export type LoadoutCell =
       /** Compact grid label ("Container 1"); the slot's full label stays in details. */
       shortLabel: string;
     }
-  | { kind: "power_cell"; key: typeof POWER_CELL_UTILITY_KEY }
-  | {
-      kind: "placeholder";
-      key: string;
-      label: string;
-      icon: EquipmentSlotIconKind;
-    };
+  | { kind: "power_cell"; key: typeof POWER_CELL_UTILITY_KEY };
 
 export function equipmentSlotKey(target: EquipmentTarget): string {
   return `${target.assignmentKind}:${target.suitSlotId}`;
@@ -51,40 +34,41 @@ export function shortSlotLabel(label: string): string {
   return label.replace(/^Container attachment (\d+)$/, "Container $1");
 }
 
-export function placeholderKey(id: string): string {
-  return `placeholder:${id}`;
-}
+/** The authored suit slots the loadout arranges (`balance.carrying`). */
+export type LoadoutSlotIds = {
+  miningToolSlotId: string;
+  handsSlotId: string;
+  feetSlotId: string;
+};
 
 /**
  * The three-row, two-column first view: Mining tool | Power Cell utility,
- * Gloves | Boots placeholders, then every other authored slot in pairs (the
- * two containers now). Real slots come only from the authoritative projection.
+ * Gloves | Boots, then every other authored slot in pairs (the two containers
+ * now). Every slot comes from the authoritative projection (#399 made Gloves and
+ * Boots real); none is a placeholder.
  */
 export function deriveLoadoutCells(
   slots: readonly EquipmentSlotState[],
-  miningToolSlotId: string,
+  slotIds: LoadoutSlotIds,
 ): LoadoutCell[] {
-  const isTool = (slot: EquipmentSlotState) =>
-    slot.target.assignmentKind === "gear" && slot.target.suitSlotId === miningToolSlotId;
+  const isGear = (slot: EquipmentSlotState, suitSlotId: string) =>
+    slot.target.assignmentKind === "gear" && slot.target.suitSlotId === suitSlotId;
+  const isTool = (slot: EquipmentSlotState) => isGear(slot, slotIds.miningToolSlotId);
+  const isGloves = (slot: EquipmentSlotState) => isGear(slot, slotIds.handsSlotId);
+  const isBoots = (slot: EquipmentSlotState) => isGear(slot, slotIds.feetSlotId);
   const cell = (slot: EquipmentSlotState): LoadoutCell => ({
     kind: "slot",
     key: equipmentSlotKey(slot.target),
     slot,
-    icon: isTool(slot) ? "tool" : "container",
+    icon: isTool(slot) ? "tool" : isGloves(slot) ? "gloves" : isBoots(slot) ? "boots" : "container",
     shortLabel: shortSlotLabel(slot.label),
   });
   return [
     ...slots.filter(isTool).map(cell),
     { kind: "power_cell", key: POWER_CELL_UTILITY_KEY },
-    ...FUTURE_SLOT_PLACEHOLDERS.map(
-      ({ id, label, icon }): LoadoutCell => ({
-        kind: "placeholder",
-        key: placeholderKey(id),
-        label,
-        icon,
-      }),
-    ),
-    ...slots.filter((slot) => !isTool(slot)).map(cell),
+    ...slots.filter(isGloves).map(cell),
+    ...slots.filter(isBoots).map(cell),
+    ...slots.filter((slot) => !isTool(slot) && !isGloves(slot) && !isBoots(slot)).map(cell),
   ];
 }
 

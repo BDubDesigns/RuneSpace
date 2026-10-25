@@ -83,6 +83,18 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                   <div className="pointer-events-none">
                     <PlaceSummary surface={surface} />
                   </div>
+                  {/* An unobtrusive count of parcels waiting in the one mailbox
+                      every FedHex pickup opens (#399). Absent when empty. */}
+                  {place.fedhexMailbox && state.fedhex.pendingCount > 0 ? (
+                    <p
+                      className="pointer-events-none relative px-3 pb-2 text-xs font-semibold text-[color:var(--rs-accent-mining)]"
+                      data-fedhex-pending-indicator={state.fedhex.pendingCount}
+                    >
+                      {state.fedhex.pendingCount === 1
+                        ? "1 parcel waiting for you"
+                        : `${state.fedhex.pendingCount} parcels waiting for you`}
+                    </p>
+                  ) : null}
                   <div className="relative mt-auto p-3 pt-0">
                     <MissionActionLink
                       aria-label={`Enter ${surface.displayName}`}

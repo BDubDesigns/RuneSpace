@@ -413,6 +413,20 @@ in this view; focal (50, 55) keeps the machine and sign in the 390 px header str
 Landing Station panorama, the Rivet overlay and the terminal scene are unchanged. Its sign is
 part of the approved pixels; no UI is composited.
 
+### FedHex parcel pickup Local Places (issue #399)
+
+`fedhex_holo_hollow_landing` and `fedhex_stillreach_landing_station` are two Local Places
+that deliberately share **one** 4:1 interior scene: the owner-approved 2508×627 RGB PNG
+(`fedhex_sci_fi_parcel_hub.png`, SHA-256 `04b35967e1fe…`, kept unaltered as
+`assets/location-scenes/fedhex-parcel-hub-master.png`) downsampled whole, never cropped, to
+`fedhex-parcel-hub.webp`, 1536×384 lossy q80, by `scripts/prepare-fedhex-slice-j-art.mjs`,
+which refuses any other file. It is a standardised indoor FedHex pickup (a centred locker wall
+under the purple and orange wordmark, a terminal and industrial shelves) with no exterior
+geography and no landing-pad art; focal (50, 50) keeps the wordmark and lockers in the 390 px
+header strip. It supersedes the earlier distinct-exterior plan, so neither place has its own
+file and neither parent landing panorama changed. The wordmark is part of the approved pixels;
+no UI is composited.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's

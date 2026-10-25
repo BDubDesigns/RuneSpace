@@ -248,6 +248,7 @@ import {
 } from "@/server/runeworking";
 import type { RuneworkingCommandError } from "@/server/runeworking-commands";
 import type { EchoReadingCommandError } from "@/server/echo-hunt-commands";
+import { loadFedhexProjection, type FedhexMailboxProjection } from "@/server/fedhex";
 import {
   createEchoReadingResolver,
   echoRandomFrom,
@@ -317,6 +318,9 @@ function slotItemProjection(
     name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
     massGrams: carriedItemMassGrams(instance.itemId, balance),
     ...(definition?.kind === "container" ? { slotCapacity: definition.slotCapacity } : {}),
+    ...(definition?.kind === "wearable"
+      ? { miningSuccessLevelBonus: definition.miningSuccessLevelBonus }
+      : {}),
     ...(unmet ? { requiredMiningLevel: unmet.requiredMiningLevel } : {}),
   };
 }
@@ -560,7 +564,10 @@ export type MiningSourceProjection = {
   attemptDurationTicks: number;
   /** A charged attempt here with the Mining tool actually equipped (#233). */
   boostedAttemptDurationTicks: number;
+  /** Includes worn hands and feet gear's effective levels (#399). */
   successChanceBps: number;
+  /** Those effective levels, so the surface can say where the extra chance comes from. */
+  successLevelBonus: number;
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
@@ -601,6 +608,8 @@ export type EquipmentSlotItemProjection = {
   massGrams: number;
   /** A container's Inventory slot contribution. */
   slotCapacity?: number;
+  /** A wearable's effective Mining levels for success chance only (#399). */
+  miningSuccessLevelBonus?: number;
   /** Present only while the character's Mining level is below the item's requirement. */
   requiredMiningLevel?: number;
   /**
@@ -987,6 +996,8 @@ export type PlayGameplayState = {
    * reading and the newest undismissed reading result. Never a hidden target.
    */
   echoHunt: EchoHuntProjection;
+  /** The character's one FedHex mailbox, the same from either pickup (#399). */
+  fedhex: FedhexMailboxProjection;
   /** One current Seeker reading refusal, for its Item Details (#393). */
   echoReadingError?: EchoReadingCommandError;
   /**
@@ -1038,6 +1049,11 @@ export type PlayGameplayState = {
   equipment: {
     aggregateContainerSlots: number;
     carriedPowerCellQuantity: number;
+    /**
+     * Effective Mining levels from worn hands and feet gear (#399), for success
+     * chance only. Never the character's level.
+     */
+    miningSuccessLevelBonus: number;
     /**
      * Whichever authored Mining tool is equipped (#233) — its own identity,
      * charge against its own maximum, and its own effects at the source in
@@ -2596,10 +2612,12 @@ export async function stateFromTransaction(
     locationStates[currentLocationId]?.availableActionIds.includes(source.actionId),
   );
   const echoHunt = await loadEchoHuntProjection(transaction, characterId, currentLocationId);
+  const fedhex = await loadFedhexProjection(transaction, characterId);
   return {
     characterId,
     missions,
     echoHunt,
+    fedhex,
     location: { currentLocationId },
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
@@ -2709,7 +2727,13 @@ export async function stateFromTransaction(
             equippedTool?.definition,
             true,
           ),
-          successChanceBps: miningSuccessChanceBps(miningProgress.level, locationMiningSource),
+          // Worn hands and feet gear adds effective levels to this chance only
+          // (#399); the natural level above still gates the source.
+          successChanceBps: miningSuccessChanceBps(
+            miningProgress.level + snapshot.equipmentLoadout.miningSuccessLevelBonus,
+            locationMiningSource,
+          ),
+          successLevelBonus: snapshot.equipmentLoadout.miningSuccessLevelBonus,
           successXp: locationMiningSource.successXp,
           yieldMinimum: locationMiningSource.yieldMinimum,
           yieldMaximum: locationMiningSource.yieldMaximum,
@@ -2809,6 +2833,7 @@ export async function stateFromTransaction(
     equipment: {
       aggregateContainerSlots: snapshot.equipmentLoadout.containerSlotCapacity,
       carriedPowerCellQuantity,
+      miningSuccessLevelBonus: snapshot.equipmentLoadout.miningSuccessLevelBonus,
       miningTool: equippedTool
         ? (() => {
             const tool = equippedTool.definition;
@@ -2836,6 +2861,20 @@ export async function stateFromTransaction(
             suitSlotId: balance.carrying.miningToolSuitSlotId,
           },
           label: "Mining tool",
+        },
+        {
+          target: {
+            assignmentKind: "gear" as const,
+            suitSlotId: balance.carrying.handsSuitSlotId,
+          },
+          label: "Gloves",
+        },
+        {
+          target: {
+            assignmentKind: "gear" as const,
+            suitSlotId: balance.carrying.feetSuitSlotId,
+          },
+          label: "Boots",
         },
         ...balance.carrying.containerSuitSlotIds.map((suitSlotId, index) => ({
           target: { assignmentKind: "container" as const, suitSlotId },

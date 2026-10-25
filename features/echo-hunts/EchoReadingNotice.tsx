@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { ArrowUp, Circle } from "lucide-react";
+import { ItemVisual } from "@/components/items/ItemVisual";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
@@ -10,12 +11,13 @@ import { Panel } from "@/components/ui/Panel";
 import { usePlay } from "@/features/play/PlayContext";
 import { getItemDefinition } from "@/game/config/balance";
 import { SKILL_IDS } from "@/game/config/foundations";
-import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { getItemPresentation, resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { acknowledgeEchoReadingAction } from "@/server/actions";
 import {
   echoCompassDegrees,
   echoDirectionsCopy,
+  echoLegendaryDeliveryLine,
   echoRewardLostLine,
   echoWrongReadingLine,
 } from "./echo-copy";
@@ -81,6 +83,8 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
   const runeworkingName = getSkillPresentation(SKILL_IDS.runeworking)?.displayName ?? "Runeworking";
   const reward = notice.rewardItemId;
   const rewardDefinition = reward ? getItemDefinition(reward) : undefined;
+  const legendary = !!reward && getItemPresentation(reward)?.rarity === "legendary";
+  const mailed = notice.rewardMailed === true;
   return (
     <Panel
       aria-labelledby="echo-reading-result-heading"
@@ -101,6 +105,14 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
       >
         {found ? "Resonance Echo discovered!" : "The Seeker trembles, then goes still."}
       </p>
+      {found && legendary ? (
+        <p
+          className="mt-1 font-display text-sm font-bold uppercase tracking-[0.14em] text-[color:var(--rs-item-legendary-accent)]"
+          data-echo-notice-legendary
+        >
+          Legendary find!
+        </p>
+      ) : null}
       {hasClue ? (
         <div
           className="mt-3 flex items-center gap-3"
@@ -139,19 +151,34 @@ export function EchoReadingNotice({ spotlight = false }: { spotlight?: boolean }
             skillId={SKILL_IDS.runeworking}
             skillName={runeworkingName}
           />
-          {reward && notice.rewardKept ? (
+          {reward && (notice.rewardKept || mailed) ? (
             <div className="h-28 w-28" data-echo-notice-reward={reward}>
-              <StackItemVisual
-                itemId={reward}
-                name={resolveItemPresentation(reward, reward).displayName}
-                quantity={1}
-                stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
-              />
+              {rewardDefinition?.kind === "unique" ? (
+                <ItemVisual
+                  itemId={reward}
+                  name={resolveItemPresentation(reward, reward).displayName}
+                />
+              ) : (
+                <StackItemVisual
+                  itemId={reward}
+                  name={resolveItemPresentation(reward, reward).displayName}
+                  quantity={1}
+                  stackLimit={rewardDefinition?.kind === "stack" ? rewardDefinition.stackLimit : 1}
+                />
+              )}
             </div>
           ) : null}
         </div>
       ) : null}
-      {found && reward && notice.rewardKept === false ? (
+      {found && reward && legendary ? (
+        <p
+          className="mt-2 text-sm text-[color:var(--rs-text-primary)]"
+          data-echo-notice-delivery={mailed ? "fedhex" : "inventory"}
+        >
+          {echoLegendaryDeliveryLine(reward, mailed)}
+        </p>
+      ) : null}
+      {found && reward && notice.rewardKept === false && !mailed ? (
         <p
           className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
           data-echo-notice-lost={reward}

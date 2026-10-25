@@ -21,6 +21,8 @@ import {
   itemDisplayName,
   itemStateLabel,
   offerableStacks,
+  TRADE_SCARCITY_WARNING,
+  tradeHasScarcityWarning,
   tradeStage,
   type TradeStage,
 } from "./trade-presentation";
@@ -128,6 +130,15 @@ function TradeSessionSurface({ session }: { session: TradeSessionView }) {
             </div>
           ) : null}
           {error ? <Feedback tone="danger">{error}</Feedback> : null}
+          {tradeHasScarcityWarning(session.yours, session.theirs) ? (
+            <p
+              className="border border-[color:var(--rs-item-legendary-accent)] bg-[color:var(--rs-legendary-find-surface)] p-3 text-sm font-semibold text-[color:var(--rs-text-primary)]"
+              data-trade-scarcity-warning=""
+              role="note"
+            >
+              {TRADE_SCARCITY_WARNING}
+            </p>
+          ) : null}
           {frozen ? (
             <FrozenReview session={session} />
           ) : (

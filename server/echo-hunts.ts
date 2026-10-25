@@ -4,16 +4,24 @@ import {
   characterEchoHunts,
   characters,
   echoReadingNotices,
+  itemInstances,
   type ActiveAction,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  getItemDefinition,
+  getItemMaximumCharge,
+  standardSkillLevelThresholds,
+} from "@/game/config/balance";
 import { SKILL_IDS } from "@/game/config/foundations";
 import { BEGINNER_ECHO_TIER } from "@/game/content/echo-hunts";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getLocation, getLocationPlanetId } from "@/game/content/locations";
 import { getPlanetPresentation } from "@/game/content/planets";
 import {
   beginnerEchoTargetPool,
   checkEchoClue,
+  isLegendaryEchoReward,
   resolveEchoReading,
   validateEchoHuntContent,
   type EchoClueCheck,
@@ -27,9 +35,11 @@ import type { MiningRandom } from "@/game/domain/mining";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { applyCarriedStackDiff } from "@/server/carried-inventory";
+import { createEchoRecoveryParcel } from "@/server/fedhex";
 import { recordTrackedActivity } from "@/server/mission-progress";
 import { loadPlaySnapshot } from "@/server/play-state";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { recordLegendaryFindAnnouncement } from "@/server/public-system-messages";
 
 // Pools must be real locations of their planets and every table must total 100%;
 // fail at module load, not in a player's transaction.
@@ -109,6 +119,8 @@ export type PersistedEchoReading =
 export async function persistEchoReading(
   transaction: DatabaseTransaction,
   outcome: Exclude<PersistedEchoReading, { kind: "pending" }>,
+  /** The discoverer, whose name a Legendary announcement carries (#399). */
+  character: { displayName: string },
 ): Promise<void> {
   if (outcome.kind === "no_seeker" || outcome.kind === "no_hunt_here") return;
   const { characterId, readAt } = outcome;
@@ -160,6 +172,40 @@ export async function persistEchoReading(
       awardedXp: outcome.xpAwarded,
       thresholds: standardSkillLevelThresholds(),
     });
+    // A unique prize is its own authoritative instance (#399). One that fits is
+    // created here, with the XP, the hunt's end and the notice; one that does not
+    // fit is a durable FedHex parcel instead, never lost and never rolled again.
+    if (outcome.rewardKept && getItemDefinition(outcome.rewardItemId)?.kind === "unique") {
+      const maximumCharge = getItemMaximumCharge(outcome.rewardItemId);
+      await transaction.insert(itemInstances).values({
+        characterId,
+        itemId: outcome.rewardItemId,
+        currentCharge: maximumCharge === undefined ? null : 0,
+        createdAt: readAt,
+        updatedAt: readAt,
+      });
+    } else if (outcome.rewardMailed) {
+      await createEchoRecoveryParcel(transaction, {
+        characterId,
+        itemId: outcome.rewardItemId,
+        readAt,
+      });
+    }
+    // Exactly one excited line at the discovery itself, carried or mailed. It
+    // lives in this transaction, which runs once per reading, so claiming,
+    // re-reading and trading can never repeat it.
+    if (isLegendaryEchoReward(outcome.rewardItemId)) {
+      await recordLegendaryFindAnnouncement(transaction, {
+        characterName: character.displayName,
+        itemName: resolveItemPresentation(outcome.rewardItemId, outcome.rewardItemId).displayName,
+        planetName: getPlanetPresentation(
+          outcome.planetId as Parameters<typeof getPlanetPresentation>[0],
+        ).displayName,
+        // The announcement's own instant, as Mining's: a discovery resolved
+        // from an offline catch-up is announced when it is recorded.
+        now: new Date(),
+      });
+    }
     // One genuine discovery, credited only to an accepted, unfinished Mission
     // that counts Echoes — never a wrong reading, and never back-credited.
     await recordTrackedActivity(transaction, {
@@ -180,7 +226,11 @@ export async function persistEchoReading(
       sourceLocationId: outcome.sourceLocationId,
       ...(outcome.kind === "wrong"
         ? { eastWest: outcome.directions.eastWest, northSouth: outcome.directions.northSouth }
-        : { rewardItemId: outcome.rewardItemId, rewardKept: outcome.rewardKept }),
+        : {
+            rewardItemId: outcome.rewardItemId,
+            rewardKept: outcome.rewardKept,
+            rewardMailed: outcome.rewardMailed,
+          }),
       xpAwarded: outcome.kind === "found" ? outcome.xpAwarded : 0,
       readAt,
     })
@@ -214,9 +264,10 @@ export function createEchoReadingResolver(
         transition: { kind: "stop", consumedTicks: durationTicks },
       };
     },
-    persist: async (transaction, outcome) => {
+    persist: async (transaction, outcome, context) => {
       if (outcome.kind === "pending") return;
-      await persistEchoReading(transaction, outcome);
+      if (!context) throw new Error("Persisting an Echo reading needs the character it resolved");
+      await persistEchoReading(transaction, outcome, context.character);
     },
   };
 }
@@ -284,6 +335,8 @@ export type EchoReadingNoticeProjection = {
   northSouth?: EchoNorthSouth;
   rewardItemId?: string;
   rewardKept?: boolean;
+  /** A Legendary that did not fit was sent to the FedHex mailbox (#399). */
+  rewardMailed?: boolean;
   xpAwarded: number;
   readAt: string;
 };
@@ -400,6 +453,7 @@ export async function loadEchoHuntProjection(
             ...(notice.northSouth ? { northSouth: notice.northSouth as EchoNorthSouth } : {}),
             ...(notice.rewardItemId ? { rewardItemId: notice.rewardItemId } : {}),
             ...(notice.rewardKept !== null ? { rewardKept: notice.rewardKept } : {}),
+            ...(notice.outcome === "found" ? { rewardMailed: notice.rewardMailed } : {}),
             xpAwarded: notice.xpAwarded,
             readAt: notice.readAt.toISOString(),
           },

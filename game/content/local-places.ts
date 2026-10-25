@@ -22,6 +22,22 @@ import { LocalPlaceDefinitionSchema, type LocalPlaceDefinition } from "@/game/sc
  * `LocationDefinition`s merely to reuse Travel/map behavior. Nesting is one
  * level only.
  */
+/**
+ * The one FedHex interior both pickups show (#399). The owner-approved 2508x627
+ * master is downsampled whole to the 1536x384 Local Place production size, never
+ * cropped (scripts/prepare-fedhex-slice-j-art.mjs).
+ */
+const FEDHEX_PARCEL_HUB_SCENE = {
+  asset: "/location-scenes/fedhex-parcel-hub.webp" as const,
+  width: 1536,
+  height: 384,
+  alt: "Inside a standard FedHex parcel pickup: a wall of numbered parcel lockers under the purple and orange FedHex wordmark, a pickup terminal at the centre, and industrial shelves stacked with parcels and crates on either side",
+  focal: { x: 50, y: 50 } as const,
+};
+
+const FEDHEX_PLACE_DESCRIPTION =
+  "A standard FedHex parcel pickup: a wall of numbered lockers, a pickup terminal humming at the centre and shelves of crates waiting to be sorted. Every FedHex counter opens the same mailbox, wherever you collect from.";
+
 const localPlaceDefinitions = [
   {
     id: LOCAL_PLACE_IDS.holoHollowSouvenirs,
@@ -195,6 +211,28 @@ const localPlaceDefinitions = [
         focal: { x: 50, y: 55 } as const,
       },
     },
+  },
+  {
+    // FedHex's two parcel pickups (#399), one under each landing hub. They are
+    // the same standardized interior and open the same character-owned mailbox,
+    // so they share one owner-approved 4:1 scene. Always visible and enterable,
+    // even with nothing waiting: the mailbox is infrastructure, not an event.
+    id: LOCAL_PLACE_IDS.fedhexHoloHollowLanding,
+    parentLocationId: LOCATION_IDS.holoHollowLanding,
+    displayName: "FedHex — Holo Hollow Landing",
+    description: FEDHEX_PLACE_DESCRIPTION,
+    access: { kind: "open" as const },
+    fedhexMailbox: true as const,
+    presentation: { scene: FEDHEX_PARCEL_HUB_SCENE },
+  },
+  {
+    id: LOCAL_PLACE_IDS.fedhexStillreachLandingStation,
+    parentLocationId: LOCATION_IDS.stillreachLandingStation,
+    displayName: "FedHex — Stillreach Landing Station",
+    description: FEDHEX_PLACE_DESCRIPTION,
+    access: { kind: "open" as const },
+    fedhexMailbox: true as const,
+    presentation: { scene: FEDHEX_PARCEL_HUB_SCENE },
   },
 ] as const satisfies readonly LocalPlaceDefinition[];
 

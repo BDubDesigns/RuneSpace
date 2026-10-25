@@ -1106,6 +1106,8 @@ export const echoReadingNotices = pgTable(
     northSouth: text("north_south"),
     rewardItemId: text("reward_item_id"),
     rewardKept: boolean("reward_kept"),
+    // A Legendary that did not fit was sent to the FedHex mailbox instead of lost (#399).
+    rewardMailed: boolean("reward_mailed").notNull().default(false),
     xpAwarded: integer("xp_awarded").notNull().default(0),
     readAt: timestamp("read_at", { withTimezone: true }).notNull(),
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
@@ -1116,6 +1118,62 @@ export const echoReadingNotices = pgTable(
       table.readAt,
     ),
     check("echo_reading_notices_outcome", sql`${table.outcome} IN ('wrong', 'found')`),
+  ],
+);
+
+/**
+ * FedHex mailbox parcels (#399): the durable record of one message with one
+ * claimable attachment, owned by its recipient character.
+ *
+ * FedHex is RuneSpace's permanent postal brand, so the row is the smallest
+ * truthful contract a later player-authored letter or parcel can extend:
+ * recipient, message identity and type, sender identity and display, subject and
+ * body, receipt time, the attachment's item identity, and claim status. Slice J
+ * writes exactly one kind (`echo_legendary_recovery`, from the Wise Old Enby)
+ * and one attachment per parcel.
+ *
+ * The attachment is an item DEFINITION, not an item instance: the authoritative
+ * unique instance is minted once, by the claim, in the same transaction that
+ * sets `claimed_at` and `claimed_item_instance_id` — so an unclaimed parcel is
+ * never a carried, tradable or equippable item anywhere, and a double claim can
+ * never mint a second instance. `source_key` makes the write that created it
+ * idempotent. Parcels never expire and are never deleted.
+ */
+export const fedhexParcels = pgTable(
+  "fedhex_parcels",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    messageType: text("message_type").notNull(),
+    // The event that created the parcel, unique per recipient (for an Echo, the reading's instant).
+    sourceKey: text("source_key").notNull(),
+    // `npc` today; a character sender is the future player-authored mail.
+    senderKind: text("sender_kind").notNull(),
+    senderId: text("sender_id").notNull(),
+    senderDisplayName: text("sender_display_name").notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    attachmentItemId: text("attachment_item_id").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    // An audit reference, deliberately not a foreign key: a claimed item is an
+    // ordinary carried instance that may be traded (its owner changes) or
+    // discarded (its row is deleted), and neither may be blocked by its mail.
+    claimedItemInstanceId: text("claimed_item_instance_id"),
+  },
+  (table) => [
+    check(
+      "fedhex_parcels_claim_consistent",
+      sql`(${table.claimedAt} IS NULL) = (${table.claimedItemInstanceId} IS NULL)`,
+    ),
+    uniqueIndex("fedhex_parcels_character_source_unique").on(table.characterId, table.sourceKey),
+    index("fedhex_parcels_pending_idx")
+      .on(table.characterId, table.receivedAt)
+      .where(sql`${table.claimedAt} IS NULL`),
   ],
 );
 
@@ -1616,7 +1674,8 @@ export const chatMessages = pgTable(
     /**
      * What this row is (#308): `player` is a message a character sent, and
      * `rare_find` and `ultra_rare_find` are automatic System announcements of a
-     * Mining find, by the rarity of the item (#342). A
+     * Mining find, by the rarity of the item (#342), and `legendary_find` the
+     * announcement of a Legendary Resonance Echo discovery (#399). A
      * System row has NO sender: it is not a player, so it never borrows an
      * account, a character, or a made-up identity — the three sender columns
      * below are null exactly when the row is not a `player` message.
@@ -1642,7 +1701,7 @@ export const chatMessages = pgTable(
     check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade', 'whisper')`),
     check(
       "chat_messages_kind_check",
-      sql`${table.kind} in ('player', 'rare_find', 'ultra_rare_find')`,
+      sql`${table.kind} in ('player', 'rare_find', 'ultra_rare_find', 'legendary_find')`,
     ),
     check(
       "chat_messages_sender_check",

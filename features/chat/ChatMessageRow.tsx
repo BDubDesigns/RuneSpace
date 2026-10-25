@@ -146,7 +146,8 @@ export function ChatMessageRow({
 
 /**
  * An automatic System line in General (#308), a Mining RARE FIND or, for an
- * Ultra Rare item (#342), ULTRA RARE FIND. It is plainly RuneSpace's own output:
+ * Ultra Rare item (#342), ULTRA RARE FIND, or a Legendary Echo discovery (#399),
+ * LEGENDARY FIND. It is plainly RuneSpace's own output:
  * named "System", carrying the restrained rarity treatment, with no sender to
  * open and so no Whisper, Report, or Block, and it can mention no one.
  */
@@ -160,6 +161,11 @@ const SYSTEM_LINE_TREATMENTS = {
     label: "ULTRA RARE FIND",
     accent: "var(--rs-ultra-rare-find-accent)",
     surface: "var(--rs-ultra-rare-find-surface)",
+  },
+  legendary_find: {
+    label: "LEGENDARY FIND",
+    accent: "var(--rs-legendary-find-accent)",
+    surface: "var(--rs-legendary-find-surface)",
   },
 } as const;
 

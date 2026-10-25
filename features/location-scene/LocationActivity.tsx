@@ -3,6 +3,7 @@
 import { LOCAL_PLACE_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
+import { FedhexMailbox } from "@/features/fedhex/FedhexMailbox";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
@@ -76,6 +77,10 @@ export function LocationActivity({
         // (#381). It is the place's only activity; the landing ring and the
         // fuel terminal next door host none.
         return <RefiningConsole localPlaceId={activePlace.id} />;
+      case LOCAL_PLACE_IDS.fedhexHoloHollowLanding:
+      case LOCAL_PLACE_IDS.fedhexStillreachLandingStation:
+        // Both FedHex pickups open the one character-owned mailbox (#399).
+        return <FedhexMailbox localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.hhBnb:
         return (
           <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />

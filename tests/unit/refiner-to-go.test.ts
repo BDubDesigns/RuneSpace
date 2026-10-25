@@ -22,7 +22,11 @@ describe("issue #381 Refiner-To-Go", () => {
     expect(refiner().access).toEqual({ kind: "open" });
     expect(
       getLocalPlacesForLocation(LOCATION_IDS.stillreachLandingStation).map((p) => p.id),
-    ).toEqual([LOCAL_PLACE_IDS.stillreachFuelTerminal, LOCAL_PLACE_IDS.stillreachRefinerToGo]);
+    ).toEqual([
+      LOCAL_PLACE_IDS.stillreachFuelTerminal,
+      LOCAL_PLACE_IDS.stillreachRefinerToGo,
+      LOCAL_PLACE_IDS.fedhexStillreachLandingStation,
+    ]);
     expect(getLocation(refiner().id)).toBeUndefined();
     expect(refiner().merchantId).toBeUndefined();
     // Neither the landing ring nor the terminal hosts Refining as an activity.

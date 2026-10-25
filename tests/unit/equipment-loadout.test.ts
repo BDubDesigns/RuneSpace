@@ -30,37 +30,55 @@ const slot = (
 });
 
 const tool = slot("gear", "mining_tool");
+const gloves = slot("gear", "hands");
+const boots = slot("gear", "feet");
 const one = slot("container", "container_1");
 const two = slot("container", "container_2");
+const slotIds = { miningToolSlotId: "mining_tool", handsSlotId: "hands", feetSlotId: "feet" };
 
 describe("equipment loadout grid", () => {
   it("lays out Mining tool | Power Cell, Gloves | Boots, then the containers", () => {
-    const cells = deriveLoadoutCells([tool, one, two], "mining_tool");
+    // Authored order does not matter: the grid arranges by slot identity.
+    const cells = deriveLoadoutCells([one, boots, two, gloves, tool], slotIds);
     expect(cells.map(({ kind, key }) => `${kind}:${key}`)).toEqual([
       "slot:gear:mining_tool",
       "power_cell:utility:power_cell",
-      "placeholder:placeholder:gloves",
-      "placeholder:placeholder:boots",
+      "slot:gear:hands",
+      "slot:gear:feet",
       "slot:container:container_1",
       "slot:container:container_2",
     ]);
   });
 
-  it("keeps Gloves and Boots visual-only: they never come from, or become, authoritative slots", () => {
-    const cells = deriveLoadoutCells([tool, one, two], "mining_tool");
-    expect(cells.filter((cell) => cell.kind === "slot")).toHaveLength(3);
-    expect(cells.filter((cell) => cell.kind === "placeholder").map((cell) => cell.icon)).toEqual([
-      "gloves",
-      "boots",
+  it("makes Gloves and Boots real authoritative slots with their own silhouettes", () => {
+    const cells = deriveLoadoutCells([tool, gloves, boots, one, two], slotIds);
+    expect(cells.filter((cell) => cell.kind === "slot")).toHaveLength(5);
+    expect(cells.some((cell) => cell.kind !== "slot" && cell.kind !== "power_cell")).toBe(false);
+    expect(
+      cells.flatMap((cell) =>
+        cell.kind === "slot" ? [[cell.slot.target.suitSlotId, cell.icon]] : [],
+      ),
+    ).toEqual([
+      ["mining_tool", "tool"],
+      ["hands", "gloves"],
+      ["feet", "boots"],
+      ["container_1", "container"],
+      ["container_2", "container"],
     ]);
-    // A selection key for a placeholder resolves to no authoritative slot.
-    expect(resolveSelectedSlot([tool, one, two], "placeholder:gloves")).toBeUndefined();
+    // Their keys resolve to the authoritative slots like any other.
+    expect(resolveSelectedSlot([tool, gloves, boots], "gear:hands")).toBe(gloves);
+    expect(resolveSelectedSlot([tool, gloves, boots], "gear:feet")).toBe(boots);
+  });
+
+  it("is not told about Gloves and Boots a server that has not projected them: nothing is invented", () => {
+    const cells = deriveLoadoutCells([tool, one, two], slotIds);
+    expect(cells.filter((cell) => cell.kind === "slot")).toHaveLength(3);
   });
 
   it("shortens only the container labels", () => {
     expect(shortSlotLabel("Container attachment 2")).toBe("Container 2");
     expect(shortSlotLabel("Mining tool")).toBe("Mining tool");
-    const cells = deriveLoadoutCells([tool, one], "mining_tool");
+    const cells = deriveLoadoutCells([tool, one], slotIds);
     const slotCell = cells.find((cell) => cell.kind === "slot" && cell.slot === one);
     expect(slotCell?.kind === "slot" && slotCell.shortLabel).toBe("container_1");
   });

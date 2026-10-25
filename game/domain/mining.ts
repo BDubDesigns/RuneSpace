@@ -208,6 +208,12 @@ export function miningSuccessChanceBps(level: number, source: MiningSourceBalanc
 export type MiningSnapshot<Id = string> = {
   miningLevel: number;
   /**
+   * Effective levels from worn hands and feet gear (#399), added to
+   * `miningLevel` for the success roll ONLY. Every gate (source, tool, recipe)
+   * keeps reading the natural `miningLevel`. Absent means none.
+   */
+  successLevelBonus?: number;
+  /**
    * The character's Prioritize primary resources setting (#342), read under the
    * same character lock as the resolution. Off, the default and when omitted,
    * protects Secondary Finds: an attempt needs room for the source's full
@@ -498,7 +504,10 @@ export function resolveMining<Id>(input: {
   let successes = 0;
   let failures = 0;
   const resolvedAttempts: MiningResolvedAttempt[] = [];
-  const thresholdBasisPoints = miningSuccessChanceBps(snapshot.miningLevel, source);
+  const thresholdBasisPoints = miningSuccessChanceBps(
+    snapshot.miningLevel + (snapshot.successLevelBonus ?? 0),
+    source,
+  );
   const award = miningAwardFacts(balance, source);
   const prioritized = snapshot.prioritizePrimaryResources === true;
   // The least primary ore a success keeps: the source's full minimum, or one ore

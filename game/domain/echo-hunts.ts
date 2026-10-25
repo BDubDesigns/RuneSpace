@@ -3,12 +3,14 @@ import {
   getItemDefinition,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
-import type { PlanetId } from "@/game/config/foundations";
+import type { ItemId, PlanetId } from "@/game/config/foundations";
 import { BEGINNER_ECHO_TARGET_POOLS } from "@/game/content/echo-hunts";
 import { getLocation, getLocationPlanetId, LOCATIONS } from "@/game/content/locations";
 import type { StackState } from "@/game/domain/inventory";
+import { getItemPresentation } from "@/game/content/item-presentation";
 import {
   addStackExact,
+  addUnique,
   carriedQuantity,
   removeStacks,
   workingInventory,
@@ -25,8 +27,8 @@ import {
  * at once — so the first reading may find the Echo where the player stands.
  * A wrong reading reports, from the exact hex it was taken at, which way the
  * target lies on each screen axis of the flat-top map. A discovery ends the hunt
- * and rolls exactly one ordinary item; the next reading on that planet starts a
- * new hunt. Nothing here reads a clock, a database or a random source of its
+ * and rolls exactly one item from the planet's table (a Legendary at 1/500, #399);
+ * the next reading on that planet starts a new hunt. Nothing here reads a clock, a database or a random source of its
  * own: the server supplies all three.
  */
 
@@ -212,8 +214,14 @@ export type EchoReadingOutcome =
       planetId: string;
       sourceLocationId: string;
       rewardItemId: string;
-      /** False when the rolled item did not fit and slipped back into RuneSpace. */
+      /** True when the reward went into carried Inventory. */
       rewardKept: boolean;
+      /**
+       * True when a Legendary that did not fit was sent to the FedHex mailbox
+       * instead (#399). Never true for an ordinary item, which is lost.
+       */
+      rewardMailed: boolean;
+      /** Why the reward did not fit; set whenever the reward was not carried (mailed or lost). */
       lostReason?: "slots" | "mass";
       xpAwarded: number;
     } & WorkingInventoryDiff)
@@ -230,8 +238,9 @@ export type EchoReadingOutcome =
  * the Echo is here. A discovery rolls exactly one item from the current
  * planet's table and keeps it only if it fits the inventory left AFTER the Seeker
  * is gone — partial stacks, a freed slot and the freed mass all count. It never
- * rerolls: an item that does not fit is lost, and the discovery still pays its
- * fixed XP.
+ * rerolls: an ordinary item that does not fit is lost, a Legendary that does not
+ * fit is mailed through FedHex instead (#399), and the discovery still pays its
+ * fixed XP either way.
  */
 export function resolveEchoReading(input: {
   snapshot: EchoReadingSnapshot;
@@ -268,17 +277,37 @@ export function resolveEchoReading(input: {
   }
 
   const rewardItemId = rollEchoReward(table, input.random, balance);
-  const added = addStackExact(consumed.inventory, rewardItemId, 1, balance);
+  // A Legendary is unique equipment: one authoritative instance, never a stack.
+  const added =
+    getItemDefinition(rewardItemId, balance)?.kind === "unique"
+      ? addUnique(consumed.inventory, rewardItemId as ItemId, balance)
+      : addStackExact(consumed.inventory, rewardItemId as ItemId, 1, balance);
+  const mailed = !added.ok && isLegendaryEchoReward(rewardItemId);
   return {
     kind: "found",
     planetId,
     sourceLocationId: snapshot.currentLocationId,
     rewardItemId,
     rewardKept: added.ok,
+    rewardMailed: mailed,
     ...(added.ok ? {} : { lostReason: added.reason }),
     xpAwarded: beginner.discoveryXp,
     ...workingInventoryDiff(snapshot.stacks, added.ok ? added.inventory : consumed.inventory),
   };
+}
+
+/** The Legendary announcement's copy: the character's name, never the account's. */
+export function legendaryFindAnnouncementBody(input: {
+  characterName: string;
+  itemName: string;
+  planetName: string;
+}): string {
+  return `${input.characterName} uncovered Legendary ${input.itemName} from a Resonance Echo on ${input.planetName}!`;
+}
+
+/** Whether a reward is a Legendary item: the one kind FedHex recovers instead of losing (#399). */
+export function isLegendaryEchoReward(itemId: string): boolean {
+  return getItemPresentation(itemId)?.rarity === "legendary";
 }
 
 /** A reading may begin only while a Seeker is carried. */
@@ -299,8 +328,8 @@ export function canBeginEchoReading(
  * Module-load validation: each pool is real World Locations of its own planet
  * with no repeats (the exact members, Deep Jag's absence included, are pinned by
  * tests), each planet with a pool has a table
- * and vice versa, every reward is an authored stackable item, and every table
- * sums to exactly its declared total.
+ * and vice versa, every reward is an authored stackable item or a Legendary
+ * unique item, and every table sums to exactly its declared total.
  */
 export function validateEchoHuntContent(
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
@@ -331,8 +360,12 @@ export function validateEchoHuntContent(
       if (!Number.isInteger(entry.weight) || entry.weight <= 0) {
         throw new Error(`${planetId} Echo reward weights must be positive integers`);
       }
-      if (getItemDefinition(entry.itemId, balance)?.kind !== "stack") {
-        throw new Error(`${planetId} Echo reward "${entry.itemId}" must be a stackable item`);
+      const kind = getItemDefinition(entry.itemId, balance)?.kind;
+      // An ordinary prize is stackable; the one other shape is a Legendary unique (#399).
+      if (kind !== "stack" && !(kind === "unique" && isLegendaryEchoReward(entry.itemId))) {
+        throw new Error(
+          `${planetId} Echo reward "${entry.itemId}" must be a stackable item or a Legendary unique item`,
+        );
       }
       total += entry.weight;
     }

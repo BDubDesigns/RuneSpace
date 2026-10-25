@@ -191,6 +191,14 @@ test("an Ultra Rare slab shimmers in Inventory; a plain Rare Sapphire and ordina
   await expect(slab).toContainText("Motherlode Slab");
   await expect(slab.locator("[data-item-shimmer]")).toHaveCount(1);
   await expect(slab.locator(".rs-item-shimmer__spark")).toHaveCount(3);
+  // Ultra Rare keeps the sparkles only (#399): no sweeping sheen, no Legendary label.
+  await expect(slab.locator("[data-item-shimmer-sweep]")).toHaveCount(0);
+  await expect(slab.locator("[data-item-rarity-label]")).toHaveCount(0);
+  expect(
+    await slab
+      .locator("[data-item-shimmer]")
+      .evaluate((node) => getComputedStyle(node, "::before").content),
+  ).toBe("none");
   await expect(sapphire).toHaveCount(1);
   await expect(sapphire.locator("[data-item-shimmer]")).toHaveCount(0);
   await expect(inventory.locator("[data-item-shimmer]")).toHaveCount(1);

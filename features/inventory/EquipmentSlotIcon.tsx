@@ -3,8 +3,7 @@ import type { EquipmentSlotIconKind } from "./equipment-loadout";
 /**
  * Recessed industrial silhouettes for an EMPTY equipment slot (#364). These are
  * UI-category marks, not item art: they draw in `currentColor` so the tile
- * decides their strength. Gloves and boots are drawn ahead of their slots and
- * stay unreachable until the authoritative model ships those slots.
+ * decides their strength.
  */
 const PATHS: Record<EquipmentSlotIconKind, string[]> = {
   // Handheld cutter: housing, emitter nozzle and trigger grip.

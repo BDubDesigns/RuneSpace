@@ -18,7 +18,9 @@ type VisualTileProps = {
   /**
    * The item's authored rarity (#308). A rare tile takes the rarity outline
    * unless the caller names its own accent (skill XP does); Ultra Rare and above
-   * also carry the shared shimmer (#342).
+   * also carry the shared shimmer (#342): Ultra Rare sparkles only, Legendary
+   * sparkles plus the travelling sweep and a visible label (#399). Ultra Rare shows sparkles only; Legendary
+   * adds the travelling sweep and a visible label (#399).
    */
   rarity?: ItemRarity;
   background?: ReactNode;
@@ -121,6 +123,12 @@ export function VisualTile({
       {/* Ultra Rare and above shimmer over the artwork zone (#342), under the
           nameplate and plates so labels stay fully legible. */}
       <RarityShimmer rarity={rarity} />
+      {/* Legendary also reads as a word, never colour alone (#399). */}
+      {rarity === "legendary" ? (
+        <span className="rs-item-rarity-label" data-item-rarity-label="legendary">
+          Legendary
+        </span>
+      ) : null}
       {/* One reserved two-line label band for every tile (#199). Skill XP uses
           accentColor and has no left stack-fill track, so its nameplate spans
           the full width; item tiles keep their stack-track clearance. */}

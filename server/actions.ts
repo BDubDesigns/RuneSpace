@@ -45,6 +45,7 @@ import {
 } from "@/server/fabrication-commands";
 import { finishCurrentRuneworking, startRuneworking } from "@/server/runeworking-commands";
 import { acknowledgeEchoReading, startEchoReading } from "@/server/echo-hunt-commands";
+import { claimFedhexParcel, type FedhexClaimResult } from "@/server/fedhex-commands";
 import {
   finishCurrentTinkering,
   setTinkeringScrapPreference,
@@ -206,6 +207,7 @@ import {
   RuneworkingCommandRequestSchema,
   StartEchoReadingRequestSchema,
   AcknowledgeEchoReadingRequestSchema,
+  ClaimFedhexParcelRequestSchema,
   StartTinkeringRequestSchema,
   TinkeringCommandRequestSchema,
   TinkeringScrapPreferenceRequestSchema,
@@ -1303,6 +1305,23 @@ export async function tradeWithMerchantAction(input: unknown): Promise<TradeActi
     const user = await requireCurrentUser(await headers());
     const { characterId, ...trade } = request.data;
     return await tradeWithMerchant(user.id, characterId, trade);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type FedhexClaimActionResult = FedhexClaimResult | { error: string };
+
+/** Claim one parcel at a FedHex pickup (#399). Every rule is the server's. */
+export async function claimFedhexParcelAction(input: unknown): Promise<FedhexClaimActionResult> {
+  const request = ClaimFedhexParcelRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid parcel command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...claim } = request.data;
+    return await claimFedhexParcel(user.id, characterId, claim);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
