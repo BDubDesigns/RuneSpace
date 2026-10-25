@@ -38,6 +38,9 @@ const FEDHEX_PARCEL_HUB_SCENE = {
 const FEDHEX_PLACE_DESCRIPTION =
   "A standard FedHex parcel pickup: a wall of numbered lockers, a pickup terminal humming at the centre and shelves of crates waiting to be sorted. Every FedHex counter opens the same mailbox, wherever you collect from.";
 
+const MILKY_WAYMO_PLACE_DESCRIPTION =
+  "Milky Waymo's automated passenger check-in: a row of blue-and-white ticketing kiosks and a shuttle that flies itself, offering one-way passage between Holo Hollow Landing and Stillreach Landing Station without all that flying yourself nonsense.";
+
 const localPlaceDefinitions = [
   {
     id: LOCAL_PLACE_IDS.holoHollowSouvenirs,
@@ -233,6 +236,47 @@ const localPlaceDefinitions = [
     access: { kind: "open" as const },
     fedhexMailbox: true as const,
     presentation: { scene: FEDHEX_PARCEL_HUB_SCENE },
+  },
+  {
+    // Milky Waymo's two check-ins (#404), one under each landing hub: distinct
+    // physical businesses with one shared booking implementation and opposite
+    // destinations. Neither is a World Location or a map hex. Both are open to
+    // walk into from the start so the locked screen is visible; booking is
+    // gated server-side on the character's own durable first Rivet arrival at
+    // Stillreach. The owner-approved 2508x627 masters are downsampled whole to
+    // the Local Place production size (scripts/prepare-milky-waymo-art.mjs).
+    id: LOCAL_PLACE_IDS.milkyWaymoHoloHollowLanding,
+    parentLocationId: LOCATION_IDS.holoHollowLanding,
+    displayName: "Milky Waymo — Holo Hollow Landing",
+    description: MILKY_WAYMO_PLACE_DESCRIPTION,
+    access: { kind: "open" as const },
+    passengerCheckIn: true as const,
+    presentation: {
+      scene: {
+        asset: "/location-scenes/milky-waymo-spaceport-check-in.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A weathered industrial spaceport terminal on a worn paved apron under a heavy sky, a lit blue-and-white Milky Waymo sign above a row of passenger check-in kiosks and a Passenger Check-In board, with a white-and-blue Milky Waymo passenger shuttle waiting at Gate A",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
+  {
+    id: LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation,
+    parentLocationId: LOCATION_IDS.stillreachLandingStation,
+    displayName: "Milky Waymo — Stillreach Landing Station",
+    description: MILKY_WAYMO_PLACE_DESCRIPTION,
+    access: { kind: "open" as const },
+    passengerCheckIn: true as const,
+    presentation: {
+      scene: {
+        asset: "/location-scenes/milky-waymo-outpost-under-aurora-skies.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A rugged Milky Waymo check-in canopy on bare, dusty alien soil beneath a prismatic aurora, a lone ticketing kiosk and Check-In and Boarding signs under its lights, glowing mushrooms in the foreground and the white-and-blue Milky Waymo shuttle waiting beside a boarding stair",
+        focal: { x: 50, y: 50 } as const,
+      },
+    },
   },
 ] as const satisfies readonly LocalPlaceDefinition[];
 

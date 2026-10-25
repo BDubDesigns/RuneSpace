@@ -532,3 +532,21 @@ none authors an overlay.
 ## Explicit non-goals (not in this slice)
 
 No map-hex redesign, new locations/adjacency, Travel/Mining/Power Cell/inventory/equipment/persistence/reward changes, Annex Enter/Exit mechanic, multiple selectable scenes per location, full-screen hero art, parallax, particles, video backgrounds, cinematic transitions, or broad header/footer redesign.
+
+## Milky Waymo check-ins and the passenger shuttle (issue #404)
+
+Two owner-approved 2508×627 (4:1) Local Place scenes, one per landing hub, each downsampled
+whole (never cropped) to 1536×384: `milky-waymo-spaceport-check-in.webp` (Skatboll: industrial
+terminal, worn paved apron, blue-and-white kiosks, the shuttle at Gate A) and
+`milky-waymo-outpost-under-aurora-skies.webp` (Stillreach: check-in canopy on **bare dusty alien
+soil, no pavement**, mushrooms, aurora, the shuttle by a boarding stair). They appear on each
+place's card and header only; the ticketing interface is CSS (`docs/design-system.md`), and
+neither is a World Location, map hex or station interior. Their focal point is the centre of the
+frame (`50, 50`), which keeps the kiosks and the shuttle in the crop at the phone width.
+
+The flight cinematic draws the transparent shuttle (`milky-waymo-shuttle.webp`, alpha bounds
+39, 55, 1719×794 of its 1774×887 master) in the Rivet's place. It is seated on the same
+untrimmed-canvas reference box as the Rivet's owner-approved marks, so the shuttle lifts off and
+touches down on the Holo Hollow Landing pad and in the Stillreach mushroom ring without any
+second measurement; `tests/unit/milky-waymo-art.test.ts` checks it against the owner's Option B
+coordinates.

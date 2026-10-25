@@ -1885,6 +1885,80 @@ teaches it is *First Resonance Echo* (`docs/missions.md`). FedHex: `game/content
 `0049_fedhex_mailbox_legendary_echo` (additive: `fedhex_parcels`,
 `echo_reading_notices.reward_mailed`, and the `legendary_find` chat kind).
 
+### Milky Waymo passenger travel (issue #404)
+
+Milky Waymo is an independent, fully automated passenger shuttle between Holo
+Hollow Landing and Stillreach Landing Station. A ticket is **200 Credits one way**
+and the flight is **180 seconds**, the same in both directions
+(`passengerTravel` in `game/config/balance.ts`). It is a service the character
+buys, not a Rivet flight with the ship hidden.
+
+- **Unlock.** The character has first landed at Stillreach aboard their own Rivet.
+  It is derived, with no flag of its own, from the durable landing receipt that
+  flight wrote (`ship_arrival_notices`, route Holo Hollow Landing → Stillreach).
+  Receipts are only ever dismissed, never deleted, so it survives flying home and
+  dismissing the notice. It is not inferred from where the ship is berthed.
+- **What travels.** The character, carried Inventory and equipped items. The
+  Rivet, its berth, its fuel and its Cargo Hold are neither read nor written by a
+  passenger journey, and the service works wherever the Rivet is parked. It is not
+  a refuel, repair or fuel-spend mechanic, and there is no free ride, loan,
+  discount, cancellation or compulsory return.
+- **Where.** Two Local Places, `milky_waymo_holo_hollow_landing` and
+  `milky_waymo_stillreach_landing_station` (flag `passengerCheckIn`), each a
+  distinct physical business sharing one booking implementation with the opposite
+  destination. They are not World Locations or map hexes. Both are open to enter
+  before the unlock, where the kiosk says the service is not yet available.
+- **Booking.** `bookPassage` (`server/passenger-commands.ts`) is the one confirmed
+  command. Under the character lock, after lazy reconciliation, it re-derives the
+  character's location, that the named place is that hub's check-in, the unlock,
+  that the character is idle (no action, walk, flight or journey) and the balance,
+  then debits 200 CR with one guarded `UPDATE … WHERE credits >= fare`, writes the
+  journey and starts the `passenger_travel` action in the same transaction. Any
+  refusal writes nothing, and a repeated or concurrent confirmation is refused by
+  the shared in-transit boundary (`PassengerInTransitError`), so a fare cannot be
+  charged twice or journeys overlap. The kiosk's BOOK PASSAGE only opens the
+  confirmation and decides nothing.
+- **State.** One row per character in `character_passenger_journeys` (migration
+  `0050_milky_waymo_passenger_journeys`, additive, no backfill): route, origin,
+  destination, the fare actually charged and the immutable absolute `started_at` /
+  `arrives_at`. A booking replaces the row. The journey is in the air while
+  `landed_at` is null; a landed row is also the durable arrival receipt until
+  `acknowledged_at` (DISEMBARK) records that the player dismissed it. It is kept off
+  `character_ships` on purpose.
+- **Landing.** `createPassengerTravelResolver` (`server/passenger-state.ts`) lands
+  lazily on the next authenticated read or command, from the recorded arrival
+  instant rather than a tick count, so a return hours later lands at the scheduled
+  instant. It moves `characters.current_location_id` and stamps `landed_at`,
+  once, in one transaction, and throws, rolling back, on any inconsistency.
+  Dismissing the notice never lands anything.
+- **Blocking and force-idle.** The journey is an active action, and the shared
+  owned-character boundary denies every command in transit by default
+  (`allowDuringFlight`, now meaning flight or journey); the only opt-outs are the
+  Play read and presentation-only dismissals, kept exact by
+  `tests/unit/ship-flight-gate.test.ts`. Trade requests already refuse any busy
+  character. An operator force-idle or teleport is refused during a journey, as for
+  a flight, because deleting only the action would strand a charged passenger.
+- **Presentation.** The shuttle replaces the Rivet in the existing flight
+  cinematic (`game/content/flight-cinematics.ts` derives the passenger cinematics
+  from the Rivet leg's own chart and backdrops, seating the shuttle on the same
+  measured marks). Under the chart the cabin assistant speaks a fixed greeting, one
+  of five lines at 00:30, 01:00, 01:30, 02:00 and 02:30 drawn without repeats from
+  a 24-line pool (12 supplied with the issue, 12 written for it), and a fixed
+  arrival sign-off (`game/content/cabin-announcements.ts`,
+  `game/domain/cabin-announcements.ts`). The line is derived from the recorded
+  start and arrival instants and a seed made of the route and start, so reloads
+  neither restart, reshuffle nor replay it, and nothing is persisted for flavor. It
+  types at the dialogue player's 20 ms per character (`features/dialogue/typewriter.ts`)
+  only when a line begins on screen; a late resume, reduced motion or a screen
+  reader gets the whole line.
+- **Playtest note.** A character stranded at Stillreach without 200 CR must earn it
+  there; the shipped Stillreach sale paths are Oil Shale, Stone and Echo finds to
+  Last Leg Trading's terminal. Verify in playtest.
+
+**Authority.** `game/domain/passenger-travel.ts`, `game/content/passenger-routes.ts`,
+`game/content/passenger-kiosk.ts`, `server/passenger-state.ts`,
+`server/passenger-commands.ts`, `features/passenger/`.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are

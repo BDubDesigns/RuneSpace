@@ -118,10 +118,25 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the FedHex Mailboxes Update as the newest (#399)", () => {
+  it("publishes the Milky Waymo Update as the newest (#404)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("fedhex-mailboxes");
+    expect(latest.slug).toBe("milky-waymo");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("fedhex-mailboxes")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    expect(text).toContain("200 Credit");
+    expect(text).toContain("three-minute");
+    // The announcements are for players to hear in the cabin, not to read in a changelog.
+    expect(text).not.toMatch(/ChatGPT|Claude|legally considered|looks forward to charging/i);
+    // The hero is the approved check-in art at its runtime size.
+    expect(latest.hero?.src).toBe("/location-scenes/milky-waymo-spaceport-check-in.webp");
+  });
+
+  it("keeps the FedHex Mailboxes Update published beneath it (#399)", () => {
+    const latest = getPublicUpdate("fedhex-mailboxes")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("first-resonance-echo")!.publishedAt),
     );

@@ -129,11 +129,13 @@ describe("issue #357 Holo Hollow Landing", () => {
     );
   });
 
-  it("has Last Leg Trading and the FedHex pickup (#399) as its open Local Places and hosts no merchant of its own", () => {
+  it("has Last Leg Trading, the FedHex pickup (#399) and Milky Waymo (#404) as its open Local Places and hosts no merchant of its own", () => {
     const places = getLocalPlacesForLocation(landing);
     expect(places.map((place) => place.id)).toEqual([
       LOCAL_PLACE_IDS.lastLegTrading,
       LOCAL_PLACE_IDS.fedhexHoloHollowLanding,
+      // Milky Waymo's check-in (#404).
+      LOCAL_PLACE_IDS.milkyWaymoHoloHollowLanding,
     ]);
     const shop = getLocalPlace(LOCAL_PLACE_IDS.lastLegTrading)!;
     expect(shop.merchantId).toBe(MERCHANT_IDS.lastLegTrading);

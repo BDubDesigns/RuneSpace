@@ -244,10 +244,11 @@ async function reconcileActiveAction<Snapshot, Outcome>(
 export type OwnedCharacterCommandOptions = {
   allowDuringTrade?: boolean;
   /**
-   * Whether the command may run while the character's ship is in flight
-   * (#358). Default-deny: a Rivet in the air blocks every player command at this
-   * one shared boundary — walking, activities, trading, Inventory and Equipment
-   * changes, cargo — except the ones that opt out, which are reads and
+   * Whether the command may run while the character is in a flight (#358) or on
+   * a Milky Waymo passenger journey (#404). Default-deny: a Rivet in the air, or a
+   * shuttle under way, blocks every player command at this one shared boundary —
+   * walking, activities, trading, Inventory and Equipment changes, cargo, and a
+   * second booking — except the ones that opt out, which are reads and
    * presentation-only dismissals that change no gameplay state.
    * `tests/unit/ship-flight-gate.test.ts` keeps the opt-out list exact.
    */
@@ -267,13 +268,25 @@ export class ShipInFlightError extends OwnershipError {
   }
 }
 
+/**
+ * The refusal a command receives while a Milky Waymo shuttle is carrying the
+ * character (#404). The same shape as `ShipInFlightError`: a plain `{ error }`
+ * for the player, with the command's transaction rolled back before it wrote.
+ */
+export class PassengerInTransitError extends OwnershipError {
+  constructor() {
+    super("Your shuttle is under way. Wait for arrival.", 409);
+    this.name = "PassengerInTransitError";
+  }
+}
+
 function assertNotInFlight(
   action: Pick<ActiveAction, "actionId"> | undefined,
   options: OwnedCharacterCommandOptions,
 ): void {
-  if (!options.allowDuringFlight && action?.actionId === ACTION_IDS.shipFlight) {
-    throw new ShipInFlightError();
-  }
+  if (options.allowDuringFlight) return;
+  if (action?.actionId === ACTION_IDS.shipFlight) throw new ShipInFlightError();
+  if (action?.actionId === ACTION_IDS.passengerTravel) throw new PassengerInTransitError();
 }
 
 /**

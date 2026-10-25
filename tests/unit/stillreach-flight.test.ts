@@ -324,11 +324,12 @@ describe("Last Leg Trading's Stillreach terminal", () => {
     expect(terminal().parentLocationId).toBe(LOCATION_IDS.stillreachLandingStation);
     expect(terminal().id).not.toBe(LOCAL_PLACE_IDS.lastLegTrading);
     expect(terminal().access).toEqual({ kind: "open" });
-    // Refiner-To-Go (#381) and the FedHex pickup (#399) stand beside it, in authored order.
+    // Refiner-To-Go (#381), the FedHex pickup (#399) and Milky Waymo (#404) stand beside it, in authored order.
     expect(getLocalPlacesForLocation(LOCATION_IDS.stillreachLandingStation)).toEqual([
       terminal(),
       getLocalPlace(LOCAL_PLACE_IDS.stillreachRefinerToGo)!,
       getLocalPlace(LOCAL_PLACE_IDS.fedhexStillreachLandingStation)!,
+      getLocalPlace(LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation)!,
     ]);
     expect(terminal().presentation.scene).toMatchObject({
       asset: "/location-scenes/stillreach-fuel-terminal.webp",

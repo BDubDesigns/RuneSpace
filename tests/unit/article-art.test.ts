@@ -144,6 +144,7 @@ describe("canonical article art", () => {
     expect(index).toContain("Seeker? I Hardly Know Her!");
     expect(index).toContain("First Resonance Echo");
     expect(index).toContain("FedHex Mailboxes");
+    expect(index).toContain("Milky Waymo");
     // Only the Latest Update section should render an Update summary. A title
     // may also legitimately appear elsewhere on the landing page (for example,
     // the Wise Old Enby's new gameplay screenshot caption).
@@ -151,7 +152,8 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("FedHex Mailboxes");
+    expect(latestUpdateSection).toContain("Milky Waymo");
+    expect(latestUpdateSection).not.toContain("FedHex Mailboxes<");
     expect(latestUpdateSection).not.toContain("First Resonance Echo<");
     expect(latestUpdateSection).not.toContain("Seeker? I Hardly Know Her!<");
     expect(latestUpdateSection).not.toContain("The Wise Old Enby<");

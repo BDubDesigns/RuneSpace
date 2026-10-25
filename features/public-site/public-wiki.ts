@@ -151,11 +151,21 @@ const authoredWikiArticles = [
           "Before you launch, the Flight Controls show the cost, your fuel now and your fuel after landing. If you would land with less than the 120 FU the flight back needs, they warn you. You can still go: nothing refuels the ship for free on the other side and there is no automatic return, so plan to load fuel you have bought, traded or made before you fly home.",
           "Once launched, the flight cannot be cancelled and the fuel is spent. You watch the Rivet lift off, cross a chart from Skatboll to Stillreach for most of the trip, and touch down. You can minimize the flight and still browse your Inventory, Equipment and Missions, but you cannot walk, mine, refine, trade or move anything until you land. The flight keeps going if you close the game; come back early and it picks up where it is, come back late and you have already landed.",
           "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of eight locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
+          "Flying the Rivet is not the only way across. Milky Waymo, a fully automated passenger shuttle, runs between Holo Hollow Landing and Stillreach Landing Station once you have flown your own Rivet to Stillreach for the first time. See Riding Milky Waymo below.",
           [
             "Two walks from the Landing Station, by way of Windward Track, is Hilltop Workshop, where ",
             { text: "the Wise Old Enby", articleSlug: "the-wise-old-enby" },
             " lives and works. Anyone who gets there can talk to them.",
           ],
+        ],
+      },
+      {
+        heading: "Riding Milky Waymo",
+        paragraphs: [
+          "Milky Waymo keeps a check-in at Holo Hollow Landing and another at Stillreach Landing Station, listed among each landing's places. A ticket is 200 Credits one way and the ride takes 3 minutes, in both directions. It unlocks the first time your own Rivet lands at Stillreach, and stays unlocked after that, even once you have flown home. Before then you can walk in and look, but the kiosk says the service is not yet available.",
+          "The kiosk shows your destination, the fare, the trip time and your Credits. Booking Passage opens a confirmation, and only CONFIRM & BOARD charges you. If you do not have 200 Credits it says so and charges nothing. You must be standing still with nothing else on the go, and Milky Waymo works wherever your Rivet is parked.",
+          "You, your carried Inventory and your equipped items make the trip. Your Rivet, its fuel and everything in its Cargo Hold stay exactly where they were, so if you ride home you will have to go back for the ship the same way. The journey cannot be cancelled. While it lasts you cannot walk, mine, refine, trade or fly, though your Inventory, Equipment and Missions can still be browsed.",
+          "The shuttle crosses the same chart the Rivet does. Under it, a cabin assistant greets you, speaks a new line every thirty seconds and signs off when you arrive; it is a recording, not a conversation. Closing the game does not stop the ride: you land on schedule and a notice with a DISEMBARK button waits for you.",
         ],
       },
       {

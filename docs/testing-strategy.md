@@ -201,6 +201,24 @@ small number of critical mobile player journeys.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
 
+### Issue #404 Milky Waymo coverage
+
+- Unit: the pure route, fare, duration and unlock rules (`passenger-travel`), the 24-line pool,
+  seeded no-repeat selection and the time-derived announcement (`cabin-announcements`), the
+  approved art checksums, the shuttle's cinematic placement and the Rivet's own art being left
+  alone (`milky-waymo-art`), plus the exact `allowDuringFlight`/trade-gate opt-out lists.
+- Integration (`tests/integration/milky-waymo.test.ts`, real PostgreSQL, which also exercises
+  migration `0050`): unlock from durable Rivet history, atomic exactly-once 200 CR charging
+  under repeated and concurrent confirmations, every refusal writing nothing, the in-transit
+  gates, lazy once-only landing at the scheduled instant including after hours offline, rollback
+  of a corrupt landing, acknowledgment as presentation only, and the Rivet, its berth, fuel and
+  Cargo Hold, carried Inventory and Equipment unchanged byte for byte.
+- Browser (`milky-waymo`): both kiosks at 390 px and desktop through locked, welcome,
+  confirmation and insufficient-funds screens, a confirmed booking, the shuttle cinematic with
+  its cabin assistant, reload mid-journey, reduced motion, landing, DISEMBARK, keyboard
+  operation and a stale confirmation. The journey's own instants are moved in the database
+  rather than waiting out 180 seconds.
+
 ### Issue #145 surface coverage
 
 The dedicated Play-surface change has focused coverage for the boundaries that

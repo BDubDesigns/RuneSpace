@@ -144,6 +144,11 @@ import {
 } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
+  createPassengerTravelResolver,
+  projectPassenger,
+  type PassengerProjection,
+} from "@/server/passenger-state";
+import {
   createShipFlightResolver,
   loadShipRow,
   projectShip,
@@ -1135,6 +1140,12 @@ export type PlayGameplayState = {
    * landing receipt not yet dismissed. Every figure is server-owned.
    */
   ship: ShipProjection;
+  /**
+   * The character's Milky Waymo passage (#404): whether the service is theirs,
+   * the one fare and duration, the shuttle in the air if any and the landed
+   * journey they have not yet disembarked. Every figure is server-owned.
+   */
+  passenger: PassengerProjection;
   /** Present only while the character is in transit (server-authoritative). */
   travelState?: {
     originLocationId: string;
@@ -1325,6 +1336,12 @@ export function createPlayResolver(
     {
       actionId: ACTION_IDS.travel,
       resolver: createTravelResolver() as PlayResolver,
+    },
+    {
+      // A Milky Waymo passenger journey (#404): lazily landed from its own
+      // recorded arrival instant, moving the character and nothing else.
+      actionId: ACTION_IDS.passengerTravel,
+      resolver: createPassengerTravelResolver() as PlayResolver,
     },
     {
       // The Rivet in flight (#358): lazily landed on the next authenticated
@@ -2594,6 +2611,7 @@ export async function stateFromTransaction(
       .filter((stack) => stack.itemId === ITEM_IDS.fullSmallFuelCanister)
       .reduce((total, stack) => total + stack.quantity, 0),
   });
+  const passenger = await projectPassenger(transaction, { characterId, action });
   const locationStates: Record<string, LocationStateProjection> = {};
   for (const location of LOCATIONS) {
     const resolved = resolveLocationState(location, locationStateFacts);
@@ -2623,6 +2641,7 @@ export async function stateFromTransaction(
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
     scavengeReveals,
     ship,
+    passenger,
     travelState,
     powerAnnex:
       currentLocationId === LOCATION_IDS.emergencyPowerAnnex

@@ -14,7 +14,7 @@ import {
 } from "@/features/ship/flight";
 import { REPAIR_TARGET_IDS, SHIP_ROUTE_IDS } from "@/game/config/foundations";
 import type { ShipProjection } from "@/server/ship-state";
-import { EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
+import { EMPTY_PASSENGER_PROJECTION, EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
 
 const play = vi.hoisted(() => ({ state: {} as unknown }));
 vi.mock("@/features/play/PlayContext", () => ({
@@ -78,8 +78,20 @@ describe("transit helpers", () => {
       },
     };
     expect(isShipInFlight({ ship: flying })).toBe(true);
-    expect(isPlayInTransit({ ship: flying, travelState: undefined })).toBe(true);
-    expect(isPlayInTransit({ ship: EMPTY_SHIP_PROJECTION, travelState: undefined })).toBe(false);
+    expect(
+      isPlayInTransit({
+        ship: flying,
+        travelState: undefined,
+        passenger: EMPTY_PASSENGER_PROJECTION,
+      }),
+    ).toBe(true);
+    expect(
+      isPlayInTransit({
+        ship: EMPTY_SHIP_PROJECTION,
+        travelState: undefined,
+        passenger: EMPTY_PASSENGER_PROJECTION,
+      }),
+    ).toBe(false);
   });
 
   it("counts down from the recorded instants and never lands on a client clock", () => {

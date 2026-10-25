@@ -119,7 +119,11 @@ export function AdminOverviewTab({
             </span>
           </Field>
           <Field label="Current action">
-            {play.ship.flight ? "ship_flight" : (activeActionId ?? "idle")}
+            {play.ship.flight
+              ? "ship_flight"
+              : play.passenger.journey
+                ? "passenger_travel"
+                : (activeActionId ?? "idle")}
           </Field>
           <Field label="Ship berth">{locationLabel(play.ship.berthLocationId)}</Field>
           <Field label="Ship fuel">
@@ -132,6 +136,16 @@ export function AdminOverviewTab({
               </Field>
               <Field label="Flight arrives">
                 <IsoTimestamp value={play.ship.flight.arrivesAt} />
+              </Field>
+            </>
+          ) : null}
+          {play.passenger.journey ? (
+            <>
+              <Field label="Passenger destination">
+                {locationLabel(play.passenger.journey.destinationLocationId)}
+              </Field>
+              <Field label="Passenger arrives">
+                <IsoTimestamp value={play.passenger.journey.arrivesAt} />
               </Field>
             </>
           ) : null}

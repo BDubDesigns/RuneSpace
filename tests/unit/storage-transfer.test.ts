@@ -15,7 +15,7 @@ import {
   type StorageTransferAdapter,
 } from "@/features/storage/StorageTransferSurface";
 import { toggleSelection } from "@/features/shared/selectable-details";
-import { EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
+import { EMPTY_PASSENGER_PROJECTION, EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
 
 const carriedShale = {
   id: "carried-shale",
@@ -230,6 +230,7 @@ function cargoState(): PlayGameplayState {
     scavengeReveals: [],
     merchantDailyPurchases: {},
     ship: EMPTY_SHIP_PROJECTION,
+    passenger: EMPTY_PASSENGER_PROJECTION,
   };
 }
 

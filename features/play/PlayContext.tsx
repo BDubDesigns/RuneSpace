@@ -66,9 +66,11 @@ function boundaryKeyForState(state: PlayGameplayState): string | undefined {
     ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
     : state.ship.flight
       ? `flight:${state.ship.flight.routeId}:${state.ship.flight.arrivesAt}`
-      : state.activeAction
-        ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
-        : undefined;
+      : state.passenger.journey
+        ? `passenger:${state.passenger.journey.routeId}:${state.passenger.journey.arrivesAt}`
+        : state.activeAction
+          ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
+          : undefined;
 }
 
 /**
@@ -237,6 +239,7 @@ export function PlayProvider({
   const boundaryAt =
     state.travelState?.arrivesAt ??
     state.ship.flight?.arrivesAt ??
+    state.passenger.journey?.arrivesAt ??
     state.activeAction?.nextAttemptAt;
 
   useEffect(() => {

@@ -4,10 +4,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
+import { PassengerArrivalNotice } from "@/features/passenger/PassengerArrivalNotice";
+import { PassengerJourneyPanel } from "@/features/passenger/PassengerJourneyPanel";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
 import { EchoReadingNotice } from "@/features/echo-hunts/EchoReadingNotice";
-import { isShipInFlight } from "@/features/ship/flight";
+import { isPassengerInTransit, isShipInFlight } from "@/features/ship/flight";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
@@ -60,6 +62,7 @@ export function PlayConsole({
   const desktop = useDesktopWorkspace();
   const inTransit = Boolean(state.travelState);
   const inFlight = isShipInFlight(state);
+  const onShuttle = isPassengerInTransit(state);
   const [, startTransition] = useTransition();
   const [spotlightNoticeId, setSpotlightNoticeId] = useState<string>();
   const readingInInventory = useRef<{ previousNoticeId?: string } | undefined>(undefined);
@@ -143,6 +146,8 @@ export function PlayConsole({
       <ScavengeSuppressedNotice />
       {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
       <ShipArrivalNotice />
+      {/* The durable passenger disembark notice, until it is dismissed (#404). */}
+      <PassengerArrivalNotice />
       {/* A Seeker reading's durable result, wherever the player is (#393). */}
       <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (
@@ -153,6 +158,8 @@ export function PlayConsole({
         <JourneyPanel />
       ) : inFlight ? (
         <FlightPanel />
+      ) : onShuttle ? (
+        <PassengerJourneyPanel />
       ) : (
         <>
           {/* The grammar, in order (#193): the place, then the one thing you

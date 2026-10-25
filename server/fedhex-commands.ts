@@ -94,6 +94,7 @@ export async function claimFedhexParcel(
         const inTransit =
           action?.actionId === ACTION_IDS.travel ||
           action?.actionId === ACTION_IDS.shipFlight ||
+          action?.actionId === ACTION_IDS.passengerTravel ||
           Boolean(travelRows[0]);
         return inTransit
           ? refuse("in_transit", "Arrive before collecting parcels.")

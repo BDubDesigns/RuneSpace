@@ -939,6 +939,16 @@ const balanceSchema = z.object({
       requiredRefiningLevel: z.literal(5),
     }),
   }),
+  /**
+   * Milky Waymo passenger shuttle (#404): one fare, one duration, both
+   * directions. Authored in real seconds because, like a Rivet flight, a journey
+   * is scheduled by its recorded absolute arrival instant, never a tick count.
+   */
+  passengerTravel: z.object({
+    actionId: z.literal(ACTION_IDS.passengerTravel),
+    fareCredits: z.literal(200),
+    durationSeconds: z.literal(180),
+  }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
@@ -1918,6 +1928,11 @@ const defaults = balanceSchema.parse({
         durationSeconds: 260,
       },
     },
+  },
+  passengerTravel: {
+    actionId: ACTION_IDS.passengerTravel,
+    fareCredits: 200,
+    durationSeconds: 180,
   },
   travel: {
     actionId: ACTION_IDS.travel,
