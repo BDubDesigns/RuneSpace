@@ -15,7 +15,7 @@ import {
   TRADE_SCARCITY_WARNING,
   tradeHasScarcityWarning,
 } from "@/features/player-trade/trade-presentation";
-import { legendaryFindAnnouncementBody } from "@/server/public-system-messages";
+import { legendaryFindAnnouncementBody } from "@/game/domain/echo-hunts";
 
 /**
  * Exactly two animated rarity tiers (#399): Ultra Rare keeps the small plus

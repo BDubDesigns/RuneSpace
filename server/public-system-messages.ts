@@ -1,5 +1,6 @@
 import { chatMessages, type ChatMessage } from "@/db/rune-space";
 import type { ItemRarity } from "@/game/content/item-presentation";
+import { legendaryFindAnnouncementBody } from "@/game/domain/echo-hunts";
 import type { SystemChatMessageView } from "@/game/schemas/chat";
 import { afterCharacterCommandCommits, type DatabaseTransaction } from "@/server/action-resolution";
 import { publishRealtimeEvent } from "@/server/realtime";
@@ -79,15 +80,6 @@ export async function recordRareFindAnnouncement(
     publishRealtimeEvent({ kind: "everyone" }, "chat.message", view);
   });
   return view;
-}
-
-/** The Legendary announcement's copy: the character's name, never the account's. */
-export function legendaryFindAnnouncementBody(input: {
-  characterName: string;
-  itemName: string;
-  planetName: string;
-}): string {
-  return `${input.characterName} uncovered Legendary ${input.itemName} from a Resonance Echo on ${input.planetName}!`;
 }
 
 /**

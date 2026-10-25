@@ -210,12 +210,16 @@ test("each Stillreach scene renders its own panorama with no activity, status or
       await expect(page.locator("[data-last-leg-terminal]")).toHaveCount(0);
       const places = page.locator("[data-local-place]");
       if (id === LOCATION_IDS.stillreachLandingStation) {
-        await expect(places).toHaveCount(2);
+        // The fuel terminal, Refiner-To-Go and the FedHex pickup (#399).
+        await expect(places).toHaveCount(3);
         await expect(
           page.locator(`[data-local-place="${LOCAL_PLACE_IDS.stillreachFuelTerminal}"]`),
         ).toHaveCount(1);
         await expect(
           page.locator(`[data-local-place="${LOCAL_PLACE_IDS.stillreachRefinerToGo}"]`),
+        ).toHaveCount(1);
+        await expect(
+          page.locator(`[data-local-place="${LOCAL_PLACE_IDS.fedhexStillreachLandingStation}"]`),
         ).toHaveCount(1);
       } else {
         await expect(places).toHaveCount(0);

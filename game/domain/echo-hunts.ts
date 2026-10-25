@@ -296,6 +296,15 @@ export function resolveEchoReading(input: {
   };
 }
 
+/** The Legendary announcement's copy: the character's name, never the account's. */
+export function legendaryFindAnnouncementBody(input: {
+  characterName: string;
+  itemName: string;
+  planetName: string;
+}): string {
+  return `${input.characterName} uncovered Legendary ${input.itemName} from a Resonance Echo on ${input.planetName}!`;
+}
+
 /** Whether a reward is a Legendary item: the one kind FedHex recovers instead of losing (#399). */
 export function isLegendaryEchoReward(itemId: string): boolean {
   return getItemPresentation(itemId)?.rarity === "legendary";
