@@ -101,7 +101,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 94 production player actions", () => {
+  it("enumerates exactly the 101 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -120,13 +120,15 @@ describe("player server actions (server/actions.ts)", () => {
     // Resonance Rig's Runeworking start and finish-current. #393 adds reading a
     // Beginner Echo Seeker and dismissing a reading's result. #399 adds
     // claiming one FedHex parcel. #404 adds booking a Milky Waymo passage and
-    // disembarking its arrival notice.
-    expect(bodies.size).toBe(94);
+    // disembarking its arrival notice. #406 adds seven research-job commands:
+    // accept, start a field action, deliver the packet, collect payment, confirm
+    // the passage, abandon, and dismiss the arrival receipt.
+    expect(bodies.size).toBe(101);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(90);
+    expect(gameplay).toHaveLength(97);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -144,7 +146,8 @@ describe("player server actions (server/actions.ts)", () => {
         body.includes("runEquipmentAction(") ||
         body.includes("runTradeRequestCommand(") ||
         body.includes("runTradeOfferAction(") ||
-        body.includes("runSiteStashAction(");
+        body.includes("runSiteStashAction(") ||
+        body.includes("runResearchAction(");
       expect(recovers, `${name} must recover from a gameplay refusal`).toBe(true);
     }
     for (const helper of [
@@ -153,6 +156,7 @@ describe("player server actions (server/actions.ts)", () => {
       "async function runTradeRequestCommand",
       "async function runTradeOfferAction",
       "async function runSiteStashAction",
+      "async function runResearchAction",
     ]) {
       const start = source.indexOf(helper);
       const body = source.slice(start, source.indexOf("\n}\n", start));

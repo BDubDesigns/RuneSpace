@@ -13,6 +13,7 @@
  * acceptance).
  */
 
+import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import {
   getEffectiveGameBalance,
   getItemDefinition,
@@ -31,14 +32,16 @@ import {
  * "Player trade" entry ask this predicate, so a future bound, restricted or
  * Mission-only item is excluded from both by changing only this rule.
  *
- * Today every item with an authoritative inventory definition is transferable;
- * an item with no definition is not an item at all.
+ * Every item with an authoritative inventory definition is transferable except
+ * a Wise Old Enby research loan (#406), which exists only to do its job; an item
+ * with no definition is not an item at all.
  */
 export function isItemTransferable(
   itemId: string,
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
 ): boolean {
-  return getItemDefinition(itemId, balance) !== undefined;
+  // A Wise Old Enby research loan (#406) is never the borrower's to give away.
+  return getItemDefinition(itemId, balance) !== undefined && !isResearchLoanItem(itemId);
 }
 
 /** Every tunable number in the request/session contract lives here. */

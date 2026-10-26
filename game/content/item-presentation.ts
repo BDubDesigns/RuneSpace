@@ -224,6 +224,32 @@ const itemPresentations = {
     description:
       "A fragment attuned to detect hidden disturbances in RuneSpace. Consume one to sense the direction of a hidden Resonance Echo on your current planet.",
   },
+  // The Wise Old Enby's research-job loans (#406). No approved artwork exists
+  // yet, so each renders its text fallback; approved art is added later by
+  // setting `artworkSrc` and adding the master/derivative per the art cookbook.
+  [ITEM_IDS.sealedResearchPacket]: {
+    displayName: "Sealed Research Packet",
+    accessibleDescription: "A sealed research packet loaned by The Wise Old Enby",
+    textFallback: "RP",
+    description:
+      "A sealed packet of recorded research, on loan from The Wise Old Enby. It is a good deal heavier than it looks. Deliver it to the FedHex terminal at Stillreach Landing Station.",
+  },
+  [ITEM_IDS.geologicalSampleCase]: {
+    displayName: "Geological Sample Case",
+    accessibleDescription:
+      "A small labelled sampling case with three compartments, loaned by The Wise Old Enby",
+    textFallback: "GC",
+    description:
+      "A sampling case with three labeled compartments, on loan from The Wise Old Enby. Specimens are recorded inside it and add no weight.",
+  },
+  [ITEM_IDS.resonanceSampler]: {
+    displayName: "Resonance Sampler",
+    accessibleDescription:
+      "A small hand-held resonance sampling instrument with a handle, loaned by The Wise Old Enby",
+    textFallback: "RSA",
+    description:
+      "A small, sophisticated instrument on loan from The Wise Old Enby. It records the current resonance signature of the place where it is used.",
+  },
   // Stillreach Prospecting Quarry Mining (#379). Stone is the ordinary primary
   // resource; the Boulder is its single Ultra Rare find. Neither's art bakes in
   // a sparkle: the Ultra Rare shimmer belongs to the shared item visuals, keyed

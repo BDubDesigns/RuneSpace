@@ -19,6 +19,7 @@ import { clearFabricationWorkpiece, isFabricationAction } from "@/server/fabrica
 import { interruptTinkering, isTinkeringAction } from "@/server/tinkering";
 import { clearRuneworkingCycle, isRuneworkingAction } from "@/server/runeworking";
 import { isEchoReadingAction } from "@/server/echo-hunts";
+import { isResearchFieldAction } from "@/server/research-jobs";
 import { clearActiveJourney } from "@/server/travel";
 import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
@@ -54,6 +55,8 @@ import { missOpenRepairCleanPass } from "@/server/welding";
  *             consumed, no target was chosen and nothing was paid — a reading
  *             resolves only when its time has passed — so the hunt and its last
  *             clue are exactly as they were. There is no player path to this.
+ * - Research field action (#406): delete the action. Nothing was reserved or
+ *             consumed, and progress is written only when the action resolves.
  * - Tinkering (#232): the shared Tinkering interruption — delete the action,
  *             keeping the committed cycle exactly as the player's own Stop does.
  * - Travel:   delete the remaining active action + `characterTravelState` only;
@@ -148,6 +151,14 @@ export async function forceIdleResolvedAction(
   }
 
   if (isEchoReadingAction(actionId)) {
+    await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  // A research field action (#406): delete the action. Nothing was reserved or
+  // consumed and progress is written only when the action resolves, so the run
+  // is exactly as it was and the specimen or reading can simply be started again.
+  if (isResearchFieldAction(actionId)) {
     await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
     return { interrupted: true, interruptedActionId: actionId };
   }

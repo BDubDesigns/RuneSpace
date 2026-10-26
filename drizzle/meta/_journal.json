@@ -358,6 +358,13 @@
       "when": 1792958711523,
       "tag": "0050_milky_waymo_passenger_journeys",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793042301181,
+      "tag": "0051_research_jobs",
+      "breakpoints": true
     }
   ]
 }

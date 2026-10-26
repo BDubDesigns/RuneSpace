@@ -1,3 +1,4 @@
+import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import { and, asc, eq } from "drizzle-orm";
 import {
   cargoHoldItemInstances,
@@ -102,6 +103,7 @@ export type SiteStashRefusalReason =
   | "item_not_found"
   | "item_unavailable"
   | "equipped_item"
+  | "loaned_item"
   | "item_not_stored";
 
 export type SiteStashRefusal = {
@@ -298,7 +300,11 @@ async function loadCarriedInstance(
   itemInstanceId: string,
 ): Promise<
   | { ok: true; instance: typeof itemInstances.$inferSelect }
-  | { ok: false; reason: "item_not_found" | "equipped_item" | "item_unavailable"; message: string }
+  | {
+      ok: false;
+      reason: "item_not_found" | "equipped_item" | "item_unavailable" | "loaned_item";
+      message: string;
+    }
 > {
   const [[instance], assignments, [cargo]] = await Promise.all([
     transaction
@@ -324,6 +330,13 @@ async function loadCarriedInstance(
   ]);
   if (!instance)
     return { ok: false, reason: "item_not_found", message: "That item is no longer available." };
+  // A Wise Old Enby research loan (#406) is for the job, never for storage.
+  if (isResearchLoanItem(instance.itemId))
+    return {
+      ok: false,
+      reason: "loaned_item",
+      message: "A loaned research item cannot be stored in a stash.",
+    };
   if (assignments.some((assignment) => assignment.itemInstanceId === instance.id))
     return {
       ok: false,

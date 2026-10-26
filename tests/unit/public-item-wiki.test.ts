@@ -108,8 +108,11 @@ describe("Wiki item catalog", () => {
         "Empty Small Fuel Canister",
         "Full Small Fuel Canister",
         "Galvanic Wire Spool",
+        "Geological Sample Case",
         "Mounting Bracket",
         "Power Cell",
+        "Resonance Sampler",
+        "Sealed Research Packet",
         "Wheel Assembly",
       ],
       [

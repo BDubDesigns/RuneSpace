@@ -9,10 +9,13 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
+import { ResearchJobsView } from "@/features/research/ResearchJobsView";
+import { RESEARCH_GIVER } from "@/game/content/research-jobs";
 import { usePlay } from "@/features/play/PlayContext";
 import { composePresentedDialogue } from "@/game/domain/skill-level-dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
@@ -89,6 +92,11 @@ export function NpcConversation({
 }) {
   const { acceptState, acquireCommand, releaseCommand, state } = usePlay();
   const [open, setOpen] = useState<OpenConversation>();
+  // Which list the hub is showing (#406). The Wise Old Enby groups their replayable
+  // topics and their research jobs under two buttons beneath the story
+  // conversations; everybody else keeps the single "Talk about" list.
+  const [section, setSection] = useState<"hub" | "topics" | "research">("hub");
+  const groupedHub = npc.id === RESEARCH_GIVER.npcId;
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
@@ -125,14 +133,16 @@ export function NpcConversation({
   useEffect(() => {
     // A Credits receipt replaces the control that was just activated even when
     // it is shown against the same dialogue, so it is its own view.
-    const view = open ? `${open.dialogueId}${open.creditsReceipt ? ":receipt" : ""}` : "hub";
+    const view = open
+      ? `${open.dialogueId}${open.creditsReceipt ? ":receipt" : ""}`
+      : `hub:${section}`;
     const changed = previousView.current !== undefined && previousView.current !== view;
     previousView.current = view;
     if (!changed) return;
     content.current
       ?.querySelector<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])')
       ?.focus();
-  }, [open?.dialogueId, open?.creditsReceipt]);
+  }, [open?.dialogueId, open?.creditsReceipt, section]);
 
   const missionEntries = entries.filter(
     (entry): entry is Extract<NpcConversationEntry, { kind: "mission" }> =>
@@ -267,6 +277,36 @@ export function NpcConversation({
             {...(venueBackgroundId ? { venueBackgroundId } : {})}
             completedRepairTargetIds={completedRepairTargetIds}
           />
+        ) : groupedHub && section === "research" ? (
+          <ResearchJobsView
+            onBack={() => setSection("hub")}
+            onClose={onClose}
+            stationary={stationary}
+          />
+        ) : groupedHub && section === "topics" ? (
+          <div className="mt-4" data-conversation-hub={npc.id} data-conversation-view="topics">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-display text-[11px] uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]">
+                Conversation Topics
+              </h3>
+              <ActionButton
+                data-conversation-back
+                intent="secondary"
+                onClick={() => setSection("hub")}
+              >
+                Back
+              </ActionButton>
+            </div>
+            <ul className="mt-3 space-y-2" data-conversation-section="topics">
+              {topicEntries.map((entry) => (
+                <ConversationEntryButton
+                  entry={entry}
+                  key={entry.id}
+                  onSelect={() => selectEntry(entry)}
+                />
+              ))}
+            </ul>
+          </div>
         ) : (
           <div className="mt-4" data-conversation-hub={npc.id}>
             <p className="text-sm text-[color:var(--rs-text-secondary)]">{npc.role}</p>
@@ -281,7 +321,13 @@ export function NpcConversation({
                 ))}
               </ConversationSection>
             ) : null}
-            {topicEntries.length > 0 ? (
+            {groupedHub ? (
+              <GroupedHubButtons
+                hasTopics={topicEntries.length > 0}
+                onSelect={setSection}
+                researchGuidance={state.research.assignment?.stage === "ready"}
+              />
+            ) : topicEntries.length > 0 ? (
               <ConversationSection heading="Talk about" testId="topics">
                 {topicEntries.map((entry) => (
                   <ConversationEntryButton
@@ -297,6 +343,57 @@ export function NpcConversation({
         )}
       </div>
     </Drawer>
+  );
+}
+
+/**
+ * The two grouped buttons beneath the Wise Old Enby's story conversations
+ * (#406): replayable Conversation Topics, and Research Jobs. Each opens a
+ * focused list of its own; neither dumps its contents into one flat menu, and
+ * story Mission conversations stay on the top level above them. Research Jobs
+ * carries the blue turn-in meaning while a finished run is waiting to be handed
+ * in.
+ */
+function GroupedHubButtons({
+  hasTopics,
+  onSelect,
+  researchGuidance,
+}: {
+  hasTopics: boolean;
+  onSelect: (section: "topics" | "research") => void;
+  researchGuidance: boolean;
+}) {
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2" data-conversation-groups>
+      {hasTopics ? (
+        <button
+          className="rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center justify-between gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-3 text-left"
+          data-conversation-group="topics"
+          onClick={() => onSelect("topics")}
+          type="button"
+        >
+          <span className="font-display text-sm font-bold uppercase tracking-wide">
+            Conversation Topics
+          </span>
+        </button>
+      ) : null}
+      <button
+        className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center justify-between gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-3 text-left ${researchGuidance ? "rs-mission-available" : ""}`}
+        data-conversation-group="research"
+        data-mission-guidance={researchGuidance ? "turn_in" : undefined}
+        onClick={() => onSelect("research")}
+        type="button"
+      >
+        <span className="font-display text-sm font-bold uppercase tracking-wide">
+          Research Jobs
+        </span>
+        {researchGuidance ? (
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]">
+            Turn in
+          </span>
+        ) : null}
+      </button>
+    </div>
   );
 }
 

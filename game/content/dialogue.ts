@@ -3523,6 +3523,386 @@ const dialogue = {
       ),
     ],
   },
+  // The Wise Old Enby's repeatable research jobs (#406). Wording is the approved
+  // Courier and Survey script and the Calibration implementation-copy draft from
+  // the Canon page; all of it is first-pass copy open to playtest revision.
+  [DIALOGUE_IDS.researchJobBlocked]: {
+    id: DIALOGUE_IDS.researchJobBlocked,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah, you're already helping me with something! Let's see that through before I burden you with another assignment.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierOffer]: {
+    id: DIALOGUE_IDS.researchCourierOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Oh, perfect timing! I've got a sealed research packet that needs to reach FedHex down at the landing station.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Take it to their terminal, hand it over, then come back to me. Everything inside is already recorded and sealed. No need to concern yourself with the contents.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I'll pay you twenty-five Credits for the round trip. Most of my research stays on this hill. The paperwork, apparently, has more ambitious travel plans.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "No special tools or experience needed. Just a little room in your Inventory and a willingness to stretch your legs. Interested?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierAccepted]: {
+    id: DIALOGUE_IDS.researchCourierAccepted,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Wonderful! There you are. One packet, sealed and accounted for. Safe travels!",
+      ),
+      enbyItem(ITEM_IDS.sealedResearchPacket, 1),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierRepeatOffer]: {
+    id: DIALOGUE_IDS.researchCourierRepeatOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Back for another delivery? I've got a fresh packet ready for you.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Same arrangement as before. Down to FedHex, back up the hill, twenty-five Credits. Shall we?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierCapacity]: {
+    id: DIALOGUE_IDS.researchCourierCapacity,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Ah. A small logistical complication. Your Inventory appears to have reached a rather firm opinion about carrying anything else.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Make room for one small packet and come back. I'll keep it safe until then.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierReminder]: {
+    id: DIALOGUE_IDS.researchCourierReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Still got that packet? Good. Take it to the FedHex terminal at Stillreach Landing Station. They'll see it on its way.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Then come back here. I'm considerably easier to find than most of the things I study.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierTurnIn]: {
+    id: DIALOGUE_IDS.researchCourierTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah, there you are! Packet delivered, and you've made it back in one piece. Excellent!",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You know, research is made up of a thousand little tasks like this. It's terribly easy to forget how important they are until one of them doesn't get done.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Now, I believe I promised you something rather more useful than my gratitude. Twenty-five Credits, wasn't it?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.researchCourierCompletion]: {
+    id: DIALOGUE_IDS.researchCourierCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "There we are. Thank you, genuinely. Come by again if you're looking for more work.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyOffer]: {
+    id: DIALOGUE_IDS.geologicalSurveyOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "You wouldn't happen to be interested in a bit of fieldwork, would you? Real fieldwork. With a field, and everything.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "I'm comparing surface material from three places: Prospecting Quarry, The Dry Seam, and Harmonic Workings. What the ground looks like on top can tell us quite a lot about what's happening underneath.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "I've got a sampling case with three compartments. Take it to each location and collect a surface specimen. Nothing fancy. No digging, no cutter, and no Mining experience required.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I'd collect them myself, but every time I leave the workshop, something starts making a noise it absolutely wasn't making before. I've begun to suspect they're doing it deliberately.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Bring me all three specimens, and I'll pay you seventy-five Credits. How does that sound?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyAccepted]: {
+    id: DIALOGUE_IDS.geologicalSurveyAccepted,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Splendid! One case, three compartments. I've even labeled them. A triumph of organizational discipline, if I do say so myself.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Collect the samples in whatever order you like. The case will keep them separated. Bring it back when you've filled all three.",
+      ),
+      enbyItem(ITEM_IDS.geologicalSampleCase, 1),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyRepeatOffer]: {
+    id: DIALOGUE_IDS.geologicalSurveyRepeatOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Back for another survey? Excellent! Stillreach hasn't stopped being interesting, and my notes certainly haven't stopped multiplying.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Same three locations, same sampling case, seventy-five Credits. Shall we give my filing system something else to complain about?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyCapacity]: {
+    id: DIALOGUE_IDS.geologicalSurveyCapacity,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Ah. A minor logistical difficulty. Science may be limitless, but your Inventory appears to have other ideas.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "The case is quite light, but it does need a little space of its own. Make some room and I'll have it ready for you.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyNoProgress]: {
+    id: DIALOGUE_IDS.geologicalSurveyNoProgress,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "No specimens yet? That's quite alright. The rocks aren't going anywhere. I'd be considerably more concerned if they were.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Remember: Prospecting Quarry, The Dry Seam, and Harmonic Workings. One surface sample from each.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyPartial]: {
+    id: DIALOGUE_IDS.geologicalSurveyPartial,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(EXPRESSION_IDS.friendly, "Ah, making progress! Very good."),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Every specimen tells us something on its own. But it's the comparison I'm interested in. Keep going until you've collected all three.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyTurnIn]: {
+    id: DIALOGUE_IDS.geologicalSurveyTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah! There you are! All three specimens, and not a single one appears to have escaped. Wonderful!",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Three very different places, three pieces of the same planet. Now comes the interesting part: finding out what they have in common.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And thanks to you, I can do that without leaving my workshop unattended. My instruments will be terribly disappointed.",
+      ),
+      enbyLocal(EXPRESSION_IDS.friendly, "Seventy-five Credits, as promised. You've earned them."),
+    ],
+  },
+  [DIALOGUE_IDS.geologicalSurveyCompletion]: {
+    id: DIALOGUE_IDS.geologicalSurveyCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Thank you, genuinely. Good fieldwork is worth more than people give it credit for.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And if you're ever looking for more, I have enough unanswered questions to keep us both busy for approximately the rest of our lives.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationOffer]: {
+    id: DIALOGUE_IDS.resonanceCalibrationOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "There's something peculiar about the resonance at The Low Hum. It never quite settles into the same pattern twice.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Fascinating when you're studying it. Considerably less convenient when you're trying to use it for transportation.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You see, there's a natural resonance at the Crash Site on Skatboll. With the right measurements, I can open a passage through RuneSpace and send someone directly there.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Take my Resonance Sampler to The Low Hum and record its current signature. Bring the instrument back, and I'll use that reading to send you to Skatboll. No Credits, no fuel, just a little fieldwork.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "One important detail: the passage carries you and whatever you're carrying. Your ship and Cargo Hold stay exactly where they are.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I've yet to devise a reliable way to fit an entire spacecraft through one of these passages. My workshop insurance is grateful for that.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Interested? There's no rush. Only take the assignment when you're considering a trip back to Skatboll.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationAccepted]: {
+    id: DIALOGUE_IDS.resonanceCalibrationAccepted,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Excellent! Here's the sampler. Small, light, and considerably more sophisticated than it looks.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I finally installed a handle on this version. You'd be surprised how much that improved the fieldwork.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Take it to The Low Hum, record the resonance, and bring it back. I'll handle the rest.",
+      ),
+      enbyItem(ITEM_IDS.resonanceSampler, 1),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationRepeatOffer]: {
+    id: DIALOGUE_IDS.resonanceCalibrationRepeatOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Another passage to Skatboll? Certainly! I imagine The Low Hum has changed its tune again by now.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Fresh reading, same destination. The sampler does the measuring, I do the complicated bit, and you get to travel without sitting in a ship for several minutes. Shall we?",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationCapacity]: {
+    id: DIALOGUE_IDS.resonanceCalibrationCapacity,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Ah. It seems your Inventory has reached full capacity. Unfortunately, I haven't invented a sampler that can be carried without actually carrying it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Make a little room and come back. It's only a hundred grams.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationReminder]: {
+    id: DIALOGUE_IDS.resonanceCalibrationReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The sampler needs a fresh signature from The Low Hum. The resonance changes over time, you see. An old reading won't tell me quite what I need.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Science can be terribly inconsiderate about reusing perfectly good measurements.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.resonanceCalibrationDeparture]: {
+    id: DIALOGUE_IDS.resonanceCalibrationDeparture,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(EXPRESSION_IDS.friendly, "Ah! There you are. Let's have a look at that reading."),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Yes... yes, that's quite interesting. The pattern has shifted again. Only slightly, but enough to matter.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "Remarkable stuff, RuneSpace. Never stays quite where you left it. Rather like my glasses.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Well! The measurements look good. I can open a passage to Skatboll's Crash Site whenever you're ready.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Remember, only you and your carried belongings will make the trip. Your ship, its fuel, and its Cargo Hold will remain wherever you've left them.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "If your ship is still on Stillreach, you'll need to arrange your own transportation back to retrieve it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "And before you ask: no, I won't be throwing the ship after you.",
+      ),
+      enbyLocal(EXPRESSION_IDS.friendly, "Ready to go?"),
+      enbyLocal(EXPRESSION_IDS.friendly, "If you're ready, stand just there. Yes, that spot."),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "When the resonance takes hold, you'll feel a slight sensation. Perfectly normal.",
+      ),
+      enbyLocal(EXPRESSION_IDS.amused, "Probably."),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Whenever you're ready, then. Safe travels! And do come back sometime. The universe is much more interesting with company.",
+      ),
+    ],
+  },
 } as const satisfies Record<DialogueId, DialogueSequence>;
 
 /** Ordered authoritative dialogue catalog consumed by the RuneSpace adapter. */

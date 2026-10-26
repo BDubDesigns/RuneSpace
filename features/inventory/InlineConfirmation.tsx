@@ -23,6 +23,7 @@ export function InlineConfirmation({
   onConfirm: () => void;
   "data-break-apart-confirmation"?: boolean;
   "data-drop-confirmation"?: boolean;
+  "data-research-abandon-confirmation"?: boolean;
 }) {
   return (
     <div

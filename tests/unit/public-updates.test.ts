@@ -118,10 +118,25 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Milky Waymo Update as the newest (#404)", () => {
+  it("publishes the Research Jobs Update as the newest (#406)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("milky-waymo");
+    expect(latest.slug).toBe("research-jobs");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("milky-waymo")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    expect(text).toContain("25 Credits");
+    expect(text).toContain("75 Credits");
+    expect(text).toContain("Abandon Assignment");
+    // It never shortens the character's name to their identity.
+    expect(text.replace(/The Wise Old Enby/g, "")).not.toMatch(/\bEnby\b/);
+    expect(latest.hero?.src).toBe("/location-scenes/hilltop-workshop.webp");
+  });
+
+  it("keeps the Milky Waymo Update published beneath it (#404)", () => {
+    const latest = getPublicUpdate("milky-waymo")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("fedhex-mailboxes")!.publishedAt),
     );

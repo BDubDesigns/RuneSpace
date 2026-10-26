@@ -1265,6 +1265,25 @@ const balanceSchema = z.object({
       }),
     }),
     /**
+     * The Wise Old Enby's research-job loan items (#406). Each is one unique,
+     * nonstackable ordinary Inventory item: it takes a real slot and its real
+     * mass (the packet is a substantial 2 kg), and nothing is exempt from
+     * carrying capacity. Whether an item is a loan is the job registry's
+     * (`game/content/research-jobs`), not a flag here.
+     */
+    sealedResearchPacket: z.object({
+      itemId: z.literal(ITEM_IDS.sealedResearchPacket),
+      massGrams: z.literal(2_000),
+    }),
+    geologicalSampleCase: z.object({
+      itemId: z.literal(ITEM_IDS.geologicalSampleCase),
+      massGrams: z.literal(100),
+    }),
+    resonanceSampler: z.object({
+      itemId: z.literal(ITEM_IDS.resonanceSampler),
+      massGrams: z.literal(100),
+    }),
+    /**
      * Stillreach Stone (#379): 1 kg a piece, five to a stack, so a full stack is
      * 5 kg and the slot count is the real limit. The Boulder is one unbroken 5 kg
      * specimen: it never stacks, and it owns its +150 Mining XP like every other
@@ -1294,6 +1313,20 @@ const balanceSchema = z.object({
       outputItemId: z.literal(ITEM_IDS.runeFragment),
       outputQuantity: z.literal(5),
     }),
+  }),
+  /**
+   * The Wise Old Enby's repeatable research jobs (#406). Field actions are whole
+   * game ticks (8 ticks = 4.8 s at the 600 ms tick), the authoritative duration;
+   * any seconds copy is derived from it. The two Credits jobs pay no XP, and the
+   * Calibration teleport pays neither Credits nor XP.
+   */
+  researchJobs: z.object({
+    surfaceSampleActionId: z.literal(ACTION_IDS.researchSurfaceSample),
+    surfaceSampleDurationTicks: z.literal(8),
+    resonanceRecordingActionId: z.literal(ACTION_IDS.researchResonanceRecording),
+    resonanceRecordingDurationTicks: z.literal(8),
+    courierRewardCredits: z.literal(25),
+    surveyRewardCredits: z.literal(75),
   }),
   /**
    * Beginner Resonance Echo hunts (#393): reading a Beginner Echo Seeker from
@@ -2054,6 +2087,9 @@ const defaults = balanceSchema.parse({
       massGrams: 1_000,
       equipment: { kind: "wearable", slot: "hands", miningSuccessLevelBonus: 1 },
     },
+    sealedResearchPacket: { itemId: ITEM_IDS.sealedResearchPacket, massGrams: 2_000 },
+    geologicalSampleCase: { itemId: ITEM_IDS.geologicalSampleCase, massGrams: 100 },
+    resonanceSampler: { itemId: ITEM_IDS.resonanceSampler, massGrams: 100 },
     stone: { itemId: ITEM_IDS.stone, massGrams: 1_000, stackLimit: 5 },
     boulder: {
       itemId: ITEM_IDS.boulder,
@@ -2068,6 +2104,14 @@ const defaults = balanceSchema.parse({
       outputItemId: ITEM_IDS.runeFragment,
       outputQuantity: 5,
     },
+  },
+  researchJobs: {
+    surfaceSampleActionId: ACTION_IDS.researchSurfaceSample,
+    surfaceSampleDurationTicks: 8,
+    resonanceRecordingActionId: ACTION_IDS.researchResonanceRecording,
+    resonanceRecordingDurationTicks: 8,
+    courierRewardCredits: 25,
+    surveyRewardCredits: 75,
   },
   echoHunts: {
     beginner: {

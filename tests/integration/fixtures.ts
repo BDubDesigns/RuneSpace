@@ -411,6 +411,14 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
       .delete(rune.echoReadingNotices)
       .where(eq(rune.echoReadingNotices.characterId, characterId));
     await tx.delete(rune.fedhexParcels).where(eq(rune.fedhexParcels.characterId, characterId));
+    // The Wise Old Enby's research jobs (#406): the active run references its loaned
+    // item instance, so it goes before item_instances below.
+    await tx
+      .delete(rune.characterResearchAssignments)
+      .where(eq(rune.characterResearchAssignments.characterId, characterId));
+    await tx
+      .delete(rune.characterResearchJobs)
+      .where(eq(rune.characterResearchJobs.characterId, characterId));
     await tx
       .delete(rune.characterWorkOrderPostings)
       .where(eq(rune.characterWorkOrderPostings.characterId, characterId));

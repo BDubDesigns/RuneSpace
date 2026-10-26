@@ -5,6 +5,7 @@ import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { PassengerArrivalModal } from "@/features/passenger/PassengerArrivalModal";
+import { ResearchArrivalModal } from "@/features/research/ResearchArrivalModal";
 import { PassengerJourneyPanel } from "@/features/passenger/PassengerJourneyPanel";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
@@ -149,6 +150,7 @@ export function PlayConsole({
       {/* The passenger arrival modal, until it is dismissed (#404). It is a portal over
           the whole game, so it presents wherever the player is. */}
       <PassengerArrivalModal />
+      <ResearchArrivalModal />
       {/* A Seeker reading's durable result, wherever the player is (#393). */}
       <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (

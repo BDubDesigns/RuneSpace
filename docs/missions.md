@@ -1105,6 +1105,72 @@ That pattern is a signal that authored content (offers, requirements, turn-in, d
 
 When in doubt, favour adding or correcting authored mission content and reusing the existing semantic paths over introducing mission-specific code.
 
+## 15. Repeatable Wise Old Enby research assignments (#406)
+
+Missions here are one-shot, so the Wise Old Enby's three repeatable jobs —
+Research Courier, Geological Field Survey and Resonance Calibration — are **not**
+Mission definitions. They share one narrow lifecycle of their own, and only their
+*presentation* reuses the Mission vocabulary (the Log, the strips and guidance).
+Do not add a fourth job, a daily job or a job board by extending this; a real
+need earns its own deliberate extension.
+
+| Concern | Home |
+| --- | --- |
+| Job content: copy, loan item, sites, dialogue ids | `game/content/research-jobs.ts` (`RESEARCH_JOBS`, `RESEARCH_GIVER`, `RESEARCH_COPY`) |
+| Pure rules: stage, field-action availability, delivery rule, capacity, offer status, the Mission-shaped projection, validation | `game/domain/research-jobs.ts` |
+| Persistence | `character_research_assignments` (the one held run), `character_research_jobs` (completion count + Calibration arrival receipt); migration `0051_research_jobs` |
+| Reads, projection, field-action resolver | `server/research-jobs.ts` |
+| Commands: accept, start a field action, deliver, collect payment, confirm passage, abandon, acknowledge arrival | `server/research-job-commands.ts`; `server/actions.ts` (`runResearchAction`) |
+| UI | `features/research/`; the Research Jobs button in `features/npc/NpcConversation.tsx` |
+
+- **One slot.** `character_research_assignments` has the character as its primary
+  key, so a character holds at most one run across all three jobs, however many
+  accepts race. A run is deleted on a paid turn-in, a confirmed passage or an
+  abandonment. Each run has its own `id`; every command on a held run names it, so
+  a stale client can never act on a later run of the same job. Story Missions are
+  untouched.
+- **A loan is one ordinary unique item**, minted in the transaction that records
+  the run, after the slot and mass preflight (a free slot AND the full mass: the
+  packet is 2 kg, the case and the sampler 0.1 kg). A refusal reports `slots`,
+  `mass` or `slots_and_mass` and writes nothing. `isResearchLoanItem` (derived from
+  the registry) makes it untradable (`isItemTransferable`), and Cargo Hold and
+  stash deposits refuse it (`loaned_item`). There is no Inventory Use, no exempt
+  slot and no mass bypass.
+- **Stages are derived, never stored.** `field` until the work is done (Courier
+  delivered, Survey three of three, Calibration recorded), then `ready`: only the
+  return to the Enby remains. The Survey keeps its collected sites as a list on the
+  run row (no per-site items); the case's mass never changes.
+- **Field actions** are `ACTION_IDS.researchSurfaceSample` and
+  `researchResonanceRecording`: one stationary, whole-tick action of 8 ticks (4.8 s
+  at the 600 ms tick), resolved lazily by `createResearchFieldResolver` exactly like
+  an Echo reading. The progress is written in the transaction that resolves it,
+  guarded by the run id and by the site (or recording) not already being stored, and
+  only if the run and the original carried item still hold. Travel and other
+  activities refuse while one runs. No ore, XP or other reward exists.
+- **Courier delivery** is allowed only at the Stillreach FedHex (`canDeliverPacket`):
+  one guarded write sets `delivered_at` and clears the item reference, and the
+  packet instance is deleted. FedHex pays nothing. Skatboll's FedHex never accepts it.
+- **Payment** (`completeResearchJob`) deletes the run (the exactly-once stamp),
+  reclaims the Survey's case and adds the Credits in SQL (25 and 75; 0 XP).
+- **The Calibration passage** (`teleportResearchJob`) deletes the run, reclaims the
+  sampler and moves **only the character** to the Crash Site in one transaction.
+  The Rivet, its fuel and the Cargo Hold are keyed to the ship and are not
+  touched. Declining is simply sending no command: nothing is banked. The
+  durable arrival receipt is `character_research_jobs.last_completed_at` of the
+  Calibration row newer than `arrival_acknowledged_at`; acknowledging it is
+  presentation only.
+- **Abandon Assignment** (`abandonResearchJob`) works from anywhere at any stage. It
+  forfeits progress, the loan and any payout or passage, cancels a pending field
+  action, counts nothing and frees the slot.
+- **Presentation.** The held run is appended to `state.missions` as a Mission-shaped
+  projection (`projectResearchAssignment`, `MissionProjection.research`) and
+  `state.research` carries the offers, the run and the arrival receipt. Guidance
+  uses the ordinary vocabulary: the Survey's several sites are `guidance.locationIds`.
+  A run has no Pin: it is always in Current Missions. The conversation resolver
+  ignores it (it is not a Mission definition), so story conversations stay on the
+  Enby's top level and the jobs live under Research Jobs
+  (`docs/npc-conversations.md` §4.4).
+
 ## 14. Current limitations
 
 The framework currently models **one live-state phase** per mission. Requirements observe current authoritative state (§5), while tracked activity requirements persist only a capped current value keyed by character, mission, and authored `progressKey`. This keeps ordinary missions simple, but the following progress shapes are **not yet modelled** and must earn an explicit framework extension when a real mission needs them:
@@ -1119,7 +1185,7 @@ The framework currently models **one live-state phase** per mission. Requirement
   multi-step conversation chains remain unmodelled.
 - **NPC schedules or movement beyond story placement** — an NPC's placement *is* Mission-derived (#190, #231: ordered `relocations` in `game/content/npcs.ts`, see `docs/npc-conversations.md`), but nothing moves anybody by time, shift, pathing, or chance. Mission location semantics remain intentionally authored on each definition rather than derived from NPC placement, so moving an NPC never silently moves where a Mission can be accepted or turned in.
 - **Arbitrary persistent per-step ledgers** beyond the narrow tracked-attempt contract (timestamps, event history, flags, provenance, or lifetime counters like "shale mined since acceptance" — current carried-stack requirements intentionally count any carried quantity (§5–§6)).
-- **Branching, repeatable, or timed mission systems.**
+- **Branching, repeatable, or timed mission systems.** The Wise Old Enby's three research jobs (§15) are a deliberately separate, narrow lifecycle, not a general repeatable-Mission framework.
 - **Persistent multi-stage missions.** (`deferred_stage` (§5.3) is not this: it is a placeholder objective that a later slice replaces, not a stage history.) A mission surface shows all requirements of the **current stage/leg** but never future-stage objectives. The current production framework is one stage, so authored requirements form the current simultaneous requirement set. A future mission with genuinely sequential legs (e.g. deliver one material set, then receive a new objective elsewhere) earns a deliberate multi-stage extension then — not speculatively now.
 
 The current requirement/projection vocabulary was kept reusable so a future narrow phase wrapper (`mission → phase → same requirements / dialogue / guidance vocabulary`) can layer on top without rewriting the existing missions, and mission location semantics already avoid the `homeLocationId` derivation trap.

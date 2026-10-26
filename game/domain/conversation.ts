@@ -20,6 +20,7 @@ import {
   MISSION_STANDING_LABELS,
   missionOmitsMoment,
   reminderMomentFor,
+  type MissionRequirementStatus,
   type MissionState,
 } from "@/game/domain/missions";
 
@@ -73,7 +74,7 @@ export type NpcConversationProjection = {
    * authoritative requirement holds, so the encounter does not replay.
    */
   requirements?: readonly {
-    kind: MissionRequirementKind;
+    kind: MissionRequirementStatus["kind"];
     satisfied: boolean;
     npcId?: string;
     /** The optional lead NPCs of a conversation requirement and whether one was followed (#369). */

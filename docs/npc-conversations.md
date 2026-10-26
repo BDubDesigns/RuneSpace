@@ -284,6 +284,29 @@ After a successful acceptance with no authored continuation the surface returns
 to the same hub, which re-derives from the new state and now lists the Mission's
 turn-in at that NPC, so the player never leaves the conversation.
 
+### 4.4 Grouped topics and Research Jobs (#406)
+
+The Wise Old Enby is the one NPC whose hub is grouped. Story Mission
+conversations (the **Current** section) stay on the top level, including offers,
+reminders and turn-ins, and the previously flat **Talk about** list becomes two
+buttons beneath them: **Conversation Topics** (their replayable topics, with Back)
+and **Research Jobs** (`features/research/ResearchJobsView.tsx`). Selecting either
+enters a focused list of its own; Back returns to the hub, and a topic's Back or
+Finish returns to the Conversation Topics list. Every other NPC keeps the single
+"Talk about" list.
+
+Research Jobs lists the open jobs with their pitch, needs and reward. A job locked
+behind the story (Resonance Calibration) is not listed. While one job is held, the
+others stay visible but blocked, naming it. A job's dialogue is selected from
+authoritative state, never from a Mission: the full briefing until the character has
+completed that job once, then the short introduction (the full briefing stays
+replayable), the reminder for the run's progress, and the return conversation that
+carries the final action. **Accept** (`ACCEPT ASSIGNMENT` / `NOT RIGHT NOW`),
+**COLLECT PAYMENT** and **OPEN PASSAGE TO SKATBOLL** are research commands
+(`docs/missions.md` §15), not Mission commands, and no dialogue transaction exists:
+backing out of a scene never commits anything. **OPEN PASSAGE TO SKATBOLL** only opens
+a separate confirmation modal; the whole farewell plays first, on Stillreach.
+
 ## 5. Replayable topics
 
 ```ts

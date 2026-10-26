@@ -8,6 +8,8 @@ import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
+import { ResearchDelivery } from "@/features/research/ResearchDelivery";
+import { ResearchFieldAction } from "@/features/research/ResearchFieldAction";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
@@ -80,8 +82,15 @@ export function LocationActivity({
         return <RefiningConsole localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.fedhexHoloHollowLanding:
       case LOCAL_PLACE_IDS.fedhexStillreachLandingStation:
-        // Both FedHex pickups open the one character-owned mailbox (#399).
-        return <FedhexMailbox localPlaceId={activePlace.id} />;
+        // Both FedHex pickups open the one character-owned mailbox (#399). A held
+        // Research Courier run adds its handoff section above the pickup (#406);
+        // it renders nothing at any other terminal or without an eligible packet.
+        return (
+          <>
+            <ResearchDelivery localPlaceId={activePlace.id} />
+            <FedhexMailbox localPlaceId={activePlace.id} />
+          </>
+        );
       case LOCAL_PLACE_IDS.milkyWaymoHoloHollowLanding:
       case LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation:
         // Milky Waymo's passenger ticketing kiosk (#404): one booking
@@ -105,6 +114,10 @@ export function LocationActivity({
           guidance that point at them are exactly where they have always been.
           It renders nothing for a character standing anywhere else. */}
       {locationId === state.ship.berthLocationId ? <ShipPanel /> : null}
+      {/* The Wise Old Enby's research field action (#406) is one compact row above
+          the site's own activity; it renders nothing unless a held run has work
+          here, and never replaces Mining or the stash below it. */}
+      <ResearchFieldAction />
       {primaryActivity(locationId, characterName, state)}
       {/* A site stash (#284) is a sibling of the site's own activity, never a
           replacement for it. It renders nothing until the server projects one,

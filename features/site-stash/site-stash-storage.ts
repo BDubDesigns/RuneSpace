@@ -1,3 +1,4 @@
+import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import type { PlayGameplayState, SiteStashState } from "@/server/play";
 import type { StorageProjection } from "@/features/storage/storage-selection";
 import type { StorageDestinationLabels } from "@/features/storage/StorageTransferSurface";
@@ -19,7 +20,8 @@ export function projectSiteStashStorage(
   return {
     carried: {
       stacks: state.inventory.stacks,
-      uniqueItems: state.inventory.uniqueItems,
+      // A Wise Old Enby research loan (#406) is carried for its job and never stored.
+      uniqueItems: state.inventory.uniqueItems.filter((item) => !isResearchLoanItem(item.itemId)),
       slotsUsed: state.inventory.slotsUsed,
       capacitySlots: state.inventory.slotsUsed + state.inventory.slotsAvailable,
     },

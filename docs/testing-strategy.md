@@ -186,7 +186,7 @@ small number of critical mobile player journeys.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
   `mining`, `character-profile`, `location-population`, `character-portraits`,
   `cargo-hold`, `inventory-equip`, `equipment-loadout`, `travel`, `walk-it-off`, `cut-your-teeth`,
-  `refining`, `bounded-runs`, `rusk-recovery`, `fabrication` (which also selects
+  `refining`, `bounded-runs`, `rusk-recovery`, `research-jobs`, `fabrication` (which also selects
   `fabrication-advanced.spec.ts`), `work-orders`, `gameplay-access`, and `account-verification`; recipe
   in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
@@ -200,6 +200,27 @@ small number of critical mobile player journeys.
   and the matching CI job establish CI parity.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
+
+### Issue #406 Wise Old Enby research jobs coverage
+
+- Unit (`tests/unit/research-jobs.test.ts`): the registry and its validation; loan
+  items (2 kg / 100 g / 100 g, untradable); slot/mass/both capacity; offer status and
+  the Calibration story gate; stages and progress; field-action and delivery
+  availability; the Mission-shaped projection, objectives and guidance; and the
+  copy: the character is always "The Wise Old Enby", every sequence is the Enby's,
+  the whole Calibration farewell precedes the passage, and first-time scripts are
+  longer than the repeat ones.
+- Integration (`tests/integration/research-jobs.test.ts`, real PostgreSQL, which also
+  exercises migration `0051`): one assignment slot under concurrent accepts and
+  re-accepts; capacity refusals writing nothing; the 8-tick field actions resolving
+  exactly once however many sessions read them; exactly-once packet delivery, payment
+  and passage under races; stale and foreign run ids; abandonment from anywhere
+  (including after a Courier delivery and with a pending action); the passage moving
+  only the character; the durable arrival receipt; and the Cargo Hold refusing a loan.
+- E2E (`tests/e2e/research-jobs.spec.ts`, canonical and focused phase
+  `research-jobs`): the grouped Enby hub, each job end to end at phone width, the
+  Research Delivery placement, the field actions, declining the passage, the durable
+  arrival modal (button, Escape, reload), Abandon Assignment and a desktop layout.
 
 ### Issue #404 Milky Waymo coverage
 

@@ -22,6 +22,7 @@ import { playDialogueToText } from "./dialogue-steps";
 import {
   expect,
   openConversationEntry,
+  openConversationTopics,
   openNpcConversation,
   openTestCharacter,
   test,
@@ -188,6 +189,7 @@ test("completing the mystery flows straight into the lesson, and the Rig opens",
   // instructions replay as a topic.
   await expect(conversation.locator(`[data-conversation-entry="${LESSON}:offer"]`)).toHaveCount(0);
   await expect(conversation.locator(`[data-conversation-entry="${LESSON}:active"]`)).toBeVisible();
+  await openConversationTopics(conversation);
   await expect(topics(conversation)).toHaveText([
     "Introductions",
     "The workshop",

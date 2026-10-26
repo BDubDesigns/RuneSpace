@@ -37,6 +37,9 @@ import {
 import { InlineConfirmation } from "./InlineConfirmation";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { EchoSeekerDetails } from "@/features/echo-hunts/EchoSeekerDetails";
+import { loanBadge } from "@/features/research/loan-badge";
+import { ResearchLoanDetails } from "@/features/research/ResearchLoanDetails";
+import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
@@ -389,7 +392,7 @@ export function InventoryPanel({
           badge={
             item.currentCharge !== undefined
               ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
-              : undefined
+              : loanBadge(state, item.itemId)
           }
           className={
             missionGuidanceTargets.equipmentItemIds.has(item.itemId)
@@ -561,9 +564,15 @@ export function InventoryPanel({
                       />
                     </div>
                   ) : null}
-                  <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                    Unique item — cannot be dropped.
-                  </p>
+                  {isResearchLoanItem(resolvedSelection.entry.itemId) ? (
+                    // A Wise Old Enby loan (#406): what it is for and how far along the
+                    // job is, in place of the generic unique-item line.
+                    <ResearchLoanDetails itemId={resolvedSelection.entry.itemId} />
+                  ) : (
+                    <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                      Unique item — cannot be dropped.
+                    </p>
+                  )}
                   {equipAvailability ? (
                     <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
                       <ActionButton
