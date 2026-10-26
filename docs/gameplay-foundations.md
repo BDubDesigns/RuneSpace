@@ -1923,7 +1923,7 @@ buys, not a Rivet flight with the ship hidden.
   destination, the fare actually charged and the immutable absolute `started_at` /
   `arrives_at`. A booking replaces the row. The journey is in the air while
   `landed_at` is null; a landed row is also the durable arrival receipt until
-  `acknowledged_at` (DISEMBARK) records that the player dismissed it. It is kept off
+  `acknowledged_at` records that the player dismissed it. It is kept off
   `character_ships` on purpose.
 - **Landing.** `createPassengerTravelResolver` (`server/passenger-state.ts`) lands
   lazily on the next authenticated read or command, from the recorded arrival
@@ -1951,6 +1951,15 @@ buys, not a Rivet flight with the ship hidden.
   types at the dialogue player's 20 ms per character (`features/dialogue/typewriter.ts`)
   only when a line begins on screen; a late resume, reduced motion or a screen
   reader gets the whole line.
+- **Arrival modal.** A landed, undismissed journey opens a centred blue-and-white
+  modal by itself (`features/passenger/PassengerArrivalModal.tsx`), including for a
+  player returning from offline. It is the shared `Drawer` in its `vendor` variant, so
+  it has the usual portal, dimming scrim, focus trap, Escape, outside-tap and fade; the
+  sign-off types with the blinking cursor (whole under reduced motion). DISEMBARK,
+  outside-tap and Escape are one path: the Drawer's close sends the existing
+  acknowledgment, and the stored receipt keeps it dismissed across refreshes. The
+  character has already landed independently of it. The Rivet's own landing notice
+  is unchanged.
 - **Playtest note.** A character stranded at Stillreach without 200 CR must earn it
   there; the shipped Stillreach sale paths are Oil Shale, Stone and Echo finds to
   Last Leg Trading's terminal. Verify in playtest.

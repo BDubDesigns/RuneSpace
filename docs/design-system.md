@@ -608,7 +608,7 @@ cyan tokens, and its palette is fixed because the machine is the same in any the
   both stop under `prefers-reduced-motion`. A typed line reserves its final height
   (`.rs-typewriter`) so it never shoves controls down while it types.
 - **Cabin assistant.** The same blue screen in miniature (`.mw-cabin`) under the
-  flight chart and on the arrival notice.
+  flight chart and, inside the arrival modal, on the cabinet it sits in.
 
 ## Accessibility
 

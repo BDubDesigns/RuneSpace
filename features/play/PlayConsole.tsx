@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
-import { PassengerArrivalNotice } from "@/features/passenger/PassengerArrivalNotice";
+import { PassengerArrivalModal } from "@/features/passenger/PassengerArrivalModal";
 import { PassengerJourneyPanel } from "@/features/passenger/PassengerJourneyPanel";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
@@ -146,8 +146,9 @@ export function PlayConsole({
       <ScavengeSuppressedNotice />
       {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
       <ShipArrivalNotice />
-      {/* The durable passenger disembark notice, until it is dismissed (#404). */}
-      <PassengerArrivalNotice />
+      {/* The passenger arrival modal, until it is dismissed (#404). It is a portal over
+          the whole game, so it presents wherever the player is. */}
+      <PassengerArrivalModal />
       {/* A Seeker reading's durable result, wherever the player is (#393). */}
       <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (

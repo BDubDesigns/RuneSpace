@@ -10,6 +10,7 @@ import {
   shipArrivalNotices,
 } from "@/db/rune-space";
 import {
+  ACTION_IDS,
   ITEM_IDS,
   LOCAL_PLACE_IDS,
   LOCATION_IDS,
@@ -542,4 +543,169 @@ test("charges nothing and starts no journey on a forged or stale confirmation", 
   expect(
     await db.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
   ).toEqual([]);
+});
+
+/**
+ * A rider whose shuttle left 181 seconds ago and has not been looked at since: the
+ * database holds a journey that is due, and nothing has landed it yet. The next
+ * authenticated read does, exactly as for a player returning from being offline.
+ */
+async function seedDueJourney(characterId: string) {
+  await seedRider(characterId, { at: HOLO });
+  const startedAt = new Date(Date.now() - 181_000);
+  await db.insert(characterPassengerJourneys).values({
+    characterId,
+    routeId: PASSENGER_ROUTE_IDS.holoHollowLandingToStillreachLandingStation,
+    originLocationId: HOLO,
+    destinationLocationId: STILLREACH,
+    fareCredits: 200,
+    startedAt,
+    arrivesAt: new Date(startedAt.getTime() + 180_000),
+  });
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.passengerTravel,
+    startedAt,
+    resolvedThroughAt: startedAt,
+  });
+}
+
+const ARRIVAL_TEXT =
+  "Congratulations! You have successfully arrived at Stillreach Landing Station. Please collect your belongings and exit the vehicle. Milky Waymo appreciates your business and looks forward to charging you again.";
+const MODAL = '[role="dialog"][aria-label="Milky Waymo arrival"]';
+
+for (const [method, viewport] of [
+  ["DISEMBARK", PHONE],
+  ["Escape", DESKTOP],
+  ["a tap outside", PHONE],
+] as const) {
+  test(`presents the arrival modal on return and ${method} dismisses it for good, at ${viewport.width}px`, async ({
+    page,
+    testCharacter,
+  }) => {
+    test.setTimeout(90_000);
+    const characterId = testCharacter.id;
+    await seedDueJourney(characterId);
+    await page.setViewportSize(viewport);
+    await openTestCharacter(page, characterId);
+
+    // It presents by itself, as a real modal over a dimmed game.
+    const modal = page.locator(MODAL);
+    await expect(modal).toBeVisible({ timeout: 30_000 });
+    await expect(modal).toHaveAttribute("aria-modal", "true");
+    await expect(modal.locator("[data-cabin-title]")).toHaveText("Milky Waymo — Cabin Assistant");
+    await expect(modal.getByRole("img", { name: "Milky Waymo" })).toBeVisible();
+    const backdrop = page.locator('[role="presentation"].rs-overlay-backdrop');
+    await expect(backdrop).toBeVisible();
+    const scrim = await backdrop.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(scrim).not.toMatch(/rgba\(\d+, \d+, \d+, 0\)|transparent/);
+
+    // The character arrived server-side on that read, before anyone touched the modal.
+    const landed = await characterRow(characterId);
+    expect(landed.currentLocationId).toBe(STILLREACH);
+    expect(landed.credits).toBe(1_000);
+    const row = (await journeyRow(characterId))!;
+    expect(row.landedAt).not.toBeNull();
+    expect(row.acknowledgedAt).toBeNull();
+
+    // Focus is inside, on DISEMBARK, and Tab cannot leave.
+    const disembark = modal.locator("[data-passenger-disembark]");
+    await expect(disembark).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(disembark).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(disembark).toBeFocused();
+    // The page behind is locked in place.
+    expect(await page.evaluate(() => document.body.style.position)).toBe("fixed");
+
+    // The approved sign-off types itself with the blinking cursor, and a screen reader is
+    // given the whole line as the dialog's description rather than character by character.
+    const visible = modal.locator("[data-typewriter-visible]");
+    const full = modal.locator("[data-typewriter-full]");
+    await expect(full).toHaveText(ARRIVAL_TEXT);
+    await expect(modal).toHaveAttribute("aria-describedby", (await full.getAttribute("id"))!);
+    await expect(visible).toHaveAttribute("aria-hidden", "true");
+    expect(((await visible.textContent()) ?? "").length).toBeLessThan(ARRIVAL_TEXT.length);
+    await expect(modal.locator(".rs-dialogue-cursor")).toHaveText("_");
+    await expectNoHorizontalOverflow(page);
+    const box = (await modal.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    // Centred in the viewport.
+    expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(2);
+    await expect(modal.locator("[data-typewriter-complete]")).toHaveAttribute(
+      "data-typewriter-complete",
+      "true",
+      { timeout: 15_000 },
+    );
+    await expect(modal.locator(".rs-dialogue-cursor")).toHaveCount(0);
+    await expect(visible).toHaveText(ARRIVAL_TEXT);
+    await captureReviewScreenshot(
+      page,
+      `milky-waymo-arrival-modal-${viewport === PHONE ? "mobile" : "desktop"}.png`,
+    );
+
+    // A refresh before dismissing presents it again: it stays until acknowledged.
+    await page.reload();
+    await expect(page.locator(MODAL)).toBeVisible({ timeout: 30_000 });
+
+    // Every way out sends the one existing acknowledgment, and nothing else changes.
+    if (method === "DISEMBARK")
+      await page.locator(MODAL).locator("[data-passenger-disembark]").click();
+    else if (method === "Escape") await page.keyboard.press("Escape");
+    else await page.mouse.click(2, 2);
+    await expect(page.locator(MODAL)).toHaveCount(0);
+    await expect.poll(async () => (await journeyRow(characterId))!.acknowledgedAt).not.toBeNull();
+    const after = await characterRow(characterId);
+    expect(after.currentLocationId).toBe(STILLREACH);
+    expect(after.credits).toBe(1_000);
+    expect(await page.evaluate(() => document.body.style.position)).not.toBe("fixed");
+
+    // Dismissed across refreshes.
+    await page.reload();
+    await expect(
+      page.locator("[data-local-place-directory], [data-location-scene]").first(),
+    ).toBeVisible();
+    await expect(page.locator(MODAL)).toHaveCount(0);
+    await expect(page.locator("[data-ship-arrival-notice]")).toHaveCount(0);
+  });
+}
+
+test("clicking inside the arrival modal does not dismiss it", async ({ page, testCharacter }) => {
+  test.setTimeout(60_000);
+  const characterId = testCharacter.id;
+  await seedDueJourney(characterId);
+  await openTestCharacter(page, characterId);
+  const modal = page.locator(MODAL);
+  await expect(modal).toBeVisible({ timeout: 30_000 });
+  await modal.locator("[data-typewriter-visible]").click();
+  await modal.locator("[data-cabin-title]").click();
+  await expect(modal).toBeVisible();
+  expect((await journeyRow(characterId))!.acknowledgedAt).toBeNull();
+});
+
+test("shows the arrival sign-off whole under reduced motion and still dismisses", async ({
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(60_000);
+  const characterId = testCharacter.id;
+  await seedDueJourney(characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize(PHONE);
+  await openTestCharacter(page, characterId);
+  const modal = page.locator(MODAL);
+  await expect(modal).toBeVisible({ timeout: 30_000 });
+  // Whole at once: no typing and no cursor to wait for.
+  await expect(modal.locator("[data-typewriter-visible]")).toHaveText(ARRIVAL_TEXT);
+  await expect(modal.locator(".rs-dialogue-cursor")).toHaveCount(0);
+  expect(
+    await page
+      .locator('[role="presentation"].rs-overlay-backdrop')
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("none");
+  await page.keyboard.press("Escape");
+  await expect(modal).toHaveCount(0);
+  await expect.poll(async () => (await journeyRow(characterId))!.acknowledgedAt).not.toBeNull();
 });

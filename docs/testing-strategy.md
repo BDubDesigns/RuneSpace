@@ -215,7 +215,7 @@ small number of critical mobile player journeys.
   Cargo Hold, carried Inventory and Equipment unchanged byte for byte.
 - Browser (`milky-waymo`): both kiosks at 390 px and desktop through locked, welcome,
   confirmation and insufficient-funds screens, a confirmed booking, the shuttle cinematic with
-  its cabin assistant, reload mid-journey, reduced motion, landing, DISEMBARK, keyboard
+  its cabin assistant, reload mid-journey, reduced motion, landing, the arrival modal (presented on return, dismissed by DISEMBARK, Escape and an outside tap, each persisting across a refresh, centred and focus-trapped at 390 px and desktop, whole under reduced motion), keyboard
   operation and a stale confirmation. The journey's own instants are moved in the database
   rather than waiting out 180 seconds.
 

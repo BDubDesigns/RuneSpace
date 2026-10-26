@@ -29,7 +29,7 @@ const authoredUpdates = [
       ],
       "Step into Milky Waymo from the landing's places and a bright blue-and-white ticketing kiosk shows where it will take you, the 200 Credit fare, the three-minute trip and your balance. Booking asks you to confirm first; nothing is charged until you do, and once the shuttle departs the journey cannot be cancelled. Before you have flown to Stillreach, you can still walk up and look, but the kiosk says the service is not yet available.",
       "You travel; your Rivet does not. Your carried belongings and equipment come with you, while your ship, its fuel and everything in its Cargo Hold stay parked where you left them, wherever that is. The ride keeps going if you close the game, and you will find it landed when you return.",
-      "On board, a cabin assistant under the flight chart greets you, speaks a new line every thirty seconds and signs off on arrival. It is a recording, not a conversation, and DISEMBARK clears its notice once you have landed.",
+      "On board, a cabin assistant under the flight chart greets you, speaks a new line every thirty seconds and signs off on arrival. It is a recording, not a conversation, and when you land it opens a window with its sign-off and a DISEMBARK button.",
     ],
     patchNotes: [
       {

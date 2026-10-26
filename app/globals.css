@@ -2071,7 +2071,8 @@ body {
    pairing below clears WCAG AA against the screen it sits on.
    --------------------------------------------------------------------------- */
 .mw-kiosk,
-.mw-cabin {
+.mw-cabin,
+.mw-modal {
   --mw-blue: #0a5fe8;
   --mw-blue-deep: #0848c4;
   --mw-blue-ink: #072a73;
@@ -2545,10 +2546,6 @@ body {
   }
 }
 
-.mw-cabin__action {
-  margin-top: 0.75rem;
-}
-
 /* A typed line reserves its whole height up front (an invisible copy sizes the
    box and the typed text overlays it), so a line growing as it types never
    shoves the controls below it down the screen. */
@@ -2562,4 +2559,59 @@ body {
 
 .rs-typewriter__sizer {
   visibility: hidden;
+}
+
+/* The passenger arrival modal (#404): Drawer's vendor skin, a small white cabinet
+   with the cabin assistant's blue screen inside it, over RuneSpace's own scrim. */
+.rs-overlay-panel--vendor {
+  border: 1px solid #b7c6dc;
+  border-radius: 1.5rem;
+  padding: 0.75rem;
+  background: radial-gradient(ellipse 6rem 1.2rem at 14% 99%, rgb(94 78 52 / 0.2), transparent 70%),
+    radial-gradient(ellipse 5rem 1rem at 90% 98%, rgb(94 78 52 / 0.22), transparent 70%),
+    linear-gradient(180deg, #fbfdff, #edf3fa 62%, #d9e3f1);
+  box-shadow:
+    inset 0 2px 0 #fff,
+    inset 0 -4px 0 rgb(7 42 115 / 0.14),
+    0 18px 48px rgb(0 0 0 / 0.55);
+  color: #072a73;
+}
+
+.rs-overlay-panel--vendor:focus {
+  outline: none;
+}
+
+.mw-modal__top {
+  padding: 0.25rem 0.5rem 0.75rem;
+}
+
+.mw-modal__logo {
+  display: block;
+  height: auto;
+  width: 10.5rem;
+  max-width: 100%;
+  mix-blend-mode: multiply;
+}
+
+.mw-modal__screen {
+  border: 0.4rem solid #0c1a3d;
+  border-radius: 1.1rem;
+  padding: 1.125rem 1rem 1.25rem;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgb(255 255 255 / 0.2), transparent 70%),
+    linear-gradient(180deg, var(--mw-blue), var(--mw-blue-deep));
+  color: var(--mw-white);
+}
+
+.mw-modal__screen .mw-kiosk__eyebrow {
+  margin: 0;
+}
+
+@media (min-width: 560px) {
+  .rs-overlay-panel--vendor {
+    padding: 1rem;
+  }
+
+  .mw-modal__screen {
+    padding: 1.375rem 1.5rem 1.5rem;
+  }
 }
