@@ -44,6 +44,8 @@ describe("accepted-trade gate", () => {
     expect(optOuts()).toEqual([
       // A Seeker reading's result notice: dismissal only, nothing else changes (#393).
       "server/echo-hunt-commands.ts#acknowledgeEchoReading",
+      // Disembarking changes no Credits, Inventory or Equipment (#404).
+      "server/passenger-commands.ts#acknowledgePassengerArrival",
       "server/play.ts#acknowledgeScavengeReveal",
       "server/play.ts#getPlayGameplayState",
       // The landing receipt's dismissal changes no Credits, Inventory or Equipment (#358).

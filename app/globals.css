@@ -2059,3 +2059,559 @@ body {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Milky Waymo passenger kiosk and cabin assistant (#404).
+
+   A custom vendor-owned terminal like Last Leg's (.rs-terminal), and just as
+   deliberately not RuneSpace's skin: a rounded white cabinet with mild wear and
+   a vivid blue touchscreen in the colours of the approved logo, set in its own
+   corporate sans. Pure CSS and the approved logo image; no kiosk illustration.
+   Its palette is fixed (the machine is the same in any theme), and every text
+   pairing below clears WCAG AA against the screen it sits on.
+   --------------------------------------------------------------------------- */
+.mw-kiosk,
+.mw-cabin,
+.mw-modal {
+  --mw-blue: #0a5fe8;
+  --mw-blue-deep: #0848c4;
+  --mw-blue-ink: #072a73;
+  --mw-white: #ffffff;
+  --mw-mist: #e8f1ff;
+  --mw-shell-top: #fbfdff;
+  --mw-shell-bottom: #d9e3f1;
+  --mw-bezel: #0c1a3d;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+}
+
+.mw-kiosk {
+  position: relative;
+  margin-inline: auto;
+  width: 100%;
+  max-width: 46rem;
+}
+
+.mw-kiosk__cabinet {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #b7c6dc;
+  border-radius: 1.75rem;
+  padding: 0.875rem;
+  background:
+    /* mild wear: scuffs low on the shell, a few hairline scratches */ radial-gradient(
+      ellipse 5rem 1.1rem at 12% 97%,
+      rgb(94 78 52 / 0.22),
+      transparent 70%
+    ),
+    radial-gradient(ellipse 7rem 1.4rem at 88% 99%, rgb(94 78 52 / 0.26), transparent 70%),
+    radial-gradient(ellipse 2.5rem 0.6rem at 4% 38%, rgb(94 78 52 / 0.14), transparent 70%),
+    radial-gradient(ellipse 3rem 0.7rem at 97% 12%, rgb(94 78 52 / 0.12), transparent 70%),
+    repeating-linear-gradient(
+      101deg,
+      transparent 0 46px,
+      rgb(60 80 110 / 0.07) 46px 47px,
+      transparent 47px 130px
+    ),
+    linear-gradient(180deg, var(--mw-shell-top), #edf3fa 62%, var(--mw-shell-bottom));
+  box-shadow:
+    inset 0 2px 0 #fff,
+    inset 0 -4px 0 rgb(7 42 115 / 0.14),
+    0 2px 0 rgb(255 255 255 / 0.1),
+    0 16px 38px rgb(0 0 0 / 0.5);
+  color: var(--mw-blue-ink);
+}
+
+.mw-kiosk__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.25rem 0.5rem 0.75rem;
+}
+
+.mw-kiosk__brand {
+  min-width: 0;
+}
+
+.mw-kiosk__logo {
+  display: block;
+  height: auto;
+  width: 10.5rem;
+  max-width: 100%;
+  /* The approved lockup is blue on white: multiplied onto the shell, its white
+     drops away and the mark and wordmark are left exactly as drawn. */
+  mix-blend-mode: multiply;
+}
+
+.mw-kiosk__tagline {
+  margin: 0.125rem 0 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mw-blue-ink);
+}
+
+.mw-kiosk__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  border: 1px solid #b5cdf5;
+  border-radius: 999px;
+  background: #e6efff;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mw-blue-ink);
+}
+
+.mw-kiosk__lamp {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--mw-blue);
+  box-shadow: 0 0 0 3px rgb(10 95 232 / 0.22);
+  animation: mw-kiosk-lamp 2.6s ease-in-out infinite;
+}
+
+@keyframes mw-kiosk-lamp {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgb(10 95 232 / 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(10 95 232 / 0.05);
+  }
+}
+
+.mw-kiosk__bezel {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 0.5rem;
+  background: linear-gradient(180deg, #14234d, var(--mw-bezel));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 -2px 0 rgb(0 0 0 / 0.5),
+    0 1px 0 #fff;
+}
+
+.mw-kiosk__screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.875rem;
+  padding: 1.125rem 1rem 1.25rem;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgb(255 255 255 / 0.2), transparent 70%),
+    linear-gradient(180deg, var(--mw-blue), var(--mw-blue-deep));
+  color: var(--mw-white);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+
+/* The glass: a faint diagonal sheen over everything, never in the way of a tap. */
+.mw-kiosk__screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgb(255 255 255 / 0.1) 0 18%, transparent 18% 100%);
+}
+
+.mw-kiosk__screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mw-kiosk__base {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.875rem 0.5rem 0.25rem;
+}
+
+.mw-kiosk__slot {
+  height: 0.5rem;
+  width: min(11rem, 40%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1b2a4f, #0c1a3d);
+  box-shadow:
+    inset 0 2px 3px rgb(0 0 0 / 0.6),
+    0 1px 0 #fff;
+}
+
+.mw-kiosk__reader {
+  display: grid;
+  place-items: center;
+  height: 1.75rem;
+  width: 2.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #b7c6dc;
+  background: linear-gradient(180deg, #f4f8fd, #dbe5f2);
+  color: var(--mw-blue);
+  box-shadow: inset 0 1px 0 #fff;
+}
+
+.mw-kiosk__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mw-mist);
+}
+
+.mw-kiosk__title {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.45rem, 5.2vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__title:focus {
+  outline: none;
+}
+
+.mw-kiosk__title:focus-visible {
+  outline: 3px solid var(--mw-white);
+  outline-offset: 4px;
+}
+
+.mw-kiosk__quote {
+  margin: 0.875rem 0 0;
+  border-left: 4px solid var(--mw-white);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: rgb(255 255 255 / 0.14);
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__destination {
+  margin-top: 1.25rem;
+}
+
+.mw-kiosk__destination-name {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.25rem, 4.6vw, 1.6rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__facts {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.mw-kiosk__fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 0.75rem;
+  background: rgb(7 42 115 / 0.34);
+  padding: 0.65rem 0.85rem;
+}
+
+.mw-kiosk__fact dt {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mw-mist);
+}
+
+.mw-kiosk__fact dd {
+  margin: 0;
+  flex: none;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--mw-white);
+}
+
+@media (min-width: 560px) {
+  .mw-kiosk__cabinet {
+    padding: 1.125rem;
+  }
+
+  .mw-kiosk__screen {
+    padding: 1.5rem 1.5rem 1.625rem;
+  }
+
+  .mw-kiosk__logo {
+    width: 11rem;
+  }
+
+  .mw-kiosk__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mw-kiosk__facts--pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mw-kiosk__fact {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.35rem;
+  }
+
+  .mw-kiosk__fact dd {
+    text-align: left;
+    font-size: 1.3rem;
+  }
+}
+
+.mw-kiosk__note {
+  margin: 1rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__warning {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 1rem 0 0;
+  border: 2px solid var(--mw-white);
+  border-radius: 0.75rem;
+  background: rgb(7 42 115 / 0.5);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__warning svg {
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+.mw-kiosk__actions {
+  display: grid;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 560px) {
+  .mw-kiosk__actions--pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  }
+}
+
+.mw-kiosk__button {
+  min-height: 3.25rem;
+  border: 2px solid var(--mw-white);
+  border-radius: 0.875rem;
+  padding: 0.6rem 1.1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    transform 0.12s ease;
+}
+
+.mw-kiosk__button--primary {
+  background: var(--mw-white);
+  color: #0a47bd;
+  box-shadow: 0 4px 0 #a9c4f2;
+}
+
+.mw-kiosk__button--primary:hover:not(:disabled) {
+  background: #eef5ff;
+}
+
+.mw-kiosk__button--primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #a9c4f2;
+}
+
+.mw-kiosk__button--secondary {
+  background: transparent;
+  color: var(--mw-white);
+}
+
+.mw-kiosk__button--secondary:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.16);
+}
+
+.mw-kiosk__button:focus-visible {
+  outline: 3px solid var(--mw-white);
+  outline-offset: 4px;
+}
+
+.mw-kiosk__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.mw-kiosk__feedback {
+  margin: 0.875rem 0 0;
+  border-radius: 0.75rem;
+  background: var(--mw-white);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #0a2f7a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mw-kiosk__lamp {
+    animation: none;
+  }
+
+  .mw-kiosk__button {
+    transition: none;
+  }
+
+  .mw-kiosk__button--primary:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* The cabin assistant: the same blue screen in miniature, under the flight chart. */
+.mw-cabin {
+  margin-top: 0.75rem;
+  border: 2px solid #dbe7fb;
+  border-radius: 1rem;
+  padding: 0.75rem 0.875rem 0.875rem;
+  background: linear-gradient(180deg, var(--mw-blue), var(--mw-blue-deep));
+  color: var(--mw-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    0 6px 18px rgb(0 0 0 / 0.35);
+}
+
+.mw-cabin__header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.mw-cabin__mark {
+  height: auto;
+  width: 3.1rem;
+  flex: none;
+  border-radius: 0.4rem;
+  background: var(--mw-white);
+  padding: 0.25rem 0.3rem;
+}
+
+.mw-cabin__title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--mw-mist);
+}
+
+.mw-cabin__line {
+  margin: 0.55rem 0 0;
+  /* Room for a long line at phone width so the panel does not jump as lines change. */
+  min-height: 6em;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--mw-white);
+}
+
+@media (min-width: 560px) {
+  .mw-cabin__line {
+    min-height: 3em;
+  }
+}
+
+/* A typed line reserves its whole height up front (an invisible copy sizes the
+   box and the typed text overlays it), so a line growing as it types never
+   shoves the controls below it down the screen. */
+.rs-typewriter {
+  display: grid;
+}
+
+.rs-typewriter > * {
+  grid-area: 1 / 1;
+}
+
+.rs-typewriter__sizer {
+  visibility: hidden;
+}
+
+/* The passenger arrival modal (#404): Drawer's vendor skin, a small white cabinet
+   with the cabin assistant's blue screen inside it, over RuneSpace's own scrim. */
+.rs-overlay-panel--vendor {
+  border: 1px solid #b7c6dc;
+  border-radius: 1.5rem;
+  padding: 0.75rem;
+  background: radial-gradient(ellipse 6rem 1.2rem at 14% 99%, rgb(94 78 52 / 0.2), transparent 70%),
+    radial-gradient(ellipse 5rem 1rem at 90% 98%, rgb(94 78 52 / 0.22), transparent 70%),
+    linear-gradient(180deg, #fbfdff, #edf3fa 62%, #d9e3f1);
+  box-shadow:
+    inset 0 2px 0 #fff,
+    inset 0 -4px 0 rgb(7 42 115 / 0.14),
+    0 18px 48px rgb(0 0 0 / 0.55);
+  color: #072a73;
+}
+
+.rs-overlay-panel--vendor:focus {
+  outline: none;
+}
+
+.mw-modal__top {
+  padding: 0.25rem 0.5rem 0.75rem;
+}
+
+.mw-modal__logo {
+  display: block;
+  height: auto;
+  width: 10.5rem;
+  max-width: 100%;
+  mix-blend-mode: multiply;
+}
+
+.mw-modal__screen {
+  border: 0.4rem solid #0c1a3d;
+  border-radius: 1.1rem;
+  padding: 1.125rem 1rem 1.25rem;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgb(255 255 255 / 0.2), transparent 70%),
+    linear-gradient(180deg, var(--mw-blue), var(--mw-blue-deep));
+  color: var(--mw-white);
+}
+
+.mw-modal__screen .mw-kiosk__eyebrow {
+  margin: 0;
+}
+
+@media (min-width: 560px) {
+  .rs-overlay-panel--vendor {
+    padding: 1rem;
+  }
+
+  .mw-modal__screen {
+    padding: 1.375rem 1.5rem 1.5rem;
+  }
+}

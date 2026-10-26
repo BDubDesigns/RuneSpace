@@ -1,6 +1,8 @@
 import {
+  PASSENGER_ROUTE_IDS,
   PLANET_IDS,
   SHIP_ROUTE_IDS,
+  type PassengerRouteId,
   type PlanetId,
   type ShipRouteId,
 } from "@/game/config/foundations";
@@ -170,6 +172,97 @@ export const FLIGHT_CINEMATICS: Readonly<Record<ShipRouteId, FlightCinematic>> =
   },
 };
 
+/**
+ * The transparent Milky Waymo passenger shuttle (#404), trimmed on its alpha
+ * bounds by `scripts/prepare-milky-waymo-art.mjs` (1289x596, the 1719x794 crop of
+ * its 1774x887 master at 0.75).
+ */
+const MILKY_WAYMO_SHUTTLE_OVERLAY = {
+  asset: "/location-scenes/milky-waymo-shuttle.webp" as const,
+  width: 1289,
+  height: 596,
+};
+
+/**
+ * Where each trimmed overlay sits on its own untrimmed 1774x887 master canvas.
+ * The Rivet's marks above were measured from that canvas, and the shuttle master
+ * is the same canvas size, so the shuttle is seated by mapping the Rivet's trimmed
+ * mark back to its canvas and trimming the shuttle at its own offset: the two
+ * vehicles stand on the very same reference box, and neither has to be re-measured.
+ */
+const RIVET_TRIM = { left: 16, top: 43, width: 1742 } as const;
+const SHUTTLE_TRIM = { left: 39, top: 55, width: 1719 } as const;
+
+const round3 = (value: number) => Number(value.toFixed(3));
+
+function shuttlePlacement(rivet: { left: number; top: number; width: number }) {
+  // Canvas px per master px, then the master canvas's own top-left in percent.
+  const scale = ((rivet.width / 100) * CINEMATIC_SIZE.width) / RIVET_TRIM.width;
+  const canvasLeft = rivet.left - ((RIVET_TRIM.left * scale) / CINEMATIC_SIZE.width) * 100;
+  const canvasTop = rivet.top - ((RIVET_TRIM.top * scale) / CINEMATIC_SIZE.height) * 100;
+  return {
+    left: round3(canvasLeft + ((SHUTTLE_TRIM.left * scale) / CINEMATIC_SIZE.width) * 100),
+    top: round3(canvasTop + ((SHUTTLE_TRIM.top * scale) / CINEMATIC_SIZE.height) * 100),
+    width: round3(((SHUTTLE_TRIM.width * scale) / CINEMATIC_SIZE.width) * 100),
+  };
+}
+
+/** The same approved backdrop with the Milky Waymo shuttle on the Rivet's mark. */
+function shuttleBackdrop(source: FlightCinematicBackdrop, alt: string): FlightCinematicBackdrop {
+  return {
+    dustColor: source.dustColor,
+    scene: { ...source.scene, alt },
+    ship: SceneOverlaySchema.parse({
+      ...MILKY_WAYMO_SHUTTLE_OVERLAY,
+      placement: shuttlePlacement(source.ship.placement),
+    }),
+  };
+}
+
+const SKATBOLL_DEPARTURE_SHUTTLE_ALT =
+  "A white-and-blue Milky Waymo passenger shuttle lifting off the wet Holo Hollow Landing pad inside its painted H.H. circle, green edge lights glowing, fuel tanks and service sheds behind it under snowy hills";
+const SKATBOLL_ARRIVAL_SHUTTLE_ALT =
+  "A white-and-blue Milky Waymo passenger shuttle settling onto the wet Holo Hollow Landing pad inside its painted H.H. circle, green edge lights glowing, fuel tanks and service sheds behind it under snowy hills";
+const STILLREACH_DEPARTURE_SHUTTLE_ALT =
+  "A white-and-blue Milky Waymo passenger shuttle lifting out of the open clearing inside a wide ring of glowing violet, blue and amber mushrooms at Stillreach Landing Station, weathered station buildings to the left and prismatic aurora overhead at twilight";
+const STILLREACH_ARRIVAL_SHUTTLE_ALT =
+  "A white-and-blue Milky Waymo passenger shuttle settling into the open clearing inside a wide ring of glowing violet, blue and amber mushrooms at Stillreach Landing Station, weathered station buildings to the left and prismatic aurora overhead at twilight";
+
+/**
+ * The passenger journey's cinematic (#404): the interplanetary Rivet leg's own
+ * chart and approved backdrops, flown by the Milky Waymo shuttle instead of the
+ * Rivet. Derived from the Rivet entries so a chart or backdrop is never authored
+ * twice, and keyed by the passenger route so a journey never reaches the Rivet's.
+ */
+function passengerCinematic(
+  shipRouteId: ShipRouteId,
+  alts: { departure: string; arrival: string },
+): FlightCinematic {
+  const source = FLIGHT_CINEMATICS[shipRouteId];
+  if (!source) throw new Error(`Ship route "${shipRouteId}" has no flight cinematic.`);
+  return {
+    chartTitle: source.chartTitle,
+    chart: source.chart,
+    departure: shuttleBackdrop(source.departure, alts.departure),
+    arrival: shuttleBackdrop(source.arrival, alts.arrival),
+  };
+}
+
+export const PASSENGER_FLIGHT_CINEMATICS: Readonly<Record<PassengerRouteId, FlightCinematic>> = {
+  [PASSENGER_ROUTE_IDS.holoHollowLandingToStillreachLandingStation]: passengerCinematic(
+    SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation,
+    { departure: SKATBOLL_DEPARTURE_SHUTTLE_ALT, arrival: STILLREACH_ARRIVAL_SHUTTLE_ALT },
+  ),
+  [PASSENGER_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding]: passengerCinematic(
+    SHIP_ROUTE_IDS.stillreachLandingStationToHoloHollowLanding,
+    { departure: STILLREACH_DEPARTURE_SHUTTLE_ALT, arrival: SKATBOLL_ARRIVAL_SHUTTLE_ALT },
+  ),
+};
+
+/** A cinematic by its route: a Rivet flight route or a Milky Waymo passenger route. */
 export function getFlightCinematic(routeId: string): FlightCinematic | undefined {
-  return (FLIGHT_CINEMATICS as Readonly<Record<string, FlightCinematic>>)[routeId];
+  return (
+    (FLIGHT_CINEMATICS as Readonly<Record<string, FlightCinematic>>)[routeId] ??
+    (PASSENGER_FLIGHT_CINEMATICS as Readonly<Record<string, FlightCinematic>>)[routeId]
+  );
 }

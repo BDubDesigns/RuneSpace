@@ -12,7 +12,7 @@ import {
 } from "@/features/inventory/inventory-selection";
 import { InventoryDetailsStats } from "@/features/inventory/InventoryDetailsStats";
 import { salvageCutterProjection } from "./mining-tool-projection";
-import { EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
+import { EMPTY_PASSENGER_PROJECTION, EMPTY_SHIP_PROJECTION } from "./ship-projection-fixture";
 
 const balance = getEffectiveGameBalance();
 
@@ -203,6 +203,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     scavengeReveals: [],
     merchantDailyPurchases: {},
     ship: EMPTY_SHIP_PROJECTION,
+    passenger: EMPTY_PASSENGER_PROJECTION,
   };
 }
 

@@ -592,6 +592,11 @@ export const ACTION_IDS = {
   // one-active-action state; the flight's own route and timestamps are durable
   // ship state, so `active_actions` keeps its narrow no-payload shape.
   shipFlight: asContentId("ship_flight"),
+  // A Milky Waymo passenger shuttle journey (#404). Like Travel and a Rivet
+  // flight it is a blocking one-active-action state; the journey's own route and
+  // timestamps are durable passenger state, so `active_actions` keeps its narrow
+  // no-payload shape.
+  passengerTravel: asContentId("passenger_travel"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -613,6 +618,22 @@ export const SHIP_ROUTE_IDS = {
 } as const satisfies Record<string, ContentId>;
 
 export type ShipRouteId = (typeof SHIP_ROUTE_IDS)[keyof typeof SHIP_ROUTE_IDS];
+
+/**
+ * Stable identities for Milky Waymo's two passenger routes (#404): the same
+ * interplanetary leg as the Rivet's, one per direction, but a separate service
+ * with its own fare, so they are never `ShipRouteId`s.
+ */
+export const PASSENGER_ROUTE_IDS = {
+  holoHollowLandingToStillreachLandingStation: asContentId(
+    "milky_waymo_holo_hollow_landing_to_stillreach_landing_station",
+  ),
+  stillreachLandingStationToHoloHollowLanding: asContentId(
+    "milky_waymo_stillreach_landing_station_to_holo_hollow_landing",
+  ),
+} as const satisfies Record<string, ContentId>;
+
+export type PassengerRouteId = (typeof PASSENGER_ROUTE_IDS)[keyof typeof PASSENGER_ROUTE_IDS];
 
 /** Stable identities for the approved local world (issues #40, #47, #83, #159). */
 export const LOCATION_IDS = {
@@ -682,6 +703,10 @@ export const LOCAL_PLACE_IDS = {
   // under each landing hub. Both open the same character-owned mailbox.
   fedhexHoloHollowLanding: asContentId("fedhex_holo_hollow_landing"),
   fedhexStillreachLandingStation: asContentId("fedhex_stillreach_landing_station"),
+  // Milky Waymo's two check-in kiosks (#404), one under each landing hub. They
+  // share one booking implementation with opposite destinations.
+  milkyWaymoHoloHollowLanding: asContentId("milky_waymo_holo_hollow_landing"),
+  milkyWaymoStillreachLandingStation: asContentId("milky_waymo_stillreach_landing_station"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */

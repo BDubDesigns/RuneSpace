@@ -109,6 +109,12 @@ import {
   type RefuelResult,
   type ShipArrivalAcknowledgmentResult,
 } from "@/server/ship-commands";
+import {
+  acknowledgePassengerArrival,
+  bookPassage,
+  type BookPassageResult,
+  type PassengerArrivalAcknowledgmentResult,
+} from "@/server/passenger-commands";
 import { TravelRuleError } from "@/server/travel";
 import { turnBackTravel } from "@/server/travel-commands";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -191,6 +197,8 @@ import {
   RefuelShipRequestSchema,
   LaunchShipRequestSchema,
   AcknowledgeShipArrivalRequestSchema,
+  BookPassageRequestSchema,
+  AcknowledgePassengerArrivalRequestSchema,
   ClaimPowerCellsRequestSchema,
   TradeRequestSchema,
   LoadPowerCellRequestSchema,
@@ -1228,6 +1236,48 @@ export async function acknowledgeShipArrivalAction(
   try {
     const user = await requireCurrentUser(await headers());
     return await acknowledgeShipArrival(user.id, request.data.characterId, request.data.noticeId);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type BookPassageActionResult = BookPassageResult | { error: string };
+
+/**
+ * Book and board one Milky Waymo passage (#404). The browser names only the
+ * check-in it is standing at; the server decides everything and this one
+ * confirmed command is the only thing that charges the fare.
+ */
+export async function bookPassageAction(input: unknown): Promise<BookPassageActionResult> {
+  const request = BookPassageRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid booking command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await bookPassage(user.id, request.data.characterId, {
+      localPlaceId: request.data.localPlaceId,
+    });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type PassengerArrivalAcknowledgmentActionResult =
+  | PassengerArrivalAcknowledgmentResult
+  | { error: string };
+
+/** Disembark: dismiss the durable passenger arrival notice (#404). Presentation only. */
+export async function acknowledgePassengerArrivalAction(
+  input: unknown,
+): Promise<PassengerArrivalAcknowledgmentActionResult> {
+  const request = AcknowledgePassengerArrivalRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid arrival acknowledgment." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acknowledgePassengerArrival(user.id, request.data.characterId);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

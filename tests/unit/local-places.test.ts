@@ -106,14 +106,17 @@ describe("issue #159 Local Place registry", () => {
     ]);
     // Holo Hollow Landing's Last Leg Trading (#357), Stillreach Landing
     // Station's fuel terminal (#375), Refiner-To-Go (#381) and the two FedHex
-    // pickups (#399) are the registry's places outside the settlement.
-    expect(places).toHaveLength(LOCAL_PLACES.length - 5);
+    // pickups (#399) and Milky Waymo's two check-ins (#404) are the registry's
+    // places outside the settlement.
+    expect(places).toHaveLength(LOCAL_PLACES.length - 7);
     const outside: Record<string, string> = {
       [LOCAL_PLACE_IDS.lastLegTrading]: LOCATION_IDS.holoHollowLanding,
       [LOCAL_PLACE_IDS.stillreachFuelTerminal]: LOCATION_IDS.stillreachLandingStation,
       [LOCAL_PLACE_IDS.stillreachRefinerToGo]: LOCATION_IDS.stillreachLandingStation,
       [LOCAL_PLACE_IDS.fedhexHoloHollowLanding]: LOCATION_IDS.holoHollowLanding,
       [LOCAL_PLACE_IDS.fedhexStillreachLandingStation]: LOCATION_IDS.stillreachLandingStation,
+      [LOCAL_PLACE_IDS.milkyWaymoHoloHollowLanding]: LOCATION_IDS.holoHollowLanding,
+      [LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation]: LOCATION_IDS.stillreachLandingStation,
     };
     for (const place of LOCAL_PLACES) {
       expect(place.parentLocationId).toBe(outside[place.id] ?? LOCATION_IDS.holoHollow);

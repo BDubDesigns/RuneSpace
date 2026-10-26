@@ -532,6 +532,54 @@ export const shipArrivalNotices = pgTable(
   ],
 );
 
+/**
+ * A character's one Milky Waymo passenger journey (#404): the ticket that is in
+ * the air now or the last one that landed, never a history.
+ *
+ * Deliberately not on `character_ships`: a passenger journey moves the character
+ * and nothing else, so it shares no row, no flight columns and no Rivet
+ * semantics with the ship. A booking replaces the row, so storage stays one row
+ * per character however often they ride.
+ *
+ * The journey is in the air while `landed_at` is null, and its recorded
+ * `started_at` and `arrives_at` are immutable absolute instants: they govern the
+ * countdown, the cinematic and the landing, never a client clock. Landing is
+ * committed once, lazily, in the transaction that moves the character, and stamps
+ * `landed_at` with the scheduled arrival instant, so a retried resolution cannot
+ * land twice. A landed row doubles as the durable arrival receipt until
+ * `acknowledged_at` records that the player disembarked; that is presentation
+ * only and changes nothing else. `fare_credits` is what this ticket actually
+ * charged, kept so the exactly-one-fare invariant is auditable if the fare ever
+ * changes.
+ */
+export const characterPassengerJourneys = pgTable(
+  "character_passenger_journeys",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    routeId: text("route_id").notNull(),
+    originLocationId: text("origin_location_id").notNull(),
+    destinationLocationId: text("destination_location_id").notNull(),
+    fareCredits: integer("fare_credits").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    arrivesAt: timestamp("arrives_at", { withTimezone: true }).notNull(),
+    landedAt: timestamp("landed_at", { withTimezone: true }),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  },
+  (table) => [
+    check(
+      "character_passenger_journeys_schedule",
+      sql`${table.arrivesAt} > ${table.startedAt} AND ${table.originLocationId} <> ${table.destinationLocationId} AND ${table.fareCredits} > 0`,
+    ),
+    // A receipt can only be dismissed once the journey has actually landed.
+    check(
+      "character_passenger_journeys_ack_after_landing",
+      sql`${table.acknowledgedAt} IS NULL OR ${table.landedAt} IS NOT NULL`,
+    ),
+  ],
+);
+
 /** Durable idempotency marker for the one-time Issue #18 starter loadout. */
 export const characterStarterProvisioning = pgTable("character_starter_provisioning", {
   characterId: text("character_id")
@@ -2579,6 +2627,7 @@ export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
 export type CharacterShip = typeof characterShips.$inferSelect;
 export type ShipArrivalNotice = typeof shipArrivalNotices.$inferSelect;
+export type CharacterPassengerJourney = typeof characterPassengerJourneys.$inferSelect;
 export type CharacterEchoHunt = typeof characterEchoHunts.$inferSelect;
 export type EchoReadingNotice = typeof echoReadingNotices.$inferSelect;
 export type CharacterMission = typeof characterMissions.$inferSelect;

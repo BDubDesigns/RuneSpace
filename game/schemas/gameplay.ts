@@ -95,6 +95,21 @@ export const AcknowledgeShipArrivalRequestSchema = z.object({
   noticeId: z.string().uuid(),
 });
 
+/**
+ * Booking Milky Waymo passage (#404) names only the check-in the player is
+ * standing at. The route, fare, duration and unlock are all resolved server-side;
+ * the destination is never a client value.
+ */
+export const BookPassageRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  localPlaceId: z.string().min(1).max(100),
+});
+
+/** Disembarking is presentation-only and idempotent (#404): it names only the character. */
+export const AcknowledgePassengerArrivalRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** The Power Annex command supplies only the owned character identity. */
 export const ClaimPowerCellsRequestSchema = z.object({
   characterId: z.string().uuid(),

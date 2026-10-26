@@ -10,12 +10,23 @@ export function isShipInFlight(state: Pick<PlayGameplayState, "ship">): boolean 
 }
 
 /**
- * Whether the character is between places for any reason: walking, riding, or
- * flying. Every surface that stands down while in transit asks this, so a
- * flight blocks the same things a Journey does.
+ * Whether a Milky Waymo shuttle is carrying the character (#404). Read from the
+ * server-projected journey, never from a client clock.
  */
-export function isPlayInTransit(state: Pick<PlayGameplayState, "ship" | "travelState">): boolean {
-  return Boolean(state.travelState) || isShipInFlight(state);
+export function isPassengerInTransit(state: Pick<PlayGameplayState, "passenger">): boolean {
+  return state.passenger.journey !== undefined;
+}
+
+/**
+ * Whether the character is between places for any reason: walking, riding,
+ * flying their own ship, or riding a passenger shuttle. Every surface that
+ * stands down while in transit asks this, so a flight or a shuttle journey
+ * blocks the same things a Journey does.
+ */
+export function isPlayInTransit(
+  state: Pick<PlayGameplayState, "ship" | "travelState" | "passenger">,
+): boolean {
+  return Boolean(state.travelState) || isShipInFlight(state) || isPassengerInTransit(state);
 }
 
 /** Fraction of the flight completed, 0..100, from the server's own recorded instants. */

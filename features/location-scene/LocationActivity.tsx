@@ -12,6 +12,7 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
+import { MilkyWaymoKiosk } from "@/features/passenger/MilkyWaymoKiosk";
 import { LastLegTerminal } from "@/features/trade/LastLegTerminal";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
@@ -52,7 +53,7 @@ export function LocationActivity({
   localPlaceId?: string;
 }) {
   const { state } = usePlay();
-  if (state.travelState || state.ship.flight) return null;
+  if (state.travelState || state.ship.flight || state.passenger.journey) return null;
 
   const locationId = state.location.currentLocationId;
   // Navigation state, validated exactly as the place surface validates it: a
@@ -81,6 +82,11 @@ export function LocationActivity({
       case LOCAL_PLACE_IDS.fedhexStillreachLandingStation:
         // Both FedHex pickups open the one character-owned mailbox (#399).
         return <FedhexMailbox localPlaceId={activePlace.id} />;
+      case LOCAL_PLACE_IDS.milkyWaymoHoloHollowLanding:
+      case LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation:
+        // Milky Waymo's passenger ticketing kiosk (#404): one booking
+        // implementation, opposite destinations.
+        return <MilkyWaymoKiosk localPlaceId={activePlace.id} />;
       case LOCAL_PLACE_IDS.hhBnb:
         return (
           <CurlyStashMountActivity repair={state.repairs[REPAIR_TARGET_IDS.curlyStashMount]} />

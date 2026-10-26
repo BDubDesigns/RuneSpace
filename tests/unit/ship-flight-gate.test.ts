@@ -42,6 +42,8 @@ describe("in-flight gate", () => {
     expect(optOuts()).toEqual([
       // A Seeker reading's result notice: dismissal only, nothing else changes (#393).
       "server/echo-hunt-commands.ts#acknowledgeEchoReading",
+      // Disembarking a Milky Waymo shuttle: dismissal only, the landing already stands (#404).
+      "server/passenger-commands.ts#acknowledgePassengerArrival",
       "server/play.ts#acknowledgeScavengeReveal",
       "server/play.ts#getPlayGameplayState",
       "server/ship-commands.ts#acknowledgeShipArrival",

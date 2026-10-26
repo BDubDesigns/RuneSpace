@@ -26,6 +26,7 @@ describe("issue #381 Refiner-To-Go", () => {
       LOCAL_PLACE_IDS.stillreachFuelTerminal,
       LOCAL_PLACE_IDS.stillreachRefinerToGo,
       LOCAL_PLACE_IDS.fedhexStillreachLandingStation,
+      LOCAL_PLACE_IDS.milkyWaymoStillreachLandingStation,
     ]);
     expect(getLocation(refiner().id)).toBeUndefined();
     expect(refiner().merchantId).toBeUndefined();

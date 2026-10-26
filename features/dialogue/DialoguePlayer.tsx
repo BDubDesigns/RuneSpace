@@ -9,8 +9,7 @@ import type { CreditsReceipt } from "@/game/domain/conversation";
 import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { creditsReceiptBeat, type PresentedDialogueBeat } from "./credits-receipt";
 import { DialogueScene } from "./DialogueScene";
-
-const CHARACTER_REVEAL_MS = 20;
+import { CHARACTER_REVEAL_MS } from "./typewriter";
 
 /**
  * Plays one authored dialogue sequence inside the NPC conversation surface.

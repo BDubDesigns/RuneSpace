@@ -173,6 +173,16 @@ export async function forceIdleResolvedAction(
     throw new Error("A ship in flight cannot be interrupted; it lands on its own schedule.");
   }
 
+  // A Milky Waymo journey (#404) is uninterruptible for the same reason: the
+  // fare, route and arrival are one immutable record, and deleting only the
+  // action row would strand the character mid-journey with the fare spent and
+  // nothing to land them. It lands on its own recorded schedule.
+  if (actionId === ACTION_IDS.passengerTravel) {
+    throw new Error(
+      "A passenger shuttle under way cannot be interrupted; it lands on its own schedule.",
+    );
+  }
+
   // Unsupported/unknown action id: FAIL CLOSED. #113 only knows how to clean
   // Mining / Refining / Welding / Travel safely. A future activity could add
   // activity-specific auxiliary persistence that this switch does not know how

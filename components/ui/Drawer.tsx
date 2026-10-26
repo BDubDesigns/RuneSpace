@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type MutableRefObject,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -86,6 +87,9 @@ export function Drawer({
   size = "default",
   dismissible = true,
   initialFocusRef,
+  variant = "default",
+  closeHandleRef,
+  describedById,
 }: {
   children: ReactNode;
   label: string;
@@ -97,6 +101,18 @@ export function Drawer({
   /** Some committed-result surfaces must be acknowledged before dismissal. */
   dismissible?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * `"vendor"` is for a business with its own skin (Milky Waymo's arrival, #404):
+   * the same portal, scrim, focus trap, Escape, outside-tap and fade, but no
+   * RuneSpace header or Close button and no RuneSpace panel chrome. The content
+   * brings its own look (`.rs-overlay-panel--vendor`) and its own controls, and
+   * reaches the one close path through `closeHandleRef`.
+   */
+  variant?: "default" | "vendor";
+  /** Filled with this Drawer's close(), so a control in the content dismisses exactly as Escape does. */
+  closeHandleRef?: MutableRefObject<(() => void) | null>;
+  /** The element whose text describes the dialog, for assistive technology. */
+  describedById?: string;
 }) {
   const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -169,11 +185,21 @@ export function Drawer({
     // Tab can never slip behind the still-visible backdrop.
     const active = document.activeElement;
     if (!(active instanceof Node && panel.current?.contains(active))) {
-      if (dismissible) closeButton.current?.focus();
+      if (dismissible && closeButton.current) closeButton.current.focus();
       else focusFirstAvailable();
     }
     setExiting(true);
   }
+
+  // The one close path, offered to the content of a vendor-skinned dialog.
+  useEffect(() => {
+    if (!closeHandleRef) return;
+    closeHandleRef.current = close;
+    return () => {
+      closeHandleRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
 
   // Move focus into the modal on open.
   useEffect(() => {
@@ -298,6 +324,11 @@ export function Drawer({
       ? "flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] flex-col sm:h-[min(calc(100dvh-2rem),52rem)]"
       : "max-h-[min(78dvh,42rem)]";
 
+  const vendor = variant === "vendor";
+  const panelChrome = vendor
+    ? "rs-overlay-panel--vendor"
+    : "border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)]";
+
   return createPortal(
     <div
       ref={backdrop}
@@ -307,32 +338,35 @@ export function Drawer({
     >
       <div className={`relative w-full ${frameSize}`}>
         <section
+          aria-describedby={describedById}
           aria-label={label}
           aria-modal="true"
-          className={`${panelAnim} w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${panelSize}`}
+          className={`${panelAnim} w-full overflow-y-auto ${panelChrome} sm:max-h-[calc(100dvh-2rem)] ${panelSize}`}
           onAnimationEnd={onPanelAnimationEnd}
           ref={panel}
           role="dialog"
           tabIndex={-1}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <SectionHeader eyebrow={eyebrow} headingClassName="truncate" level={2}>
-                {title}
-              </SectionHeader>
+          {vendor ? null : (
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <SectionHeader eyebrow={eyebrow} headingClassName="truncate" level={2}>
+                  {title}
+                </SectionHeader>
+              </div>
+              {dismissible ? (
+                <ActionButton
+                  ref={closeButton}
+                  aria-label={`Close ${label.toLowerCase()}`}
+                  className="shrink-0 px-3"
+                  intent="secondary"
+                  onClick={close}
+                >
+                  Close
+                </ActionButton>
+              ) : null}
             </div>
-            {dismissible ? (
-              <ActionButton
-                ref={closeButton}
-                aria-label={`Close ${label.toLowerCase()}`}
-                className="shrink-0 px-3"
-                intent="secondary"
-                onClick={close}
-              >
-                Close
-              </ActionButton>
-            ) : null}
-          </div>
+          )}
           {children}
         </section>
         <ScrollAffordanceOverlay affordances={scrollAffordances} className={panelAnim} />

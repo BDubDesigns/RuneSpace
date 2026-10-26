@@ -473,6 +473,18 @@ Miner's Gloves (approved 1254×1254 transparent RGBA masters, SHA-256 `dba7d2f2�
 `bb219b38…`) with the Wheel Assembly convention. Neither item carries a baked sparkle or sweep:
 the Legendary treatment is coded UI.
 
+Milky Waymo's art (#404) came from the owner's handoff ZIP and is kept unaltered,
+SHA-256 checked, in `assets/`: the two 2508×627 check-in panoramas
+(`milky-waymo-spaceport-check-in-master.png` for Skatboll's paved apron,
+`milky-waymo-outpost-under-aurora-skies-master.png` for Stillreach's bare soil with no
+pavement), the 1774×887 transparent passenger shuttle, and the owner's logo
+lockup and M/W mark (`assets/branding/`). `scripts/prepare-milky-waymo-art.mjs` downsamples
+each panorama whole to 1536×384 q80, applies the overlay recipe to the shuttle (trimmed
+on its alpha bounds, 0.75 scale, lossless alpha) and trims the logo's margin before
+restoring an even 8 px one. The kiosk is CSS around the approved logo; it has no
+illustration of its own. The shuttle is seated in the flight cinematic on the very
+reference box the Rivet's marks were measured from (`game/content/flight-cinematics.ts`).
+
 ## Signage and generated text
 
 Signs are useful environmental storytelling in RuneSpace.

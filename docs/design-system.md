@@ -586,6 +586,30 @@ its own unclipped `<form>` wrapper with the separate `--rs-glow-news-unread`
 attention token. It could adopt `.rs-control-halo` with its own `news-unread`
 tone without sharing Mission semantics, but has not been migrated.
 
+## Milky Waymo kiosk (Issue #404)
+
+A vendor-owned terminal with its own skin, like Last Leg's `.rs-terminal`, and the
+opposite of its palette: a rounded white cabinet with mild wear and a vivid blue
+touchscreen in the approved logo's colours, set in a corporate system sans
+(`.mw-kiosk` in `app/globals.css`). It deliberately does not use RuneSpace's dark
+cyan tokens, and its palette is fixed because the machine is the same in any theme.
+
+- **Colour.** Screen `#0a5fe8 → #0848c4`, labels `#e8f1ff`, body text white,
+  primary control white with `#0a47bd` text, cabinet text `#072a73`. Every pairing
+  clears WCAG AA against the surface it sits on. The approved logo is used as
+  delivered, blended onto the cabinet; it is never redrawn or recoloured.
+- **Typography.** System sans at heavy weights, with uppercase tracked labels for
+  fields and a large uppercase title per screen. Values never wrap (`white-space:
+  nowrap`); labels may.
+- **Controls.** 52 px minimum, real buttons, a 3 px white focus ring offset 4 px.
+  Each screen's title takes focus when it appears. Only the welcome line types
+  itself; fares, balances, controls and warnings appear immediately.
+- **Motion.** The status lamp's pulse and the button press are the only motion, and
+  both stop under `prefers-reduced-motion`. A typed line reserves its final height
+  (`.rs-typewriter`) so it never shoves controls down while it types.
+- **Cabin assistant.** The same blue screen in miniature (`.mw-cabin`) under the
+  flight chart and, inside the arrival modal, on the cabinet it sits in.
+
 ## Accessibility
 
 Controls use a 44px practical minimum target and visible `:focus-visible` ring. A beveled control (`.rs-bevel` + `.rs-focus`: `ActionButton`, `ActionLink`, their Mission variants, form fields, footer destinations) would clip an outside ring, so one shared rule in `app/globals.css` draws its ring inside instead, inset by `--rs-bevel-focus-inset` so the ring clears the chamfer and sits apart from a Mission-guided control's inset green/blue ring — focus and Mission guidance stay two separate marks. Pointer focus shows no ring. Prove focus paints with rendered pixels (`expectKeyboardFocusRingPaints` in `tests/e2e/fixtures.ts`), not `getComputedStyle()`, which reports the clipped outline as present. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.

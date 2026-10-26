@@ -109,6 +109,13 @@ export const LocalPlaceDefinitionSchema = z
      * place authors only this marker; parcels live on the character, not here.
      */
     fedhexMailbox: z.literal(true).optional(),
+    /**
+     * Marks this place as a Milky Waymo check-in (#404): its interior hosts the
+     * passenger ticketing kiosk. Both check-ins share one booking implementation;
+     * the place authors only this marker, and the route it books is the one
+     * departing its parent hub (`game/content/passenger-routes`).
+     */
+    passengerCheckIn: z.literal(true).optional(),
     presentation: z
       .object({
         scene: LocalPlaceSceneSchema,
