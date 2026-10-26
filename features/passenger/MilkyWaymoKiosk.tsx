@@ -293,7 +293,9 @@ function WelcomeScreen({
           {destinationName}
         </p>
         {destinationPlanetName ? (
-          <p className="mw-kiosk__eyebrow" data-kiosk-planet>{destinationPlanetName}</p>
+          <p className="mw-kiosk__eyebrow" data-kiosk-planet>
+            {destinationPlanetName}
+          </p>
         ) : null}
       </div>
       <dl className="mw-kiosk__facts">
@@ -363,7 +365,9 @@ function ConfirmScreen({
           {destinationName}
         </p>
         {destinationPlanetName ? (
-          <p className="mw-kiosk__eyebrow" data-kiosk-planet>{destinationPlanetName}</p>
+          <p className="mw-kiosk__eyebrow" data-kiosk-planet>
+            {destinationPlanetName}
+          </p>
         ) : null}
       </div>
       <dl className="mw-kiosk__facts mw-kiosk__facts--pair">
