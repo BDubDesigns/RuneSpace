@@ -15,7 +15,8 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
+import { areLocationsAdjacent, getLocation, getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 import { beginTravelAction } from "@/server/actions";
 import { travelErrorMessage } from "./travel-errors";
 import { usePlay } from "@/features/play/PlayContext";
@@ -522,6 +523,18 @@ export function LocalMapPanel({
   // The map is the character's own planet's: derived from the authoritative
   // current location, so a Journey (which never changes planet) keeps its map.
   const mapGeometry = getLocalMapGeometryForLocation(currentLocationId);
+  // Planet identity in the map heading (#402): the planet's display name from
+  // its presentation, plus the region designation where the current location
+  // authors one (Skatboll's Holo Hollow Region; Stillreach authors none, so
+  // its heading is the planet name alone). Derived from the registry, never
+  // restated, so the heading cannot drift from the map it labels.
+  const mapPlanetId = getLocationPlanetId(currentLocationId);
+  const mapHeading = [
+    mapPlanetId ? getPlanetPresentation(mapPlanetId).displayName : undefined,
+    getLocation(currentLocationId)?.region === "holo_hollow" ? "Holo Hollow Region" : undefined,
+  ]
+    .filter(Boolean)
+    .join(" — ");
   // Accepted Missions only: available offers never reach the map.
   const missionTargets = derivePinnedGuidanceTargets(state);
   const travel = state.travelState;
@@ -666,7 +679,7 @@ export function LocalMapPanel({
   return (
     <Panel tone="raised" onKeyDown={clearSelectionOnEscape}>
       <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Local area">Map</SectionHeader>
+        <SectionHeader eyebrow={mapHeading || "Local area"}>Map</SectionHeader>
         {onBack ? (
           <ActionButton className="shrink-0 px-3" intent="secondary" onClick={onBack}>
             {mapReturnLabel(inTransit)}

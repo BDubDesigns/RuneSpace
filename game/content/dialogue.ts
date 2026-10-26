@@ -1241,6 +1241,29 @@ const dialogue = {
       wadeLocal(EXPRESSION_IDS.scowl, "No."),
     ],
   },
+  // Skatboll planet identity (#402): Wade's version is about the work, not
+  // the town — a wreck falls where it falls, and that ground is Skatboll.
+  [DIALOGUE_IDS.wadeSkatbollTopic]: {
+    id: DIALOGUE_IDS.wadeSkatbollTopic,
+    npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190), same as his other
+    // replayable topics.
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Holo Hollow's a town. Skatboll's the planet. Mix those up and your errand looks a lot shorter than it is.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "A wreck doesn't care what town it's near. It fell where it fell, and that's where I go.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Holo Hollow's where you go for parts. Tell me where the wreck is if you want the damn thing fixed.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.tansyMiningTopic]: {
     id: DIALOGUE_IDS.tansyMiningTopic,
     npcId: NPC_IDS.tansyRusk,
@@ -1385,6 +1408,40 @@ const dialogue = {
       bixLocal(EXPRESSION_IDS.neutral, "Mining kept the place going."),
       bixLocal(EXPRESSION_IDS.amused, "Sort of."),
       bixLocal(EXPRESSION_IDS.neutral, "Still here, though."),
+    ],
+  },
+  // Skatboll planet identity (#402): Bix's version is the shopkeeper's — the
+  // tourists thought one street was the whole planet, and he sold them the
+  // souvenirs to prove it. Distinct from Toll's shipping-label version.
+  [DIALOGUE_IDS.bixSkatbollTopic]: {
+    id: DIALOGUE_IDS.bixSkatbollTopic,
+    npcId: NPC_IDS.bixWeller,
+    beats: [
+      bixLocal(EXPRESSION_IDS.neutral, "Tourists used to go home saying they'd seen Skatboll."),
+      bixLocal(EXPRESSION_IDS.amused, "They'd seen one street. One shop. Mine, if I was lucky."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Holo Hollow's the town. Skatboll's the planet it's sitting on — and the rest of it never bought a souvenir.",
+      ),
+    ],
+  },
+  // Skatboll planet identity (#402): Renn's quiet correction, in his own
+  // register — a town is not a planet, no matter how hard it talks about
+  // itself. Says nothing about his own standing at the Center, which canon
+  // leaves deliberately unresolved.
+  [DIALOGUE_IDS.rennSkatbollTopic]: {
+    id: DIALOGUE_IDS.rennSkatbollTopic,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "People talk about Holo Hollow like it's the whole world."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "It's one town. The planet is Skatboll, and Skatboll gets along fine without asking our opinion.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Knowing which one you're standing in doesn't fix anything. It just stops you lying to yourself about the size of it.",
+      ),
     ],
   },
   [DIALOGUE_IDS.rennAssistanceCenterTopic]: {

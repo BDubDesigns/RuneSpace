@@ -321,6 +321,7 @@ reuses a Mission-owned sequence.
 | --- | --- | --- |
 | Wade Rusk | Recovery work | always |
 | Wade Rusk | Stash mounts | after **Hold It Together** is completed |
+| Wade Rusk | Skatboll | always |
 | Tansy Rusk | Mining | always |
 | Tansy Rusk | Beyond Holo Hollow | after **Hold It Together** is completed |
 
@@ -329,11 +330,13 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Bix Weller | The shop | always |
 | Bix Weller | Power Cells | always |
 | Bix Weller | Holo Hollow | always |
+| Bix Weller | Skatboll | always |
 | Mara Kells | The B&B | always |
 | Mara Kells | Bix | always |
 | Renn Calder | The Assistance Center | always |
 | Renn Calder | Ferrite | always |
 | Renn Calder | Life here | always |
+| Renn Calder | Skatboll | always |
 | Curly | Seeing the Worlds | always |
 | Curly | Back Home | after **Curly Must-Stash** is completed |
 | Toll Kade | Skatboll | always |
@@ -382,6 +385,15 @@ Renn has no merchant function. He is no longer social-only: #172 gave him
 His three topics remain ordinary replayable conversation and still carry no
 Mission command — the Mission is resolved by Mission content, not by the topic
 hub, exactly as for every other NPC.
+
+The Skatboll topics (#402) give the same planet/town fact three different
+speakers' angles instead of repeating Toll's shipping-label line: Bix's
+tourists thought one street was the whole planet, Renn's quiet correction is
+that a town is not a planet no matter how hard it talks about itself, and
+Wade's is that recovery work needs the wreck's actual location, not a town/planet mix-up.
+Each is `always`, carries no Mission or Trade action, and adds no new place,
+mechanic, or canon fact — in particular Renn's says nothing about his own
+standing at the Assistance Center, which Canon leaves deliberately unresolved.
 
 Toll Kade (#357) works inside the Last Leg Trading Local Place at Holo Hollow
 Landing, so his three topics are listed for anyone standing in that shop, on

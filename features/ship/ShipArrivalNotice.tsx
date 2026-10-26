@@ -5,11 +5,18 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { usePlay } from "@/features/play/PlayContext";
+import { getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 import { acknowledgeShipArrivalAction } from "@/server/actions";
 
 /**
  * The durable landing notice (#358): "Flight complete — Arrived at <place>" and,
- * when the landing earned it, "Mission Complete: <title>".
+ * when the landing earned it, "Mission Complete: <title>". Since #402 the
+ * title also names the planet ("Arrived at <place> · <planet>"), so a return
+ * from Stillreach reads as an arrival on Skatboll at Holo Hollow Landing —
+ * the same "destination · planet" convention as the star chart's readout.
+ * The planet comes from the destination location's registry membership, so
+ * the notice needs no new server field.
  *
  * It is a stored receipt, not a toast: it is part of the authoritative Play
  * state, so it is still here after closing the browser, a dropped connection or
@@ -27,6 +34,10 @@ export function ShipArrivalNotice() {
 
   if (!notice) return null;
   const noticeId = notice.noticeId;
+  const noticePlanetId = getLocationPlanetId(notice.destinationLocationId);
+  const noticePlanetName = noticePlanetId
+    ? getPlanetPresentation(noticePlanetId).displayName
+    : undefined;
 
   function dismiss() {
     if (dismissing) return;
@@ -63,6 +74,7 @@ export function ShipArrivalNotice() {
     >
       <p className="font-display text-lg font-bold tracking-wide" data-ship-arrival-title>
         Flight complete — Arrived at {notice.destinationName}
+        {noticePlanetName ? ` · ${noticePlanetName}` : null}
       </p>
       {notice.completedMissionTitle ? (
         <p

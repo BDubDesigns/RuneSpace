@@ -142,6 +142,8 @@ describe("ShipFlightControls", () => {
     setState({ fuelUnits: 40, routes: [route] });
     const markup = render(() => React.createElement(ShipFlightControls));
     expect(markup).toContain("Holo Hollow Landing");
+    // #402: the launch card names the destination's planet, like the readout.
+    expect(markup).toMatch(/Holo Hollow Landing<span[^>]*> · Skatboll<\/span>/);
     expect(markup).toContain("10 FU");
     expect(markup).toContain("40 / 300 FU");
     expect(markup).toContain("30 / 300 FU");
@@ -195,7 +197,8 @@ describe("ShipArrivalNotice", () => {
       },
     });
     const markup = render(() => React.createElement(ShipArrivalNotice));
-    expect(markup).toContain("Flight complete — Arrived at Holo Hollow Landing");
+    // #402: the arrival names planet and landing site together.
+    expect(markup).toContain("Flight complete — Arrived at Holo Hollow Landing · Skatboll");
     expect(markup).toContain("Mission Complete: Move Along");
     expect(markup).toContain("DISMISS");
     expect(markup).not.toMatch(/reward|Wade|portrait|toast/i);
@@ -235,6 +238,8 @@ describe("FlightPanel", () => {
     const markup = render(() => React.createElement(FlightPanel));
     expect(markup).toContain("data-flight-surface");
     expect(markup).toContain("Holo Hollow Landing");
+    // #402: the in-flight route line names the destination's planet too.
+    expect(markup).toMatch(/Holo Hollow Landing<\/strong> · Skatboll/);
     expect(markup).toContain("MINIMIZE");
     expect(markup).toMatch(/\d+ seconds? remaining/);
     // No cancel, abort or refund control: the only button is Minimize.

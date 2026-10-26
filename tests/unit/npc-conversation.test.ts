@@ -448,6 +448,7 @@ describe("issue #164 replayable social topics", () => {
       "Recovery work",
       "Stash mounts",
       "ForceSales",
+      "Skatboll",
     ]);
     expect(getNpcConversationTopics(NPC_IDS.tansyRusk).map((topic) => topic.label)).toEqual([
       "Mining",
@@ -504,7 +505,12 @@ describe("issue #164 replayable social topics", () => {
         nextObjectiveKind: "repair_target_complete",
       }),
     ]);
-    expect(before.map((entry) => entry.id)).toEqual([CONVERSATION_TOPIC_IDS.wadeRecoveryWork]);
+    // Skatboll (#402) is always available, so it is present both before and
+    // after Hold It Together; only Stash mounts is gated on it.
+    expect(before.map((entry) => entry.id)).toEqual([
+      CONVERSATION_TOPIC_IDS.wadeRecoveryWork,
+      CONVERSATION_TOPIC_IDS.wadeSkatboll,
+    ]);
 
     const after = topicEntries(NPC_IDS.wadeRusk, [
       wio("completed"),
@@ -515,6 +521,7 @@ describe("issue #164 replayable social topics", () => {
     expect(after.map((entry) => entry.id)).toEqual([
       CONVERSATION_TOPIC_IDS.wadeRecoveryWork,
       CONVERSATION_TOPIC_IDS.wadeStashMounts,
+      CONVERSATION_TOPIC_IDS.wadeSkatboll,
     ]);
 
     const sequence = getDialogue(DIALOGUE_IDS.wadeStashMountsTopic);
@@ -533,6 +540,31 @@ describe("issue #164 replayable social topics", () => {
     );
     expect(sequence?.beats[0]?.text).toMatch(/^You know what wastes more time/);
     expect(sequence?.beats.at(-1)?.text).toBe("I fix machinery. Not geography.");
+  });
+
+  it("offers Skatboll planet-identity topics for Bix, Renn and Wade, always", () => {
+    // #402: one short subject each, in the speaker's own register, each
+    // naming Skatboll as the planet and Holo Hollow as the town — without
+    // repeating Toll's shipping-label line or adding new lore.
+    const cases = [
+      [NPC_IDS.bixWeller, CONVERSATION_TOPIC_IDS.bixSkatboll, DIALOGUE_IDS.bixSkatbollTopic],
+      [NPC_IDS.rennCalder, CONVERSATION_TOPIC_IDS.rennSkatboll, DIALOGUE_IDS.rennSkatbollTopic],
+      [NPC_IDS.wadeRusk, CONVERSATION_TOPIC_IDS.wadeSkatboll, DIALOGUE_IDS.wadeSkatbollTopic],
+    ] as const;
+    for (const [npcId, topicId, dialogueId] of cases) {
+      const topic = getNpcConversationTopics(npcId).find((candidate) => candidate.id === topicId);
+      expect(topic?.label).toBe("Skatboll");
+      expect(topic?.availability).toEqual({ kind: "always" });
+      const sequence = getDialogue(dialogueId);
+      expect(sequence?.npcId).toBe(npcId);
+      expect(sequence?.beats.length).toBeGreaterThan(0);
+      const text = sequence?.beats.map((beat) => beat.text).join(" ") ?? "";
+      expect(text).toContain("Skatboll");
+      expect(text).toContain("Holo Hollow");
+      expect(text).not.toContain("shipping label");
+    }
+    // Wade's moves with him, like his other replayable topics.
+    expect(getDialogue(DIALOGUE_IDS.wadeSkatbollTopic)?.presentsAtCurrentVenue).toBe(true);
   });
 
   it("seeds Tansy's arc with the approved Beyond Holo Hollow beats", () => {

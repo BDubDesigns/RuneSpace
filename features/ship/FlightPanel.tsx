@@ -8,7 +8,8 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { usePlay } from "@/features/play/PlayContext";
 import { FlightCinematic } from "@/features/ship/FlightCinematic";
 import { flightCountdown, flightProgressPercent } from "@/features/ship/flight";
-import { getLocation } from "@/game/content/locations";
+import { getLocation, getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 
 /**
  * The Rivet in flight (#358): an authoritative countdown, led by the flight
@@ -40,6 +41,12 @@ export function FlightPanel() {
   if (!flight) return null;
 
   const origin = getLocation(flight.originLocationId)?.displayName ?? "origin";
+  // Destination planet (#402), same "destination · planet" convention as the
+  // star chart readout and the arrival notice, derived from the registry.
+  const destinationPlanetId = getLocationPlanetId(flight.destinationLocationId);
+  const destinationPlanetName = destinationPlanetId
+    ? getPlanetPresentation(destinationPlanetId).displayName
+    : undefined;
   const { remainingSeconds, arrivalPending } = flightCountdown(flight, now);
   const remaining = arrivalPending
     ? "Touchdown pending. Waiting for confirmation."
@@ -54,7 +61,8 @@ export function FlightPanel() {
         tone="raised"
       >
         <p className="text-sm text-[color:var(--rs-text-primary)]" data-flight-remaining>
-          In flight to <strong>{flight.destinationName}</strong> — {remaining}
+          In flight to <strong>{flight.destinationName}</strong>
+          {destinationPlanetName ? ` · ${destinationPlanetName}` : null} — {remaining}
         </p>
         <ActionButton data-flight-reopen intent="secondary" onClick={() => setMinimized(false)}>
           OPEN FLIGHT
@@ -76,7 +84,8 @@ export function FlightPanel() {
       </div>
       <p className="mt-4 text-sm text-[color:var(--rs-text-primary)]" data-flight-route>
         Flying the Rivet Utility Shuttle from <strong>{origin}</strong> to{" "}
-        <strong>{flight.destinationName}</strong>.
+        <strong>{flight.destinationName}</strong>
+        {destinationPlanetName ? ` · ${destinationPlanetName}` : null}.
       </p>
       <div className="mt-4" data-flight-progress>
         <StatusMeter

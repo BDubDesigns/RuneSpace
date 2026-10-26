@@ -156,6 +156,7 @@ test("books and rides Skatboll to Stillreach: kiosk, confirmation, shuttle, cabi
   await expect(kiosk.locator("[data-kiosk-duration]")).toHaveText("3 minutes");
   await expect(kiosk.locator("[data-kiosk-credits]")).toHaveText("1,000 CR");
   await expect(kiosk.locator("[data-kiosk-destination]")).toHaveText("Stillreach Landing Station");
+  await expect(kiosk.locator("[data-kiosk-planet]")).toHaveText("Stillreach");
   await expect(kiosk.locator("[data-kiosk-belongings]")).toHaveText(
     "Your carried belongings and equipment travel with you. Your personal ship and its cargo remain where you left them.",
   );
@@ -303,6 +304,7 @@ test("books and rides Skatboll to Stillreach: kiosk, confirmation, shuttle, cabi
   // Stillreach's own desk now sells the way home, for the same fare.
   await enterDesk(page, STILLREACH_DESK);
   await expect(page.locator(`${KIOSK} [data-kiosk-destination]`)).toHaveText("Holo Hollow Landing");
+  await expect(page.locator(`${KIOSK} [data-kiosk-planet]`)).toHaveText("Skatboll");
   await expect(page.locator(`${KIOSK} [data-kiosk-credits]`)).toHaveText("800 CR");
 });
 
@@ -594,6 +596,9 @@ for (const [method, viewport] of [
     await expect(modal).toBeVisible({ timeout: 30_000 });
     await expect(modal).toHaveAttribute("aria-modal", "true");
     await expect(modal.locator("[data-cabin-title]")).toHaveText("Milky Waymo — Cabin Assistant");
+    await expect(modal.locator("[data-passenger-arrival-planet]")).toHaveText(
+      "Stillreach Landing Station · Stillreach",
+    );
     await expect(modal.getByRole("img", { name: "Milky Waymo" })).toBeVisible();
     const backdrop = page.locator('[role="presentation"].rs-overlay-backdrop');
     await expect(backdrop).toBeVisible();

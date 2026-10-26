@@ -492,7 +492,9 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   // Talk stays the canonical conversation hub and carries no merchant command.
   const conversation = await openNpcConversation(page, "Bix Weller");
   const topics = conversation.locator('[data-conversation-section="topics"]').getByRole("button");
-  await expect(topics).toHaveCount(3);
+  // #402 adds Bix's replayable Skatboll topic to the original three.
+  await expect(topics).toHaveCount(4);
+  await expect(topics.getByText("Skatboll", { exact: true })).toBeVisible();
   await topics.first().click();
   await expect(conversation.locator("[data-dialogue-scene-location]")).toHaveText(
     "HOLO HOLLOW SOUVENIRS + MINING SUPPLIES",

@@ -6,6 +6,8 @@ import { Drawer } from "@/components/ui/Drawer";
 import { TypewriterText } from "@/features/dialogue/TypewriterText";
 import { usePlay } from "@/features/play/PlayContext";
 import { cabinArrivalAnnouncement } from "@/game/content/cabin-announcements";
+import { getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 import { acknowledgePassengerArrivalAction } from "@/server/actions";
 
 /**
@@ -44,6 +46,10 @@ export function PassengerArrivalModal() {
   useEffect(() => setMounted(true), []);
 
   if (!mounted || !notice) return null;
+  const destinationPlanetId = getLocationPlanetId(notice.destinationLocationId);
+  const destinationPlanetName = destinationPlanetId
+    ? getPlanetPresentation(destinationPlanetId).displayName
+    : undefined;
 
   function acknowledge() {
     enqueueForeground(() => {
@@ -92,6 +98,11 @@ export function PassengerArrivalModal() {
           <p className="mw-kiosk__tagline">Interplanetary Passenger Services</p>
         </header>
         <div className="mw-modal__screen">
+          {destinationPlanetName ? (
+            <p className="mw-kiosk__eyebrow" data-passenger-arrival-planet>
+              {notice.destinationName} · {destinationPlanetName}
+            </p>
+          ) : null}
           <h2 className="mw-kiosk__eyebrow" data-cabin-title>
             Milky Waymo — Cabin Assistant
           </h2>
