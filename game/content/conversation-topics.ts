@@ -109,6 +109,14 @@ export const CONVERSATION_TOPICS = [
     availability: { kind: "always" },
   },
   {
+    // #402: the planet, from the shopkeeper's side of the counter.
+    id: CONVERSATION_TOPIC_IDS.bixSkatboll,
+    npcId: NPC_IDS.bixWeller,
+    label: "Skatboll",
+    dialogueId: DIALOGUE_IDS.bixSkatbollTopic,
+    availability: { kind: "always" },
+  },
+  {
     // Mara is reachable only inside HH B&B, which Keep the Change opens, so the
     // Local Place access rule is the single gate — her topics add no second
     // condition that could leave her present with nothing to say.
@@ -147,6 +155,14 @@ export const CONVERSATION_TOPICS = [
     availability: { kind: "always" },
   },
   {
+    // #402: the planet, as Renn's quiet correction of the town's self-mythology.
+    id: CONVERSATION_TOPIC_IDS.rennSkatboll,
+    npcId: NPC_IDS.rennCalder,
+    label: "Skatboll",
+    dialogueId: DIALOGUE_IDS.rennSkatbollTopic,
+    availability: { kind: "always" },
+  },
+  {
     // #217: visible once Work Orders' ForceSales Free refresh is unlocked
     // (board unlock + Refining 5), read from the already-authoritative
     // server-computed projection rather than re-deriving either condition.
@@ -155,6 +171,14 @@ export const CONVERSATION_TOPICS = [
     label: "ForceSales",
     dialogueId: DIALOGUE_IDS.wadeForceSalesTopic,
     availability: { kind: "work_orders_refresh_unlocked" },
+  },
+  {
+    // #402: the planet, from the recovery yard — a wreck falls where it falls.
+    id: CONVERSATION_TOPIC_IDS.wadeSkatboll,
+    npcId: NPC_IDS.wadeRusk,
+    label: "Skatboll",
+    dialogueId: DIALOGUE_IDS.wadeSkatbollTopic,
+    availability: { kind: "always" },
   },
   {
     // Curly (#292) is reachable exactly when HH B&B is, like Mara, so his

@@ -350,7 +350,7 @@ test("plays Move Along: the automatic start, fuelling from both sources, the fir
   const notice = page.locator(NOTICE);
   await expect(notice).toBeVisible({ timeout: 45_000 });
   await expect(notice.locator("[data-ship-arrival-title]")).toHaveText(
-    "Flight complete — Arrived at Holo Hollow Landing",
+    "Flight complete — Arrived at Holo Hollow Landing · Skatboll",
   );
   await expect(notice.locator("[data-ship-arrival-mission]")).toHaveText(
     "Mission Complete: Move Along",

@@ -338,15 +338,19 @@ const dialogueIds = {
   // ForceSales: available once the board is unlocked and Refining 5 exposes
   // the daily refresh (#217).
   wadeForceSalesTopic: asContentId("wade_rusk_topic_force_sales"),
+  wadeSkatbollTopic: asContentId("wade_rusk_topic_skatboll"),
   tansyMiningTopic: asContentId("tansy_rusk_topic_mining"),
   tansyBeyondHoloHollowTopic: asContentId("tansy_rusk_topic_beyond_holo_hollow"),
   // Holo Hollow foundation topics (#159).
   bixTheShopTopic: asContentId("bix_weller_topic_the_shop"),
   bixPowerCellsTopic: asContentId("bix_weller_topic_power_cells"),
   bixHoloHollowTopic: asContentId("bix_weller_topic_holo_hollow"),
+  // Skatboll planet-identity topics (#402).
+  bixSkatbollTopic: asContentId("bix_weller_topic_skatboll"),
   rennAssistanceCenterTopic: asContentId("renn_calder_topic_assistance_center"),
   rennFerriteTopic: asContentId("renn_calder_topic_ferrite"),
   rennLifeHereTopic: asContentId("renn_calder_topic_life_here"),
+  rennSkatbollTopic: asContentId("renn_calder_topic_skatboll"),
   // Mara's own replayable topics, reachable once Keep the Change unlocks HH B&B
   // (#170). Her Bix-shop appearance is authored Mission dialogue, not a topic.
   maraTheBnbTopic: asContentId("mara_kells_topic_the_bnb"),
@@ -418,14 +422,17 @@ const conversationTopicIds = {
   wadeRecoveryWork: asContentId("wade_rusk_recovery_work"),
   wadeStashMounts: asContentId("wade_rusk_stash_mounts"),
   wadeForceSales: asContentId("wade_rusk_force_sales"),
+  wadeSkatboll: asContentId("wade_rusk_skatboll"),
   tansyMining: asContentId("tansy_rusk_mining"),
   tansyBeyondHoloHollow: asContentId("tansy_rusk_beyond_holo_hollow"),
   bixTheShop: asContentId("bix_weller_the_shop"),
   bixPowerCells: asContentId("bix_weller_power_cells"),
   bixHoloHollow: asContentId("bix_weller_holo_hollow"),
+  bixSkatboll: asContentId("bix_weller_skatboll"),
   rennAssistanceCenter: asContentId("renn_calder_assistance_center"),
   rennFerrite: asContentId("renn_calder_ferrite"),
   rennLifeHere: asContentId("renn_calder_life_here"),
+  rennSkatboll: asContentId("renn_calder_skatboll"),
   maraTheBnb: asContentId("mara_kells_the_bnb"),
   maraBix: asContentId("mara_kells_bix"),
   curlySeeingTheWorlds: asContentId("curly_seeing_the_worlds"),

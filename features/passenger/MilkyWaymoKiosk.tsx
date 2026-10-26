@@ -9,7 +9,8 @@ import {
   waitForFlightVisuals,
   warmFlightCinematic,
 } from "@/features/ship/flight-cinematic-images";
-import { getLocation } from "@/game/content/locations";
+import { getLocation, getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 import { PASSENGER_KIOSK_COPY as COPY } from "@/game/content/passenger-kiosk";
 import { passengerRouteFrom } from "@/game/content/passenger-routes";
 import { bookPassageAction } from "@/server/actions";
@@ -93,6 +94,10 @@ export function MilkyWaymoKiosk({ localPlaceId }: { localPlaceId: string }) {
   const routeIdentity = route.id;
   const destinationName =
     getLocation(route.destinationLocationId)?.displayName ?? route.destinationLocationId;
+  const destinationPlanetId = getLocationPlanetId(route.destinationLocationId);
+  const destinationPlanetName = destinationPlanetId
+    ? getPlanetPresentation(destinationPlanetId).displayName
+    : undefined;
   const { fareCredits, durationMs, unlocked } = state.passenger;
   const duration = passengerDurationLabel(durationMs);
   const credits = state.credits;
@@ -187,6 +192,7 @@ export function MilkyWaymoKiosk({ localPlaceId }: { localPlaceId: string }) {
                 boarding={boarding}
                 busy={busy}
                 destinationName={destinationName}
+                destinationPlanetName={destinationPlanetName}
                 duration={duration}
                 fareCredits={fareCredits}
                 feedback={feedback}
@@ -207,6 +213,7 @@ export function MilkyWaymoKiosk({ localPlaceId }: { localPlaceId: string }) {
                 busy={busy}
                 credits={credits}
                 destinationName={destinationName}
+                destinationPlanetName={destinationPlanetName}
                 duration={duration}
                 fareCredits={fareCredits}
                 onBook={() => showScreen(credits >= fareCredits ? "confirm" : "insufficient")}
@@ -258,6 +265,7 @@ function WelcomeScreen({
   busy,
   credits,
   destinationName,
+  destinationPlanetName,
   duration,
   fareCredits,
   onBook,
@@ -266,6 +274,7 @@ function WelcomeScreen({
   busy: boolean;
   credits: number;
   destinationName: string;
+  destinationPlanetName: string | undefined;
   duration: string;
   fareCredits: number;
   onBook: () => void;
@@ -283,6 +292,11 @@ function WelcomeScreen({
         <p className="mw-kiosk__destination-name" data-kiosk-destination>
           {destinationName}
         </p>
+        {destinationPlanetName ? (
+          <p className="mw-kiosk__eyebrow" data-kiosk-planet>
+            {destinationPlanetName}
+          </p>
+        ) : null}
       </div>
       <dl className="mw-kiosk__facts">
         <div className="mw-kiosk__fact">
@@ -320,6 +334,7 @@ function ConfirmScreen({
   boarding,
   busy,
   destinationName,
+  destinationPlanetName,
   duration,
   fareCredits,
   feedback,
@@ -331,6 +346,7 @@ function ConfirmScreen({
   boarding: boolean;
   busy: boolean;
   destinationName: string;
+  destinationPlanetName: string | undefined;
   duration: string;
   fareCredits: number;
   feedback: string | undefined;
@@ -348,6 +364,11 @@ function ConfirmScreen({
         <p className="mw-kiosk__destination-name" data-kiosk-destination>
           {destinationName}
         </p>
+        {destinationPlanetName ? (
+          <p className="mw-kiosk__eyebrow" data-kiosk-planet>
+            {destinationPlanetName}
+          </p>
+        ) : null}
       </div>
       <dl className="mw-kiosk__facts mw-kiosk__facts--pair">
         <div className="mw-kiosk__fact">

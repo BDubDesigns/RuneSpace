@@ -8,7 +8,8 @@ import { usePlay } from "@/features/play/PlayContext";
 import { CabinAssistant } from "@/features/passenger/CabinAssistant";
 import { FlightCinematic } from "@/features/ship/FlightCinematic";
 import { flightCountdown, flightProgressPercent } from "@/features/ship/flight";
-import { getLocation } from "@/game/content/locations";
+import { getLocation, getLocationPlanetId } from "@/game/content/locations";
+import { getPlanetPresentation } from "@/game/content/planets";
 
 /**
  * A Milky Waymo passenger journey in the air (#404): the existing interplanetary
@@ -40,6 +41,10 @@ export function PassengerJourneyPanel() {
   if (!journey) return null;
 
   const origin = getLocation(journey.originLocationId)?.displayName ?? "origin";
+  const destinationPlanetId = getLocationPlanetId(journey.destinationLocationId);
+  const destinationPlanetName = destinationPlanetId
+    ? getPlanetPresentation(destinationPlanetId).displayName
+    : undefined;
   const { remainingSeconds, arrivalPending } = flightCountdown(journey, now);
   const remaining = arrivalPending
     ? "Arrival pending. Waiting for confirmation."
@@ -63,7 +68,8 @@ export function PassengerJourneyPanel() {
       )}
       <p className="mt-4 text-sm text-[color:var(--rs-text-primary)]" data-passenger-route>
         Riding the Milky Waymo shuttle from <strong>{origin}</strong> to{" "}
-        <strong>{journey.destinationName}</strong>.
+        <strong>{journey.destinationName}</strong>
+        {destinationPlanetName ? ` · ${destinationPlanetName}` : null}.
       </p>
       <div className="mt-4" data-passenger-progress>
         <StatusMeter

@@ -168,7 +168,12 @@ type LaunchProps = {
   onLaunch: (routeId: string) => void;
 };
 
-/** The launch card for a hop on one planet (#358): unchanged by the star chart. */
+/**
+ * The launch card for a hop on one planet (#358): unchanged by the star chart,
+ * except that since #402 its destination line names the planet too — the same
+ * "destination · planet" convention as the star chart readout, so a hop's
+ * destination never reads as a planet name on its own.
+ */
 function LocalRouteCard({
   route,
   ship,
@@ -177,6 +182,10 @@ function LocalRouteCard({
   foregroundBusy,
   onLaunch,
 }: LaunchProps & { route: ShipRouteProjection; ship: ShipProjection }) {
+  const destinationPlanetId = getLocationPlanetId(route.destinationLocationId);
+  const destinationPlanetName = destinationPlanetId
+    ? getPlanetPresentation(destinationPlanetId).displayName
+    : undefined;
   return (
     <div
       className="space-y-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
@@ -186,6 +195,11 @@ function LocalRouteCard({
         <dt className="text-[color:var(--rs-text-muted)]">Destination</dt>
         <dd className="font-semibold text-[color:var(--rs-text-primary)]">
           {route.destinationName}
+          {destinationPlanetName ? (
+            <span className="font-normal text-[color:var(--rs-text-secondary)]">
+              {` · ${destinationPlanetName}`}
+            </span>
+          ) : null}
         </dd>
         <dt className="text-[color:var(--rs-text-muted)]">Fuel cost</dt>
         <dd data-ship-route-cost>{route.fuelCostFuelUnits} FU</dd>
