@@ -481,7 +481,12 @@ export async function openConversationEntry(
   const entry = conversation.getByRole("button", { name: entryName });
   // The Wise Old Enby groups their replayable topics under one Conversation
   // Topics button (#406); open that list when the entry is not on the hub.
-  if ((await entry.count()) === 0) await openConversationTopics(conversation);
+  if ((await entry.count()) === 0) {
+    // From a topics list, Back returns to the hub (where story entries live).
+    const back = conversation.locator("[data-conversation-back]");
+    if ((await back.count()) > 0) await back.click();
+    if ((await entry.count()) === 0) await openConversationTopics(conversation);
+  }
   await entry.click();
   await expect(conversation.locator("[data-dialogue-text]")).toBeVisible();
   return conversation;
