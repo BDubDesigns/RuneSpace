@@ -372,6 +372,13 @@
       "when": 1793061109532,
       "tag": "0052_research_assignment_pin",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793113471779,
+      "tag": "0053_player_presence",
+      "breakpoints": true
     }
   ]
 }
