@@ -1,8 +1,10 @@
 import {
   analyticsConfig,
-  hasOptOutCookie,
+  consentAllows,
   hasPrivacySignal,
+  hasSignalCookie,
   isAnalyticsHost,
+  readAnalyticsChoice,
   type AnalyticsConfig,
 } from "@/features/analytics/analytics-policy";
 import { ANALYTICS_EVENTS } from "@/features/analytics/analytics-events";
@@ -16,7 +18,7 @@ import { ANALYTICS_EVENTS } from "@/features/analytics/analytics-events";
  * This runs strictly AFTER the authoritative commit and can never change its
  * result: it is fire-and-forget with a short timeout, swallows every failure,
  * and applies the same gates as the browser (production host, configured
- * token, the visitor's opt-out cookie, Global Privacy Control, Do Not Track).
+ * token, the visitor's consent choice, Global Privacy Control, Do Not Track).
  * The distinct ID is the stable Better Auth user ID, so the event belongs to
  * the same PostHog person the browser identifies. There is no `posthog-node`
  * dependency: one POST to the public capture endpoint is all that is needed.
@@ -34,7 +36,12 @@ export function serverAnalyticsAllowed(
   if (!config) return false;
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
   if (!isAnalyticsHost(host)) return false;
-  if (hasOptOutCookie(requestHeaders.get("cookie"))) return false;
+  const cookies = requestHeaders.get("cookie");
+  // The explicit choice, under the shipped consent model "yes" is required.
+  if (!consentAllows(readAnalyticsChoice(cookies))) return false;
+  // A privacy signal wins over a stored "yes". The browser also mirrors its
+  // signal into a cookie, so it is honored even if the headers never arrive.
+  if (hasSignalCookie(cookies)) return false;
   return !hasPrivacySignal({
     globalPrivacyControl: requestHeaders.get("sec-gpc"),
     doNotTrack: requestHeaders.get("dnt"),

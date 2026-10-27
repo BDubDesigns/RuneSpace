@@ -6,7 +6,7 @@ registration and character creation, and whether they actually enter and return
 to the game. It is deliberately **not** a general game/economy telemetry system
 (issue #413). This document is the operational and privacy contract; the
 player-facing disclosure is the "Product analytics", "Anonymous and signed-in
-analytics", and "How long analytics is kept, and your choice" sections of the
+analytics", and "Your analytics choice, and how long it's kept" sections of the
 Safety & Privacy Wiki article (`features/public-site/public-wiki.ts`), which
 must stay true to what ships here.
 
@@ -32,14 +32,15 @@ must stay true to what ships here.
 
 | Piece | Home |
 | --- | --- |
-| Gates, config parsing, opt-out cookie name | `features/analytics/analytics-policy.ts` (pure) |
+| Gates, config parsing, consent model, choice/signal cookie names | `features/analytics/analytics-policy.ts` (pure) |
 | Event names, route templates, attribution, payload sanitizer, milestone rule | `features/analytics/analytics-events.ts` (pure) |
 | `posthog-js` wrapper (lazy import, SDK config, identify/reset, events) | `features/analytics/analytics-client.ts` |
 | Pageviews + identity bootstrap (root layout) | `features/analytics/AnalyticsProvider.tsx` |
 | `gameplay_entered` + `gameplay_milestone_reached` | `features/analytics/PlayAnalytics.tsx` (mounted by `PlayScreen`) |
 | `account_registration_succeeded` | `features/auth/RegisterForm.tsx` |
 | `character_creation_succeeded` (server, best-effort) | `server/analytics.ts`, called by `createCharacterAction` |
-| Opt-out control | `features/analytics/AnalyticsPrivacyControl.tsx` on `/wiki/safety-and-privacy` |
+| One-time consent question | `features/analytics/AnalyticsConsentPrompt.tsx` (mounted by `AnalyticsProvider`, hidden on Play) |
+| Standing choice control | `features/analytics/AnalyticsPrivacyControl.tsx` on `/wiki/safety-and-privacy` |
 
 `posthog-js` is the only added dependency (exact-pinned): it provides identity
 persistence, batching, and retries that are not worth hand-rolling. It is
@@ -117,27 +118,71 @@ template.
   that step; read cross-device conversion with that in mind. Anonymous visits
   before sign-in are never identifiable as internal or as a returning player.
 
-## Privacy choices
+## Consent and privacy choices
 
-Analytics runs unless the visitor opts out; it never runs when:
+### What PostHog actually stores and sends
 
-- the browser sends **Global Privacy Control** (`navigator.globalPrivacyControl`
-  / `Sec-GPC: 1`) or **Do Not Track**; or
-- the visitor chose "Turn analytics off" on Safety & Privacy, stored as the
-  first-party cookie `rs_analytics_optout=1` (one year, `SameSite=Lax`,
-  `Secure` over HTTPS). Being a cookie, the server-side character-creation event
-  honors it too. Opting out stops the SDK (`opt_out_capturing` + `reset`) at
-  once, without a reload; opting back in resumes it.
+With this configuration (`persistence: "localStorage"`, no cookies) `posthog-js`
+writes one `localStorage` entry per browser (`ph_<token>_posthog`: a random
+anonymous/device ID, session and window IDs, the first-touch attribution
+registered by RuneSpace, and, after sign-in, the identified user ID), plus its
+own consent flag if opt-in/out is ever called. It then sends events to
+`us.i.posthog.com`, which necessarily receives the network address and browser
+details of each request. The one server-side event stores nothing on the device.
+Reading or writing device storage for analytics, and processing identifiers like
+these, is what prior-consent rules (for example the EU ePrivacy rule on
+terminal-equipment storage, and the GDPR) generally cover; the strictly
+necessary exemption does not obviously fit launch analytics. This is a summary of
+behavior, not legal advice, and RuneSpace makes no claim of regulatory compliance.
 
-**Consent is a product/legal decision this PR does not make for the owner.** The
-shipped model is *opt-out with automatic honoring of browser privacy signals*.
-It does not show a consent banner or block collection for visitors in
-jurisdictions that require prior opt-in consent (for example the EU/UK), and the
-disclosure makes no regulatory-compliance claim. If the owner decides prior
-consent is required for some regions, the smallest follow-up is to make
-`analyticsStatus()` / `serverAnalyticsAllowed()` also require a stored opt-in
-for those visitors; the single gate in `analytics-policy.ts` is the place to add
-it.
+### Shipped model: consent first (opt-in), for everyone
+
+A visitor's jurisdiction cannot be determined reliably in the browser, so the
+smallest solution that satisfies "no collection before required consent where
+applicable" without guessing is to require it **everywhere** by default
+(`ANALYTICS_CONSENT_MODEL = "opt-in"` in `analytics-policy.ts`):
+
+- On the production host, a visitor with no saved choice and no privacy signal
+  sees a one-time **Accept / Decline** prompt (not on the Play screen, whose
+  footer it would cover). Until they press Accept, **nothing** is loaded,
+  stored, or sent: no SDK download, no `localStorage` write, no session
+  request, no server-side event.
+- The choice is the first-party cookie `rs_analytics_choice=on|off` (one year,
+  `SameSite=Lax`, `Secure` over HTTPS). It is a record of the preference, not
+  analytics. Being a cookie, the server reporter sees it. Safety & Privacy offers
+  the same choice at any time; turning analytics off stops the SDK at once
+  (`opt_out_capturing` + `reset`) without a reload.
+- **Global Privacy Control and Do Not Track always win**, even over a stored
+  yes: analytics stays off, and no prompt is shown. The browser's signal is read
+  from `navigator.globalPrivacyControl`, `navigator.doNotTrack`, and the legacy
+  `window.doNotTrack` / `navigator.msDoNotTrack`. Because request headers can be
+  stripped by a proxy, the browser also mirrors the signal into the session
+  cookie `rs_analytics_signal=1` on every page load (only where analytics could
+  run), and the server-side event refuses on that cookie as well as on
+  `Sec-GPC`/`DNT` headers.
+- Permission is re-read after the SDK import resolves and immediately before
+  every queued event or identity action (and again in the SDK's `before_send`).
+  A decline, or a privacy signal appearing, while the SDK is loading therefore
+  can never initialise tracking or emit an event; a withdrawn start is not
+  cached, so a later Accept still starts cleanly.
+
+### Owner decision: the cost of consent-first
+
+Opt-in will undercount: only visitors who press Accept are measured, so absolute
+visitor and funnel numbers are a floor (typically well below true traffic), and
+attribution for declined visitors is lost entirely. Alternatives, all one-line
+changes to `ANALYTICS_CONSENT_MODEL` or a small follow-up:
+
+1. **Keep opt-in everywhere** (shipped): simplest to defend, lowest numbers.
+2. **Opt-out everywhere** (`"opt-out"`): analytics runs until declined, with GPC/DNT
+   and the Safety & Privacy control honored. Highest numbers, but collects before
+   consent from visitors in regions that require it.
+3. **Region-aware**: opt-in only for regions requiring it, which needs a trusted
+   country signal at the edge (for example Cloudflare's `CF-IPCountry`, if the
+   site is proxied) and a decision on the default for unknown regions.
+
+Do not ship option 2 or 3 without a deliberate decision, and have counsel confirm
+the Safety & Privacy copy for whichever model is chosen.
 
 ## Configuration
 
@@ -264,9 +309,11 @@ out at step 4 by design (see Identity).
 
 1. Set the two Coolify build variables above and redeploy.
 2. Open `https://runespace.qcfailed.com/?utm_source=scapelikes` in a fresh
-   browser profile (no extension blockers, no Global Privacy Control). In
-   PostHog Live events, a `$pageview` appears with `route_category: landing`,
-   `utm_source: scapelikes`, `$current_url` equal to the bare origin + `/`.
+   browser profile (no extension blockers, no Global Privacy Control). The
+   consent prompt appears and **no** PostHog request or `ph_*` `localStorage`
+   entry exists yet. Press **Accept**: in PostHog Live events, a `$pageview`
+   appears with `route_category: landing`, `utm_source: scapelikes`,
+   `$current_url` equal to the bare origin + `/`.
 3. Click through Wiki → Safety & Privacy: one `$pageview` per page; the page
    shows "Analytics is on in this browser."
 4. Register, verify the email in the same browser, create a character, enter
@@ -275,7 +322,9 @@ out at step 4 by design (see Identity).
    identified by the user ID (not an email or name). Mine until XP is gained:
    one `gameplay_milestone_reached`.
 5. Sign out; the next pageview has a different distinct ID.
-6. Turn analytics off on Safety & Privacy: no further events.
+6. Turn analytics off on Safety & Privacy: no further events. Repeat in a
+   profile with Global Privacy Control (or Do Not Track) enabled: no prompt, no
+   events, and no `character_creation_succeeded` even after Accept was stored.
 7. Open a `pr-<n>.runespace.qcfailed.com` preview and `localhost`: **no** events
    from either.
 
@@ -289,4 +338,8 @@ Unit tests (stubbed PostHog; CI never contacts it) live in
 `analytics-client.test.ts`, and `analytics-server.test.ts`. They cover the
 host/config/privacy gates, route templates and attribution sanitizing, payload
 allowlisting, event boundaries and the milestone rule, identify/reset, the
-disabled paths, and the server reporter's gates and failure swallowing.
+disabled paths, the consent model and choice/signal cookies, the permission
+re-check when the choice changes while the SDK is loading or an action is
+queued (deterministic, using a held-open SDK import), and the server reporter's
+gates (including a privacy signal that never reaches the request headers) and
+failure swallowing.

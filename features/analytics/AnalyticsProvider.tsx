@@ -4,31 +4,40 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/features/auth/auth-client";
 import {
-  analyticsPermitted,
+  analyticsStatus,
   identifyAnalyticsAccount,
   resetAnalyticsIdentity,
   startAnalytics,
+  syncPrivacySignalCookie,
   trackAnalyticsPageview,
+  type AnalyticsPermission,
 } from "./analytics-client";
+import { AnalyticsConsentPrompt } from "./AnalyticsConsentPrompt";
 import { ANALYTICS_CHOICE_EVENT } from "./analytics-policy";
 
 /**
  * Product analytics bootstrap (issue #413), mounted once in the root layout.
- * It renders nothing. Outside production, without a configured token, or after
- * the visitor opts out, it never mounts the runtime below, so no session
- * request, SDK download, or network call is added to the page.
+ * Outside production or without a configured token it renders nothing. On
+ * production it asks the visitor once (the shipped opt-in model) and mounts the
+ * runtime below only while analytics is permitted, so until then no session
+ * request, SDK download, storage write, or network call is added to the page.
  */
 export function AnalyticsProvider() {
-  const [enabled, setEnabled] = useState(false);
+  const [status, setStatus] = useState<AnalyticsPermission>("unconfigured");
 
   useEffect(() => {
-    const sync = () => setEnabled(analyticsPermitted());
+    const sync = () => {
+      syncPrivacySignalCookie();
+      setStatus(analyticsStatus());
+    };
     sync();
     window.addEventListener(ANALYTICS_CHOICE_EVENT, sync);
     return () => window.removeEventListener(ANALYTICS_CHOICE_EVENT, sync);
   }, []);
 
-  return enabled ? <AnalyticsRuntime /> : null;
+  if (status === "permitted") return <AnalyticsRuntime />;
+  if (status === "needs-consent") return <AnalyticsConsentPrompt />;
+  return null;
 }
 
 function AnalyticsRuntime() {

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ANALYTICS_PRODUCTION_HOSTNAME,
   DEFAULT_POSTHOG_HOST,
-  hasOptOutCookie,
+  consentAllows,
+  hasSignalCookie,
+  readAnalyticsChoice,
   hasPrivacySignal,
   isAnalyticsHost,
   resolveAnalyticsConfig,
@@ -64,13 +66,32 @@ describe("production host gate", () => {
 });
 
 describe("privacy choices", () => {
-  it("reads the opt-out cookie exactly", () => {
-    expect(hasOptOutCookie("a=b; rs_analytics_optout=1; c=d")).toBe(true);
-    expect(hasOptOutCookie("rs_analytics_optout=1")).toBe(true);
-    expect(hasOptOutCookie("rs_analytics_optout=0")).toBe(false);
-    expect(hasOptOutCookie("xrs_analytics_optout=1")).toBe(false);
-    expect(hasOptOutCookie("")).toBe(false);
-    expect(hasOptOutCookie(null)).toBe(false);
+  it("reads the saved choice cookie exactly", () => {
+    expect(readAnalyticsChoice("a=b; rs_analytics_choice=on; c=d")).toBe("on");
+    expect(readAnalyticsChoice("rs_analytics_choice=off")).toBe("off");
+    expect(readAnalyticsChoice("rs_analytics_choice=1")).toBeUndefined();
+    expect(readAnalyticsChoice("xrs_analytics_choice=on")).toBeUndefined();
+    expect(readAnalyticsChoice("")).toBeUndefined();
+    expect(readAnalyticsChoice(null)).toBeUndefined();
+  });
+
+  it("requires an explicit yes under opt-in (the shipped model)", () => {
+    expect(consentAllows("on", "opt-in")).toBe(true);
+    expect(consentAllows(undefined, "opt-in")).toBe(false);
+    expect(consentAllows("off", "opt-in")).toBe(false);
+    expect(consentAllows(undefined)).toBe(false);
+  });
+
+  it("only a stored no blocks under opt-out", () => {
+    expect(consentAllows(undefined, "opt-out")).toBe(true);
+    expect(consentAllows("on", "opt-out")).toBe(true);
+    expect(consentAllows("off", "opt-out")).toBe(false);
+  });
+
+  it("reads the browser-maintained privacy-signal cookie", () => {
+    expect(hasSignalCookie("a=b; rs_analytics_signal=1")).toBe(true);
+    expect(hasSignalCookie("rs_analytics_signal=0")).toBe(false);
+    expect(hasSignalCookie(null)).toBe(false);
   });
 
   it("honors Global Privacy Control and Do Not Track", () => {

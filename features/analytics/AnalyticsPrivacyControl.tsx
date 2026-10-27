@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Panel } from "@/components/ui/Panel";
 import { ANALYTICS_CHOICE_EVENT } from "./analytics-policy";
-import { analyticsOptedOut, analyticsStatus, setAnalyticsOptOut } from "./analytics-client";
+import { analyticsStatus, setAnalyticsChoice, type AnalyticsPermission } from "./analytics-client";
 
 /**
  * The player-facing analytics choice on Safety & Privacy (issue #413). The
@@ -13,14 +13,10 @@ import { analyticsOptedOut, analyticsStatus, setAnalyticsOptOut } from "./analyt
  * signal already turns analytics off and is reported rather than overridden.
  */
 export function AnalyticsPrivacyControl() {
-  const [state, setState] = useState<ReturnType<typeof analyticsStatus> | undefined>();
-  const [optedOut, setOptedOut] = useState(false);
+  const [state, setState] = useState<AnalyticsPermission | undefined>();
 
   useEffect(() => {
-    const sync = () => {
-      setState(analyticsStatus());
-      setOptedOut(analyticsOptedOut());
-    };
+    const sync = () => setState(analyticsStatus());
     sync();
     window.addEventListener(ANALYTICS_CHOICE_EVENT, sync);
     return () => window.removeEventListener(ANALYTICS_CHOICE_EVENT, sync);
@@ -28,17 +24,18 @@ export function AnalyticsPrivacyControl() {
 
   if (state === undefined) return null;
 
-  let status: string;
-  if (state === "privacy-signal") {
-    status =
-      "Your browser is sending a Global Privacy Control or Do Not Track signal, so analytics is off for you.";
-  } else if (optedOut) {
-    status = "Analytics is off in this browser.";
-  } else if (state === "permitted") {
-    status = "Analytics is on in this browser.";
-  } else {
-    status = "Analytics isn't running on this site, so there is nothing to turn off here.";
-  }
+  const on = state === "permitted";
+  const messages: Record<AnalyticsPermission, string> = {
+    permitted: "Analytics is on in this browser.",
+    declined: "Analytics is off in this browser.",
+    "needs-consent": "You haven't chosen yet, so analytics is off.",
+    "privacy-signal":
+      "Your browser is sending a Global Privacy Control or Do Not Track signal, so analytics is off for you.",
+    "wrong-host":
+      "Analytics isn't running on this site, so there is nothing to turn on or off here.",
+    unconfigured:
+      "Analytics isn't running on this site, so there is nothing to turn on or off here.",
+  };
 
   return (
     <Panel className="mt-8 max-w-3xl" tone="raised" data-testid="analytics-privacy-control">
@@ -46,15 +43,15 @@ export function AnalyticsPrivacyControl() {
         Your analytics choice
       </h2>
       <p className="mt-2 text-sm leading-6 text-[color:var(--rs-text-secondary)]" role="status">
-        {status}
+        {messages[state]}
       </p>
       <div className="mt-4">
         <ActionButton
           intent="secondary"
-          onClick={() => setAnalyticsOptOut(!optedOut)}
+          onClick={() => setAnalyticsChoice(on ? "off" : "on")}
           type="button"
         >
-          {optedOut ? "Turn analytics on" : "Turn analytics off"}
+          {on ? "Turn analytics off" : "Turn analytics on"}
         </ActionButton>
       </div>
     </Panel>

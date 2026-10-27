@@ -5,7 +5,8 @@ const config = {
   token: "phc_vemdyMrA4jSAnccPsASNqkfs6GT5fgB8vZYcZ6gHgr2h",
   apiHost: "https://us.i.posthog.com",
 };
-const production = { host: "runespace.qcfailed.com" };
+const CONSENT = "rs_analytics_choice=on";
+const production = { host: "runespace.qcfailed.com", cookie: CONSENT };
 
 function report(
   headers: Record<string, string>,
@@ -33,22 +34,43 @@ describe("server analytics reporter", () => {
 
   it("honors x-forwarded-host ahead of host", () => {
     expect(
-      report({ host: "localhost:3000", "x-forwarded-host": "runespace.qcfailed.com" }),
+      report({
+        host: "localhost:3000",
+        "x-forwarded-host": "runespace.qcfailed.com",
+        cookie: CONSENT,
+      }),
     ).toHaveBeenCalled();
     expect(
-      report({ host: "runespace.qcfailed.com", "x-forwarded-host": "pr-1.runespace.qcfailed.com" }),
+      report({
+        host: "runespace.qcfailed.com",
+        "x-forwarded-host": "pr-1.runespace.qcfailed.com",
+        cookie: CONSENT,
+      }),
     ).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["localhost", { host: "localhost:3000" }],
-    ["a preview", { host: "pr-413.runespace.qcfailed.com" }],
-    ["no host", {}],
-    ["the opt-out cookie", { ...production, cookie: "a=b; rs_analytics_optout=1" }],
+    ["localhost", { host: "localhost:3000", cookie: CONSENT }],
+    ["a preview", { host: "pr-413.runespace.qcfailed.com", cookie: CONSENT }],
+    ["no host", { cookie: CONSENT }],
+    ["no consent choice yet (opt-in)", { host: "runespace.qcfailed.com" }],
+    ["a declined choice", { ...production, cookie: "a=b; rs_analytics_choice=off" }],
+    ["a malformed choice", { ...production, cookie: "rs_analytics_choice=yes" }],
     ["Global Privacy Control", { ...production, "sec-gpc": "1" }],
     ["Do Not Track", { ...production, dnt: "1" }],
   ])("sends nothing for %s", (_label, headers) => {
     expect(report(headers)).not.toHaveBeenCalled();
+  });
+
+  it("honors a browser-reported privacy signal even when no signal header arrives", () => {
+    // A proxy that strips Sec-GPC / DNT cannot hide the browser's own signal:
+    // the client mirrors it into a session cookie that overrides a stored yes.
+    expect(
+      report({ ...production, cookie: `${CONSENT}; rs_analytics_signal=1` }),
+    ).not.toHaveBeenCalled();
+    expect(
+      report({ ...production, cookie: `${CONSENT}; rs_analytics_signal=0` }),
+    ).toHaveBeenCalled();
   });
 
   it("sends nothing when analytics is not configured", () => {

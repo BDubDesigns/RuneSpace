@@ -2137,8 +2137,8 @@ const authoredWikiArticles = [
       {
         heading: "Product analytics",
         paragraphs: [
-          "On runespace.qcfailed.com, RuneSpace uses PostHog, a third-party product-analytics service, to learn where visitors come from, which public pages they open, where they stop while setting up an account and character, and whether they enter and come back to the game. Analytics never runs on the test copies RuneSpace uses to preview changes, or when the game is run on a developer's own computer.",
-          "It records the general kind of page you open (for example the Wiki, Sign in, or Play) \u2014 never a character's ID, a Player name, anything you searched for, a verification link, or anything after a \u201c?\u201d in an address. It records the website you arrived from and the utm_source, utm_medium, and utm_campaign tags on a link that brought you here, plus basic browser details such as browser, operating system, device type, and screen size, and a random ID that RuneSpace stores in your browser. Like any website, your browser also has to contact PostHog to send this, so PostHog receives the network address and browser details every web request carries.",
+          "On runespace.qcfailed.com, if you accept, RuneSpace uses PostHog, a third-party product-analytics service, to learn where visitors come from, which public pages they open, where they stop while setting up an account and character, and whether they enter and come back to the game. Analytics never runs on the test copies RuneSpace uses to preview changes, or when the game is run on a developer's own computer.",
+          "It records the general kind of page you open (for example the Wiki, Sign in, or Play) \u2014 never a character's ID, a Player name, anything you searched for, a verification link, or anything after a \u201c?\u201d in an address. It records the website you arrived from and the utm_source, utm_medium, and utm_campaign tags on a link that brought you here, plus basic browser details such as browser, operating system, device type, and screen size, and a random ID that RuneSpace stores in your browser \u2014 all of it only if you accept. Like any website, your browser also has to contact PostHog to send this, so PostHog receives the network address and browser details every web request carries.",
           "It records four moments in the game: an account was created, a character was created, Play was opened, and the first time a character's skill XP rose while you were playing. It does not record chat, Whispers, trades, anything you type, your email address, your Player name, character names, inventory, missions, or conversations. RuneSpace does not record sessions or clicks, and does not use analytics for advertising.",
         ],
       },
@@ -2150,10 +2150,11 @@ const authoredWikiArticles = [
         ],
       },
       {
-        heading: "How long analytics is kept, and your choice",
+        heading: "Your analytics choice, and how long it's kept",
         paragraphs: [
+          "Analytics is off until you say yes. The first time you visit the public site, RuneSpace asks. Before you press Accept, nothing is stored in your browser for analytics and nothing is sent to PostHog. RuneSpace remembers your answer in a small cookie so it doesn't ask again, and you can change it at the bottom of this page whenever you like.",
+          "If your browser sends a Global Privacy Control or Do Not Track signal, analytics stays off \u2014 even if you accepted earlier \u2014 and RuneSpace doesn't ask. Turning analytics off stops anything further being sent, and also stops the character-creation report RuneSpace's server would otherwise send. Clearing your browser's site data forgets your answer, so you'll be asked again.",
           "PostHog keeps analytics events for up to one year, the retention of RuneSpace's current PostHog plan, and RuneSpace does not copy them anywhere else.",
-          "You can turn analytics off at the bottom of this page. Doing so is remembered in your browser, applies to the character-creation report RuneSpace's server sends too, and stops anything further being sent. If your browser sends a Global Privacy Control or Do Not Track signal, analytics is already off and RuneSpace honors that without you doing anything. Clearing your browser's site data forgets your choice, so turn it off again if you do.",
         ],
       },
       {

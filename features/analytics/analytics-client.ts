@@ -1,12 +1,15 @@
 import type { PostHog } from "posthog-js";
 import {
+  ANALYTICS_CHOICE_COOKIE,
   ANALYTICS_CHOICE_EVENT,
-  ANALYTICS_OPT_OUT_COOKIE,
-  ANALYTICS_OPT_OUT_MAX_AGE_SECONDS,
+  ANALYTICS_CHOICE_MAX_AGE_SECONDS,
+  ANALYTICS_SIGNAL_COOKIE,
   analyticsConfig,
-  hasOptOutCookie,
+  consentAllows,
   hasPrivacySignal,
   isAnalyticsHost,
+  readAnalyticsChoice,
+  type AnalyticsChoice,
 } from "./analytics-policy";
 import {
   analyticsRouteTemplate,
@@ -22,7 +25,13 @@ import {
  * Browser-side PostHog wrapper (issue #413). Every public function is a safe
  * no-op unless `analyticsPermitted()` holds, and none ever throws: analytics
  * can fail or be blocked without affecting the game. `posthog-js` is imported
- * lazily, so localhost, CI and previews never even download it.
+ * lazily, so localhost, CI, previews, and (under the shipped opt-in model)
+ * visitors who have not said yes never even download it, and nothing is
+ * written to their storage.
+ *
+ * Permission is re-read, not remembered: after the SDK import resolves and
+ * immediately before every queued event or identity action, so a choice made
+ * while the SDK is loading (or while an action waits on it) is honored.
  *
  * The SDK is configured so that nothing is captured automatically: no
  * autocapture, pageviews, pageleaves, heatmaps, dead clicks, exceptions,
@@ -35,44 +44,76 @@ export type AnalyticsPermission =
   | "unconfigured"
   | "wrong-host"
   | "privacy-signal"
-  | "opted-out";
+  | "needs-consent"
+  | "declined";
+
+type PrivacyNavigator = Navigator & {
+  globalPrivacyControl?: boolean;
+  msDoNotTrack?: string;
+};
+
+/** Global Privacy Control / Do Not Track as the browser exposes them to scripts. */
+export function browserPrivacySignal(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const nav = navigator as PrivacyNavigator;
+  const win = typeof window === "undefined" ? undefined : (window as { doNotTrack?: string });
+  return (
+    hasPrivacySignal({
+      globalPrivacyControl: nav.globalPrivacyControl,
+      doNotTrack: nav.doNotTrack,
+    }) ||
+    hasPrivacySignal({ doNotTrack: nav.msDoNotTrack }) ||
+    hasPrivacySignal({ doNotTrack: win?.doNotTrack })
+  );
+}
+
+/** The visitor's saved choice, independent of host or browser signals. */
+export function analyticsChoice(): AnalyticsChoice | undefined {
+  return typeof document === "undefined" ? undefined : readAnalyticsChoice(document.cookie);
+}
 
 /** Why analytics is or is not running for this page load. */
 export function analyticsStatus(): AnalyticsPermission {
   if (typeof window === "undefined" || !analyticsConfig) return "unconfigured";
   if (!isAnalyticsHost(window.location.hostname)) return "wrong-host";
-  if (
-    hasPrivacySignal({
-      globalPrivacyControl: (navigator as Navigator & { globalPrivacyControl?: boolean })
-        .globalPrivacyControl,
-      doNotTrack: navigator.doNotTrack,
-    })
-  ) {
-    return "privacy-signal";
-  }
-  if (hasOptOutCookie(document.cookie)) return "opted-out";
-  return "permitted";
+  if (browserPrivacySignal()) return "privacy-signal";
+  if (consentAllows(analyticsChoice())) return "permitted";
+  return analyticsChoice() === "off" ? "declined" : "needs-consent";
 }
 
 export function analyticsPermitted(): boolean {
   return analyticsStatus() === "permitted";
 }
 
-/** The visitor's saved choice, independent of host or browser signals. */
-export function analyticsOptedOut(): boolean {
-  return typeof document !== "undefined" && hasOptOutCookie(document.cookie);
+function cookieAttributes(maxAge?: number): string {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  return `${maxAge === undefined ? "" : `; Max-Age=${maxAge}`}; Path=/; SameSite=Lax${secure}`;
 }
 
-export function setAnalyticsOptOut(optOut: boolean): void {
+/** Record the visitor's explicit choice. Turning analytics off stops it at once. */
+export function setAnalyticsChoice(choice: AnalyticsChoice): void {
   try {
-    const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = optOut
-      ? `${ANALYTICS_OPT_OUT_COOKIE}=1; Max-Age=${ANALYTICS_OPT_OUT_MAX_AGE_SECONDS}; Path=/; SameSite=Lax${secure}`
-      : `${ANALYTICS_OPT_OUT_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax${secure}`;
-    if (optOut) stopAnalytics();
+    document.cookie = `${ANALYTICS_CHOICE_COOKIE}=${choice}${cookieAttributes(ANALYTICS_CHOICE_MAX_AGE_SECONDS)}`;
+    if (choice === "off") stopAnalytics();
     window.dispatchEvent(new Event(ANALYTICS_CHOICE_EVENT));
   } catch {
     /* a blocked cookie must not break the privacy page */
+  }
+}
+
+/**
+ * Keep the session signal cookie in step with the browser's privacy signal, so
+ * the server-side reporter sees it even if the headers never arrive. Only runs
+ * where analytics could run at all (configured token, production host).
+ */
+export function syncPrivacySignalCookie(): void {
+  try {
+    if (!analyticsConfig || !isAnalyticsHost(window.location.hostname)) return;
+    document.cookie = browserPrivacySignal()
+      ? `${ANALYTICS_SIGNAL_COOKIE}=1${cookieAttributes()}`
+      : `${ANALYTICS_SIGNAL_COOKIE}=; Max-Age=0${cookieAttributes()}`;
+  } catch {
+    /* best effort */
   }
 }
 
@@ -81,18 +122,27 @@ export function setAnalyticsOptOut(optOut: boolean): void {
 let loading: Promise<PostHog | null> | undefined;
 
 /**
- * Load and initialise PostHog once. Resolves to `null` (and caches nothing
- * that could re-enable it) when analytics is not permitted or loading fails.
+ * Load and initialise PostHog once. Resolves to `null` when analytics is not
+ * permitted, when permission is withdrawn while the SDK is loading, or when
+ * loading fails; a null outcome is never cached, so a later grant can start.
  */
 export function startAnalytics(): Promise<PostHog | null> {
   if (!analyticsPermitted() || !analyticsConfig) return Promise.resolve(null);
   const config = analyticsConfig;
-  loading ??= import("posthog-js")
+  if (loading) return loading;
+  const attempt: Promise<PostHog | null> = import("posthog-js")
     .then(({ default: posthog }) => {
+      // The visitor may have declined, or a privacy signal may have appeared,
+      // while the SDK downloaded: nothing may initialise or resume then.
+      if (!analyticsPermitted()) {
+        if (posthog.__loaded) posthog.opt_out_capturing();
+        return null;
+      }
       // After an opt-out and opt back in the singleton is already initialised.
       if (posthog.__loaded) {
-        if (posthog.has_opted_out_capturing())
+        if (posthog.has_opted_out_capturing()) {
           posthog.opt_in_capturing({ captureEventName: false });
+        }
         return posthog;
       }
       posthog.init(config.token, {
@@ -120,12 +170,19 @@ export function startAnalytics(): Promise<PostHog | null> {
         respect_dnt: true,
         save_referrer: false,
         mask_personal_data_properties: true,
-        before_send: (capture) => sanitizeCapture(capture),
+        // Last gate before an event is built: permission can change between
+        // the action that asked for it and the SDK handling it.
+        before_send: (capture) => (analyticsPermitted() ? sanitizeCapture(capture) : null),
       });
       return posthog;
     })
-    .catch(() => null);
-  return loading;
+    .catch(() => null)
+    .then((posthog) => {
+      if (!posthog && loading === attempt) loading = undefined;
+      return posthog;
+    });
+  loading = attempt;
+  return attempt;
 }
 
 /** Stop capturing and forget this browser's analytics identity. */
@@ -134,8 +191,10 @@ export function stopAnalytics(): void {
   loading = undefined;
   void pending
     ?.then((posthog) => {
-      posthog?.opt_out_capturing();
-      posthog?.reset();
+      // A grant that arrived in the meantime has already restarted analytics.
+      if (!posthog || analyticsPermitted()) return;
+      posthog.opt_out_capturing();
+      posthog.reset();
     })
     .catch(() => undefined);
 }
@@ -144,7 +203,8 @@ function withClient(run: (posthog: PostHog) => void): void {
   if (!analyticsPermitted()) return;
   void startAnalytics()
     .then((posthog) => {
-      if (posthog) run(posthog);
+      // Re-check: the choice may have changed while the SDK loaded.
+      if (posthog && analyticsPermitted()) run(posthog);
     })
     .catch(() => undefined);
 }

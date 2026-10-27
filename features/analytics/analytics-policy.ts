@@ -6,8 +6,10 @@
  * Tracking is allowed only when ALL of these hold:
  * - a PostHog project token is configured (build-time, `NEXT_PUBLIC_*`);
  * - the page is served from exactly the production public host;
- * - the visitor has not chosen to opt out, and their browser is not sending a
- *   Global Privacy Control or Do Not Track signal.
+ * - the visitor's choice satisfies the consent model below (by default they
+ *   have explicitly said yes, before anything is stored or sent);
+ * - their browser is not sending a Global Privacy Control or Do Not Track
+ *   signal, which wins over any stored "yes".
  *
  * Anything else is a silent no-op: the game never depends on analytics.
  */
@@ -18,9 +20,33 @@ export const ANALYTICS_PRODUCTION_HOSTNAME = "runespace.qcfailed.com";
 /** PostHog US Cloud ingestion host (issue #413), used when none is configured. */
 export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
-/** First-party opt-out flag: a cookie so the server reporter can honor it too. */
-export const ANALYTICS_OPT_OUT_COOKIE = "rs_analytics_optout";
-export const ANALYTICS_OPT_OUT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+/**
+ * The consent model. `"opt-in"` (shipped) means no PostHog storage or network
+ * traffic, and no server-side event, until the visitor presses Accept. Because
+ * the visitor's jurisdiction cannot be determined reliably, it applies to
+ * everyone. `"opt-out"` would run analytics until the visitor declines. Which
+ * to ship is an owner decision (see `docs/analytics.md`); this constant is the
+ * only place it is made.
+ */
+export type AnalyticsConsentModel = "opt-in" | "opt-out";
+export const ANALYTICS_CONSENT_MODEL: AnalyticsConsentModel = "opt-in";
+
+/**
+ * The visitor's explicit choice, a first-party cookie (rather than storage the
+ * SDK owns) so the server reporter can honor it too. It is a preference record,
+ * not analytics.
+ */
+export const ANALYTICS_CHOICE_COOKIE = "rs_analytics_choice";
+export const ANALYTICS_CHOICE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
+/**
+ * Session cookie the browser keeps in step with its Global Privacy Control /
+ * Do Not Track state, so the server reporter honors a signal even when a proxy
+ * or the request path does not forward `Sec-GPC` / `DNT`.
+ */
+export const ANALYTICS_SIGNAL_COOKIE = "rs_analytics_signal";
+
+export type AnalyticsChoice = "on" | "off";
 
 /** Fired on `window` when the visitor changes their analytics choice. */
 export const ANALYTICS_CHOICE_EVENT = "runespace:analytics-choice";
@@ -70,13 +96,37 @@ export function isAnalyticsHost(host: string | null | undefined): boolean {
   return match[1]!.toLowerCase().replace(/\.$/, "") === ANALYTICS_PRODUCTION_HOSTNAME;
 }
 
-/** Whether a `Cookie` header carries the opt-out flag. */
-export function hasOptOutCookie(cookieHeader: string | null | undefined): boolean {
-  if (!cookieHeader) return false;
-  return cookieHeader.split(";").some((part) => part.trim() === `${ANALYTICS_OPT_OUT_COOKIE}=1`);
+function cookieValue(cookieHeader: string | null | undefined, name: string): string | undefined {
+  if (!cookieHeader) return undefined;
+  for (const part of cookieHeader.split(";")) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(`${name}=`)) return trimmed.slice(name.length + 1);
+  }
+  return undefined;
 }
 
-/** Global Privacy Control / Do Not Track, as sent by browsers. */
+/** The visitor's saved choice from a `Cookie` header, if any. */
+export function readAnalyticsChoice(
+  cookieHeader: string | null | undefined,
+): AnalyticsChoice | undefined {
+  const value = cookieValue(cookieHeader, ANALYTICS_CHOICE_COOKIE);
+  return value === "on" || value === "off" ? value : undefined;
+}
+
+/** Whether a choice (or its absence) satisfies the consent model. */
+export function consentAllows(
+  choice: AnalyticsChoice | undefined,
+  model: AnalyticsConsentModel = ANALYTICS_CONSENT_MODEL,
+): boolean {
+  return model === "opt-in" ? choice === "on" : choice !== "off";
+}
+
+/** Whether the browser-maintained privacy-signal cookie is set. */
+export function hasSignalCookie(cookieHeader: string | null | undefined): boolean {
+  return cookieValue(cookieHeader, ANALYTICS_SIGNAL_COOKIE) === "1";
+}
+
+/** Global Privacy Control / Do Not Track, as exposed by the browser or its headers. */
 export function hasPrivacySignal(signals: {
   globalPrivacyControl?: boolean | string | null | undefined;
   doNotTrack?: string | null | undefined;
