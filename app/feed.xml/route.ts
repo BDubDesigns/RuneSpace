@@ -4,11 +4,13 @@
 // show, newest first, one item per update: title, /updates/<slug> link,
 // summary as the description, and the authored publishedAt as pubDate.
 // No new data source: new updates flow into the feed on the next deploy,
-// which is why this route needs no force-dynamic (the data ships with the
+// which is why this route is pinned force-static (the data ships with the
 // build, same as the /updates pages themselves). Consumed by the Scapelikes
 // developer dashboard's game news feed import, and any feed reader.
 
 import { getPublishedUpdates, getPublicUpdatePath } from "@/features/public-site/public-updates";
+
+export const dynamic = "force-static";
 
 const SITE_URL = "https://runespace.qcfailed.com";
 
