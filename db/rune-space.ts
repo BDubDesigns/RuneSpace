@@ -101,6 +101,14 @@ export const playerAccounts = pgTable(
   ],
 );
 
+/** Most recent validated Play check-in, one row per account (issue #410). */
+export const playerPresence = pgTable("player_presence", {
+  playerAccountId: text("player_account_id")
+    .primaryKey()
+    .references(() => playerAccounts.id, { onDelete: "cascade" }),
+  lastCheckInAt: timestamp("last_check_in_at", { withTimezone: true }).notNull(),
+});
+
 /** Permanent player-account ownership of explicitly unlockable portraits. */
 export const playerPortraitUnlocks = pgTable(
   "player_portrait_unlocks",

@@ -1,28 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PublicNavigation } from "./PublicNavigation";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 
 const EMBLEM_WIDTH = 1292;
 const EMBLEM_HEIGHT = 1340;
 
 /**
- * Below `min-[390px]`, the full horizontal lockup plus Home/Updates/Wiki no
- * longer fits the compact public header without the nav strip needing an
- * internal scroll. Only below that breakpoint, swap to the standalone R
- * emblem (`public/branding/runespace-emblem.png`) so the nav fits without
- * scrolling; the full lockup remains the header identity everywhere else.
- * This swap is deliberately scoped to the public-site header only — it does
- * not change the authenticated game header or general branding guidance.
- *
- * Neither header identity is `priority` (issue #117). A CSS breakpoint decides
- * which of the two is displayed, but a preload is unconditional: measured at
- * 390 px the hidden emblem still cost 9,218 B, and at 360 px the hidden lockup
- * still cost 32,334 B. Left to lazy loading the browser skips the one with no
- * layout box entirely and fetches only the visible mark, which is in the
- * initial viewport and therefore still requested immediately — no viewport
- * JavaScript, no hydration branch, no second asset. The landing hero lockup
- * below keeps its own `priority`; it is the large visible brand moment.
+ * The emblem leaves room for public links on phones; wide layouts keep the
+ * full lockup. The landing hero retains its own full-size logo. Both header
+ * assets load lazily so the hidden breakpoint variant is not preloaded.
  */
 
 export type PublicSiteNavItem = {
@@ -59,35 +47,20 @@ export function PublicSiteShell({
             href="/"
           >
             <RuneSpaceBrand
-              className="hidden h-10 w-auto max-w-[min(46vw,12rem)] min-[390px]:block sm:h-11 sm:max-w-[13rem]"
+              className="hidden h-10 w-auto max-w-[min(46vw,12rem)] sm:h-11 sm:max-w-[13rem] min-[680px]:block"
               priority={false}
               sizes="(max-width: 640px) 46vw, 208px"
             />
             <Image
               alt="RuneSpace"
-              className="block h-10 w-auto min-[390px]:hidden"
+              className="block h-10 w-auto min-[680px]:hidden"
               height={EMBLEM_HEIGHT}
               sizes="40px"
               src="/branding/runespace-emblem.png"
               width={EMBLEM_WIDTH}
             />
           </Link>
-          {navigation.length > 0 ? (
-            <nav aria-label="Public" className="min-w-0 flex-1 overflow-x-auto">
-              <ul className="flex min-w-max items-center gap-4 sm:gap-5">
-                {navigation.map((item) => (
-                  <li key={`${item.href}-${item.label}`}>
-                    <Link
-                      className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-sm font-semibold text-[color:var(--rs-text-secondary)] underline-offset-4 transition duration-[var(--rs-duration-fast)] hover:text-[color:var(--rs-text-primary)] hover:underline"
-                      href={item.href}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
+          {navigation.length > 0 ? <PublicNavigation items={navigation} /> : null}
           {headerActions ? <div className="ml-auto shrink-0">{headerActions}</div> : null}
         </div>
       </header>

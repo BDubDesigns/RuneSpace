@@ -681,3 +681,7 @@ single source of truth for E2E behavioral verification in both local development
 and GitHub Actions; curated screenshots are produced and uploaded only in the
 explicit screenshot lane (see §3), and per-failure diagnostics are always
 retained with shard-specific artifact names.
+
+### High Scores and presence (issue #410)
+
+`tests/integration/high-scores-presence.test.ts` exercises public rank ordering, sparse XP, search, profile projection, presence deduplication, authorization and expiry against a disposable PostgreSQL database. `tests/e2e/high-scores.spec.ts` covers public navigation, shareable profiles, and in-game access; it is included in the canonical allowlist and focused phase `high-scores`.

@@ -153,7 +153,8 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("Research Jobs at Hilltop Workshop");
+    expect(latestUpdateSection).toContain("High Scores Are Here");
+    expect(latestUpdateSection).not.toContain("Research Jobs at Hilltop Workshop");
     expect(latestUpdateSection).not.toContain("Milky Waymo<");
     expect(latestUpdateSection).not.toContain("FedHex Mailboxes<");
     expect(latestUpdateSection).not.toContain("First Resonance Echo<");

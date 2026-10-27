@@ -8,6 +8,7 @@ import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
+import { PlayPresence } from "@/features/presence/PlayPresence";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
 import { ChatProvider } from "@/features/chat/ChatContext";
@@ -257,6 +258,7 @@ function PlayWorkspace({
 
   return (
     <>
+      <PlayPresence characterId={characterId} />
       {/* Chat/Social (#245) is a utility over Play, like Inventory: below
           desktop width its launcher floats above the footer and its Drawer
           opens over the current surface without navigating; at desktop width
