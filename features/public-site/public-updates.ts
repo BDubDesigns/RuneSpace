@@ -9,6 +9,27 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "high-scores",
+    title: "High Scores Are Here",
+    publishedAt: "2026-10-27T09:00:00-07:00",
+    summary:
+      "Compare characters across RuneSpace, share a profile, and see how many players have the game open.",
+    body: [
+      "High Scores are open to everyone. Browse by Character Level, combined XP, or any presented skill, and search for a character by name. Tied scores share a rank, and every character appears, including those just starting out.",
+      "Open a character to see their Player name, portrait, and skill progress. Share sends friends a direct link to the current profile. Scores reflect progress that has been recorded when the game resolves work.",
+      "The players-online number counts accounts with a recent game check-in. It may take up to two minutes to fall after a player closes the game, and multiple characters or tabs on one account count once.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Public High Scores for Character Level, overall XP, and each presented skill, with search and shareable character profiles.",
+          "A players-online count on the homepage and High Scores page.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #406 — Stillreach Slice L: The Wise Old Enby's repeatable research jobs.
     slug: "research-jobs",
     title: "Research Jobs at Hilltop Workshop",

@@ -118,10 +118,10 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Research Jobs Update as the newest (#406)", () => {
+  it("keeps the Research Jobs Update published (#406)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
-    const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("research-jobs");
+    const latest = getPublicUpdate("research-jobs")!;
+    expect(getLatestPublishedUpdate().slug).toBe("high-scores");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("milky-waymo")!.publishedAt),
     );

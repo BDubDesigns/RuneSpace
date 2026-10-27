@@ -43,6 +43,12 @@ Dependency rules:
 
 Lower layers never import higher layers. Domain logic never imports UI.
 
+## High Scores and presence (issue #410)
+
+Public High Scores read committed XP without resolving actions. `server/high-scores.ts` constructs a bounded, paginated database ranking from the presented skill set and its authoritative curves; SQL window ranks are calculated before search. The public profile boundary in `server/public-character-profile.ts` projects only identity, portrait, and progression, and is independent of the authenticated same-location profile and its social controls. Profile URLs use character names; a renamed or unknown name does not resolve.
+
+`player_presence` holds at most one last accepted Play check-in per account. `server/player-presence.ts` validates gameplay access and character ownership on each check-in and uses database time; the public endpoint returns only an aggregate of rows less than two minutes old. Tabs cannot remove each other's presence, and the check-in write throttle prevents repeated requests from multiplying writes. Public page visits and sign-in alone do not check in. The latest timestamp is retained until replaced or the account is deleted.
+
 ## Player-intent flow
 
 1. Player interacts in `app/` / `features/` (UI only).

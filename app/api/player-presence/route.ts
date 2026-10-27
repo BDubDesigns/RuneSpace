@@ -21,12 +21,27 @@ export async function GET() {
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
-  if (
-    (origin && origin !== new URL(request.url).origin) ||
-    fetchSite === "cross-site" ||
-    fetchSite === "same-site"
-  ) {
+  if (fetchSite === "cross-site" || fetchSite === "same-site") {
     return new NextResponse(null, { status: 403, headers: noStore });
+  }
+  if (origin) {
+    // Next may construct request.url from its internal listener, while Host
+    // and the forwarded protocol identify the browser-facing deployment.
+    const host = request.headers.get("host");
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const protocol = forwardedProto ? `${forwardedProto}:` : new URL(request.url).protocol;
+    try {
+      const browserOrigin = new URL(origin);
+      if (
+        !host ||
+        browserOrigin.host.toLowerCase() !== host.toLowerCase() ||
+        browserOrigin.protocol !== protocol
+      ) {
+        return new NextResponse(null, { status: 403, headers: noStore });
+      }
+    } catch {
+      return new NextResponse(null, { status: 403, headers: noStore });
+    }
   }
   const characterId = new URL(request.url).searchParams.get("characterId");
   if (!z.string().uuid().safeParse(characterId).success || !characterId) {

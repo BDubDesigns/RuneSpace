@@ -3,6 +3,7 @@ import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
+import { PlayersOnline } from "@/features/presence/PlayersOnline";
 import { SoftAlphaCountdown } from "@/features/launch/SoftAlphaCountdown";
 import {
   formatPublicUpdateDate,
@@ -126,6 +127,15 @@ export function PublicLandingPage({
                   </ActionLink>
                 </>
               )}
+            </div>
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <PlayersOnline />
+              <a
+                className="rs-focus font-semibold text-[color:var(--rs-accent-primary)] underline"
+                href="/high-scores"
+              >
+                View High Scores
+              </a>
             </div>
             {launch.launchTargetAt ? (
               <SoftAlphaCountdown

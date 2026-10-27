@@ -2063,6 +2063,13 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "High Scores and players online",
+        paragraphs: [
+          "High Scores publicly show every character's name, Player name, portrait, Character Level, and skill progress. Anyone can open or share a character's profile.",
+          "While you have Play open, RuneSpace records the latest game check-in for your account. A public count includes each recently checked-in account once, without showing who is online. A check-in stops counting after two minutes; the latest timestamp remains with the account until replaced by a later check-in or the account is deleted.",
+        ],
+      },
+      {
         heading: "Public chat and promoted ads",
         paragraphs: [
           "Every General and Trade message is saved with its text, the channel, when it was sent, the character that sent it, that character's name at the time, and the player account the character belongs to. A promoted Trade ad is saved the same way, plus the Credits it cost. Automatic System lines in General, such as a rare-find announcement, are saved with their text and time but no player attached. Everyone playing can read public messages while they're kept.",
