@@ -463,12 +463,31 @@ export async function openNpcConversation(page: Page, npcName: string) {
   return conversation;
 }
 
+/**
+ * Open a grouped NPC's Conversation Topics list (#406), a no-op for everybody
+ * whose topics already sit on the hub.
+ */
+export async function openConversationTopics(conversation: import("@playwright/test").Locator) {
+  const group = conversation.locator('[data-conversation-group="topics"]');
+  if ((await group.count()) > 0) await group.click();
+  await expect(conversation.locator('[data-conversation-section="topics"]')).toBeVisible();
+}
+
 /** Select one hub entry and play its authored dialogue sequence. */
 export async function openConversationEntry(
   conversation: import("@playwright/test").Locator,
   entryName: string | RegExp,
 ) {
-  await conversation.getByRole("button", { name: entryName }).click();
+  const entry = conversation.getByRole("button", { name: entryName });
+  // The Wise Old Enby groups their replayable topics under one Conversation
+  // Topics button (#406); open that list when the entry is not on the hub.
+  if ((await entry.count()) === 0) {
+    // From a topics list, Back returns to the hub (where story entries live).
+    const back = conversation.locator("[data-conversation-back]");
+    if ((await back.count()) > 0) await back.click();
+    if ((await entry.count()) === 0) await openConversationTopics(conversation);
+  }
+  await entry.click();
   await expect(conversation.locator("[data-dialogue-text]")).toBeVisible();
   return conversation;
 }

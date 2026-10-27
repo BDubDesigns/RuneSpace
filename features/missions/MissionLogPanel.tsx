@@ -18,6 +18,7 @@ import {
   type MissionProjection,
 } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
+import { ResearchAbandon } from "@/features/research/ResearchAbandon";
 import { guidanceMissions, isMissionPinned } from "./mission-pins";
 import { useMissionPin } from "./useMissionPin";
 
@@ -239,6 +240,8 @@ function MissionEntry({
               </ul>
             </div>
           ) : null}
+          {/* A held Wise Old Enby research run can be abandoned from here (#406). */}
+          {!completed && mission.research ? <ResearchAbandon mission={mission} /> : null}
           {completed && mission.earnedReward ? (
             <p
               className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3 text-sm text-[color:var(--rs-text-secondary)]"

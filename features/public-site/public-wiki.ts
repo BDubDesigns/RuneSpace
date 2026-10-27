@@ -1921,6 +1921,19 @@ const authoredWikiArticles = [
           ],
         ],
       },
+      {
+        heading: "Research Jobs",
+        paragraphs: [
+          "Talk to them and choose Research Jobs for repeatable work. They keep one research job going at a time per character; story missions are separate and never blocked. Each job lends you one item that takes a normal Inventory slot and its real weight, so you need room for it. You cannot sell, trade, store, stash or drop a loaned item, and none of these jobs pays any XP. To give a job up, choose Abandon Assignment in its Mission Log entry, from anywhere: you lose its progress and the loaned item, and nothing is paid.",
+          [
+            "Research Courier lends a 2 kg Sealed Research Packet. Carry it to the FedHex terminal at Stillreach Landing Station (see ",
+            { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+            "), choose Deliver Research Packet, then return to them to collect 25 Credits.",
+          ],
+          "Geological Field Survey lends a 0.1 kg Geological Sample Case. Collect one surface sample at each of Prospecting Quarry, The Dry Seam and Harmonic Workings, in any order, at eight game ticks (4.8 seconds) apiece, then return to collect 75 Credits. It is not Mining and needs no tool or skill.",
+          "Resonance Calibration opens once they have explained RuneSpace. It lends a 0.1 kg Resonance Sampler: record a signature at The Low Hum (also eight ticks), then return to them and hear them out. They can then open a passage to Crash Site on Skatboll. Nothing happens until you confirm Teleport Now; Not Yet keeps your sampler and the job. You and what you carry make the trip, but your Rivet, its fuel and your Cargo Hold stay where they are parked. It costs no Credits and pays no XP.",
+        ],
+      },
     ],
   },
   {

@@ -18,6 +18,7 @@ import { playDialogueToText } from "./dialogue-steps";
 import {
   expect,
   openConversationEntry,
+  openConversationTopics,
   openMapSurface,
   openNpcConversation,
   openTestCharacter,
@@ -528,6 +529,7 @@ test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
 
     const conversation = await openNpcConversation(page, ENBY);
     await expect(conversation.locator('[data-conversation-section="current"]')).toHaveCount(0);
+    await openConversationTopics(conversation);
     const topics = conversation.locator('[data-conversation-section="topics"] button');
     await expect(topics).toHaveText(["Introductions", "The workshop", "Stillreach"]);
 
@@ -587,6 +589,7 @@ test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
 
     await finishLessonScene(conversation);
     await expect(conversation.locator(`[data-conversation-entry^="${MISSION}:"]`)).toHaveCount(0);
+    await openConversationTopics(conversation);
     await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
     expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
     expect(total(await rows(testCharacter.id), FRAGMENT)).toBe(2);
@@ -629,6 +632,7 @@ test.describe("the Wise Old Enby at Hilltop Workshop (#389)", () => {
     await playDialogueToText(conversation, /One step at a time/);
     await conversation.locator("[data-dialogue-action]").click();
     await finishLessonScene(conversation);
+    await openConversationTopics(conversation);
     await expect(conversation.getByRole("button", { name: /About RuneSpace/ })).toBeVisible();
     expect((await missionRows(testCharacter.id))[0]?.completedAt).not.toBeNull();
     expect(await progressOf(testCharacter.id)).toEqual({ "toll-lead": 1, "toll-hint": 0 });

@@ -323,6 +323,29 @@ export const ClaimFedhexParcelRequestSchema = z.object({
   localPlaceId: ContentId,
 });
 
+/**
+ * The Wise Old Enby's research jobs (#406). Accepting names a job; every command
+ * on a run in progress names the run's own id, so a stale client acting on an
+ * earlier run finds nothing to act on. The server resolves the rest.
+ */
+export const AcceptResearchJobRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  jobId: ContentId,
+});
+
+export const ResearchAssignmentRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  assignmentId: z.string().uuid(),
+});
+
+export const DeliverResearchPacketRequestSchema = ResearchAssignmentRequestSchema.extend({
+  localPlaceId: ContentId,
+});
+
+export const AcknowledgeResearchArrivalRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** Dismissing one Echo reading result (#393). */
 export const AcknowledgeEchoReadingRequestSchema = z.object({
   characterId: z.string().uuid(),

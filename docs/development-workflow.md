@@ -460,7 +460,7 @@ simply an unclaimed port here.
   `equipment-loadout`,
   `travel`, `walk-it-off`, `cut-your-teeth`, `refining`, `bounded-runs`,
   `rusk-recovery`, `fabrication`, `work-orders`,
-  `gameplay-access`, `account-verification`, `social-shell`, `public-chat`, `whispers-safety`, `moderation`, `player-trading`, `system-notices`, `chat-social-polish`, `desktop-workspace`, `site-stash`, `curly-must-stash`, `wheel-be-right-back`, `mission-pinning`, `thrust-issues`, `oil-shale-mining`, `stone-mining`, `dry-seam-mining`, `fuel-manufacturing`, `rune-materials`, `last-leg-trading`, `not-from-around-here`, `first-runeworking-lesson`, `ship-first-flight`, `stillreach`, `stillreach-flight`, `refiner-to-go`, `fedhex`, `milky-waymo`, and `scroll-affordances` (the focused runner also puts the fixed loopback test
+  `gameplay-access`, `account-verification`, `social-shell`, `public-chat`, `whispers-safety`, `moderation`, `player-trading`, `system-notices`, `chat-social-polish`, `desktop-workspace`, `site-stash`, `curly-must-stash`, `wheel-be-right-back`, `mission-pinning`, `thrust-issues`, `oil-shale-mining`, `stone-mining`, `dry-seam-mining`, `fuel-manufacturing`, `rune-materials`, `last-leg-trading`, `not-from-around-here`, `first-runeworking-lesson`, `ship-first-flight`, `stillreach`, `stillreach-flight`, `refiner-to-go`, `fedhex`, `milky-waymo`, `research-jobs`, and `scroll-affordances` (the focused runner also puts the fixed loopback test
   operator on the admin allowlist, as the canonical runner does). To run one Travel test in
   isolation, use the same disposable lifecycle with `travel`:
 

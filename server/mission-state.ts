@@ -44,6 +44,8 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
 import { characterSkillLevels } from "@/server/skill-levels";
 import { loadRepairTargetStates } from "@/server/welding";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import { projectResearchAssignment } from "@/game/domain/research-jobs";
+import { loadResearchAssignment, researchFactsOf } from "@/server/research-jobs";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 
 // Authored mission content is validated once at module load: unknown NPCs,
@@ -184,7 +186,7 @@ export async function loadMissionProjections(
     },
     completedMissionIds,
   );
-  return MISSIONS.map((mission) => {
+  const projections = MISSIONS.map((mission) => {
     const trackedProgress = progressByMissionId.get(mission.id);
     return projectMission(
       mission,
@@ -195,6 +197,16 @@ export async function loadMissionProjections(
       prerequisiteCompletedFor(mission, byMissionId),
     );
   });
+  // The held Wise Old Enby research assignment (#406), if any, joins the list as
+  // a Mission-shaped projection so the Log, strips and guidance render it. It is
+  // derived from the assignment row, after every authored Mission.
+  const assignment = await loadResearchAssignment(transaction, characterId);
+  if (!assignment) return projections;
+  const research = projectResearchAssignment(
+    researchFactsOf(assignment, new Set(itemState.carriedInstances.map((instance) => instance.id))),
+    { currentLocationId: input.currentLocationId, stationary },
+  );
+  return research ? [...projections, research] : projections;
 }
 
 /**

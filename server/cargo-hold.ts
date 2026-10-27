@@ -1,3 +1,4 @@
+import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import { and, asc, eq } from "drizzle-orm";
 import {
   cargoHoldItemInstances,
@@ -52,6 +53,7 @@ export type CargoHoldRefusalReason =
   | "equipped_item"
   | "item_already_stored"
   | "item_in_site_stash"
+  | "loaned_item"
   | "item_not_stored";
 
 export type CargoHoldRefusal = {
@@ -492,6 +494,9 @@ export async function depositCargoUniqueItem(
       const definition = getItemDefinition(instance.itemId);
       if (!definition || definition.kind !== "unique")
         return refusal("item_not_found", "That item is not a transferable unique item.");
+      // A Wise Old Enby research loan (#406) is for the job, never for storage.
+      if (isResearchLoanItem(instance.itemId))
+        return refusal("loaned_item", "A loaned research item cannot be stored in Cargo Hold.");
       if (assignmentRows.some((assignment) => assignment.itemInstanceId === instance.id))
         return refusal("equipped_item", "Unequip that item before depositing it in Cargo Hold.");
       if (cargoRows.some((row) => row.itemInstanceId === instance.id))

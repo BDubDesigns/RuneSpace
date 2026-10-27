@@ -18,6 +18,14 @@ import {
   seedRepairTarget,
 } from "./fixtures";
 
+/**
+ * These two tests make one character per authored inventory item, so their time
+ * grows with the catalog (each new item adds a fixture character). A generous
+ * explicit bound keeps a larger registry from tripping the 5 s default on a
+ * slow runner without hiding a hang.
+ */
+const CATALOG_TEST_TIMEOUT_MS = 60_000;
+
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
 
@@ -746,100 +754,113 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   // ADD ITEM grants the WHOLE canonical catalog (#333)
   // -------------------------------------------------------------------------
 
-  it("ADD ITEM grants every canonical inventory item with a real command and one audit row", async () => {
-    // Derived from the canonical definitions (the same enumerator the console's
-    // picker uses), so a newly authored item is covered without editing this test.
-    const definitions = inventoryItemDefinitions();
-    expect(definitions.length).toBeGreaterThan(6);
-    for (const definition of definitions) {
-      const { character } = await makeCharacter();
-      const label = definition.itemId;
+  it(
+    "ADD ITEM grants every canonical inventory item with a real command and one audit row",
+    async () => {
+      // Derived from the canonical definitions (the same enumerator the console's
+      // picker uses), so a newly authored item is covered without editing this test.
+      const definitions = inventoryItemDefinitions();
+      expect(definitions.length).toBeGreaterThan(6);
+      for (const definition of definitions) {
+        const { character } = await makeCharacter();
+        const label = definition.itemId;
 
-      if (definition.kind === "stack") {
-        const result = await adminCommands.addItemAsAdmin(
-          ADMIN,
-          character.id,
-          definition.itemId,
-          1,
-        );
-        expect(result.outcome, label).toEqual({
-          kind: "added",
-          itemId: definition.itemId,
-          quantity: 1,
-        });
-        expect(
-          result.state.inventory.stacks
-            .filter((stack) => stack.itemId === definition.itemId)
-            .reduce((sum, stack) => sum + stack.quantity, 0),
-          label,
-        ).toBe(1);
-        const audit = await auditFor(character.id);
-        expect(audit, label).toHaveLength(1);
-        expect(audit[0]?.operation, label).toBe("added_stackable_item");
-        expect(audit[0]?.targetIdentity, label).toBe(definition.itemId);
-        expect(audit[0]?.details, label).toEqual({ quantity: 1 });
-      } else {
-        const result = await adminCommands.addItemAsAdmin(
-          ADMIN,
-          character.id,
-          definition.itemId,
-          undefined,
-        );
-        expect(result.outcome, label).toEqual({
-          kind: "added",
-          itemId: definition.itemId,
-          quantity: 1,
-        });
-        const instances = await db
-          .select()
-          .from(rune.itemInstances)
-          .where(
-            and(
-              eq(rune.itemInstances.characterId, character.id),
-              eq(rune.itemInstances.itemId, definition.itemId),
-            ),
+        if (definition.kind === "stack") {
+          const result = await adminCommands.addItemAsAdmin(
+            ADMIN,
+            character.id,
+            definition.itemId,
+            1,
           );
-        // The fixture's starter cutter and container are themselves uniques;
-        // the granted instance is the one the audit row names.
-        const audit = await auditFor(character.id);
-        expect(audit, label).toHaveLength(1);
-        expect(audit[0]?.operation, label).toBe("added_unique_item");
-        const granted = instances.find((instance) => instance.id === audit[0]?.targetIdentity);
-        expect(granted, label).toBeDefined();
-        // Canonical initialization: charge exists only for items that author it.
-        expect(granted?.currentCharge, label).toBe(
-          getItemMaximumCharge(definition.itemId) !== undefined ? 0 : null,
-        );
-        expect(
-          result.state.inventory.uniqueItems.some((item) => item.id === granted?.id),
-          label,
-        ).toBe(true);
+          expect(result.outcome, label).toEqual({
+            kind: "added",
+            itemId: definition.itemId,
+            quantity: 1,
+          });
+          expect(
+            result.state.inventory.stacks
+              .filter((stack) => stack.itemId === definition.itemId)
+              .reduce((sum, stack) => sum + stack.quantity, 0),
+            label,
+          ).toBe(1);
+          const audit = await auditFor(character.id);
+          expect(audit, label).toHaveLength(1);
+          expect(audit[0]?.operation, label).toBe("added_stackable_item");
+          expect(audit[0]?.targetIdentity, label).toBe(definition.itemId);
+          expect(audit[0]?.details, label).toEqual({ quantity: 1 });
+        } else {
+          const result = await adminCommands.addItemAsAdmin(
+            ADMIN,
+            character.id,
+            definition.itemId,
+            undefined,
+          );
+          expect(result.outcome, label).toEqual({
+            kind: "added",
+            itemId: definition.itemId,
+            quantity: 1,
+          });
+          const instances = await db
+            .select()
+            .from(rune.itemInstances)
+            .where(
+              and(
+                eq(rune.itemInstances.characterId, character.id),
+                eq(rune.itemInstances.itemId, definition.itemId),
+              ),
+            );
+          // The fixture's starter cutter and container are themselves uniques;
+          // the granted instance is the one the audit row names.
+          const audit = await auditFor(character.id);
+          expect(audit, label).toHaveLength(1);
+          expect(audit[0]?.operation, label).toBe("added_unique_item");
+          const granted = instances.find((instance) => instance.id === audit[0]?.targetIdentity);
+          expect(granted, label).toBeDefined();
+          // Canonical initialization: charge exists only for items that author it.
+          expect(granted?.currentCharge, label).toBe(
+            getItemMaximumCharge(definition.itemId) !== undefined ? 0 : null,
+          );
+          expect(
+            result.state.inventory.uniqueItems.some((item) => item.id === granted?.id),
+            label,
+          ).toBe(true);
+        }
       }
-    }
-  });
+    },
+    CATALOG_TEST_TIMEOUT_MS,
+  );
 
-  it("ADD ITEM refuses an explicit quantity for EVERY unique item, with no instance or audit", async () => {
-    for (const definition of inventoryItemDefinitions().filter(
-      (candidate) => candidate.kind === "unique",
-    )) {
-      const { character } = await makeCharacter();
-      // The first command provisions the character's starter state; a refused
-      // grant is measured against that, not against the bare fixture.
-      await adminCommands.addItemAsAdmin(ADMIN, character.id, "not_an_item", undefined);
-      const before = await db
-        .select({ id: rune.itemInstances.id })
-        .from(rune.itemInstances)
-        .where(eq(rune.itemInstances.characterId, character.id));
-      const result = await adminCommands.addItemAsAdmin(ADMIN, character.id, definition.itemId, 2);
-      expect(result.outcome.kind, definition.itemId).toBe("refused");
-      const after = await db
-        .select({ id: rune.itemInstances.id })
-        .from(rune.itemInstances)
-        .where(eq(rune.itemInstances.characterId, character.id));
-      expect(after, definition.itemId).toHaveLength(before.length);
-      expect(await auditFor(character.id), definition.itemId).toHaveLength(0);
-    }
-  });
+  it(
+    "ADD ITEM refuses an explicit quantity for EVERY unique item, with no instance or audit",
+    async () => {
+      for (const definition of inventoryItemDefinitions().filter(
+        (candidate) => candidate.kind === "unique",
+      )) {
+        const { character } = await makeCharacter();
+        // The first command provisions the character's starter state; a refused
+        // grant is measured against that, not against the bare fixture.
+        await adminCommands.addItemAsAdmin(ADMIN, character.id, "not_an_item", undefined);
+        const before = await db
+          .select({ id: rune.itemInstances.id })
+          .from(rune.itemInstances)
+          .where(eq(rune.itemInstances.characterId, character.id));
+        const result = await adminCommands.addItemAsAdmin(
+          ADMIN,
+          character.id,
+          definition.itemId,
+          2,
+        );
+        expect(result.outcome.kind, definition.itemId).toBe("refused");
+        const after = await db
+          .select({ id: rune.itemInstances.id })
+          .from(rune.itemInstances)
+          .where(eq(rune.itemInstances.characterId, character.id));
+        expect(after, definition.itemId).toHaveLength(before.length);
+        expect(await auditFor(character.id), definition.itemId).toHaveLength(0);
+      }
+    },
+    CATALOG_TEST_TIMEOUT_MS,
+  );
 
   it("ADD ITEM refuses a stackable grant over carried mass capacity with no partial grant or audit", async () => {
     const { character } = await makeCharacter();

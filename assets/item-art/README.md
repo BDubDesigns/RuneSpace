@@ -85,6 +85,17 @@ clients.
   576×541), centred on a 640×640 transparent canvas and saved as lossless WebP. Neither carries
   a baked sparkle or sweep: the Legendary treatment is the UI's. Nothing was regenerated,
   recomposed or recoloured.
+- `sealed-research-packet.png`, `geological-sample-case.png` and `resonance-sampler.png` are the
+  approved 1254×1254 transparent RGBA renders of the Wise Old Enby's research-job loans (#406):
+  a wrapped, strapped and labelled packet, a rugged green-and-steel sampling case with three
+  coloured buttons, and a hand-held resonance sampler with a screen and a violet-lit cage. They
+  are byte-identical to the owner-supplied masters and checked by SHA-256
+  (`4e4639f9…3d35`, `e09e07ad…feb9`, `a64fde32…8f2a`). `scripts/prepare-research-loan-art.mjs`
+  produces the derivatives with the Wheel Assembly convention — alpha noise below 4 cleared,
+  near-opaque alpha (252 and above) snapped to 255, trimmed to content (1197×988, 1166×792 and
+  1037×1224), scaled to a 576 px long edge (576×475, 576×391 and 488×576), centred on a 640×640
+  transparent canvas and saved as lossless WebP. Nothing was regenerated, recomposed or
+  recoloured.
 - Production derivatives are committed under `public/item-art/` and are the only
   item assets the application consumes
   (`game/content/item-presentation.ts`).

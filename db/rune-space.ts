@@ -580,6 +580,80 @@ export const characterPassengerJourneys = pgTable(
   ],
 );
 
+/**
+ * A character's one active Wise Old Enby research assignment (#406).
+ *
+ * The primary key IS the exclusivity rule: a character can hold at most one row
+ * across all three jobs, so two racing accepts cannot both insert. The row is
+ * the whole run: the job, the loaned item it issued, and the durable progress
+ * (`delivered_at` for the Courier, `sampled_location_ids` for the Survey,
+ * `recorded_at` for Calibration). It is deleted on a paid turn-in, a confirmed
+ * teleport or an abandonment, so storage stays one row per character however
+ * often they repeat; what a finished run leaves behind lives in
+ * `character_research_jobs`. `id` is the run's identity: a stale command from an
+ * earlier run names a different id and finds nothing to act on.
+ *
+ * `item_instance_id` is the one loaned unique item, minted in the same
+ * transaction as this row. It is null once a Courier packet is consumed at
+ * FedHex, and nulled by the database if the instance row is ever removed.
+ */
+export const characterResearchAssignments = pgTable("character_research_assignments", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.id, { onDelete: "restrict" }),
+  id: text("id")
+    .notNull()
+    .unique()
+    .default(sql`gen_random_uuid()`),
+  jobId: text("job_id").notNull(),
+  itemInstanceId: text("item_instance_id").references(() => itemInstances.id, {
+    onDelete: "set null",
+  }),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  // The player's Current Missions preference for this run (#406). It lives on the
+  // run, not on `character_mission_unpins` (which references a Mission row a
+  // research run does not have), so every fresh run starts pinned.
+  pinned: boolean("pinned").notNull().default(true),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }),
+  sampledLocationIds: text("sampled_location_ids")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+});
+
+/**
+ * What finished research runs leave behind, one row per character and job
+ * (#406): how many runs were completed (so the Enby plays the short repeat
+ * introduction after the first) and, for Resonance Calibration, the durable
+ * arrival receipt. A run counts only when it is paid or teleported, never when
+ * abandoned. `arrival_acknowledged_at` is presentation only; the arrival modal
+ * is owed while the last completion is newer than it, so it survives refresh and
+ * devices and a dropped acknowledgment never replays movement.
+ */
+export const characterResearchJobs = pgTable(
+  "character_research_jobs",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    jobId: text("job_id").notNull(),
+    completions: integer("completions").notNull().default(0),
+    lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
+    arrivalAcknowledgedAt: timestamp("arrival_acknowledged_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.jobId],
+      name: "character_research_jobs_character_job_pk",
+    }),
+    check(
+      "character_research_jobs_completions_non_negative",
+      sql`${table.completions} >= 0 AND (${table.completions} = 0) = (${table.lastCompletedAt} IS NULL)`,
+    ),
+  ],
+);
+
 /** Durable idempotency marker for the one-time Issue #18 starter loadout. */
 export const characterStarterProvisioning = pgTable("character_starter_provisioning", {
   characterId: text("character_id")
@@ -2681,3 +2755,5 @@ export type PlayerTradeSession = typeof playerTradeSessions.$inferSelect;
 export type PlayerTradeOfferStack = typeof playerTradeOfferStacks.$inferSelect;
 export type PlayerTradeOfferItem = typeof playerTradeOfferItems.$inferSelect;
 export type PlayerTradeAudit = typeof playerTradeAudits.$inferSelect;
+export type CharacterResearchAssignment = typeof characterResearchAssignments.$inferSelect;
+export type CharacterResearchJob = typeof characterResearchJobs.$inferSelect;

@@ -1,0 +1,1 @@
+ALTER TABLE "character_research_assignments" ADD COLUMN "pinned" boolean DEFAULT true NOT NULL;

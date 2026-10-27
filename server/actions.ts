@@ -45,6 +45,16 @@ import {
 } from "@/server/fabrication-commands";
 import { finishCurrentRuneworking, startRuneworking } from "@/server/runeworking-commands";
 import { acknowledgeEchoReading, startEchoReading } from "@/server/echo-hunt-commands";
+import {
+  abandonResearchJob,
+  acceptResearchJob,
+  acknowledgeResearchArrival,
+  completeResearchJob,
+  deliverResearchPacket,
+  startResearchField,
+  teleportResearchJob,
+  type ResearchCommandResult,
+} from "@/server/research-job-commands";
 import { claimFedhexParcel, type FedhexClaimResult } from "@/server/fedhex-commands";
 import {
   finishCurrentTinkering,
@@ -215,6 +225,10 @@ import {
   RuneworkingCommandRequestSchema,
   StartEchoReadingRequestSchema,
   AcknowledgeEchoReadingRequestSchema,
+  AcceptResearchJobRequestSchema,
+  AcknowledgeResearchArrivalRequestSchema,
+  DeliverResearchPacketRequestSchema,
+  ResearchAssignmentRequestSchema,
   ClaimFedhexParcelRequestSchema,
   StartTinkeringRequestSchema,
   TinkeringCommandRequestSchema,
@@ -1377,6 +1391,88 @@ export async function claimFedhexParcelAction(input: unknown): Promise<FedhexCla
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
+}
+
+export type ResearchActionResult = ResearchCommandResult | { error: string };
+
+/**
+ * The Wise Old Enby's research jobs (#406). Every command names only intent;
+ * the server revalidates the job, the run, the position, the stage and the
+ * Inventory room inside the character lock.
+ */
+async function runResearchAction(
+  characterId: string,
+  command: (userId: string, id: string) => Promise<ResearchCommandResult>,
+): Promise<ResearchActionResult> {
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await command(user.id, characterId);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function acceptResearchJobAction(input: unknown): Promise<ResearchActionResult> {
+  const request = AcceptResearchJobRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid assignment command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    acceptResearchJob(userId, id, { jobId: request.data.jobId }),
+  );
+}
+
+export async function startResearchFieldAction(input: unknown): Promise<ResearchActionResult> {
+  const request = ResearchAssignmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid assignment command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    startResearchField(userId, id, { assignmentId: request.data.assignmentId }),
+  );
+}
+
+export async function deliverResearchPacketAction(input: unknown): Promise<ResearchActionResult> {
+  const request = DeliverResearchPacketRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid delivery command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    deliverResearchPacket(userId, id, {
+      assignmentId: request.data.assignmentId,
+      localPlaceId: request.data.localPlaceId,
+    }),
+  );
+}
+
+export async function completeResearchJobAction(input: unknown): Promise<ResearchActionResult> {
+  const request = ResearchAssignmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid assignment command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    completeResearchJob(userId, id, { assignmentId: request.data.assignmentId }),
+  );
+}
+
+export async function teleportResearchJobAction(input: unknown): Promise<ResearchActionResult> {
+  const request = ResearchAssignmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid assignment command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    teleportResearchJob(userId, id, { assignmentId: request.data.assignmentId }),
+  );
+}
+
+export async function abandonResearchJobAction(input: unknown): Promise<ResearchActionResult> {
+  const request = ResearchAssignmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid assignment command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    abandonResearchJob(userId, id, { assignmentId: request.data.assignmentId }),
+  );
+}
+
+export async function acknowledgeResearchArrivalAction(
+  input: unknown,
+): Promise<ResearchActionResult> {
+  const request = AcknowledgeResearchArrivalRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid arrival acknowledgment." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    acknowledgeResearchArrival(userId, id),
+  );
 }
 
 export type ChatActionResult = ChatSendResult | { error: string };

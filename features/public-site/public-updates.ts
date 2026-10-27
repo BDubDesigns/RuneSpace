@@ -9,6 +9,47 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #406 — Stillreach Slice L: The Wise Old Enby's repeatable research jobs.
+    slug: "research-jobs",
+    title: "Research Jobs at Hilltop Workshop",
+    publishedAt: "2026-10-26T10:00:00-07:00",
+    summary:
+      "The Wise Old Enby now has repeatable work for anyone who reaches Hilltop Workshop: carry a sealed packet to FedHex, collect surface samples at three Stillreach sites, or earn a passage back to Skatboll's Crash Site.",
+    hero: {
+      src: "/location-scenes/hilltop-workshop.webp",
+      alt: "A small metal-roofed workshop with lit windows and a canvas awning on a rocky hilltop covered in violet and teal scrub and tiny glowing mushrooms, misty valleys and an aurora sky beyond",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      [
+        "Talk to The Wise Old Enby at Hilltop Workshop and you will now find two buttons under their story conversations: Conversation Topics, which holds everything you could already ask them, and Research Jobs. A character can hold one research job at a time, and your story missions carry on beside it. Each job lends you one item that sits in a normal Inventory slot and weighs what it weighs, so you need room for it first (see ",
+        { text: "Inventory & Equipment", articleSlug: "inventory-and-equipment" },
+        "). None of them pays any XP, and none needs a tool, a skill or starting Credits.",
+      ],
+      "Research Courier lends you a 2 kg sealed packet. Carry it to the FedHex terminal at Stillreach Landing Station, hand it over there, and walk back for 25 Credits. Geological Field Survey lends a 0.1 kg sample case: collect one surface sample each at Prospecting Quarry, The Dry Seam and Harmonic Workings, in any order, at eight game ticks apiece, then return for 75 Credits. It is not Mining and it puts no ore in your pack.",
+      "Once The Wise Old Enby has explained RuneSpace to you, Resonance Calibration opens. Record a signature at The Low Hum with their sampler, bring it back and hear them out, and they can open a passage to Crash Site on Skatboll. Nothing moves until you press Teleport Now. You and what you carry make the trip; your Rivet, its fuel and your Cargo Hold stay parked where they are. Not Yet leaves everything as it was, and the passage is never saved up for later.",
+      "You can give any job up from its Mission Log entry with Abandon Assignment, from anywhere. You lose its progress and the loaned item, nothing is paid, and you can ask again for a fresh run.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Research Jobs with The Wise Old Enby: Research Courier (25 Credits), Geological Field Survey (75 Credits) and, after RuneSpace has been explained, Resonance Calibration (a passage to Skatboll's Crash Site). All three repeat as often as you like.",
+          "A Research Delivery section in the Stillreach FedHex terminal, above Parcel Pickup, while you carry a Courier packet.",
+          "A compact Collect Surface Sample action at each Survey site and a Record Resonance Signature action at The Low Hum, each eight ticks (4.8 seconds).",
+          "A confirmation before the Calibration passage, and a Welcome to Skatboll window on arrival that stays dismissed once you close it.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Wise Old Enby's replayable topics now sit under Conversation Topics. Story conversations still lead the list.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #404 — Stillreach Slice K: Milky Waymo, the interplanetary passenger shuttle.
     slug: "milky-waymo",
     title: "Milky Waymo",

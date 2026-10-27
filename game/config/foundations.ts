@@ -94,6 +94,11 @@ const itemIds = {
   // The first Legendary Echo rewards (#399): a matched miner's set, one per planet.
   minersBoots: asContentId("miners_boots"),
   minersGloves: asContentId("miners_gloves"),
+  // The Wise Old Enby's research-job loan items (#406): one unique, bound item
+  // per repeatable assignment. Never stackable, tradable, storable or sellable.
+  sealedResearchPacket: asContentId("sealed_research_packet"),
+  geologicalSampleCase: asContentId("geological_sample_case"),
+  resonanceSampler: asContentId("resonance_sampler"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -400,6 +405,30 @@ const dialogueIds = {
   wiseOldEnbyFirstEchoCompletion: asContentId("wise_old_enby_first_echo_completion"),
   wiseOldEnbyHowToListenTopic: asContentId("wise_old_enby_topic_how_to_listen"),
   wiseOldEnbyAboutResonanceEchoesTopic: asContentId("wise_old_enby_topic_about_resonance_echoes"),
+  // The Wise Old Enby's repeatable research jobs (#406). Presentation only: the
+  // job registry (`game/content/research-jobs.ts`) maps each moment to a sequence.
+  researchJobBlocked: asContentId("research_job_blocked"),
+  researchCourierOffer: asContentId("research_courier_offer"),
+  researchCourierAccepted: asContentId("research_courier_accepted"),
+  researchCourierRepeatOffer: asContentId("research_courier_repeat_offer"),
+  researchCourierCapacity: asContentId("research_courier_capacity"),
+  researchCourierReminder: asContentId("research_courier_reminder"),
+  researchCourierTurnIn: asContentId("research_courier_turn_in"),
+  researchCourierCompletion: asContentId("research_courier_completion"),
+  geologicalSurveyOffer: asContentId("geological_survey_offer"),
+  geologicalSurveyAccepted: asContentId("geological_survey_accepted"),
+  geologicalSurveyRepeatOffer: asContentId("geological_survey_repeat_offer"),
+  geologicalSurveyCapacity: asContentId("geological_survey_capacity"),
+  geologicalSurveyNoProgress: asContentId("geological_survey_no_progress"),
+  geologicalSurveyPartial: asContentId("geological_survey_partial"),
+  geologicalSurveyTurnIn: asContentId("geological_survey_turn_in"),
+  geologicalSurveyCompletion: asContentId("geological_survey_completion"),
+  resonanceCalibrationOffer: asContentId("resonance_calibration_offer"),
+  resonanceCalibrationAccepted: asContentId("resonance_calibration_accepted"),
+  resonanceCalibrationRepeatOffer: asContentId("resonance_calibration_repeat_offer"),
+  resonanceCalibrationCapacity: asContentId("resonance_calibration_capacity"),
+  resonanceCalibrationReminder: asContentId("resonance_calibration_reminder"),
+  resonanceCalibrationDeparture: asContentId("resonance_calibration_departure"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -604,7 +633,27 @@ export const ACTION_IDS = {
   // timestamps are durable passenger state, so `active_actions` keeps its narrow
   // no-payload shape.
   passengerTravel: asContentId("passenger_travel"),
+  // The Wise Old Enby's research-job field actions (#406): one surface sample
+  // for the Geological Field Survey, one resonance recording for Calibration.
+  // Each is a single stationary 8-tick action; the assignment row, not the
+  // action, remembers what was collected, so `active_actions` keeps its narrow
+  // no-payload shape.
+  researchSurfaceSample: asContentId("research_surface_sample"),
+  researchResonanceRecording: asContentId("research_resonance_recording"),
 } as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for the Wise Old Enby's repeatable research jobs (#406).
+ * Persisted on the active assignment and the completion history, so never
+ * renamed without a migration.
+ */
+export const RESEARCH_JOB_IDS = {
+  researchCourier: asContentId("research_courier"),
+  geologicalFieldSurvey: asContentId("geological_field_survey"),
+  resonanceCalibration: asContentId("resonance_calibration"),
+} as const satisfies Record<string, ContentId>;
+
+export type ResearchJobId = (typeof RESEARCH_JOB_IDS)[keyof typeof RESEARCH_JOB_IDS];
 
 /**
  * Stable identities for the Rivet Utility Shuttle's authored flight routes

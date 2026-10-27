@@ -1885,6 +1885,34 @@ teaches it is *First Resonance Echo* (`docs/missions.md`). FedHex: `game/content
 `0049_fedhex_mailbox_legendary_echo` (additive: `fedhex_parcels`,
 `echo_reading_notices.reward_mailed`, and the `legendary_find` chat kind).
 
+### The Wise Old Enby's research jobs (issue #406)
+
+Three repeatable jobs at Hilltop Workshop, one held per character at a time
+(`docs/missions.md` §15). Each lends one unique Inventory item (a real slot and its
+real mass; never tradable, storable or sellable) and pays no XP.
+
+- **Research Courier.** A 2 kg Sealed Research Packet, delivered at the Stillreach
+  Landing Station FedHex (a compact Research Delivery section above Parcel Pickup),
+  then **25 Credits** at the Enby.
+- **Geological Field Survey.** A 0.1 kg Geological Sample Case; one surface
+  specimen each at Prospecting Quarry, The Dry Seam and Harmonic Workings, in any
+  order, **8 ticks (4.8 s)** apiece, then **75 Credits**. It is not Mining.
+- **Resonance Calibration.** After Not From Around Here. A 0.1 kg Resonance
+  Sampler, one **8-tick** recording at The Low Hum, then, back at the workshop and
+  after the whole farewell, an explicit confirmation (TELEPORT NOW / NOT YET) that
+  atomically reclaims the sampler and moves the character, with their carried
+  Inventory and Equipment, to the Crash Site on Skatboll. Rivet, fuel and Cargo Hold
+  stay where they are parked; 0 Credits, 0 XP; nothing is banked. A durable
+  arrival modal presents over the Crash Site and its dismissal is presentation only.
+- **Abandon Assignment** in the Mission Log, from anywhere.
+
+Artwork: the three loan items use the approved art (`public/item-art/`, masters in
+`assets/item-art/`, `scripts/prepare-research-loan-art.mjs`); the text fallbacks
+(`RP`, `GC`, `RSA`) remain for when an image cannot load.
+Numbers: `researchJobs` in `game/config/balance.ts`. Migration
+`0051_research_jobs` (additive: `character_research_assignments`,
+`character_research_jobs`).
+
 ### Milky Waymo passenger travel (issue #404)
 
 Milky Waymo is an independent, fully automated passenger shuttle between Holo

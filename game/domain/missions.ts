@@ -197,6 +197,13 @@ export type MissionGuidance = {
    * boundary below.
    */
   locationId?: string;
+  /**
+   * Several World Locations that each advance the current objective at once
+   * (#406): the Geological Field Survey's remaining sample sites, in any order.
+   * They are alternatives of one objective, like `candidates` for contacts, and
+   * contribute to the same location target sets as a singular `locationId`.
+   */
+  locationIds?: readonly string[];
   /** The NPC whose interaction the current objective requires. */
   npcId?: string;
   /**
@@ -268,7 +275,12 @@ export type MissionGuidanceCandidate = {
  * authoritative (names/stack limits resolve through the observation).
  */
 export type MissionRequirementStatus = {
-  kind: MissionRequirementKind;
+  /**
+   * The requirement's kind. `research_step` (#406) is a step of a Wise Old Enby
+   * research assignment: those are projected from the assignment row, not from a
+   * Mission definition.
+   */
+  kind: MissionRequirementKind | "research_step";
   /** Rendered objective copy with authoritative names/numbers substituted. */
   objective: string;
   /** Whether this requirement currently holds against authoritative state. */
@@ -399,6 +411,13 @@ export type MissionProjection = {
   };
   /** Projected semantic guidance targets (empty when nothing needs guidance). */
   guidance?: MissionGuidance;
+  /**
+   * Present only on a Wise Old Enby research assignment (#406), which is
+   * projected from its assignment row rather than a Mission definition. It
+   * names the run, so the Mission Log can offer Abandon Assignment for exactly
+   * this run, and marks the projection as not pinnable or conversational.
+   */
+  research?: { assignmentId: string };
   /**
    * Present only while a carried item currently offers this Mission (#369): the
    * Mission is not accepted, its prerequisites hold, and the character carries a
@@ -1516,6 +1535,7 @@ export function deriveMissionGuidanceTargets(
       }
       if (target.locationId) (turnIn ? turnInLocationIds : locationIds).add(target.locationId);
     }
+    for (const id of guidance.locationIds ?? []) (turnIn ? turnInLocationIds : locationIds).add(id);
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
     if (guidance.actionItemId) actionItemIds.add(guidance.actionItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);

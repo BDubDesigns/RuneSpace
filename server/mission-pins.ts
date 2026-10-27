@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { characterMissionUnpins } from "@/db/rune-space";
+import { and, eq } from "drizzle-orm";
+import { characterMissionUnpins, characterResearchAssignments } from "@/db/rune-space";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
 /**
@@ -23,5 +23,16 @@ export async function loadUnpinnedMissionIds(
     .from(characterMissionUnpins)
     .where(eq(characterMissionUnpins.characterId, characterId))
     .orderBy(characterMissionUnpins.missionId);
-  return rows.map((row) => row.missionId);
+  // A held Wise Old Enby research run (#406) keeps its preference on the run itself;
+  // it is reported in the same list so every presentation consumer reads one value.
+  const [run] = await transaction
+    .select({ jobId: characterResearchAssignments.jobId })
+    .from(characterResearchAssignments)
+    .where(
+      and(
+        eq(characterResearchAssignments.characterId, characterId),
+        eq(characterResearchAssignments.pinned, false),
+      ),
+    );
+  return [...rows.map((row) => row.missionId), ...(run ? [run.jobId] : [])].sort();
 }

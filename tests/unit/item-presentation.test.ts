@@ -98,6 +98,19 @@ describe("item presentation content", () => {
     }
   });
 
+  it("resolves the research loans (#406) to their approved artwork, keeping the text fallbacks", () => {
+    for (const [itemId, fallback, src] of [
+      [ITEM_IDS.sealedResearchPacket, "RP", "/item-art/sealed-research-packet.webp"],
+      [ITEM_IDS.geologicalSampleCase, "GC", "/item-art/geological-sample-case.webp"],
+      [ITEM_IDS.resonanceSampler, "RSA", "/item-art/resonance-sampler.webp"],
+    ] as const) {
+      expect(getItemPresentation(itemId)).toMatchObject({
+        textFallback: fallback,
+        artworkSrc: src,
+      });
+    }
+  });
+
   it("gives every item with an inventory definition committed artwork", () => {
     for (const itemId of Object.values(ITEM_IDS)) {
       const presentation = getItemPresentation(itemId);

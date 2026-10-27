@@ -255,6 +255,14 @@ import type { RuneworkingCommandError } from "@/server/runeworking-commands";
 import type { EchoReadingCommandError } from "@/server/echo-hunt-commands";
 import { loadFedhexProjection, type FedhexMailboxProjection } from "@/server/fedhex";
 import {
+  buildResearchProjection,
+  createResearchFieldResolver,
+  isResearchFieldAction,
+  loadResearchAssignment,
+  loadResearchHistory,
+} from "@/server/research-jobs";
+import type { ResearchProjection } from "@/game/domain/research-jobs";
+import {
   createEchoReadingResolver,
   echoRandomFrom,
   isEchoReadingAction,
@@ -1003,6 +1011,13 @@ export type PlayGameplayState = {
   echoHunt: EchoHuntProjection;
   /** The character's one FedHex mailbox, the same from either pickup (#399). */
   fedhex: FedhexMailboxProjection;
+  /**
+   * The Wise Old Enby's research jobs (#406): which jobs are offered and why one
+   * is not, the held assignment's progress and the durable arrival receipt. The
+   * held run also appears in `missions` as a Mission-shaped projection so the
+   * Mission Log, strips and guidance render it with no second path.
+   */
+  research: ResearchProjection;
   /** One current Seeker reading refusal, for its Item Details (#393). */
   echoReadingError?: EchoReadingCommandError;
   /**
@@ -1394,6 +1409,16 @@ export function createPlayResolver(
     ...runeworkingRecipes().map((recipe) => ({
       actionId: recipe.actionId,
       resolver: createRuneworkingResolver() as PlayResolver,
+    })),
+    // The Wise Old Enby's research field actions (#406): one surface sample or one
+    // resonance recording, each a single stationary 8-tick action that records its
+    // progress on the assignment row when it resolves.
+    ...[
+      getEffectiveGameBalance().researchJobs.surfaceSampleActionId,
+      getEffectiveGameBalance().researchJobs.resonanceRecordingActionId,
+    ].map((actionId) => ({
+      actionId,
+      resolver: createResearchFieldResolver() as PlayResolver,
     })),
     {
       // Reading a Beginner Echo Seeker (#393): one timed, stationary reading that
@@ -2548,28 +2573,33 @@ export async function stateFromTransaction(
     ? runeworkingRecipeForActionId(action.actionId, balance)
     : undefined;
   const activeEchoReading = isEchoReadingAction(action?.actionId);
+  const activeResearchField = isResearchFieldAction(action?.actionId);
   const nextAttemptDurationTicks = activeEchoReading
     ? balance.echoHunts.beginner.readingDurationTicks
-    : isWeldingCadenceAction
-      ? balance.welding.attemptDurationTicks
-      : activeRefiningRecipe
-        ? // The run's own persisted venue prices it (#381), never the route.
-          activeRefiningRecipe.attemptDurationTicks *
-          refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
-        : activeFabricationRecipe
-          ? activeFabricationRecipe.durationTicks
-          : activeRuneworkingRecipe
-            ? activeRuneworkingRecipe.durationTicks
-            : activeTinkeringTarget
-              ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
-              : activeMiningSource
-                ? miningAttemptDurationTicks(
-                    balance,
-                    activeMiningSource,
-                    equippedTool?.definition,
-                    nextAttemptBoosted,
-                  )
-                : balance.welding.attemptDurationTicks;
+    : activeResearchField
+      ? action?.actionId === balance.researchJobs.surfaceSampleActionId
+        ? balance.researchJobs.surfaceSampleDurationTicks
+        : balance.researchJobs.resonanceRecordingDurationTicks
+      : isWeldingCadenceAction
+        ? balance.welding.attemptDurationTicks
+        : activeRefiningRecipe
+          ? // The run's own persisted venue prices it (#381), never the route.
+            activeRefiningRecipe.attemptDurationTicks *
+            refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
+          : activeFabricationRecipe
+            ? activeFabricationRecipe.durationTicks
+            : activeRuneworkingRecipe
+              ? activeRuneworkingRecipe.durationTicks
+              : activeTinkeringTarget
+                ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
+                : activeMiningSource
+                  ? miningAttemptDurationTicks(
+                      balance,
+                      activeMiningSource,
+                      equippedTool?.definition,
+                      nextAttemptBoosted,
+                    )
+                  : balance.welding.attemptDurationTicks;
   // A workpiece's timer runs from the cursor, which always stands at its start.
   // A Tinkering cycle's cursor moves with every resolution, so its timer runs
   // from the ticks it has already had.
@@ -2631,11 +2661,22 @@ export async function stateFromTransaction(
   );
   const echoHunt = await loadEchoHuntProjection(transaction, characterId, currentLocationId);
   const fedhex = await loadFedhexProjection(transaction, characterId);
+  const [researchAssignment, researchHistory] = await Promise.all([
+    loadResearchAssignment(transaction, characterId),
+    loadResearchHistory(transaction, characterId),
+  ]);
+  const research = buildResearchProjection({
+    assignment: researchAssignment,
+    history: researchHistory,
+    carriedInstanceIds: new Set(snapshot.carriedInstances.map((instance) => instance.id)),
+    completedMissionIds: deriveCompletedMissionIds(missions),
+  });
   return {
     characterId,
     missions,
     echoHunt,
     fedhex,
+    research,
     location: { currentLocationId },
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,
@@ -2656,6 +2697,7 @@ export async function stateFromTransaction(
         activeTinkeringTarget !== undefined ||
         activeRuneworkingRecipe !== undefined ||
         activeEchoReading ||
+        activeResearchField ||
         isWeldingCadenceAction)
         ? {
             actionId: action.actionId,

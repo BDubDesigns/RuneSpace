@@ -102,6 +102,7 @@ function cargoState(): PlayGameplayState {
     fabrication: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     runeworking: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     fedhex: { pendingCount: 0, parcels: [] },
+    research: { offers: [] },
     echoHunt: {
       seekerItemId: "beginner_echo_seeker",
       readingActionId: "beginner_echo_reading",
