@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { playerAccounts, playerPresence } from "@/db/rune-space";
 import { expect, openTestCharacter, test } from "./fixtures";
 
 test("public navigation, rankings, and shareable profiles work on mobile and desktop", async ({
@@ -81,7 +84,22 @@ test("public navigation, rankings, and shareable profiles work on mobile and des
   await context.close();
 });
 
-test("players can reach High Scores from Character", async ({ page, testCharacter }) => {
+test("players can reach High Scores from Character", async ({
+  page,
+  testCharacter,
+  workerAuth,
+}) => {
+  // The canonical suite reuses each worker account across tests. Expire only
+  // this fixture account's previous check-in so this test observes a new 204.
+  const [account] = await db
+    .select({ id: playerAccounts.id })
+    .from(playerAccounts)
+    .where(eq(playerAccounts.userId, workerAuth.userId));
+  if (account)
+    await db
+      .update(playerPresence)
+      .set({ lastCheckInAt: new Date(0) })
+      .where(eq(playerPresence.playerAccountId, account.id));
   await page.setViewportSize({ width: 390, height: 844 });
   const checkIn = page.waitForResponse(
     (response) =>
