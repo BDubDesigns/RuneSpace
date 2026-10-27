@@ -77,6 +77,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/qc-studio/page.tsx": "dev tool (env-gated)",
   "app/api/auth/[...all]/route.ts": "account: Better Auth handler",
   "app/api/build-info/route.ts": "public build identity",
+  "app/feed.xml/route.ts": "public Updates RSS feed",
   "app/api/diagnostics/route.ts": "client diagnostics intake",
   "app/api/e2e/turnstile-siteverify/route.ts": "local E2E stub (404 outside the gate)",
   "app/api/location-population/route.ts": "GAMEPLAY: location population read",
