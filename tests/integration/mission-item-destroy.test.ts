@@ -359,5 +359,103 @@ suite("issue #408 Mission item Destroy (real PostgreSQL)", () => {
       expect((await creditsOf(who.characterId)).credits).toBe(credits);
       expect(await completions(who.characterId)).toBe(0);
     });
+
+    /** A run whose field work is done, with the character back at the workshop. */
+    async function readyRun(who: Who, jobId: string) {
+      const { run, item } = await begin(who, jobId);
+      await db
+        .update(rune.characterResearchAssignments)
+        .set(
+          jobId === SURVEY
+            ? {
+                sampledLocationIds: [
+                  LOCATION_IDS.prospectingQuarry,
+                  LOCATION_IDS.theDrySeam,
+                  LOCATION_IDS.harmonicWorkings,
+                ],
+              }
+            : { recordedAt: start },
+        )
+        .where(eq(rune.characterResearchAssignments.id, run));
+      expect((await read(who, at(2))).research.assignment).toMatchObject({ stage: "ready" });
+      return { run, item };
+    }
+
+    it("lets exactly one of Destroy and payment end a ready run", async () => {
+      const who = await makeCharacter("DstVsPay");
+      const { run, item } = await readyRun(who, SURVEY);
+      const credits = (await creditsOf(who.characterId)).credits;
+      const payout = balance.researchJobs.surveyRewardCredits;
+      const [destroyed, paid] = await Promise.all([
+        destroy(who, item, run, at(5)),
+        jobs.completeResearchJob(who.userId, who.characterId, { assignmentId: run }, at(5)),
+      ]);
+      if (destroyed.research.status === "ok") {
+        expect(paid.research).toMatchObject({ status: "refused", reason: "no_assignment" });
+        expect((await creditsOf(who.characterId)).credits).toBe(credits);
+        expect(await completions(who.characterId)).toBe(0);
+      } else {
+        expect(paid.research).toMatchObject({ status: "ok", kind: "paid", creditsPaid: payout });
+        expect(destroyed.research).toMatchObject({ status: "refused", reason: "no_assignment" });
+        expect((await creditsOf(who.characterId)).credits).toBe(credits + payout);
+        expect(await completions(who.characterId)).toBe(1);
+      }
+      expect(await assignment(who.characterId)).toBeUndefined();
+      expect(await instancesOf(who.characterId)).toHaveLength(0);
+    });
+
+    it("lets exactly one of Destroy and the Calibration teleport end a ready run", async () => {
+      const who = await makeCharacter("DstVsTeleport");
+      const { run, item } = await readyRun(who, CALIBRATION);
+      // A parked Rivet with fuel and a Cargo Hold row, all keyed to the ship.
+      await db
+        .insert(rune.characterShips)
+        .values({
+          characterId: who.characterId,
+          berthLocationId: LOCATION_IDS.stillreachLandingStation,
+          fuelUnits: 37,
+        })
+        .onConflictDoUpdate({
+          target: rune.characterShips.characterId,
+          set: { berthLocationId: LOCATION_IDS.stillreachLandingStation, fuelUnits: 37 },
+        });
+      await db
+        .insert(rune.cargoHoldStacks)
+        .values({ characterId: who.characterId, itemId: ITEM_IDS.stone, quantity: 3 });
+      const credits = (await creditsOf(who.characterId)).credits;
+      const [destroyed, teleported] = await Promise.all([
+        destroy(who, item, run, at(5)),
+        jobs.teleportResearchJob(who.userId, who.characterId, { assignmentId: run }, at(5)),
+      ]);
+      const receipt = (await read(who, at(6))).research.arrival;
+      if (destroyed.research.status === "ok") {
+        expect(teleported.research).toMatchObject({ status: "refused", reason: "no_assignment" });
+        expect((await creditsOf(who.characterId)).at).toBe(WORKSHOP);
+        expect(await completions(who.characterId)).toBe(0);
+        expect(receipt).toBeUndefined();
+      } else {
+        expect(teleported.research).toMatchObject({ status: "ok", kind: "teleported" });
+        expect(destroyed.research).toMatchObject({ status: "refused", reason: "no_assignment" });
+        expect((await creditsOf(who.characterId)).at).toBe(LOCATION_IDS.crashSite);
+        expect(await completions(who.characterId)).toBe(1);
+        expect(receipt).toBeDefined();
+      }
+      expect((await creditsOf(who.characterId)).credits).toBe(credits);
+      expect(await assignment(who.characterId)).toBeUndefined();
+      expect(await instancesOf(who.characterId)).toHaveLength(0);
+      const [ship] = await db
+        .select()
+        .from(rune.characterShips)
+        .where(eq(rune.characterShips.characterId, who.characterId));
+      expect(ship).toMatchObject({
+        berthLocationId: LOCATION_IDS.stillreachLandingStation,
+        fuelUnits: 37,
+      });
+      const cargoStacks = await db
+        .select()
+        .from(rune.cargoHoldStacks)
+        .where(eq(rune.cargoHoldStacks.characterId, who.characterId));
+      expect(cargoStacks).toMatchObject([{ itemId: ITEM_IDS.stone, quantity: 3 }]);
+    });
   });
 });
