@@ -96,6 +96,7 @@ export const FOCUSED_PHASES = [
   "fedhex",
   "milky-waymo",
   "research-jobs",
+  "mission-item-destroy",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

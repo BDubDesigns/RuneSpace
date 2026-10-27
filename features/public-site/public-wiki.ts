@@ -1924,7 +1924,7 @@ const authoredWikiArticles = [
       {
         heading: "Research Jobs",
         paragraphs: [
-          "Talk to them and choose Research Jobs for repeatable work. They keep one research job going at a time per character; story missions are separate and never blocked. Each job lends you one item that takes a normal Inventory slot and its real weight, so you need room for it. You cannot sell, trade, store, stash or drop a loaned item, and none of these jobs pays any XP. To give a job up, choose Abandon Assignment in its Mission Log entry, from anywhere: you lose its progress and the loaned item, and nothing is paid.",
+          "Talk to them and choose Research Jobs for repeatable work. They keep one research job going at a time per character; story missions are separate and never blocked. Each job lends you one item that takes a normal Inventory slot and its real weight, so you need room for it. You cannot sell, trade, store, stash or drop a loaned item, and none of these jobs pays any XP. To give a job up, choose Abandon Assignment in its Mission Log entry, from anywhere, or choose Destroy on the loaned item in your Inventory and confirm: either way you lose its progress and the loaned item, and nothing is paid. Once the Courier packet has been handed to FedHex there is nothing left to destroy, so use Abandon Assignment.",
           [
             "Research Courier lends a 2 kg Sealed Research Packet. Carry it to the FedHex terminal at Stillreach Landing Station (see ",
             { text: "Credits & Trading", articleSlug: "credits-and-trading" },

@@ -1162,6 +1162,21 @@ need earns its own deliberate extension.
 - **Abandon Assignment** (`abandonResearchJob`) works from anywhere at any stage. It
   forfeits progress, the loan and any payout or passage, cancels a pending field
   action, counts nothing and frees the slot.
+- **Destroy (#408)** is the Inventory way to end a run. It is offered only for an
+  item that opts in through `MISSION_ITEM_DESTROY_POLICIES`
+  (`game/content/mission-item-destroy.ts`: item → the job it cancels → the loss the
+  confirmation names), never because an item is unique, bound or Mission-related.
+  `missionItemDestroyOffer` (domain) shows it for the exact instance
+  `state.research.assignment.loanItemInstanceId` names; `destroyMissionItem` sends the
+  instance id and the run id and rechecks both under the character lock (the run is
+  the held one, the instance is the one it holds and still carries, the item opts in
+  to that very job). It then ends the run with `cancelRun`, the same cleanup Abandon
+  Assignment uses (pending field action, guarded run delete, loan delete), so the
+  two cannot diverge. Nothing is paid, counted, granted, dropped or moved, and the
+  trade, flight and other Play-command gates are the ordinary ones. To let a future
+  Mission item be destroyed, add its policy entry; a Mission that is not a research
+  run also needs its own `cancels` kind and a server cancellation to dispatch to.
+  After a Courier delivery the packet is gone, so only Abandon Assignment applies.
 - **Presentation.** The held run is appended to `state.missions` as a Mission-shaped
   projection (`projectResearchAssignment`, `MissionProjection.research`) and
   `state.research` carries the offers, the run and the arrival receipt. Guidance

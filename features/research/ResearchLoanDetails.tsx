@@ -9,8 +9,8 @@ import { assignmentFactsOf, researchStage } from "@/game/domain/research-jobs";
  * The Item Details of a Wise Old Enby research loan (#406): that it is borrowed
  * and what state it is in. Read-only: every fact is the server's projection of
  * the held run, so opening this changes nothing. The loan is an ordinary carried
- * item; it simply cannot be sold, traded, stored or mailed, and Abandon
- * Assignment (in the Mission Log) is how a player gives it up.
+ * item; it simply cannot be sold, traded, stored or mailed, and a player gives
+ * it up with Abandon Assignment (Mission Log) or Destroy (`ResearchLoanDestroy`).
  */
 export function ResearchLoanDetails({ itemId }: { itemId: string }) {
   const { state } = usePlay();

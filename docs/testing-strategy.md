@@ -222,6 +222,22 @@ small number of critical mobile player journeys.
   Research Delivery placement, the field actions, declining the passage, the durable
   arrival modal (button, Escape, reload), Abandon Assignment and a desktop layout.
 
+### Issue #408 Mission item Destroy coverage
+
+- Unit (`tests/unit/mission-item-destroy.test.ts`): the explicit opt-in registry (exactly
+  the three loans, each tied to the job that lends it), nothing granted by being unique or
+  bound, and `missionItemDestroyOffer` matching only the exact held instance.
+- Integration (`tests/integration/mission-item-destroy.test.ts`, real PostgreSQL): per
+  loan, instance, run, slot and mass gone with no payout, count, move or grant; a running
+  field action cancelled and a resolved reading forfeited; no packet after delivery
+  (Abandon still works); forged, orphan, ordinary-unique, foreign and stale ids refused
+  without touching a newer run; duplicate Destroys, Destroy vs Abandon and Destroy vs
+  FedHex delivery each ending exactly one run.
+- E2E (`tests/e2e/mission-item-destroy.spec.ts`, canonical and focused phase
+  `mission-item-destroy`): all three loans at phone width (confirmation, KEEP ITEM changing
+  nothing, announced result, focus on the grid), no Destroy for unrelated or orphan items,
+  the delivered Courier, a running field action, a stale confirmation and the desktop layout.
+
 ### Issue #404 Milky Waymo coverage
 
 - Unit: the pure route, fare, duration and unlock rules (`passenger-travel`), the 24-line pool,
