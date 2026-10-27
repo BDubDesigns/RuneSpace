@@ -54,6 +54,13 @@ async function load(env: Env = {}) {
   return { client, document };
 }
 
+/** Load the module and wait for the lazily imported SDK, so each call below is deterministic. */
+async function loadStarted(env: Env = {}) {
+  const loaded = await load(env);
+  await loaded.client.startAnalytics();
+  return loaded;
+}
+
 async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -124,7 +131,7 @@ describe("analytics gating", () => {
 
 describe("analytics events", () => {
   it("records a landing pageview with attribution and first-touch once", async () => {
-    const { client } = await load({
+    const { client } = await loadStarted({
       search: "?utm_source=scapelikes&session=SECRET",
       referrer: "https://www.example.org/post?id=SECRET",
     });
@@ -142,14 +149,14 @@ describe("analytics events", () => {
   });
 
   it("does not record a pageview for an operator route", async () => {
-    const { client } = await load();
+    const { client } = await loadStarted();
     client.trackAnalyticsPageview("/admin/characters/abc", false);
     await settle();
     expect(posthog.capture).not.toHaveBeenCalled();
   });
 
   it("records a lifecycle event with only its declared properties", async () => {
-    const { client } = await load();
+    const { client } = await loadStarted();
     client.trackAnalyticsEvent("gameplay_milestone_reached", {
       milestone: "first_xp_gained",
       characterId: "SECRET",
@@ -165,7 +172,7 @@ describe("analytics events", () => {
 
 describe("analytics identity", () => {
   it("identifies by the stable account ID with no person properties, once", async () => {
-    const { client } = await load();
+    const { client } = await loadStarted();
     client.identifyAnalyticsAccount("user_1");
     await settle();
     expect(posthog.identify).toHaveBeenCalledWith("user_1");
@@ -176,7 +183,7 @@ describe("analytics identity", () => {
   });
 
   it("resets on sign-out only when an identity exists", async () => {
-    const { client } = await load();
+    const { client } = await loadStarted();
     client.resetAnalyticsIdentity();
     await settle();
     expect(posthog.reset).not.toHaveBeenCalled();
