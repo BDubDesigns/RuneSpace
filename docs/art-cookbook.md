@@ -665,6 +665,11 @@ Current production conventions:
   trimmed, scaled to a 576 px long edge, centred on a 640x640 transparent canvas,
   lossless WebP; the Stone content is 576x450, the Boulder 576x516). Neither bakes
   in the Ultra Rare shimmer; both were checked at the 80 px inventory tile
+- the Wise Old Enby's research-job loans (#406): the approved Sealed Research Packet, Geological
+  Sample Case and Resonance Sampler masters (1254x1254 transparent RGBA PNG, kept unaltered in
+  `assets/item-art/`, SHA-256 checked) and their derivatives in `public/item-art/`, prepared by
+  `scripts/prepare-research-loan-art.mjs` with the same recipe (content 576x475, 576x391 and
+  488x576 on the 640x640 canvas); checked at the 80 px inventory tile
 - the Beginner Echo Seeker (#391): the approved master (1312x1199 transparent
   RGBA PNG, kept unaltered in `assets/item-art/`, SHA-256 checked) and its
   derivative in `public/item-art/`, prepared by

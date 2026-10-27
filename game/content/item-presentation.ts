@@ -224,13 +224,12 @@ const itemPresentations = {
     description:
       "A fragment attuned to detect hidden disturbances in RuneSpace. Consume one to sense the direction of a hidden Resonance Echo on your current planet.",
   },
-  // The Wise Old Enby's research-job loans (#406). No approved artwork exists
-  // yet, so each renders its text fallback; approved art is added later by
-  // setting `artworkSrc` and adding the master/derivative per the art cookbook.
+  // The Wise Old Enby's research-job loans (#406), with their approved art.
   [ITEM_IDS.sealedResearchPacket]: {
     displayName: "Sealed Research Packet",
     accessibleDescription: "A sealed research packet loaned by The Wise Old Enby",
     textFallback: "RP",
+    artworkSrc: "/item-art/sealed-research-packet.webp",
     description:
       "A sealed packet of recorded research, on loan from The Wise Old Enby. It is a good deal heavier than it looks. Deliver it to the FedHex terminal at Stillreach Landing Station.",
   },
@@ -239,6 +238,7 @@ const itemPresentations = {
     accessibleDescription:
       "A small labelled sampling case with three compartments, loaned by The Wise Old Enby",
     textFallback: "GC",
+    artworkSrc: "/item-art/geological-sample-case.webp",
     description:
       "A sampling case with three labeled compartments, on loan from The Wise Old Enby. Specimens are recorded inside it and add no weight.",
   },
@@ -247,6 +247,7 @@ const itemPresentations = {
     accessibleDescription:
       "A small hand-held resonance sampling instrument with a handle, loaned by The Wise Old Enby",
     textFallback: "RSA",
+    artworkSrc: "/item-art/resonance-sampler.webp",
     description:
       "A small, sophisticated instrument on loan from The Wise Old Enby. It records the current resonance signature of the place where it is used.",
   },

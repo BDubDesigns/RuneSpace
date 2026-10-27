@@ -98,26 +98,21 @@ describe("item presentation content", () => {
     }
   });
 
-  // The Wise Old Enby's research loans (#406) ship with their text fallback until
-  // the owner approves artwork. An item belongs here only while it has no approved
-  // art; adding the art means setting `artworkSrc` and removing it from this list.
-  const AWAITING_APPROVED_ART: readonly string[] = [
-    ITEM_IDS.sealedResearchPacket,
-    ITEM_IDS.geologicalSampleCase,
-    ITEM_IDS.resonanceSampler,
-  ];
-
-  it("renders the research loans from their text fallback until art is approved", () => {
-    for (const itemId of AWAITING_APPROVED_ART) {
-      const presentation = getItemPresentation(itemId)!;
-      expect(presentation.artworkSrc, itemId).toBeUndefined();
-      expect(presentation.textFallback.length, itemId).toBeGreaterThan(0);
+  it("resolves the research loans (#406) to their approved artwork, keeping the text fallbacks", () => {
+    for (const [itemId, fallback, src] of [
+      [ITEM_IDS.sealedResearchPacket, "RP", "/item-art/sealed-research-packet.webp"],
+      [ITEM_IDS.geologicalSampleCase, "GC", "/item-art/geological-sample-case.webp"],
+      [ITEM_IDS.resonanceSampler, "RSA", "/item-art/resonance-sampler.webp"],
+    ] as const) {
+      expect(getItemPresentation(itemId)).toMatchObject({
+        textFallback: fallback,
+        artworkSrc: src,
+      });
     }
   });
 
-  it("gives every other item with an inventory definition committed artwork", () => {
+  it("gives every item with an inventory definition committed artwork", () => {
     for (const itemId of Object.values(ITEM_IDS)) {
-      if (AWAITING_APPROVED_ART.includes(itemId)) continue;
       const presentation = getItemPresentation(itemId);
       if (!presentation) continue;
       expect(presentation.artworkSrc, itemId).toBeDefined();

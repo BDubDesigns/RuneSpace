@@ -1166,7 +1166,12 @@ need earns its own deliberate extension.
   projection (`projectResearchAssignment`, `MissionProjection.research`) and
   `state.research` carries the offers, the run and the arrival receipt. Guidance
   uses the ordinary vocabulary: the Survey's several sites are `guidance.locationIds`.
-  A run has no Pin: it is always in Current Missions. The conversation resolver
+  A run is pinned or unpinned like a Mission, but its preference is the `pinned`
+  column of the run row (migration `0052`), because `character_mission_unpins` references a
+  Mission row a run does not have. `loadUnpinnedMissionIds` reports an unpinned run's job id in
+  the same `unpinnedMissionIds` list, `setMissionPinned` routes a job id to the run, and every
+  fresh run starts pinned. Pinning never affects progress, dialogue, payment, abandonment, the
+  passage, or the field actions and FedHex section (which read `state.research`). The conversation resolver
   ignores it (it is not a Mission definition), so story conversations stay on the
   Enby's top level and the jobs live under Research Jobs
   (`docs/npc-conversations.md` §4.4).

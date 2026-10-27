@@ -279,7 +279,10 @@ test.describe("Research Courier", () => {
     await openUtility(page, "missions");
     const log = utilitySurface(page, "Mission Log");
     await expect(log.locator(`[data-mission-log-entry="${COURIER}"]`)).toBeVisible();
-    await expect(log.locator(`[data-mission-log-pin="${COURIER}"]`)).toHaveCount(0);
+    await expect(log.locator(`[data-mission-log-pin="${COURIER}"]`)).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(log.locator("[data-research-abandon-start]")).toBeVisible();
 
     // At the Stillreach FedHex: the delivery sits above the Parcel Pickup.
@@ -701,7 +704,78 @@ test.describe("layout", () => {
     await expectNoHorizontalOverflow(page);
     await captureReviewScreenshot(page, "research-survey-dry-seam-desktop.png");
     await expect(page.locator(`[data-mission-strip="${SURVEY}"]`)).toBeVisible();
-    // A research run has no Unpin: it is always shown.
-    await expect(page.locator(`[data-mission-strip-unpin="${SURVEY}"]`)).toHaveCount(0);
+    await expect(page.locator(`[data-mission-strip-unpin="${SURVEY}"]`)).toBeVisible();
+  });
+});
+
+test.describe("pinning and repeated acceptance", () => {
+  test("a research run unpins and re-pins like a Mission, keeps its fieldwork and survives a reload", async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await standAt(id, LOCATION_IDS.hilltopWorkshop);
+    await openTestCharacter(page, id);
+    const conversation = await openResearchJobs(page);
+    await acceptJob(conversation, SURVEY);
+    await closeConversation(page);
+    await standAt(id, LOCATION_IDS.prospectingQuarry);
+    await openTestCharacter(page, id);
+
+    // A new run starts pinned.
+    const strip = page.locator(`[data-mission-strip="${SURVEY}"]`);
+    await expect(strip).toBeVisible();
+    await strip.locator(`[data-mission-strip-unpin="${SURVEY}"]`).click();
+    await expect(strip).toHaveCount(0);
+    // Fieldwork does not depend on the pin.
+    await expect(page.locator("[data-research-start]")).toBeVisible();
+    await page.reload();
+    await expect(page.locator(`[data-mission-strip="${SURVEY}"]`)).toHaveCount(0);
+    await expect(page.locator("[data-research-start]")).toBeVisible();
+
+    // Mission Log pins it again.
+    await openUtility(page, "missions");
+    const log = utilitySurface(page, "Mission Log");
+    const toggle = log.locator(`[data-mission-log-pin="${SURVEY}"]`);
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(`[data-mission-strip="${SURVEY}"]`)).toBeVisible();
+    expect((await assignmentOf(id))?.pinned).toBe(true);
+  });
+
+  test("a stale list accepting the held job shows no second item grant", async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await standAt(id, LOCATION_IDS.hilltopWorkshop);
+    await openTestCharacter(page, id);
+    const conversation = await openResearchJobs(page);
+    await conversation.locator(`[data-research-job="${COURIER}"] [data-research-job-open]`).click();
+    await playToAction(conversation);
+    // Meanwhile (another tab, a retry) the same job was accepted.
+    await db.transaction(async (tx) => {
+      const [instance] = await tx
+        .insert(itemInstances)
+        .values({ characterId: id, itemId: ITEM_IDS.sealedResearchPacket })
+        .returning();
+      await tx.insert(characterResearchAssignments).values({
+        characterId: id,
+        jobId: COURIER,
+        itemInstanceId: instance!.id,
+        startedAt: new Date(),
+      });
+    });
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-research-jobs]")).toContainText(
+      "Research Courier is already your current assignment.",
+    );
+    await expect(conversation.locator("[data-dialogue-item-artwork]")).toHaveCount(0);
+    await expect(
+      conversation.locator('[data-dialogue-player="research_courier_accepted"]'),
+    ).toHaveCount(0);
+    expect(await loansOf(id)).toHaveLength(1);
   });
 });

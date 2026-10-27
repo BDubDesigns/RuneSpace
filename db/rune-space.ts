@@ -610,6 +610,10 @@ export const characterResearchAssignments = pgTable("character_research_assignme
     onDelete: "set null",
   }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  // The player's Current Missions preference for this run (#406). It lives on the
+  // run, not on `character_mission_unpins` (which references a Mission row a
+  // research run does not have), so every fresh run starts pinned.
+  pinned: boolean("pinned").notNull().default(true),
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   recordedAt: timestamp("recorded_at", { withTimezone: true }),
   sampledLocationIds: text("sampled_location_ids")

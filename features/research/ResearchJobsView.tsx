@@ -111,7 +111,12 @@ export function ResearchJobsView({
       "accept",
       () => acceptResearchJobAction({ characterId: state.characterId, jobId: job.id }),
       (outcome) => {
-        if (outcome.status === "ok") {
+        if (outcome.status === "ok" && outcome.kind === "already_accepted") {
+          // A retry, a second tab or a stale list: the loan was issued earlier, so
+          // no item is presented as received now. Show the run that is held.
+          backToList();
+          command.setMessage(`${job.title} is already your current assignment.`);
+        } else if (outcome.status === "ok") {
           play(job.dialogue.accepted, { jobId: job.id });
         } else if (outcome.reason === "capacity") {
           // The authored refusal is presentation for a refused command; the

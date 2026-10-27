@@ -1,5 +1,10 @@
 import { and, eq } from "drizzle-orm";
-import { characterMissionUnpins, characterMissions } from "@/db/rune-space";
+import {
+  characterMissionUnpins,
+  characterMissions,
+  characterResearchAssignments,
+} from "@/db/rune-space";
+import { getResearchJob } from "@/game/content/research-jobs";
 import { getMission } from "@/game/content/missions";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
@@ -56,6 +61,26 @@ export async function setMissionPinned(
         ),
         pin,
       });
+
+      // A held Wise Old Enby research run (#406) is not a Mission row: its
+      // preference is a column of the run, written only for the run of that job.
+      const research = getResearchJob(missionId);
+      if (research) {
+        const updated = await transaction
+          .update(characterResearchAssignments)
+          .set({ pinned })
+          .where(
+            and(
+              eq(characterResearchAssignments.characterId, context.character.id),
+              eq(characterResearchAssignments.jobId, research.id),
+            ),
+          )
+          .returning({ id: characterResearchAssignments.id });
+        if (updated.length === 0) {
+          return stateFor({ status: "refused", message: `${research.title} is not active.` });
+        }
+        return stateFor({ status: pinned ? "pinned" : "unpinned" });
+      }
 
       const definition = getMission(missionId);
       if (!definition) return stateFor({ status: "refused", message: "Unknown mission." });

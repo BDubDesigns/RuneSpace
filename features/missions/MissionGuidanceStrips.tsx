@@ -136,21 +136,18 @@ export function MissionGuidanceStrips({
               ) : null}
               {/* A pin, not an X: unpinning hides the strip, it never abandons
                   the Mission. The touch target hangs into the strip's own
-                  padding, so it never makes the strip taller. A research run
-                  (#406) is always shown, so it has none. */}
-              {mission.research ? null : (
-                <button
-                  aria-label={`Unpin ${mission.title}`}
-                  className="rs-focus -my-2 -ml-1 -mr-2 inline-flex h-[var(--rs-touch-target)] w-[var(--rs-touch-target)] shrink-0 items-center justify-center opacity-80 transition-opacity duration-[var(--rs-duration-fast)] hover:opacity-100 aria-busy:opacity-40"
-                  aria-busy={pendingMissionId === mission.missionId || undefined}
-                  data-mission-strip-unpin={mission.missionId}
-                  onClick={() => unpin(mission.missionId, index)}
-                  title="Unpin"
-                  type="button"
-                >
-                  <Pin aria-hidden="true" className="h-4 w-4" fill="currentColor" />
-                </button>
-              )}
+                  padding, so it never makes the strip taller. */}
+              <button
+                aria-label={`Unpin ${mission.title}`}
+                className="rs-focus -my-2 -ml-1 -mr-2 inline-flex h-[var(--rs-touch-target)] w-[var(--rs-touch-target)] shrink-0 items-center justify-center opacity-80 transition-opacity duration-[var(--rs-duration-fast)] hover:opacity-100 aria-busy:opacity-40"
+                aria-busy={pendingMissionId === mission.missionId || undefined}
+                data-mission-strip-unpin={mission.missionId}
+                onClick={() => unpin(mission.missionId, index)}
+                title="Unpin"
+                type="button"
+              >
+                <Pin aria-hidden="true" className="h-4 w-4" fill="currentColor" />
+              </button>
             </li>
           );
         })}

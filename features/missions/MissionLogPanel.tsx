@@ -354,17 +354,11 @@ export function MissionLogPanel({
                     state={state}
                     mission={mission}
                     onToggle={() => toggle(mission.missionId)}
-                    // A research run is always shown in Current Missions (#406), so
-                    // it has no Pin toggle; Abandon Assignment is its control.
-                    pin={
-                      mission.research
-                        ? undefined
-                        : {
-                            onToggle: () => setPinned(mission.missionId, !pinned),
-                            pending: pendingMissionId === mission.missionId,
-                            pinned,
-                          }
-                    }
+                    pin={{
+                      onToggle: () => setPinned(mission.missionId, !pinned),
+                      pending: pendingMissionId === mission.missionId,
+                      pinned,
+                    }}
                   />
                 );
               })}

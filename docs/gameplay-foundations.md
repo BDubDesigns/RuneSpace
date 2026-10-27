@@ -1906,8 +1906,9 @@ real mass; never tradable, storable or sellable) and pays no XP.
   arrival modal presents over the Crash Site and its dismissal is presentation only.
 - **Abandon Assignment** in the Mission Log, from anywhere.
 
-Artwork: the three loan items have no approved art yet and render their text
-fallbacks (`RP`, `GC`, `RSA`); approved art is added by setting `artworkSrc`.
+Artwork: the three loan items use the approved art (`public/item-art/`, masters in
+`assets/item-art/`, `scripts/prepare-research-loan-art.mjs`); the text fallbacks
+(`RP`, `GC`, `RSA`) remain for when an image cannot load.
 Numbers: `researchJobs` in `game/config/balance.ts`. Migration
 `0051_research_jobs` (additive: `character_research_assignments`,
 `character_research_jobs`).

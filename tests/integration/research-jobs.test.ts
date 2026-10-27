@@ -43,6 +43,7 @@ suite("issue #406 Wise Old Enby research jobs (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let jobs: typeof import("@/server/research-job-commands");
   let cargo: typeof import("@/server/cargo-hold");
+  let pins: typeof import("@/server/mission-pin-commands");
   const createdUsers: string[] = [];
   const start = new Date("2026-10-26T12:00:00.000Z");
   const balance = getEffectiveGameBalance();
@@ -51,6 +52,8 @@ suite("issue #406 Wise Old Enby research jobs (real PostgreSQL)", () => {
   const at = (seconds: number) => new Date(start.getTime() + seconds * 1000);
   /** Comfortably after an 8-tick action (4.8 s) has been due. */
   const after = (from: Date) => new Date(from.getTime() + (TICKS + 1) * GAME_TICK_MS);
+  const COURIER = RESEARCH_JOB_IDS.researchCourier;
+  const SURVEY = RESEARCH_JOB_IDS.geologicalFieldSurvey;
   const WORKSHOP = LOCATION_IDS.hilltopWorkshop;
   const STATION = LOCATION_IDS.stillreachLandingStation;
   const STILLREACH_FEDHEX = LOCAL_PLACE_IDS.fedhexStillreachLandingStation;
@@ -65,6 +68,7 @@ suite("issue #406 Wise Old Enby research jobs (real PostgreSQL)", () => {
     play = await import("@/server/play");
     jobs = await import("@/server/research-job-commands");
     cargo = await import("@/server/cargo-hold");
+    pins = await import("@/server/mission-pin-commands");
   });
 
   afterEach(async () => {
@@ -1115,6 +1119,83 @@ suite("issue #406 Wise Old Enby research jobs (real PostgreSQL)", () => {
       expect(await instances(who.characterId)).toHaveLength(0);
       expect(await history(who.characterId, RESEARCH_JOB_IDS.resonanceCalibration)).toBeUndefined();
       expect(result.state.research.arrival).toBeUndefined();
+    });
+  });
+
+  describe("Current Missions pinning", () => {
+    const pinnedIds = async (who: Who, now = start) => (await read(who, now)).unpinnedMissionIds;
+
+    it("starts every run pinned, unpins and re-pins durably, and changes nothing else", async () => {
+      const who = await makeCharacter("Pin");
+      const run = await begin(who, RESEARCH_JOB_IDS.geologicalFieldSurvey);
+      expect(await pinnedIds(who)).toEqual([]);
+      expect((await assignment(who.characterId))!.pinned).toBe(true);
+
+      const off = await pins.setMissionPinned(who.userId, who.characterId, SURVEY, false, at(1));
+      expect(off.pin).toEqual({ status: "unpinned" });
+      expect(off.state.unpinnedMissionIds).toEqual([SURVEY]);
+      // A repeated press reports the same thing; reloads keep it.
+      expect(
+        (await pins.setMissionPinned(who.userId, who.characterId, SURVEY, false, at(2))).pin,
+      ).toEqual({ status: "unpinned" });
+      expect(await pinnedIds(who, at(3))).toEqual([SURVEY]);
+
+      // The run, its objective, availability and fieldwork are untouched while unpinned.
+      const state = await read(who, at(3));
+      expect(state.research.assignment).toMatchObject({ assignmentId: run, jobId: SURVEY });
+      expect(state.missions.find((m) => m.missionId === SURVEY)).toMatchObject({
+        state: "active",
+        research: { assignmentId: run },
+      });
+      const worked = await work(who, LOCATION_IDS.prospectingQuarry, run, at(10));
+      expect(worked.research.assignment?.sampledLocationIds).toEqual([
+        LOCATION_IDS.prospectingQuarry,
+      ]);
+      expect(worked.unpinnedMissionIds).toEqual([SURVEY]);
+
+      const on = await pins.setMissionPinned(who.userId, who.characterId, SURVEY, true, at(100));
+      expect(on.pin).toEqual({ status: "pinned" });
+      expect(on.state.unpinnedMissionIds).toEqual([]);
+      expect((await assignment(who.characterId))!.sampledLocationIds).toHaveLength(1);
+    });
+
+    it("refuses when that job is not the held run", async () => {
+      const who = await makeCharacter("PinNone");
+      expect(
+        (await pins.setMissionPinned(who.userId, who.characterId, SURVEY, false, start)).pin,
+      ).toMatchObject({ status: "refused" });
+      await begin(who, COURIER);
+      expect(
+        (await pins.setMissionPinned(who.userId, who.characterId, SURVEY, false, at(1))).pin,
+      ).toMatchObject({ status: "refused" });
+      expect(await pinnedIds(who, at(2))).toEqual([]);
+    });
+
+    it("starts a fresh run pinned even after an earlier run of the same job was unpinned", async () => {
+      const who = await makeCharacter("PinFresh");
+      const first = await begin(who, COURIER);
+      await pins.setMissionPinned(who.userId, who.characterId, COURIER, false, at(1));
+      await jobs.abandonResearchJob(who.userId, who.characterId, { assignmentId: first }, at(2));
+      expect(await pinnedIds(who, at(3))).toEqual([]);
+      const second = await begin(who, COURIER, at(4));
+      expect(second).not.toBe(first);
+      expect(await pinnedIds(who, at(5))).toEqual([]);
+      expect((await assignment(who.characterId))!.pinned).toBe(true);
+    });
+
+    it("does not disturb an ordinary Mission's pin", async () => {
+      const who = await makeCharacter("PinOrdinary");
+      await db.insert(rune.characterMissions).values({
+        characterId: who.characterId,
+        missionId: MISSION_IDS.walkItOff,
+        acceptedAt: start,
+      });
+      await begin(who, COURIER);
+      await pins.setMissionPinned(who.userId, who.characterId, MISSION_IDS.walkItOff, false, at(1));
+      await pins.setMissionPinned(who.userId, who.characterId, COURIER, false, at(2));
+      expect(await pinnedIds(who, at(3))).toEqual([COURIER, MISSION_IDS.walkItOff].sort());
+      await pins.setMissionPinned(who.userId, who.characterId, COURIER, true, at(4));
+      expect(await pinnedIds(who, at(5))).toEqual([MISSION_IDS.walkItOff]);
     });
   });
 
