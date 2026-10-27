@@ -38,6 +38,7 @@ import { InlineConfirmation } from "./InlineConfirmation";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { EchoSeekerDetails } from "@/features/echo-hunts/EchoSeekerDetails";
 import { loanBadge } from "@/features/research/loan-badge";
+import { ResearchLoanDestroy } from "@/features/research/ResearchLoanDestroy";
 import { ResearchLoanDetails } from "@/features/research/ResearchLoanDetails";
 import { isResearchLoanItem } from "@/game/domain/research-jobs";
 import { useEquipCommand } from "./useEquipCommand";
@@ -82,7 +83,10 @@ export function InventoryPanel({
   } = usePlay();
   const [, startTransition] = useTransition();
   const [confirming, setConfirming] = useState<InventoryConfirmation | undefined>();
-  const [message, setMessage] = useState<LoadPowerCellFeedback>();
+  // `success` is announced as a polite status (a destroyed Mission item).
+  const [message, setMessage] = useState<
+    LoadPowerCellFeedback | { tone: "success"; message: string }
+  >();
   // The carried-item Mission offer opened from Item Details (#369).
   // Held for the whole offer, including its Mission Started view, so the overlay
   // survives the authoritative state update that ends the offer itself.
@@ -573,6 +577,15 @@ export function InventoryPanel({
                       Unique item — cannot be dropped.
                     </p>
                   )}
+                  <ResearchLoanDestroy
+                    item={resolvedSelection.entry}
+                    key={resolvedSelection.entry.id}
+                    onResult={(feedback) => {
+                      setMessage(feedback);
+                      // The selected tile is gone: land on the grid, not on <body>.
+                      armFocusReturn(() => gridRef.current);
+                    }}
+                  />
                   {equipAvailability ? (
                     <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
                       <ActionButton

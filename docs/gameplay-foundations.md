@@ -1905,6 +1905,11 @@ real mass; never tradable, storable or sellable) and pays no XP.
   stay where they are parked; 0 Credits, 0 XP; nothing is banked. A durable
   arrival modal presents over the Crash Site and its dismissal is presentation only.
 - **Abandon Assignment** in the Mission Log, from anywhere.
+- **Destroy** on the carried loan, in Inventory Item Details (#408): an inline confirmation
+  (KEEP ITEM / DESTROY & ABANDON) that deletes that exact item and abandons its run, with
+  the same effects as Abandon Assignment: progress and the 25 / 75 Credits or the passage
+  are forfeited, nothing is paid or returned. Only the three loans opt in; a Courier packet
+  already handed to FedHex no longer exists, so only Abandon Assignment applies.
 
 Artwork: the three loan items use the approved art (`public/item-art/`, masters in
 `assets/item-art/`, `scripts/prepare-research-loan-art.mjs`); the text fallbacks

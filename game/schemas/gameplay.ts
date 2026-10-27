@@ -338,6 +338,11 @@ export const ResearchAssignmentRequestSchema = z.object({
   assignmentId: z.string().uuid(),
 });
 
+/** Destroying a bound Mission item (#408): the exact instance and the run it belongs to. */
+export const DestroyMissionItemRequestSchema = ResearchAssignmentRequestSchema.extend({
+  itemInstanceId: z.string().uuid(),
+});
+
 export const DeliverResearchPacketRequestSchema = ResearchAssignmentRequestSchema.extend({
   localPlaceId: ContentId,
 });

@@ -51,6 +51,7 @@ import {
   acknowledgeResearchArrival,
   completeResearchJob,
   deliverResearchPacket,
+  destroyMissionItem,
   startResearchField,
   teleportResearchJob,
   type ResearchCommandResult,
@@ -228,6 +229,7 @@ import {
   AcceptResearchJobRequestSchema,
   AcknowledgeResearchArrivalRequestSchema,
   DeliverResearchPacketRequestSchema,
+  DestroyMissionItemRequestSchema,
   ResearchAssignmentRequestSchema,
   ClaimFedhexParcelRequestSchema,
   StartTinkeringRequestSchema,
@@ -1462,6 +1464,17 @@ export async function abandonResearchJobAction(input: unknown): Promise<Research
   if (!request.success) return { error: "Invalid assignment command." };
   return runResearchAction(request.data.characterId, (userId, id) =>
     abandonResearchJob(userId, id, { assignmentId: request.data.assignmentId }),
+  );
+}
+
+export async function destroyMissionItemAction(input: unknown): Promise<ResearchActionResult> {
+  const request = DestroyMissionItemRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid destroy command." };
+  return runResearchAction(request.data.characterId, (userId, id) =>
+    destroyMissionItem(userId, id, {
+      itemInstanceId: request.data.itemInstanceId,
+      assignmentId: request.data.assignmentId,
+    }),
   );
 }
 

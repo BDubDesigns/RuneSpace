@@ -8,6 +8,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
  */
 export function InlineConfirmation({
   busy,
+  cancelLabel = "Cancel",
   cancelRef,
   children,
   confirmLabel,
@@ -16,6 +17,7 @@ export function InlineConfirmation({
   ...dataAttributes
 }: {
   busy: boolean;
+  cancelLabel?: string;
   cancelRef: RefObject<HTMLButtonElement | null>;
   children: ReactNode;
   confirmLabel: string;
@@ -23,6 +25,7 @@ export function InlineConfirmation({
   onConfirm: () => void;
   "data-break-apart-confirmation"?: boolean;
   "data-drop-confirmation"?: boolean;
+  "data-mission-item-destroy-confirmation"?: boolean;
   "data-research-abandon-confirmation"?: boolean;
 }) {
   return (
@@ -52,7 +55,7 @@ export function InlineConfirmation({
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <ActionButton disabled={busy} intent="secondary" onClick={onCancel} ref={cancelRef}>
-          Cancel
+          {cancelLabel}
         </ActionButton>
         <ActionButton disabled={busy} intent="danger" loading={busy} onClick={onConfirm}>
           {confirmLabel}

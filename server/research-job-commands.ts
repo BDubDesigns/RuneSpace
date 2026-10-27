@@ -9,6 +9,7 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { getLocation } from "@/game/content/locations";
+import { getMissionItemDestroyPolicy } from "@/game/content/mission-item-destroy";
 import { RESEARCH_GIVER, RESEARCH_JOBS, getResearchJob } from "@/game/content/research-jobs";
 import {
   availableFieldAction,
@@ -58,6 +59,7 @@ export type ResearchRefusal =
   | "wrong_job"
   | "wrong_stage"
   | "item_missing"
+  | "not_destroyable"
   | "another_action_active"
   | "capacity";
 
@@ -72,6 +74,7 @@ export type ResearchCommandOutcome =
         | "paid"
         | "teleported"
         | "abandoned"
+        | "destroyed"
         | "acknowledged";
       jobId?: string;
       /** Credits the transaction actually wrote, for the one call that wrote them. */
@@ -466,6 +469,22 @@ export function teleportResearchJob(
 }
 
 /**
+ * Cancel the held run: the one cleanup shared by Mission Log Abandon Assignment
+ * and Inventory Destroy (#408). Everything commits or rolls back with the
+ * caller's transaction. A field action pending for this run has nothing left to
+ * record, then `endRun` stamps the run closed (exactly once), deletes its loan
+ * and frees the slot. Nothing is counted, paid, moved or granted.
+ */
+async function cancelRun(context: Context, row: CharacterResearchAssignment): Promise<void> {
+  if (isResearchFieldAction(context.activeActionId)) {
+    await context.transaction
+      .delete(activeActions)
+      .where(eq(activeActions.characterId, context.characterId));
+  }
+  await endRun(context, row);
+}
+
+/**
  * Abandon the held assignment from anywhere, at any stage. Forfeits all
  * progress, the still-carried loan and any payout or passage, and frees the
  * slot. It is not a completion: nothing is counted and nothing is paid.
@@ -479,14 +498,42 @@ export function abandonResearchJob(
   return runResearchCommand(userId, characterId, now, async (context) => {
     const run = await loadRun(context, request.assignmentId);
     if (!run.ok) return run.outcome;
-    // A field action pending for this run has nothing left to record.
-    if (isResearchFieldAction(context.activeActionId)) {
-      await context.transaction
-        .delete(activeActions)
-        .where(eq(activeActions.characterId, context.characterId));
-    }
-    await endRun(context, run.row);
+    await cancelRun(context, run.row);
     return { status: "ok", kind: "abandoned", jobId: run.facts.jobId };
+  });
+}
+
+/**
+ * Destroy a bound Mission item from Inventory (#408). Authorized by the pair the
+ * client names, never by item type alone: the run must be the held one, the
+ * instance must be the very item that run holds and still carries, and the
+ * item's definition must opt in to cancelling exactly that job. It then ends the
+ * run through the same cancellation as Abandon Assignment, which deletes the
+ * instance with it. Nothing is paid, granted, dropped or moved.
+ */
+export function destroyMissionItem(
+  userId: string,
+  characterId: string,
+  request: { itemInstanceId: string; assignmentId: string },
+  now = new Date(),
+): Promise<ResearchCommandResult> {
+  return runResearchCommand(userId, characterId, now, async (context) => {
+    const run = await loadRun(context, request.assignmentId);
+    if (!run.ok) return run.outcome;
+    if (run.row.itemInstanceId !== request.itemInstanceId || !run.facts.loanItemHeld) {
+      return refuse("item_missing", "That item is no longer part of your current assignment.");
+    }
+    const { carriedInstances } = await loadOwnedItemInstances(
+      context.transaction,
+      context.characterId,
+    );
+    const instance = carriedInstances.find((candidate) => candidate.id === request.itemInstanceId);
+    const policy = instance ? getMissionItemDestroyPolicy(instance.itemId) : undefined;
+    if (!instance || !policy || policy.cancels.jobId !== run.row.jobId) {
+      return refuse("not_destroyable", "That item cannot be destroyed.");
+    }
+    await cancelRun(context, run.row);
+    return { status: "ok", kind: "destroyed", jobId: run.facts.jobId };
   });
 }
 

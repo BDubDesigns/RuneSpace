@@ -3,6 +3,10 @@ import { getDialogue } from "@/game/content/dialogue";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation, getLocationPlanetId } from "@/game/content/locations";
+import {
+  MISSION_ITEM_DESTROY_POLICIES,
+  getMissionItemDestroyPolicy,
+} from "@/game/content/mission-item-destroy";
 import { getNpc } from "@/game/content/npcs";
 import {
   RESEARCH_BLOCKED_DIALOGUE_ID,
@@ -53,6 +57,26 @@ const LOAN_ITEM_IDS: ReadonlySet<string> = new Set(RESEARCH_JOBS.map((job) => jo
  */
 export function isResearchLoanItem(itemId: string): boolean {
   return LOAN_ITEM_IDS.has(itemId);
+}
+
+/**
+ * The Destroy offered for one carried unique item (#408), or `undefined`. It
+ * exists only for an explicitly opted-in item (`MISSION_ITEM_DESTROY_POLICIES`)
+ * that is the exact instance the current run holds. The server runs this same
+ * match against the stored run inside the character lock.
+ */
+export function missionItemDestroyOffer(
+  assignment: ResearchAssignmentProjection | undefined,
+  item: { id: string; itemId: string },
+): { assignmentId: string; job: ResearchJobDefinition; forfeits: string } | undefined {
+  const policy = getMissionItemDestroyPolicy(item.itemId);
+  if (!policy || !assignment?.loanItemHeld) return undefined;
+  if (assignment.loanItemInstanceId !== item.id) return undefined;
+  if (assignment.jobId !== policy.cancels.jobId) return undefined;
+  const job = getResearchJob(assignment.jobId);
+  return job
+    ? { assignmentId: assignment.assignmentId, job, forfeits: policy.forfeits }
+    : undefined;
 }
 
 export function researchTotalSteps(job: ResearchJobDefinition): number {
@@ -412,6 +436,14 @@ export function validateResearchJobs(jobs: readonly ResearchJobDefinition[] = RE
     throw new Error("Research giver location is unknown.");
   if (!getDialogue(RESEARCH_BLOCKED_DIALOGUE_ID)) {
     throw new Error("The research blocked dialogue is not authored.");
+  }
+  for (const policy of MISSION_ITEM_DESTROY_POLICIES) {
+    const owner = jobs.find((job) => job.id === policy.cancels.jobId);
+    if (owner?.loanItemId !== policy.itemId) {
+      throw new Error(`Destroy policy for ${policy.itemId} names a job that does not lend it.`);
+    }
+    if (!policy.forfeits.trim())
+      throw new Error(`Destroy policy for ${policy.itemId} has no copy.`);
   }
   for (const job of jobs) {
     if (ids.has(job.id)) throw new Error(`Duplicate research job "${job.id}".`);
