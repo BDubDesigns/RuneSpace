@@ -2050,11 +2050,11 @@ const authoredWikiArticles = [
     title: "Safety & Privacy",
     category: "community",
     summary:
-      "What RuneSpace keeps when you chat, Whisper, block, or report, how long it keeps it, who can see it, and how moderation and appeals work.",
+      "What RuneSpace keeps when you chat, Whisper, block, or report, how its product analytics works and how to turn it off, how long things are kept, who can see them, and how moderation and appeals work.",
     sections: [
       {
         paragraphs: [
-          "Chat, Whispers, Block, and Report only work if RuneSpace keeps some information about them. This page says what that information is, why it's kept, how long it's kept, and who can look at it. It's here so nothing about it is a surprise.",
+          "Chat, Whispers, Block, and Report only work if RuneSpace keeps some information about them. This page says what that information is, why it's kept, how long it's kept, and who can look at it. It also covers the product analytics RuneSpace uses on its public site. It's here so nothing about it is a surprise.",
           [
             "The short version: messages are kept for 90 days, reports are kept longer as evidence, Whispers are private from other players but not from moderators with a real reason to look, and every time a moderator looks, it's recorded. The ",
             { text: "Chat & Community Rules", articleSlug: COMMUNITY_RULES_SLUG },
@@ -2135,6 +2135,28 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Product analytics",
+        paragraphs: [
+          "On runespace.qcfailed.com, RuneSpace uses PostHog, a third-party product-analytics service, to learn where visitors come from, which public pages they open, where they stop while setting up an account and character, and whether they enter and come back to the game. Analytics never runs on the test copies RuneSpace uses to preview changes, or when the game is run on a developer's own computer.",
+          "It records the general kind of page you open (for example the Wiki, Sign in, or Play) \u2014 never a character's ID, a Player name, anything you searched for, a verification link, or anything after a \u201c?\u201d in an address. It records the website you arrived from and the utm_source, utm_medium, and utm_campaign tags on a link that brought you here, plus basic browser details such as browser, operating system, device type, and screen size, and a random ID that RuneSpace stores in your browser. Like any website, your browser also has to contact PostHog to send this, so PostHog receives the network address and browser details every web request carries.",
+          "It records four moments in the game: an account was created, a character was created, Play was opened, and the first time a character's skill XP rose while you were playing. It does not record chat, Whispers, trades, anything you type, your email address, your Player name, character names, inventory, missions, or conversations. RuneSpace does not record sessions or clicks, and does not use analytics for advertising.",
+        ],
+      },
+      {
+        heading: "Anonymous and signed-in analytics",
+        paragraphs: [
+          "Before you sign in, your visits are anonymous: just the random ID in your browser. When you sign in, analytics links your visits to the internal ID RuneSpace gives your account \u2014 not your email or your name \u2014 so a player who comes back on another day is counted once however many of the three characters they use. Signing out starts a new anonymous ID.",
+          "Creating an account happens before you verify your email, so it is recorded anonymously and is joined to your account only if you verify and sign in in the same browser.",
+        ],
+      },
+      {
+        heading: "How long analytics is kept, and your choice",
+        paragraphs: [
+          "PostHog keeps analytics events for up to one year, the retention of RuneSpace's current PostHog plan, and RuneSpace does not copy them anywhere else.",
+          "You can turn analytics off at the bottom of this page. Doing so is remembered in your browser, applies to the character-creation report RuneSpace's server sends too, and stops anything further being sent. If your browser sends a Global Privacy Control or Do Not Track signal, analytics is already off and RuneSpace honors that without you doing anything. Clearing your browser's site data forgets your choice, so turn it off again if you do.",
+        ],
+      },
+      {
         heading: "What this information is used for",
         paragraphs: ["RuneSpace uses everything on this page for these things only:"],
         list: [
@@ -2142,6 +2164,7 @@ const authoredWikiArticles = [
           "Applying the shared send limit, the promoted-ad cooldown, the slur filter, and your blocks.",
           "Applying trade request limits, and checking completed trades when something goes wrong.",
           "Reviewing reports, enforcing the Chat & Community Rules, and handling appeals.",
+          "Understanding how visitors find RuneSpace and how far they get through account setup and early play, using the product analytics above.",
         ],
       },
       {

@@ -685,3 +685,13 @@ retained with shard-specific artifact names.
 ### High Scores and presence (issue #410)
 
 `tests/integration/high-scores-presence.test.ts` exercises public rank ordering, sparse XP, search, profile projection, presence deduplication, authorization and expiry against a disposable PostgreSQL database. `tests/e2e/high-scores.spec.ts` covers public navigation, shareable profiles, and in-game access; it is included in the canonical allowlist and focused phase `high-scores`.
+
+### Product analytics (issue #413)
+
+Analytics is proved at the unit layer with a stubbed PostHog: CI never contacts
+PostHog and no E2E spec enables it (the canonical build has no token, and the
+tracking gate also requires the host `runespace.qcfailed.com`). `tests/unit/analytics-*.test.ts`
+cover the config/host/privacy gates, route-template and attribution sanitizing,
+payload allowlisting, event boundaries and the first-XP milestone rule, identify
+and reset, the disabled paths, and the best-effort server reporter. See
+`docs/analytics.md`.

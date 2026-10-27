@@ -66,6 +66,10 @@ service actually runs there. See `docs/development-workflow.md` →
   build environment variables. That configuration is **not committed** here;
   see `docs/production-diagnostics.md` for how the deployed source revision is
   (or is not) supplied at build/runtime.
+- The public PostHog analytics project token and host are **build-time**
+  variables (`NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST`);
+  see `docs/analytics.md`. Tracking is additionally restricted to the exact host
+  `runespace.qcfailed.com`, so previews and local runs stay silent.
 - **Production is persistent application data.** It is never an automated-test
   target.
 - Committed Drizzle migrations remain the authoritative schema path. They are
