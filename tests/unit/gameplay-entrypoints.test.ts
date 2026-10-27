@@ -62,6 +62,8 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/characters/page.tsx": "account: Characters experience",
   "app/characters/new/page.tsx": "account: character reservation",
   "app/play/[characterId]/page.tsx": "GAMEPLAY: Play page",
+  "app/high-scores/page.tsx": "public committed-XP rankings",
+  "app/high-scores/characters/[name]/page.tsx": "public profile with no gameplay actions",
   "app/updates/page.tsx": "public Updates",
   "app/updates/[slug]/page.tsx": "public Updates",
   "app/wiki/page.tsx": "public Wiki",
@@ -80,6 +82,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/location-population/route.ts": "GAMEPLAY: location population read",
   "app/api/character-profile/route.ts": "GAMEPLAY: same-location profile read",
   "app/api/realtime/route.ts": "GAMEPLAY: realtime/social stream (#245)",
+  "app/api/player-presence/route.ts": "public aggregate GET; authenticated gameplay-owned POST",
   "app/api/e2e/realtime/route.ts": "local E2E hook (404 outside the gate)",
   "app/api/chat/route.ts": "GAMEPLAY: public chat history read (#246)",
   "app/api/chat/mentions/route.ts": "GAMEPLAY: public @mention attention read (#261)",
@@ -214,6 +217,14 @@ describe("app pages and route handlers", () => {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");
     }
+  });
+
+  it("gates presence check-ins while leaving only the aggregate public", () => {
+    const route = read("app/api/player-presence/route.ts");
+    const presence = read("server/player-presence.ts");
+    expect(route).toContain("requireCurrentUser(");
+    expect(route).toContain("error instanceof GameplayAccessError");
+    expect(presence).toContain("requirePlayableOwnedCharacter(");
   });
 
   it("keeps the moderation pages account-scoped and the operator pages admin-only", () => {
