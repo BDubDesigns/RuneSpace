@@ -17,8 +17,9 @@ import { assertDisposableE2EDatabase } from "./test-database";
  */
 test.describe.configure({ mode: "serial" });
 
-const PORT = new URL(process.env.BASE_URL ?? "http://127.0.0.1:3000").port;
-const ORIGIN = `http://localhost:${PORT}`;
+// Set from Playwright's own `baseURL` (the canonical runner does not export BASE_URL).
+let PORT = "";
+let ORIGIN = "";
 const CHROME_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -33,8 +34,10 @@ type Row = {
 let db: pg.Client;
 let browser: Browser;
 
-test.beforeAll(async ({ browser: sharedBrowser }) => {
+test.beforeAll(async ({ browser: sharedBrowser, baseURL }) => {
   assertDisposableE2EDatabase();
+  PORT = new URL(baseURL!).port;
+  ORIGIN = `http://localhost:${PORT}`;
   db = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await db.connect();
   browser = sharedBrowser;
