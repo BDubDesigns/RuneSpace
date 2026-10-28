@@ -229,6 +229,7 @@ function cargoState(): PlayGameplayState {
     refiningRecentResult: { successes: 0, failures: 0, awardedXp: 0 },
     scavengeSuppressed: false,
     scavengeReveals: [],
+    serverNow: "2026-01-01T00:00:00.000Z",
     merchantDailyPurchases: {},
     ship: EMPTY_SHIP_PROJECTION,
     passenger: EMPTY_PASSENGER_PROJECTION,

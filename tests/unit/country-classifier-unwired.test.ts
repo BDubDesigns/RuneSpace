@@ -18,18 +18,33 @@ const CLASSIFIER_FILES = new Set([
   "features/analytics/analytics-region.ts",
 ]);
 const SKIPPED_DIRECTORIES = new Set([".git", ".next", "node_modules", "tests", "assets"]);
+// Claude can create gitignored sibling checkouts inside the repository. Their
+// contents are not this checkout's import graph and must not affect this guard.
+const SKIPPED_WORKTREE_PATH = ".claude/worktrees";
 const CLASSIFIER_SPECIFIER =
   /["'](?:@\/|(?:\.\.?\/)+)?(?:[\w./-]*\/)?(?:client-ip|client-region|country-lookup|analytics-region)["']|mmdb-lib/;
+
+function shouldSkipDirectory(full: string, name: string): boolean {
+  return (
+    SKIPPED_DIRECTORIES.has(name) ||
+    path.relative(ROOT, full).split(path.sep).join("/") === SKIPPED_WORKTREE_PATH
+  );
+}
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) return SKIPPED_DIRECTORIES.has(entry.name) ? [] : sourceFiles(full);
+    if (entry.isDirectory()) return shouldSkipDirectory(full, entry.name) ? [] : sourceFiles(full);
     return /\.(?:[cm]?[jt]sx?)$/.test(entry.name) ? [full] : [];
   });
 }
 
 describe("offline country classifier (issue #419)", () => {
+  it("skips scratch worktrees but still scans ordinary application folders", () => {
+    expect(shouldSkipDirectory(path.join(ROOT, ".claude", "worktrees"), "worktrees")).toBe(true);
+    expect(shouldSkipDirectory(path.join(ROOT, "features"), "features")).toBe(false);
+  });
+
   it("is imported by nothing outside its own modules and tests", () => {
     const importers = sourceFiles(ROOT)
       .map((file) => path.relative(ROOT, file).split(path.sep).join("/"))

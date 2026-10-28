@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { planPossibleAwardAdditions } from "@/game/domain/inventory";
 import { scavengePossibleAwardSpecs, scavengeWindowAt } from "@/game/domain/scavenge";
@@ -17,18 +16,28 @@ function capacityMessage(reason: "slots" | "mass") {
     : "Every possible find needs an available inventory slot.";
 }
 
-export function ScavengeControl() {
+/**
+ * `onRefusal` reports the server's answer to a claim it did not accept. The
+ * control leaves the Journey the moment its window closes, so a refusal that
+ * arrives after that has nowhere of its own to be read; the Journey owns it.
+ */
+export function ScavengeControl({
+  onRefusal,
+}: {
+  onRefusal: (message: string | undefined) => void;
+}) {
   const {
     acceptState,
     enqueueForeground,
     foregroundBusy,
     releaseCommand,
     requestAutoRefresh,
+    serverNowMs,
     state,
   } = usePlay();
-  const [now, setNow] = useState(Date.now());
+  // The window is the server's, so it is read on the server's clock (#424).
+  const [now, setNow] = useState(serverNowMs);
   const [claiming, setClaiming] = useState(false);
-  const [message, setMessage] = useState<string>();
   const [announcement, setAnnouncement] = useState<string>();
   const [, startTransition] = useTransition();
   const previousLifecycle = useRef<string | undefined>(undefined);
@@ -36,9 +45,9 @@ export function ScavengeControl() {
 
   useEffect(() => {
     if (!travel) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 100);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 100);
     return () => window.clearInterval(clock);
-  }, [travel]);
+  }, [serverNowMs, travel]);
 
   const scavenge = travel?.scavenge;
   const timing =
@@ -68,7 +77,6 @@ export function ScavengeControl() {
           ? "Scavenge window missed. Travel continues normally."
           : undefined,
     );
-    if (lifecycle !== "available") setMessage(undefined);
   }, [lifecycle]);
 
   if (!travel || !scavenge || !timing) return null;
@@ -77,19 +85,20 @@ export function ScavengeControl() {
     if (lifecycle !== "available" || !capacity.ok || claiming) return;
     enqueueForeground(() => {
       setClaiming(true);
+      onRefusal(undefined);
       startTransition(async () => {
         try {
           const result = await claimScavengeAction({ characterId: state.characterId });
           if ("error" in result) {
-            setMessage(result.error);
+            onRefusal(result.error);
             return;
           }
           acceptState(result.state);
-          if (result.scavenge.status === "claimed") setMessage(undefined);
-          else setMessage(result.scavenge.message);
+          if (result.scavenge.status === "claimed") onRefusal(undefined);
+          else onRefusal(result.scavenge.message);
         } catch (error) {
           reportClientDiagnostic("mining-command", error);
-          setMessage("Comms interruption. Scavenge status could not be confirmed.");
+          onRefusal("Comms interruption. Scavenge status could not be confirmed.");
           requestAutoRefresh();
         } finally {
           setClaiming(false);
@@ -181,7 +190,6 @@ export function ScavengeControl() {
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-      {message ? <Feedback tone="danger">{message}</Feedback> : null}
     </section>
   );
 }

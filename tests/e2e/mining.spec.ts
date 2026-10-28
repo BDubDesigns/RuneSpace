@@ -409,11 +409,11 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
     if (request.method() === "POST" && request.headers()["next-action"])
       refreshRequests.push(request.headers()["next-action"]!);
   });
-  await page.addInitScript(() => {
-    const realNow = Date.now;
-    Date.now = () => realNow() + 2_000;
-  });
-  const boundaryStart = new Date(Date.now() - 4_500);
+  // Leave enough real time before the next attempt to observe an early response.
+  // A static fast browser clock no longer triggers one: #424 synchronizes it
+  // to serverNow. Instead simulate a one-off local clock jump and an "online"
+  // event, which can genuinely ask for reconciliation before the server is due.
+  const boundaryStart = new Date(Date.now() - 1_000);
   await db.insert(activeActions).values({
     characterId,
     actionId: ACTION_IDS.ferriteShaleMining,
@@ -421,8 +421,20 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
     resolvedThroughAt: boundaryStart,
   });
   await page.reload();
-
-  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
+  await page.evaluate(() => {
+    const realNow = Date.now;
+    try {
+      Date.now = () => realNow() + 10_000;
+      window.dispatchEvent(new Event("online"));
+    } finally {
+      Date.now = realNow;
+    }
+  });
+  // The first refresh must actually be sent before observing the eventual
+  // authoritative completion; no mocking of its response or duplicate award.
+  await expect.poll(() => refreshRequests.length).toBeGreaterThanOrEqual(1);
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 12_000 });
   expect(refreshRequests.length).toBeGreaterThanOrEqual(2);
   const persisted = await db
     .select()

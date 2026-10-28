@@ -73,6 +73,8 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     });
     expect(claimed.state.travelState?.scavenge?.outcome?.outcomeId).toBe("ferrite_shale_1");
     expect(claimed.state.scavengeReveals).toHaveLength(1);
+    // The browser reads every Journey window on the server's clock, not its own (#424).
+    expect(claimed.state.serverNow).toBe(atTick(4).toISOString());
 
     const revealRows = await db
       .select()
@@ -113,6 +115,8 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
       rewardRandom,
     );
     expect(afterGraceResult.scavenge).toMatchObject({ status: "refused", reason: "missed" });
+    // A refusal still hands the browser the clock it needs to show the truth.
+    expect(afterGraceResult.state.serverNow).toBe(afterGrace.toISOString());
   });
 
   it("preflights every possible award before calling the reward RNG", async () => {

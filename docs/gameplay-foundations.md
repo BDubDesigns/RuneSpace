@@ -2480,6 +2480,16 @@ or pathfinding, and nothing computes "the best way to get somewhere".
   arrival, replacement, or Turn Back ends the leg and its opportunity. The server accepts a
   claim for one additional second after the client-visible expiry to absorb
   network delay; this grace does not extend the visible or clickable window.
+- The window is the server's, so the browser shows it on the server's clock
+  (#424): every `PlayGameplayState` carries `serverNow`, `PlayProvider` keeps the
+  offset from the browser clock at receipt, and `usePlay().serverNowMs()` is the
+  one time source the Journey, the Scavenge control, and the Travel arrival
+  refresh read. Without it a PC clock a few seconds slow or fast showed a window
+  the server had closed or not opened, and every click was refused. The offset is
+  a display aid only — the server never reads a browser timestamp, the grace did
+  not change, and a claim that genuinely arrives too late is still refused. The
+  refusal is held by `JourneyPanel` for that Journey, because the control that
+  sent it leaves the feed when its window closes.
 - Claiming is a server-authoritative transaction. Capacity is preflighted for
   every mutually exclusive maximum branch before one weighted roll; the roll,
   inventory award, and claim marker commit exactly once. The universal table is
