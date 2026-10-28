@@ -131,7 +131,8 @@ jobs:
 
   canonical-e2e:
     name: Canonical E2E shard ${{ matrix.shard }}/3
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.51.1 does not support chromium on ubuntu-26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -193,7 +194,8 @@ jobs:
     # Opt-in only: the owner requests frozen review screenshots with the
     # `e2e-screenshots` label. Main pushes and manual runs never request it.
     if: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-screenshots') }}
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.51.1 does not support chromium on ubuntu-26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
