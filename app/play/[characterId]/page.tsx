@@ -4,6 +4,7 @@ import { PlayScreen } from "@/features/play/PlayScreen";
 import { adminCharacterInspectorHref } from "@/features/admin/admin-routes";
 import { isAdminUserId } from "@/server/admin-auth";
 import { auth } from "@/server/auth";
+import { releaseId } from "@/server/diagnostics";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 import { requireCurrentUser, requirePlayerAccount, OwnershipError } from "@/server/ownership";
 import { getPlayGameplayState } from "@/server/play";
@@ -67,6 +68,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
       characterPortrait={portrait}
       initialState={playState!}
       newsUnread={newsUnread}
+      releaseId={releaseId()}
     />
   );
 }

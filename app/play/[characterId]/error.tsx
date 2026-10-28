@@ -21,12 +21,22 @@ export function reportPlayBoundaryDiagnostic(
   return digest;
 }
 
+/**
+ * Retry connection is a full document load (issue #412). Next's `reset()` only
+ * re-renders the boundary's children from the payload that already failed: it
+ * sends no request, so a server or database that has since recovered is never
+ * asked again. A reload asks again, and also replaces a tab left on an older
+ * build. `reset` stays in the signature because Next passes it, unused.
+ */
+export function reloadPlayDocument() {
+  window.location.reload();
+}
+
 export default function PlayError({
   error,
-  reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  reset?: () => void;
 }) {
   const [incidentId, setIncidentId] = useState<string | undefined>(() =>
     playBoundaryIncidentId(error),
@@ -48,7 +58,7 @@ export default function PlayError({
           <p className="mt-3 text-xs text-[color:var(--rs-text-muted)]">Incident {incidentId}</p>
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
-          <ActionButton intent="mining" onClick={reset}>
+          <ActionButton intent="mining" onClick={reloadPlayDocument}>
             Retry connection
           </ActionButton>
           <ActionLink href="/characters" intent="secondary">

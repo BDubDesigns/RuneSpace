@@ -24,7 +24,7 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|crash-site-scene|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|dialogue-steps|dry-seam-mining|fabrication|fabrication-advanced|fedhex|first-resonance-echo|first-runeworking-lesson|fuel-manufacturing|gameplay-access|harmonic-mining|high-scores|holo-hollow|inventory-equip|last-leg-trading|location-population|milky-waymo|mining|mission-pinning|moderation|not-from-around-here|oil-shale-mining|overlay|player-trading|public-chat|refiner-to-go|refining|research-jobs|rune-materials|rusk-recovery|scroll-affordances|ship-first-flight|signout|site-stash|social-shell|stillreach|stillreach-flight|stone-mining|system-notices|thrust-issues|travel|visit-counts|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
+  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|crash-site-scene|curly-must-stash|cut-your-teeth|deep-jag|desktop-workspace|dialogue-steps|dry-seam-mining|fabrication|fabrication-advanced|fedhex|first-resonance-echo|first-runeworking-lesson|fuel-manufacturing|gameplay-access|harmonic-mining|high-scores|holo-hollow|inventory-equip|last-leg-trading|location-population|milky-waymo|mining|mission-pinning|moderation|not-from-around-here|oil-shale-mining|overlay|player-trading|public-chat|refiner-to-go|refining|release-update|research-jobs|rune-materials|rusk-recovery|scroll-affordances|ship-first-flight|signout|site-stash|social-shell|stillreach|stillreach-flight|stone-mining|system-notices|thrust-issues|travel|visit-counts|walk-it-off|wheel-be-right-back|whispers-safety)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
 
 /**
@@ -70,8 +70,9 @@ export default defineConfig({
       // Issue #223: this spec toggles the one global public-gameplay row, so it
       // runs in exactly one project (chromium); its player contexts set their
       // own mobile viewports. A second project would race its serial journeys
-      // and restore hooks against the same database row.
-      testIgnore: /gameplay-access\.spec\.ts$/,
+      // and restore hooks against the same database row. `release-update`
+      // (#412) likewise owns one fixed port and two production builds.
+      testIgnore: /(?:gameplay-access|release-update)\.spec\.ts$/,
     },
   ],
   ...(externalServer

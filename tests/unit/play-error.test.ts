@@ -6,6 +6,7 @@ vi.mock("@/features/diagnostics/client", () => ({ reportClientDiagnostic }));
 
 import {
   playBoundaryIncidentId,
+  reloadPlayDocument,
   reportPlayBoundaryDiagnostic,
 } from "@/app/play/[characterId]/error";
 
@@ -42,5 +43,18 @@ describe("play error incident references", () => {
     reportPlayBoundaryDiagnostic(new Error("render failed"), setIncidentId);
 
     expect(setIncidentId).not.toHaveBeenCalled();
+  });
+});
+
+describe("Retry connection", () => {
+  it("loads a fresh document instead of resetting the boundary from its failed payload", () => {
+    const reload = vi.fn();
+    vi.stubGlobal("window", { location: { reload } });
+    try {
+      reloadPlayDocument();
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
