@@ -204,9 +204,10 @@ async function visit(options: Visit = {}) {
     },
     promptVisible: () =>
       document.querySelector('[data-testid="analytics-consent-prompt"]') !== null,
-    /** Press the real Accept / Decline button. */
+    /** Press the real Accept / Decline button (labelled for the player in the prompt). */
     async press(label: "Accept" | "Decline") {
-      const button = [...document.querySelectorAll("button")].find((b) => b.textContent === label);
+      const text = label === "Accept" ? "Help me improve RuneSpace" : "No thanks";
+      const button = [...document.querySelectorAll("button")].find((b) => b.textContent === text);
       expect(button, `${label} button`).toBeTruthy();
       await React.act(async () => {
         button!.click();

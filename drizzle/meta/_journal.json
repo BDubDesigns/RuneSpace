@@ -379,6 +379,13 @@
       "when": 1793113471779,
       "tag": "0053_player_presence",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793212152250,
+      "tag": "0054_referral_daily_counts",
+      "breakpoints": true
     }
   ]
 }

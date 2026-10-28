@@ -10,6 +10,7 @@ import {
 } from "./public-wiki";
 
 import { AnalyticsPrivacyControl } from "@/features/analytics/AnalyticsPrivacyControl";
+import { VisitCountControl } from "@/features/analytics/VisitCountControl";
 import { SAFETY_PRIVACY_SLUG } from "./policy-links";
 import { publicSiteFooterLinks, publicSiteNavigation } from "./public-site-content";
 import { WikiLinkedText } from "./WikiLinkedText";
@@ -175,7 +176,12 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
               ) : null}
             </section>
           ))}
-          {article.slug === SAFETY_PRIVACY_SLUG ? <AnalyticsPrivacyControl /> : null}
+          {article.slug === SAFETY_PRIVACY_SLUG ? (
+            <>
+              <AnalyticsPrivacyControl />
+              <VisitCountControl />
+            </>
+          ) : null}
         </div>
       </article>
     </PublicWikiFrame>
