@@ -104,7 +104,11 @@ carried two ways, answering different questions:
 **The deployment does not invent a second release metadata system.** Details of
 the operator wiring live in `docs/production-diagnostics.md`. `GET /api/build-info`
 is the public-safe way a reviewer asks a live deployment which source revision
-it is serving, and it never exposes database or environment details.
+it is serving, and it never exposes database or environment details. An
+already-open tab uses the same runtime value to notice a new deployment and
+reload itself (issue #412); see "Open tabs and new deployments" in
+`docs/production-diagnostics.md`. Because that comparison needs only the runtime
+variable, no build-time configuration or Coolify change is required.
 
 ### Apply migrations in Coolify
 

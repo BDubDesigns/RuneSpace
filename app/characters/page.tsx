@@ -14,7 +14,9 @@ import {
 import { ManageCharacterPortrait } from "@/features/characters/ManageCharacterPortrait";
 import { CharactersModerationNotices } from "@/features/moderation/CharactersModerationNotices";
 import { db } from "@/db";
+import { ReleaseWatcher } from "@/features/deployment/ReleaseWatcher";
 import { auth } from "@/server/auth";
+import { releaseId } from "@/server/diagnostics";
 import { loadAccountGameplayAccess } from "@/server/gameplay-access";
 import { loadSanctionNotices } from "@/server/moderation-notices";
 import {
@@ -102,6 +104,8 @@ export default async function CharactersPage({
 
   return (
     <ScaffoldScreen>
+      {/* Fixes this document's release before Play is entered, and updates an idle tab (#412). */}
+      <ReleaseWatcher releaseId={releaseId()} />
       <div className="flex items-center justify-between">
         <SectionHeader eyebrow="Character selection">Characters</SectionHeader>
         <SignOutButton />

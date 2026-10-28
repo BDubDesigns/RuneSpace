@@ -26,6 +26,7 @@ import { PlayPageScrollHints } from "./PlayPageScrollHints";
 import { PlayProvider, usePlay } from "./PlayContext";
 import { isPlayInTransit } from "@/features/ship/flight";
 import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
+import { PlayReleaseWatch } from "./PlayReleaseWatch";
 import { PlayUtilityWorkspace } from "./PlayUtilityWorkspace";
 import { PlayViewSwitch } from "./PlayViewSwitch";
 import { useDesktopWorkspace } from "./workspace-presentation";
@@ -210,6 +211,7 @@ export function PlayScreen({
   characterPortrait,
   initialState,
   newsUnread,
+  releaseId,
 }: {
   /**
    * Set by the server only when the viewer is an operator (#333): the existing
@@ -223,6 +225,8 @@ export function PlayScreen({
   characterPortrait: CharacterPortraitPresentation;
   initialState: PlayGameplayState;
   newsUnread: boolean;
+  /** The server's runtime release, rendered into this document (issue #412). */
+  releaseId?: string;
 }) {
   return (
     <PlayProvider initialState={initialState}>
@@ -232,6 +236,7 @@ export function PlayScreen({
         characterName={characterName}
         characterPortrait={characterPortrait}
         newsUnread={newsUnread}
+        releaseId={releaseId}
       />
     </PlayProvider>
   );
@@ -242,11 +247,13 @@ function PlayWorkspace({
   characterName,
   characterPortrait,
   newsUnread,
+  releaseId,
 }: {
   adminInspectorHref?: string;
   characterName: string;
   characterPortrait: CharacterPortraitPresentation;
   newsUnread: boolean;
+  releaseId?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -281,6 +288,7 @@ function PlayWorkspace({
       >
         <ChatProvider characterId={characterId}>
           <PlayerTradeProvider characterId={characterId}>
+            <PlayReleaseWatch releaseId={releaseId} />
             <GameShell
               bottomNav={<PlayFooter />}
               desktopRail={
