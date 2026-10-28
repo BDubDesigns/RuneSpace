@@ -3,14 +3,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  COUNTRY_DATABASE_FILE,
-  COUNTRY_DATABASE_MAX_AGE_MS,
-  isCountryDatabaseFresh,
-  lookupCountry,
-  openCountryDatabase,
-  type CountryDatabase,
-} from "@/server/geo/country-lookup";
+import type { CountryDatabase } from "@/server/geo/country-lookup";
 
 /**
  * Offline country lookup (issue #419) against the vendored DB-IP Country Lite
@@ -23,7 +16,16 @@ import {
 vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost:5432/test");
 vi.stubEnv("BETTER_AUTH_SECRET", "unit-test-secret-0123456789");
 
+// The lookup module reaches `authOptions` (and so the environment parse) through
+// the shared client-address filter, so every import waits for the stubs above.
 const { classifyClientRegion } = await import("@/server/client-region");
+const {
+  COUNTRY_DATABASE_FILE,
+  COUNTRY_DATABASE_MAX_AGE_MS,
+  isCountryDatabaseFresh,
+  lookupCountry,
+  openCountryDatabase,
+} = await import("@/server/geo/country-lookup");
 
 const DB_PATH = path.join(process.cwd(), "server", "geo", COUNTRY_DATABASE_FILE);
 const NOW = new Date("2026-10-28T12:00:00.000Z");
