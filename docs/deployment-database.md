@@ -69,7 +69,10 @@ service actually runs there. See `docs/development-workflow.md` →
 - The public PostHog analytics project token and host are **build-time**
   variables (`NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST`);
   see `docs/analytics.md`. Tracking is additionally restricted to the exact host
-  `runespace.qcfailed.com`, so previews and local runs stay silent.
+  `runespace.qcfailed.com`; a PR preview stays silent unless its build lists the
+  PR number in the build-time `NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS` (Preview
+  variables only), and local runs and CI never send. Events carry an
+  `environment` property.
 - **Production is persistent application data.** It is never an automated-test
   target.
 - Committed Drizzle migrations remain the authoritative schema path. They are

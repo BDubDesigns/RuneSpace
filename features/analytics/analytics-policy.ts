@@ -5,7 +5,10 @@
  *
  * Tracking is allowed only when ALL of these hold:
  * - a PostHog project token is configured (build-time, `NEXT_PUBLIC_*`);
- * - the page is served from exactly the production public host;
+ * - the page is served from exactly the production public host, or from the
+ *   exact preview host `pr-<n>.runespace.qcfailed.com` of a pull request that
+ *   the build explicitly lists (preview analytics is off unless deliberately
+ *   enabled; see `NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS` below);
  * - the visitor's choice satisfies the consent model below (by default they
  *   have explicitly said yes, before anything is stored or sent);
  * - their browser is not sending a Global Privacy Control or Do Not Track
@@ -14,8 +17,16 @@
  * Anything else is a silent no-op: the game never depends on analytics.
  */
 
-/** The only host that may send analytics. Previews and localhost never do. */
+/** The production host: always eligible once the token is configured. */
 export const ANALYTICS_PRODUCTION_HOSTNAME = "runespace.qcfailed.com";
+
+/**
+ * A pull-request preview host, exactly `pr-<number>.runespace.qcfailed.com`
+ * (no leading zero, at most seven digits). Eligible only when that PR number is
+ * listed in `NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS`.
+ */
+const PREVIEW_HOST_PATTERN = /^pr-([1-9][0-9]{0,6})\.runespace\.qcfailed\.com$/;
+const MAX_PREVIEW_PRS = 20;
 
 /** PostHog US Cloud ingestion host (issue #413), used when none is configured. */
 export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
@@ -51,16 +62,38 @@ export type AnalyticsChoice = "on" | "off";
 /** Fired on `window` when the visitor changes their analytics choice. */
 export const ANALYTICS_CHOICE_EVENT = "runespace:analytics-choice";
 
-export type AnalyticsConfig = { token: string; apiHost: string };
+export type AnalyticsConfig = {
+  token: string;
+  apiHost: string;
+  /** PR numbers whose preview hosts may send analytics. Usually empty. */
+  previewPrs: readonly number[];
+};
 
 /**
- * Parse the two public build-time values. A missing token, or a host that is
- * not an https origin, yields `null` (analytics disabled) rather than an error,
- * so a bad value can never break a build or a page.
+ * Parse `NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS`: a comma-separated list of PR
+ * numbers (for example `414` or `414,420`). Unset or empty means none. The
+ * whole value is rejected, never partly honored, if any entry is not a plain
+ * positive integer, or if it lists more than twenty, so a typo cannot widen
+ * what is tracked.
+ */
+export function parsePreviewPrs(raw: string | undefined): readonly number[] {
+  const trimmed = raw?.trim();
+  if (!trimmed) return [];
+  const entries = trimmed.split(",").map((entry) => entry.trim());
+  if (entries.length > MAX_PREVIEW_PRS) return [];
+  if (!entries.every((entry) => /^[1-9][0-9]{0,6}$/.test(entry))) return [];
+  return [...new Set(entries.map(Number))];
+}
+
+/**
+ * Parse the public build-time values. A missing token, or a host that is not an
+ * https origin, yields `null` (analytics disabled) rather than an error, so a
+ * bad value can never break a build or a page.
  */
 export function resolveAnalyticsConfig(raw: {
   token?: string | undefined;
   host?: string | undefined;
+  previewPrs?: string | undefined;
 }): AnalyticsConfig | null {
   const token = raw.token?.trim();
   if (!token || !/^phc_[A-Za-z0-9]{20,}$/.test(token)) return null;
@@ -68,7 +101,7 @@ export function resolveAnalyticsConfig(raw: {
   try {
     const url = new URL(host);
     if (url.protocol !== "https:") return null;
-    return { token, apiHost: url.origin };
+    return { token, apiHost: url.origin, previewPrs: parsePreviewPrs(raw.previewPrs) };
   } catch {
     return null;
   }
@@ -76,24 +109,62 @@ export function resolveAnalyticsConfig(raw: {
 
 /**
  * The deployment config. Next inlines each `process.env.NEXT_PUBLIC_*` literal
- * at build time into both the browser and server bundles, so these two names
- * must be referenced literally (never through a dynamic key).
+ * at build time into both the browser and server bundles, so these names must
+ * be referenced literally (never through a dynamic key).
  */
 export const analyticsConfig: AnalyticsConfig | null = resolveAnalyticsConfig({
   token: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
   host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  previewPrs: process.env.NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS,
 });
 
-/**
- * Exact production-host match. Accepts a bare hostname (`location.hostname`) or
- * a `Host` header value with an optional port, and nothing else: no
- * subdomains, no suffix matching, no userinfo.
- */
-export function isAnalyticsHost(host: string | null | undefined): boolean {
-  if (!host) return false;
+/** Which deployment a request or page belongs to, derived only from its host. */
+export type AnalyticsEnvironment =
+  | { environment: "production"; host: string }
+  | { environment: "preview"; host: string; pr: number };
+
+function normalizedHostname(host: string | null | undefined): string | undefined {
+  if (!host) return undefined;
   const match = /^([a-z0-9.-]+)(?::\d{1,5})?$/i.exec(host.trim());
-  if (!match) return false;
-  return match[1]!.toLowerCase().replace(/\.$/, "") === ANALYTICS_PRODUCTION_HOSTNAME;
+  return match ? match[1]!.toLowerCase().replace(/\.$/, "") : undefined;
+}
+
+/** Whether a hostname is one of RuneSpace's own (production or any preview). */
+export function isRuneSpaceHostname(hostname: string): boolean {
+  return hostname === ANALYTICS_PRODUCTION_HOSTNAME || PREVIEW_HOST_PATTERN.test(hostname);
+}
+
+/**
+ * Decide which analytics environment, if any, a host is. Accepts a bare
+ * hostname (`location.hostname`) or a `Host` header value with an optional
+ * port, and nothing else: no other subdomain, no suffix matching, no userinfo.
+ * Production is the exact production host and never depends on the preview
+ * list, so enabling a preview cannot loosen it. A preview qualifies only when
+ * its PR number is in `previewPrs`. The environment comes from the host alone,
+ * so a production page can never be labeled preview or the reverse. Everything
+ * else (localhost, CI, unlisted previews, arbitrary hosts) is `null`.
+ */
+export function resolveAnalyticsEnvironment(
+  host: string | null | undefined,
+  previewPrs: readonly number[] = [],
+): AnalyticsEnvironment | null {
+  const hostname = normalizedHostname(host);
+  if (!hostname) return null;
+  if (hostname === ANALYTICS_PRODUCTION_HOSTNAME)
+    return { environment: "production", host: hostname };
+  const match = PREVIEW_HOST_PATTERN.exec(hostname);
+  if (!match) return null;
+  const pr = Number(match[1]);
+  return previewPrs.includes(pr) ? { environment: "preview", host: hostname, pr } : null;
+}
+
+/** The properties that mark every analytics event with its environment. */
+export function environmentProperties(
+  env: AnalyticsEnvironment,
+): { environment: "production" } | { environment: "preview"; preview_pr: number } {
+  return env.environment === "production"
+    ? { environment: "production" }
+    : { environment: "preview", preview_pr: env.pr };
 }
 
 function cookieValue(cookieHeader: string | null | undefined, name: string): string | undefined {

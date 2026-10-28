@@ -8,10 +8,25 @@ import {
   observeFirstXpGain,
   parseLandingAttribution,
   referrerDomain,
-  sanitizeCapture,
+  sanitizeCapture as sanitizeWith,
   sanitizeUtmValue,
   totalSkillXp,
 } from "@/features/analytics/analytics-events";
+
+const PRODUCTION = { environment: "production", host: "runespace.qcfailed.com" } as const;
+const PREVIEW = {
+  environment: "preview",
+  host: "pr-414.runespace.qcfailed.com",
+  pr: 414,
+} as const;
+
+/** Sanitize as the production host unless a test names another environment. */
+function sanitizeCapture<T extends Parameters<typeof sanitizeWith>[0]>(
+  capture: T,
+  env: Parameters<typeof sanitizeWith>[1] = PRODUCTION,
+) {
+  return sanitizeWith(capture, env);
+}
 
 describe("route templates", () => {
   it.each([
@@ -228,6 +243,72 @@ describe("sanitizeCapture", () => {
     })!;
     expect(result.properties.$anon_distinct_id).toBe("anon-1");
     expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+});
+
+describe("event environment separation", () => {
+  const sdkEvent = (event: string, extra: Record<string, unknown> = {}) => ({
+    event,
+    properties: {
+      distinct_id: "u1",
+      $current_url: "https://pr-414.runespace.qcfailed.com/play/abc?x=SECRET",
+      ...extra,
+    },
+  });
+
+  it("stamps environment=production on every kind of event", () => {
+    for (const event of ["$pageview", "$identify", ...Object.values(ANALYTICS_EVENTS)]) {
+      const result = sanitizeCapture(sdkEvent(event), PRODUCTION)!;
+      expect(result.properties.environment, event).toBe("production");
+      expect(result.properties).not.toHaveProperty("preview_pr");
+    }
+  });
+
+  it("stamps environment=preview and the PR number on every kind of event", () => {
+    for (const event of ["$pageview", "$identify", ...Object.values(ANALYTICS_EVENTS)]) {
+      const result = sanitizeCapture(sdkEvent(event), PREVIEW)!;
+      expect(result.properties.environment, event).toBe("preview");
+      expect(result.properties.preview_pr, event).toBe(414);
+    }
+  });
+
+  it("stamps events that carry no URL too", () => {
+    const result = sanitizeCapture({ event: "gameplay_entered", properties: {} }, PREVIEW)!;
+    expect(result.properties).toMatchObject({ environment: "preview", preview_pr: 414 });
+  });
+
+  it("derives the environment from the validated host, never from incoming properties", () => {
+    const result = sanitizeCapture(
+      sdkEvent("$pageview", { environment: "production", preview_pr: 1 }),
+      PREVIEW,
+    )!;
+    expect(result.properties).toMatchObject({ environment: "preview", preview_pr: 414 });
+    const asProduction = sanitizeCapture(
+      sdkEvent("$pageview", { environment: "preview", preview_pr: 999 }),
+      PRODUCTION,
+    )!;
+    expect(asProduction.properties.environment).toBe("production");
+    expect(asProduction.properties).not.toHaveProperty("preview_pr");
+  });
+
+  it("reports the real host and template, never the query", () => {
+    const preview = sanitizeCapture(sdkEvent("$pageview"), PREVIEW)!;
+    expect(preview.properties).toMatchObject({
+      $current_url: "https://pr-414.runespace.qcfailed.com/play/[characterId]",
+      $host: "pr-414.runespace.qcfailed.com",
+    });
+    const production = sanitizeCapture(sdkEvent("$pageview"), PRODUCTION)!;
+    expect(production.properties.$host).toBe("runespace.qcfailed.com");
+    expect(JSON.stringify([preview, production])).not.toContain("SECRET");
+  });
+
+  it("does not treat a move between RuneSpace deployments as a referral", () => {
+    const result = sanitizeCapture(
+      sdkEvent("$pageview", { $referring_domain: "pr-414.runespace.qcfailed.com" }),
+      PRODUCTION,
+    )!;
+    expect(result.properties.$referring_domain).toBe("$direct");
+    expect(referrerDomain("https://pr-414.runespace.qcfailed.com/wiki")).toBeUndefined();
   });
 });
 

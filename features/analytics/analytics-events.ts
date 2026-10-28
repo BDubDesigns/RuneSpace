@@ -1,4 +1,8 @@
-import { ANALYTICS_PRODUCTION_HOSTNAME } from "./analytics-policy";
+import {
+  environmentProperties,
+  isRuneSpaceHostname,
+  type AnalyticsEnvironment,
+} from "./analytics-policy";
 
 /**
  * The analytics event contract and every sanitizer that stands between the
@@ -141,16 +145,14 @@ export function sanitizeUtmValue(value: string | null | undefined): string | und
 }
 
 /** A referrer reduced to its lower-cased domain, or `undefined`. */
-export function referrerDomain(
-  referrer: string | null | undefined,
-  ownHostname: string = ANALYTICS_PRODUCTION_HOSTNAME,
-): string | undefined {
+export function referrerDomain(referrer: string | null | undefined): string | undefined {
   if (!referrer) return undefined;
   try {
     const url = new URL(referrer);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-    if (!hostname || hostname === ownHostname) return undefined;
+    // Navigation between RuneSpace's own deployments is not a referral.
+    if (!hostname || isRuneSpaceHostname(hostname)) return undefined;
     return hostname;
   } catch {
     return undefined;
@@ -267,7 +269,10 @@ export type SanitizedCapture<T extends CaptureLike> = Omit<T, "properties"> & {
   properties: Record<string, unknown>;
 };
 
-export function sanitizeCapture<T extends CaptureLike>(capture: T): SanitizedCapture<T> | null {
+export function sanitizeCapture<T extends CaptureLike>(
+  capture: T,
+  env: AnalyticsEnvironment,
+): SanitizedCapture<T> | null {
   if (!ALLOWED_EVENTS.has(capture.event)) return null;
   const source = capture.properties ?? {};
   const eventKeys =
@@ -300,11 +305,15 @@ export function sanitizeCapture<T extends CaptureLike>(capture: T): SanitizedCap
     }
     // Operator/internal surfaces are not tracked, even for lifecycle events.
     if (template === null) return null;
-    properties.$current_url = `https://${ANALYTICS_PRODUCTION_HOSTNAME}${template.path}`;
+    properties.$current_url = `https://${env.host}${template.path}`;
     properties.$pathname = template.path;
-    properties.$host = ANALYTICS_PRODUCTION_HOSTNAME;
+    properties.$host = env.host;
     if (capture.event === "$pageview") properties.route_category = template.category;
   }
+
+  // Every event, whatever it is, states which deployment sent it. Computed from
+  // the validated host, never read from the incoming properties.
+  Object.assign(properties, environmentProperties(env));
 
   const refDomain = referrerDomainProperty(source.$referring_domain);
   if (refDomain) {
@@ -325,7 +334,7 @@ export function sanitizeCapture<T extends CaptureLike>(capture: T): SanitizedCap
 function referrerDomainProperty(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const domain = value.trim().toLowerCase();
-  if (!HOSTNAME.test(domain) || domain === ANALYTICS_PRODUCTION_HOSTNAME) return undefined;
+  if (!HOSTNAME.test(domain) || isRuneSpaceHostname(domain)) return undefined;
   return domain;
 }
 

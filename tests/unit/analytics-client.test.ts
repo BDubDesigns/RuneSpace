@@ -13,6 +13,8 @@ type Env = {
   windowDnt?: string;
   msDnt?: string;
   token?: string;
+  /** NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS as configured at build time. */
+  previewPrs?: string;
 };
 
 const posthog = {
@@ -94,6 +96,7 @@ async function load(env: Env = {}) {
     },
   );
   vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", env.token === undefined ? TOKEN : env.token);
+  vi.stubEnv("NEXT_PUBLIC_ANALYTICS_PREVIEW_PRS", env.previewPrs ?? "");
   const client = await import("@/features/analytics/analytics-client");
   return { client, document, navigator, win };
 }
@@ -127,7 +130,36 @@ afterEach(() => {
 describe("analytics gating", () => {
   it.each([
     ["localhost", { hostname: "localhost" }, "wrong-host"],
-    ["a PR preview", { hostname: "pr-413.runespace.qcfailed.com" }, "wrong-host"],
+    [
+      "a PR preview with preview analytics off",
+      { hostname: "pr-414.runespace.qcfailed.com" },
+      "wrong-host",
+    ],
+    [
+      "a PR preview not on the list",
+      { hostname: "pr-414.runespace.qcfailed.com", previewPrs: "413,415" },
+      "wrong-host",
+    ],
+    [
+      "localhost with preview PRs listed",
+      { hostname: "localhost", previewPrs: "414" },
+      "wrong-host",
+    ],
+    [
+      "loopback with preview PRs listed",
+      { hostname: "127.0.0.1", previewPrs: "414" },
+      "wrong-host",
+    ],
+    [
+      "a spoofed preview host",
+      { hostname: "pr-414.runespace.qcfailed.com.evil.example", previewPrs: "414" },
+      "wrong-host",
+    ],
+    [
+      "a malformed preview list",
+      { hostname: "pr-414.runespace.qcfailed.com", previewPrs: "true" },
+      "wrong-host",
+    ],
     ["a missing token", { token: "" }, "unconfigured"],
     ["no choice yet (opt-in)", { choice: null }, "needs-consent"],
     ["a declined choice", { choice: "off" }, "declined"],
@@ -147,6 +179,30 @@ describe("analytics gating", () => {
     expect(posthog.init).not.toHaveBeenCalled();
     expect(posthog.capture).not.toHaveBeenCalled();
     expect(posthog.identify).not.toHaveBeenCalled();
+  });
+
+  it("is permitted on production, with or without a preview list", async () => {
+    for (const previewPrs of ["", "414"]) {
+      const { client } = await load({ previewPrs });
+      expect(client.analyticsStatus()).toBe("permitted");
+      expect(client.currentAnalyticsEnvironment()).toEqual({
+        environment: "production",
+        host: "runespace.qcfailed.com",
+      });
+    }
+  });
+
+  it("is permitted on an explicitly enabled preview, after the same consent", async () => {
+    const env = { hostname: "pr-414.runespace.qcfailed.com", previewPrs: "414" };
+    expect((await load({ ...env })).client.analyticsStatus()).toBe("permitted");
+    expect((await load({ ...env, choice: null })).client.analyticsStatus()).toBe("needs-consent");
+    expect((await load({ ...env, choice: "off" })).client.analyticsStatus()).toBe("declined");
+    expect((await load({ ...env, gpc: true })).client.analyticsStatus()).toBe("privacy-signal");
+    expect((await load({ ...env })).client.currentAnalyticsEnvironment()).toEqual({
+      environment: "preview",
+      host: "pr-414.runespace.qcfailed.com",
+      pr: 414,
+    });
   });
 
   it("is permitted only with an explicit yes", async () => {
@@ -402,5 +458,94 @@ describe("permission changing after an asynchronous step", () => {
     await expect(client.startAnalytics()).resolves.toBe(posthog);
     expect(posthog.init).toHaveBeenCalledTimes(1);
     expect(posthog.opt_out_capturing).not.toHaveBeenCalled();
+  });
+});
+
+describe("event separation at the SDK boundary", () => {
+  async function beforeSend(env: Env) {
+    const { client } = await load(env);
+    await client.startAnalytics();
+    const config = (
+      posthog.init.mock.calls.at(-1) as unknown as [string, Record<string, unknown>]
+    )[1];
+    return {
+      client,
+      send: config.before_send as (capture: {
+        event: string;
+        properties: Record<string, unknown>;
+      }) => { properties: Record<string, unknown> } | null,
+    };
+  }
+  const pageview = (host: string) => ({
+    event: "$pageview",
+    properties: { $current_url: `https://${host}/wiki?x=SECRET`, environment: "spoofed" },
+  });
+
+  it("stamps production events", async () => {
+    const { send } = await beforeSend({});
+    const sent = send(pageview("runespace.qcfailed.com"))!;
+    expect(sent.properties).toMatchObject({
+      environment: "production",
+      $host: "runespace.qcfailed.com",
+      $current_url: "https://runespace.qcfailed.com/wiki",
+    });
+    expect(sent.properties).not.toHaveProperty("preview_pr");
+  });
+
+  it("stamps an enabled preview's events with the environment and PR number", async () => {
+    const host = "pr-414.runespace.qcfailed.com";
+    const { send } = await beforeSend({ hostname: host, previewPrs: "414" });
+    for (const event of [
+      "$pageview",
+      "$identify",
+      "account_registration_succeeded",
+      "gameplay_entered",
+    ]) {
+      const sent = send({ event, properties: { $current_url: `https://${host}/play/abc` } })!;
+      expect(sent.properties, event).toMatchObject({
+        environment: "preview",
+        preview_pr: 414,
+        $host: host,
+      });
+    }
+    expect(JSON.stringify(send(pageview(host)))).not.toContain("SECRET");
+  });
+
+  it("drops the event at the boundary once permission is gone", async () => {
+    const { client, send } = await beforeSend({
+      hostname: "pr-414.runespace.qcfailed.com",
+      previewPrs: "414",
+    });
+    client.setAnalyticsChoice("off");
+    expect(send(pageview("pr-414.runespace.qcfailed.com"))).toBeNull();
+  });
+});
+
+describe("opt-out while loading on an enabled preview", () => {
+  const previewEnv = { hostname: "pr-414.runespace.qcfailed.com", previewPrs: "414" };
+
+  it("declining while the SDK loads never initialises or emits", async () => {
+    const { client } = await load(previewEnv);
+    const release = deferImport();
+    const started = client.startAnalytics();
+    client.trackAnalyticsPageview("/", true);
+    client.trackAnalyticsEvent("account_registration_succeeded");
+    client.identifyAnalyticsAccount("user_1");
+    client.setAnalyticsChoice("off");
+    release();
+    await expect(started).resolves.toBeNull();
+    await settle();
+    expect(posthog.init).not.toHaveBeenCalled();
+    expect(posthog.capture).not.toHaveBeenCalled();
+    expect(posthog.identify).not.toHaveBeenCalled();
+  });
+
+  it("declining before a queued action runs drops it", async () => {
+    const { client } = await load(previewEnv);
+    await client.startAnalytics();
+    client.trackAnalyticsEvent("gameplay_entered");
+    client.setAnalyticsChoice("off");
+    await settle();
+    expect(posthog.capture).not.toHaveBeenCalled();
   });
 });

@@ -7,9 +7,10 @@ import {
   analyticsConfig,
   consentAllows,
   hasPrivacySignal,
-  isAnalyticsHost,
   readAnalyticsChoice,
+  resolveAnalyticsEnvironment,
   type AnalyticsChoice,
+  type AnalyticsEnvironment,
 } from "./analytics-policy";
 import {
   analyticsRouteTemplate,
@@ -72,10 +73,20 @@ export function analyticsChoice(): AnalyticsChoice | undefined {
   return typeof document === "undefined" ? undefined : readAnalyticsChoice(document.cookie);
 }
 
+/**
+ * Which deployment this page is (production, or an explicitly enabled preview),
+ * or `null` anywhere analytics may not run (localhost, tests, unlisted previews,
+ * any other host). Read from the live hostname every time, never cached.
+ */
+export function currentAnalyticsEnvironment(): AnalyticsEnvironment | null {
+  if (typeof window === "undefined" || !analyticsConfig) return null;
+  return resolveAnalyticsEnvironment(window.location.hostname, analyticsConfig.previewPrs);
+}
+
 /** Why analytics is or is not running for this page load. */
 export function analyticsStatus(): AnalyticsPermission {
   if (typeof window === "undefined" || !analyticsConfig) return "unconfigured";
-  if (!isAnalyticsHost(window.location.hostname)) return "wrong-host";
+  if (!currentAnalyticsEnvironment()) return "wrong-host";
   if (browserPrivacySignal()) return "privacy-signal";
   if (consentAllows(analyticsChoice())) return "permitted";
   return analyticsChoice() === "off" ? "declined" : "needs-consent";
@@ -108,7 +119,7 @@ export function setAnalyticsChoice(choice: AnalyticsChoice): void {
  */
 export function syncPrivacySignalCookie(): void {
   try {
-    if (!analyticsConfig || !isAnalyticsHost(window.location.hostname)) return;
+    if (!currentAnalyticsEnvironment()) return;
     document.cookie = browserPrivacySignal()
       ? `${ANALYTICS_SIGNAL_COOKIE}=1${cookieAttributes()}`
       : `${ANALYTICS_SIGNAL_COOKIE}=; Max-Age=0${cookieAttributes()}`;
@@ -171,8 +182,12 @@ export function startAnalytics(): Promise<PostHog | null> {
         save_referrer: false,
         mask_personal_data_properties: true,
         // Last gate before an event is built: permission can change between
-        // the action that asked for it and the SDK handling it.
-        before_send: (capture) => (analyticsPermitted() ? sanitizeCapture(capture) : null),
+        // the action that asked for it and the SDK handling it. The
+        // environment is read from the live host and stamped on every event.
+        before_send: (capture) => {
+          const env = currentAnalyticsEnvironment();
+          return env && analyticsPermitted() ? sanitizeCapture(capture, env) : null;
+        },
       });
       return posthog;
     })
