@@ -2,13 +2,19 @@
 //
 // It renders the same repository-authored updates the /updates pages already
 // show, newest first, one item per update: title, /updates/<slug> link,
-// summary as the description, and the authored publishedAt as pubDate.
-// No new data source: new updates flow into the feed on the next deploy,
-// which is why this route is pinned force-static (the data ships with the
-// build, same as the /updates pages themselves). Consumed by the Scapelikes
-// developer dashboard's game news feed import, and any feed reader.
+// summary as the description, and the authored publishedAt as pubDate, plus
+// the full article HTML (hero image, body, patch notes) as content:encoded
+// and category "update", so the Scapelikes dashboard imports complete
+// articles rather than excerpt-only items. Item GUIDs are the article URLs
+// and publication dates are unchanged from the summary-only feed, so
+// already-imported articles refresh in place. No new data source: new
+// updates flow into the feed on the next deploy, which is why this route
+// is pinned force-static (the data ships with the build, same as the
+// /updates pages themselves). Consumed by the Scapelikes developer
+// dashboard's game news feed import, and any feed reader.
 
 import { getPublishedUpdates, getPublicUpdatePath } from "@/features/public-site/public-updates";
+import { buildPublicUpdateFeedHtml, wrapCdata } from "@/features/public-site/public-feed-html";
 
 export const dynamic = "force-static";
 
@@ -30,6 +36,8 @@ function buildFeed(): string {
         `      <link>${url}</link>`,
         `      <guid isPermaLink="true">${url}</guid>`,
         `      <description>${escapeXml(update.summary)}</description>`,
+        "      <category>update</category>",
+        `      <content:encoded>${wrapCdata(buildPublicUpdateFeedHtml(update, SITE_URL))}</content:encoded>`,
         `      <pubDate>${pubDate}</pubDate>`,
         "    </item>",
       ].join("\n");
@@ -39,7 +47,7 @@ function buildFeed(): string {
     updates.length > 0 ? new Date(updates[0]!.publishedAt).toUTCString() : new Date().toUTCString();
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<rss version="2.0">',
+    '<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">',
     "  <channel>",
     "    <title>RuneSpace Updates</title>",
     `    <link>${SITE_URL}/updates</link>`,
