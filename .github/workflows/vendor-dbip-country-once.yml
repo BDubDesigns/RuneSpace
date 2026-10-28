@@ -1,0 +1,65 @@
+name: Vendor DB-IP Country Lite (one-shot)
+on:
+  push:
+    branches:
+      - chore/vendor-dbip-country-lite-2026-10
+    paths:
+      - .github/workflows/vendor-dbip-country-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  download-verify-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Fetch exact October 2026 DB-IP Country Lite release and verify official SHA1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p server/geo
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 \
+            'https://download.db-ip.com/free/dbip-country-lite-2026-10.mmdb.gz' \
+            -o /tmp/dbip-country-lite-2026-10.mmdb.gz
+          gzip -t /tmp/dbip-country-lite-2026-10.mmdb.gz
+          gzip -dc /tmp/dbip-country-lite-2026-10.mmdb.gz \
+            > server/geo/dbip-country-lite-2026-10.mmdb
+          printf 'e515b63075ad48847f9c4332b724742e8ba15b0e  server/geo/dbip-country-lite-2026-10.mmdb\n' | sha1sum -c -
+          test "$(wc -c < server/geo/dbip-country-lite-2026-10.mmdb)" -eq 8348509
+          cat > server/geo/README.md <<'EOF'
+          # DB-IP Country Lite — October 2026
+
+          Data source: [DB-IP Country Lite](https://db-ip.com/db/download/ip-to-country-lite).
+
+          The `dbip-country-lite-2026-10.mmdb` database is © DB-IP, licensed under
+          [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+          Attribution required by DB-IP: [IP Geolocation by DB-IP](https://db-ip.com).
+
+          Edition: 2026-10. Date: 2026-10-01. Source file:
+          `https://download.db-ip.com/free/dbip-country-lite-2026-10.mmdb.gz`
+
+          Verified after extraction against the SHA1 on DB-IP's official page:
+          `e515b63075ad48847f9c4332b724742e8ba15b0e`.
+          Expected uncompressed size: 8,348,509 bytes.
+
+          This database is distributed monthly and must be updated regularly;
+          fail closed (unknown region / opt-in consent) if data becomes stale.
+          This file alone does **not** enable country-based analytics or change consent.
+
+          A public-facing attribution link must also be shown in RuneSpace's
+          Safety & Privacy UI before the classifier is wired into production.
+          EOF
+      - name: Commit data and remove one-shot workflow from branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/vendor-dbip-country-once.yml
+          git add server/geo/README.md server/geo/dbip-country-lite-2026-10.mmdb
+          git commit -m "chore(geo): vendor verified DB-IP Country Lite October 2026"
+          git push origin "HEAD:refs/heads/chore/vendor-dbip-country-lite-2026-10"
