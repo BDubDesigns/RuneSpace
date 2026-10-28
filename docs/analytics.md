@@ -5,10 +5,168 @@ where visitors come from, which public pages they open, where they drop out of
 registration and character creation, and whether they actually enter and return
 to the game. It is deliberately **not** a general game/economy telemetry system
 (issue #413). This document is the operational and privacy contract; the
-player-facing disclosure is the "Product analytics", "Anonymous and signed-in
-analytics", and "Your analytics choice, and how long it's kept" sections of the
-Safety & Privacy Wiki article (`features/public-site/public-wiki.ts`), which
-must stay true to what ships here.
+player-facing disclosure is the "Anonymous visit counts", "Product analytics",
+"Anonymous and signed-in analytics", and "Your analytics choice, and how long
+it's kept" sections of the Safety & Privacy Wiki article
+(`features/public-site/public-wiki.ts`), which must stay true to what ships here.
+
+**Two separate things share the consent banner (issue #425).** PostHog is
+optional, opt-in, and everything below the "Consent and privacy choices"
+heading applies to it only. Alongside it runs a first-party **aggregate
+referral counter** (next section) that records anonymous daily page-load
+totals, never individuals, and has its own objection control. Declining PostHog
+does not turn the counter off, and objecting to the counter does not touch
+PostHog. No copy may say "analytics is off" when only one of them is.
+
+## Aggregate referral counts (issue #425)
+
+The owner needs to know which outreach (LinkedIn, Reddit, Discord, Google, …)
+brings visitors even when they decline PostHog. That is answered by a daily
+total of public page loads filed under sanitized labels, with no individual
+data anywhere. **Counts are page loads, not people**: reloads count again,
+automated visitors can slip in, browsers without Fetch Metadata are not counted,
+and a non-existent path under `/wiki/…` is counted as Wiki. Use them to compare
+sources with each other, not as an absolute audience size.
+
+### What is counted, and what is stored
+
+One row per UTC day and label set in `referral_daily_counts`
+(`db/site-analytics.ts`, migration `0054_referral_daily_counts`):
+
+| Column | Value |
+| --- | --- |
+| `day` | UTC date |
+| `source_group` | `linkedin`, `reddit`, `discord`, `google`, `bing`, `duckduckgo`, `youtube`, `x`, `facebook`, `bluesky`, `github`, `hacker_news`, `qcfailed`, plus `internal` (own-site referrer), `other` (any unlisted referrer or `utm_source`) and `direct_unknown` (no referrer: typed, bookmarked, or stripped by an app) |
+| `utm_source`, `utm_medium`, `utm_campaign` | The existing allowlist sanitizer (`sanitizeUtmValue`: lower-case, ≤ 64 of `a-z 0-9 space _ . -`, anything else dropped whole); `''` when absent |
+| `route_category` | `landing`, `updates`, `wiki`, `high-scores`, `auth` (Register, Sign in) |
+| `visits` | Number of page loads |
+
+Nothing else is stored: no event rows, IP address, raw `Referer`, full URL or
+query, `User-Agent`, device/browser identifier, cookie, account or character ID.
+The request's headers are read to decide *whether* to count and *which labels*
+to use, then discarded. The label sets per UTC day are capped (100 distinct
+non-empty UTM combinations per process per day, `MAX_UTM_COMBINATIONS_PER_DAY`);
+the overflow is filed under one `(other)` UTM label so a crafted link cannot grow
+the table.
+
+A request is counted only if **all** of these hold (`referralCountLabels` in
+`features/analytics/referral-counts.ts`, pure and unit-tested):
+
+- `GET` on exactly `runespace.qcfailed.com` (same forwarded-host rule as the
+  server reporter). Previews, `localhost`, CI and every other host are never
+  counted. The disposable E2E runtime (CI + plain-HTTP flag + loopback DB, which
+  previews and production cannot satisfy) additionally counts the exact host
+  `localhost`, so a browser journey can prove the real counter.
+- A top-level browser document navigation, by Fetch Metadata
+  (`Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`) and `Accept:
+  text/html`, and not a `Purpose`/`Sec-Purpose` prefetch or prerender. Browsers
+  without Fetch Metadata are undercounted by design.
+- A public route: `/`, `/updates…`, `/wiki…`, `/high-scores…`, `/register`,
+  `/sign-in`. Never `/play`, `/characters`, `/admin`, `/moderation`,
+  `/qc-studio`, `/design-system`, `/api`, `/_next`, assets, or an unknown path.
+- Not an obvious crawler, link previewer or automation by `User-Agent`
+  (best effort; the string is never stored).
+- No **objection**: `Sec-GPC: 1`, `DNT: 1`, the `rs_analytics_signal=1` mirror
+  cookie, or the visitor's own `rs_stats_optout=1` cookie.
+
+The **first request can be counted before the visitor can see the control**;
+the Safety & Privacy page says so.
+
+### Where it runs, and what was verified
+
+`middleware.ts` (Node.js runtime, `matcher` narrowed to the public routes above)
+judges each request and then writes with `event.waitUntil`, so the response is
+never delayed or changed. `server/referral-counts.ts` does one
+`INSERT … ON CONFLICT DO UPDATE SET visits = visits + 1` per counted load on a
+dedicated pool of two connections (never a pool per request), with a statement
+timeout, a cap of 200 in-flight writes (excess loads are dropped, not queued
+without bound), and a 30-second back-off after any failure, so an unreachable
+database costs a few skipped counts and nothing else.
+
+Verified on Next 15.5.20 with a throwaway app and then the real built app
+(`next build && next start`), rather than assumed:
+
+- **Middleware and `instrumentation.ts` do not share module state.** Instrumentation,
+  middleware and route handlers each got their own instance of a shared module
+  (different instance IDs; the counter incremented by middleware read `0` from
+  instrumentation and from a route handler). Only `globalThis` was common, which
+  is an implementation quirk, not a contract. So there is **no in-memory buffer
+  and no instrumentation flusher**: it would silently never flush. The direct
+  upsert has nothing to share.
+- **Middleware runs for statically generated pages** (`/`, `/wiki/…`,
+  `/updates`) as well as 404s and API routes, which no layout, page or route
+  handler can see.
+- **Next strips its own RSC and prefetch markers before middleware runs**
+  (`RSC`, `Next-Router-Prefetch`, `?_rsc=`), so they cannot be used to exclude
+  client navigations. Fetch Metadata does it instead: real browsers issue Next's
+  client navigations and `<Link>` prefetches as `fetch()` calls
+  (`Sec-Fetch-Dest: empty`), proved in a real browser by
+  `tests/e2e/visit-counts.spec.ts` (an in-app link click and its prefetches add
+  nothing; a reload adds one).
+- Concurrency: 300 parallel page loads against the built server produced exactly
+  300 counted visits; the integration suite repeats this across two pools. Writes
+  to one label row serialize on commit latency (on the order of 100 per second
+  on a laptop container), far above expected traffic; past the in-flight cap
+  loads are skipped rather than queued, so a surge undercounts instead of
+  hurting the site.
+
+### Retention
+
+Rows older than 25 months (`REFERRAL_RETENTION_MONTHS`) are deleted by
+``createReferralCounter().prune()`, which each app process runs once per UTC
+day, after its first counted load of that day, off the request path. It is
+idempotent, so several processes or restarts are harmless. With no traffic there
+is nothing new to prune and no schedule to maintain.
+
+### Reading the counts (read-only, owner)
+
+```sql
+-- Visits by source and campaign, last 30 days.
+select source_group, utm_source, utm_medium, utm_campaign, sum(visits) as page_loads
+from referral_daily_counts
+where day >= current_date - 30
+group by 1, 2, 3, 4
+order by page_loads desc;
+
+-- Daily trend for one source.
+select day, route_category, visits
+from referral_daily_counts
+where source_group = 'linkedin' and day >= current_date - 30
+order by day, route_category;
+```
+
+### Objection control
+
+`rs_stats_optout=1` (first-party, one year, `SameSite=Lax`, `Secure` over HTTPS)
+is the visitor's explicit objection; it is a preference record, not tracking. The
+"Do not count my visits" control (`features/analytics/VisitCountControl.tsx`, on
+Safety & Privacy at `#visit-count-settings`, linked from the banner) is a plain
+form that posts to `/api/visit-count-preference`, which sets or clears the cookie
+and replies with a small confirmation page, so it works without JavaScript (a
+`<noscript>` form offers the undo). With JavaScript it saves in place and
+announces the result. The shared cookie string comes from `statsOptOutCookie`.
+
+Two review findings (PR #427) shaped it. The Wiki page is statically generated, so
+the server cannot read the visitor's cookie: the control therefore renders a
+neutral "can't see your saved choice yet" state (never "your visits are
+counted") until JavaScript shows the real state, and the confirmation page that
+follows a no-JS press states what was saved. And the route accepts only
+same-origin posts (`Sec-Fetch-Site: same-origin`, else a matching `Origin`,
+else refused), because browsers honor `Set-Cookie` on a cross-site form post and
+another site could otherwise clear a visitor's objection.
+
+### Consent banner (issues #413, #425)
+
+`AnalyticsConsentPrompt` is a warm, first-person invitation from the solo
+developer ("Help a solo dev make RuneSpace better?"), with two identical
+buttons, **Help me improve RuneSpace** and **No thanks**, and a link, **Privacy
+& visit-count settings**. It states plainly that daily visit totals are kept
+without following individual visitors, that the PostHog choice is optional, free
+to refuse and free to change, and that nothing goes to PostHog until the visitor
+chooses. It must not guilt, promise an outcome, or imply that consent produces
+revenue or family time. The banner only appears where PostHog can run (production
+host, token configured); the visit-count control is on Safety & Privacy on every
+host.
 
 ## Locked decisions
 
@@ -46,6 +204,8 @@ must stay true to what ships here.
 | `account_registration_succeeded` | `features/auth/RegisterForm.tsx` |
 | `character_creation_succeeded` (server, best-effort) | `server/analytics.ts`, called by `createCharacterAction` |
 | One-time consent question | `features/analytics/AnalyticsConsentPrompt.tsx` (mounted by `AnalyticsProvider`, hidden on Play) |
+| Aggregate referral counter (rules, persistence, entry point) | `features/analytics/referral-counts.ts` (pure), `server/referral-counts.ts`, `middleware.ts`, table `db/site-analytics.ts` |
+| Visit-count objection control + no-JS route | `features/analytics/VisitCountControl.tsx`, `app/api/visit-count-preference/route.ts` |
 | Standing choice control | `features/analytics/AnalyticsPrivacyControl.tsx` on `/wiki/safety-and-privacy` |
 
 `posthog-js` is the only added dependency (exact-pinned): it provides identity
@@ -172,7 +332,7 @@ applicable" without guessing is to require it **everywhere** by default
 (`ANALYTICS_CONSENT_MODEL = "opt-in"` in `analytics-policy.ts`):
 
 - On the production host, a visitor with no saved choice and no privacy signal
-  sees a one-time **Accept / Decline** prompt (not on the Play screen, whose
+  sees a one-time prompt with two equal buttons, **Help me improve RuneSpace** (accept) and **No thanks** (decline), not on the Play screen, whose
   footer it would cover). Until they press Accept, **nothing** is loaded,
   stored, or sent: no SDK download, no `localStorage` write, no session
   request, no server-side event.

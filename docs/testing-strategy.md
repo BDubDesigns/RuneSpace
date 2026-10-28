@@ -93,8 +93,8 @@ small number of critical mobile player journeys.
   setting and Ultra Rare shimmer (`oil-shale-mining`, #342; Stillreach's The Dry Seam in `dry-seam-mining`, #380), and fuel manufacturing's
   Empty and Full Small Fuel Canister recipes, art and failure shape
   (`fuel-manufacturing`, #343), Break Apart for the intact Runestone from Inventory Item Details at the 390 px portrait width (`rune-materials`, #367), Holo Hollow Landing's Last Leg Trading shop, Toll's
-  topics and the completed-Thrust-Issues trade gate (`last-leg-trading`, #357), the Rune Fragment's Inspect offer, the three guided contacts and the deliberately unfinished Stillreach stage at the 390 px portrait width (`not-from-around-here`, #369), the mystery's completion flowing into First Runeworking Lesson, the Enby's Begin Lesson / Not Now offer, Mining-level Fragment advice, three Resonance Rig attunements, the Seeker's nested Sources and the explicit turn-in at 390 px (`first-runeworking-lesson`, #391), the lesson's turn-in handing over two Seekers with First Resonance Echo, a Seeker reading from Inventory Item Details with its durable wrong and found results, the last-reading and ruled-out lines, the Enby's debrief and 300 Runeworking XP, and the Stillreach topic's personal beats at 390 px (`first-resonance-echo`, #393), the Rivet's Ship panel, refueling, first flight, landing and durable arrival notice (`ship-first-flight`, #358) with the in-phase flight cinematic (#359), Stillreach's planet-scoped eight-hex map, admin-placed walking and eight scenes at the 390 px and desktop widths (`stillreach`, #373), the two-way interplanetary Rivet flight with its takeoff, Skatboll–Stillreach chart and touchdown cinematic in both directions, the berthed Stillreach scene and Last Leg Trading's locked and online Stillreach terminal (`stillreach-flight`, #375), both FedHex pickups on one shared 4:1 interior with an empty and a waiting mailbox, the Legendary parcel claimed and refused at a full pack at 390 px and desktop (`fedhex`, #399), the Legendary Boots and Gloves as real loadout slots with their bonus (`equipment-loadout`), the Legendary and Ultra Rare trade warning in composing and the frozen review (`player-trading`), the LEGENDARY FIND System line (`public-chat`), and panel scroll hints plus the Play page preview
-  arrows (`scroll-affordances`, #345). It intentionally excludes noncanonical `smoke`, `ownership`,
+  topics and the completed-Thrust-Issues trade gate (`last-leg-trading`, #357), the Rune Fragment's Inspect offer, the three guided contacts and the deliberately unfinished Stillreach stage at the 390 px portrait width (`not-from-around-here`, #369), the mystery's completion flowing into First Runeworking Lesson, the Enby's Begin Lesson / Not Now offer, Mining-level Fragment advice, three Resonance Rig attunements, the Seeker's nested Sources and the explicit turn-in at 390 px (`first-runeworking-lesson`, #391), the lesson's turn-in handing over two Seekers with First Resonance Echo, a Seeker reading from Inventory Item Details with its durable wrong and found results, the last-reading and ruled-out lines, the Enby's debrief and 300 Runeworking XP, and the Stillreach topic's personal beats at 390 px (`first-resonance-echo`, #393), the Rivet's Ship panel, refueling, first flight, landing and durable arrival notice (`ship-first-flight`, #358) with the in-phase flight cinematic (#359), Stillreach's planet-scoped eight-hex map, admin-placed walking and eight scenes at the 390 px and desktop widths (`stillreach`, #373), the two-way interplanetary Rivet flight with its takeoff, Skatboll–Stillreach chart and touchdown cinematic in both directions, the berthed Stillreach scene and Last Leg Trading's locked and online Stillreach terminal (`stillreach-flight`, #375), both FedHex pickups on one shared 4:1 interior with an empty and a waiting mailbox, the Legendary parcel claimed and refused at a full pack at 390 px and desktop (`fedhex`, #399), the Legendary Boots and Gloves as real loadout slots with their bonus (`equipment-loadout`), the Legendary and Ultra Rare trade warning in composing and the frozen review (`player-trading`), the LEGENDARY FIND System line (`public-chat`), panel scroll hints plus the Play page preview
+  arrows (`scroll-affordances`, #345), and the aggregate referral counter with its objection control (`visit-counts`, #425). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -701,3 +701,18 @@ cover the config/host/privacy gates, route-template and attribution sanitizing,
 payload allowlisting, event boundaries and the first-XP milestone rule, identify
 and reset, the disabled paths, and the best-effort server reporter. See
 `docs/analytics.md`.
+
+The first-party aggregate referral counter (issue #425) is proved at three layers.
+`tests/unit/referral-counts*.test.ts` cover classification, every exclusion
+(host, Fetch Metadata, prefetch, crawlers, GPC/DNT, objection cookie, non-public
+routes), strict data minimization, the middleware matcher, the objection route,
+the banner and Safety & Privacy copy, and the in-flight cap, back-off and
+cardinality collapse against a scripted database.
+`tests/integration/referral-counts.test.ts` proves the migration, race-safe
+increments across pools, overflow collapse, 25-month pruning, the real
+middleware writing a row, and harmlessness with an unreachable database.
+`tests/e2e/visit-counts.spec.ts` (canonical) drives a real Chromium against the
+production server: an initial load is counted once and in-app navigation is not,
+static pages are counted, other hosts/GPC/DNT/crawlers are not, and the control
+works with and without JavaScript. The disposable E2E runtime counts the exact
+host `localhost` for it; production and previews never do.
