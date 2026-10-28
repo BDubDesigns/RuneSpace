@@ -890,6 +890,137 @@ test("Scavenge explains when every possible reward needs an open inventory slot"
   await expect(available).toContainText("Every possible find needs an available inventory slot.");
 });
 
+/**
+ * Makes `Date` in the page run `skewMs` away from the server's clock, as a
+ * player's real PC clock does. Only the browser is skewed: the database and the
+ * server action keep reading true time (#424).
+ */
+async function skewBrowserClock(page: import("@playwright/test").Page, skewMs: number) {
+  await page.addInitScript((skew) => {
+    const RealDate = Date;
+    class SkewedDate extends RealDate {
+      constructor(...args: unknown[]) {
+        if (args.length === 0) super(RealDate.now() + skew);
+        else super(...(args as [number]));
+      }
+      static override now() {
+        return RealDate.now() + skew;
+      }
+    }
+    window.Date = SkewedDate as DateConstructor;
+  }, skewMs);
+}
+
+async function expectClaimCommitted(page: import("@playwright/test").Page, characterId: string) {
+  await expect(page.locator("[data-scavenge-reveal]")).toBeVisible();
+  await expect(
+    db
+      .select({ outcomeId: characterScavengeReveals.outcomeId })
+      .from(characterScavengeReveals)
+      .where(eq(characterScavengeReveals.characterId, characterId)),
+  ).resolves.toHaveLength(1);
+}
+
+test("a browser clock running behind the server still claims inside the real window (#424)", async ({
+  page,
+}) => {
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  // The player's PC is 3.5 s slow. Their screen is a countdown of a window the
+  // server has already been counting down for 3.5 s longer than they believe.
+  await skewBrowserClock(page, -3_500);
+  const opportunity = await openScavengeOpportunity(page, characterId, { travelAgeMs: 2_000 });
+
+  // A person does not click the instant the button appears; wait until the
+  // displayed countdown is mid-window, as a real claim would be.
+  const countdown = opportunity.locator("[data-scavenge-countdown]");
+  await expect
+    .poll(async () => {
+      const text = (await countdown.textContent()) ?? "";
+      return Number.parseFloat(/([\d.]+)s remaining/.exec(text)?.[1] ?? "99");
+    })
+    .toBeLessThanOrEqual(2);
+  await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
+
+  await expectClaimCommitted(page, characterId);
+});
+
+test("a browser clock running ahead of the server does not offer Scavenge before it opens (#424)", async ({
+  page,
+}) => {
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  // Three seconds fast, the browser would call the window open while the server
+  // still says there is nothing to Scavenge yet.
+  await skewBrowserClock(page, 3_000);
+  const opportunity = await openScavengeOpportunity(page, characterId, { travelAgeMs: 0 });
+
+  // Whenever the control reads SCAVENGE NOW, the server agrees.
+  await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
+  await expectClaimCommitted(page, characterId);
+});
+
+test("a refused Scavenge claim stays readable after its control leaves the Journey (#424)", async ({
+  page,
+}) => {
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  const opportunity = await openScavengeOpportunity(page, characterId, { travelAgeMs: 2_000 });
+
+  // A request that spends longer in flight than the server's one-second grace
+  // is genuinely too late, and is refused by the server. By then the window has
+  // closed on screen too, so the control that sent it is gone from the Journey.
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST" && request.headers()["next-action"]) {
+      await new Promise((resolve) => setTimeout(resolve, 4_500));
+    }
+    await route.continue();
+  });
+  await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
+  await expect(page.locator('[data-scavenge-state="available"]')).toHaveCount(0, {
+    timeout: 8_000,
+  });
+
+  const refusal = page.getByText("The Scavenge window has expired for this Travel leg.");
+  await expect(refusal).toBeVisible({ timeout: 8_000 });
+  await page.unroute("**/*");
+  // Still there a moment later: it is not a flash that a re-render replaces.
+  await page.waitForTimeout(2_000);
+  await expect(refusal).toBeVisible();
+  await expect(
+    db
+      .select()
+      .from(characterScavengeReveals)
+      .where(eq(characterScavengeReveals.characterId, characterId)),
+  ).resolves.toHaveLength(0);
+});
+
+test("a slow browser clock still reconciles arrival at the server's arrival time (#424)", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await skewBrowserClock(page, -3_500);
+  // The server will end this walk in about 1.5 s.
+  const startedAt = new Date(Date.now() - 22_500);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.travel,
+    startedAt,
+    resolvedThroughAt: startedAt,
+  });
+  await db.insert(characterTravelState).values({
+    characterId,
+    originLocationId: LOCATION_IDS.crashSite,
+    destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
+    mode: "walk",
+    scavengeOpportunityStartTick: 3,
+  });
+  await page.goto(`/play/${characterId}`);
+  await expect(page.getByText("Journey progress")).toBeVisible();
+
+  // Three and a half seconds of client lag is not an arrival the player waits for.
+  await expect(page.locator("[data-location-surface]")).toBeVisible({ timeout: 3_500 });
+});
+
 test("Scavenge Skip reveal bypasses animation and the reel preference remains reversible", async ({
   page,
 }) => {

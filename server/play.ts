@@ -956,6 +956,13 @@ export type ScavengeAcknowledgmentResult = {
  */
 export type PlayGameplayState = {
   characterId: string;
+  /**
+   * The server's clock when this state was read (#424). Every timestamp below
+   * is the server's, so the browser needs the server's "now" — never its own
+   * clock — to tell whether a window it was handed is open. The browser derives
+   * its offset from this on receipt (`features/play/server-clock.ts`).
+   */
+  serverNow: string;
   missions: readonly MissionProjection[];
   activeAction?: {
     actionId: string;
@@ -2673,6 +2680,7 @@ export async function stateFromTransaction(
   });
   return {
     characterId,
+    serverNow: now.toISOString(),
     missions,
     echoHunt,
     fedhex,

@@ -14,6 +14,7 @@ import {
 } from "react";
 import type { PlayGameplayState } from "@/server/play";
 import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
+import { estimatedServerNowMs, serverClockOffsetMs } from "./server-clock";
 import type { PlayUtilityId } from "./utility-workspace";
 
 type PlayContextValue = {
@@ -53,6 +54,12 @@ type PlayContextValue = {
   setMissionsOpen: Dispatch<SetStateAction<boolean>>;
   setMissionsFocus: Dispatch<SetStateAction<string | undefined>>;
   acceptState: (nextState: PlayGameplayState) => void;
+  /**
+   * The server's current time in ms (#424). Display clocks for server-owned
+   * windows read this instead of `Date.now()`, so a browser clock that is off
+   * from the server's cannot show a window the server disagrees with.
+   */
+  serverNowMs: () => number;
   state: PlayGameplayState;
 };
 
@@ -113,6 +120,12 @@ export function PlayProvider({
   const foregroundQueue = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const serverClockOffset = useRef<number | undefined>(undefined);
+  serverClockOffset.current ??= serverClockOffsetMs(initialState.serverNow, Date.now());
+  const serverNowMs = useCallback(
+    () => estimatedServerNowMs(Date.now(), serverClockOffset.current ?? 0),
+    [],
+  );
 
   const openUtilityPanel = useCallback((utility: PlayUtilityId) => {
     setOpenUtilityId(utility);
@@ -227,6 +240,7 @@ export function PlayProvider({
       cancelRefresh(gateModel.current, boundaryGeneration.current);
       boundaryGeneration.current += 1;
     }
+    serverClockOffset.current = serverClockOffsetMs(nextState.serverNow, Date.now());
     stateRef.current = nextState;
     setState(nextState);
   }, []);
@@ -262,13 +276,13 @@ export function PlayProvider({
       }, delay);
     };
 
-    schedule(Math.max(100, boundaryTime - Date.now() + BOUNDARY_REFRESH_GRACE_MS));
+    schedule(Math.max(100, boundaryTime - serverNowMs() + BOUNDARY_REFRESH_GRACE_MS));
     // The retries above are bounded and spent in a few seconds. A player who was
     // offline through the boundary has none left when the connection returns, so
     // coming back online (or back to the tab) asks the server once more. Only a
     // boundary already passed is asked about; the server still decides the outcome.
     const reconcileIfDue = () => {
-      if (Date.now() >= boundaryTime) requestAutoRefresh(schedulerToken);
+      if (serverNowMs() >= boundaryTime) requestAutoRefresh(schedulerToken);
     };
     const onVisible = () => {
       if (document.visibilityState === "visible") reconcileIfDue();
@@ -282,7 +296,7 @@ export function PlayProvider({
       cancelRefresh(gateModel.current, schedulerToken);
       if (boundaryGeneration.current === schedulerToken) boundaryGeneration.current += 1;
     };
-  }, [boundaryAt, boundaryKey, requestAutoRefresh]);
+  }, [boundaryAt, boundaryKey, requestAutoRefresh, serverNowMs]);
 
   return (
     <PlayContext.Provider
@@ -313,6 +327,7 @@ export function PlayProvider({
         setMissionsOpen,
         setMissionsFocus,
         acceptState,
+        serverNowMs,
         state,
       }}
     >

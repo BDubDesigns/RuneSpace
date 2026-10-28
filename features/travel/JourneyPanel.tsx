@@ -20,15 +20,17 @@ function progressBetween(startedAt: string, arrivesAt: string, now: number): num
 }
 
 export function JourneyPanel() {
-  const { state } = usePlay();
+  const { serverNowMs, state } = usePlay();
   const travel = state.travelState;
-  const [now, setNow] = useState(Date.now());
+  // Every Journey time is the server's, so it is read on the server's clock (#424).
+  const [now, setNow] = useState(serverNowMs);
+  const [refusal, setRefusal] = useState<{ startedAt: string; message: string }>();
 
   useEffect(() => {
     if (!travel) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [travel]);
+  }, [serverNowMs, travel]);
 
   if (!travel) return null;
 
@@ -85,6 +87,15 @@ export function JourneyPanel() {
         </div>
       ) : null}
 
+      {/* The server's answer to a refused claim outlives the control that sent it:
+          that control leaves the feed the moment its window closes (#424). It is
+          this Journey's, so it never carries over to the next one. */}
+      {refusal && refusal.startedAt === travel.startedAt ? (
+        <div className="mt-4" data-journey-scavenge-refusal>
+          <Feedback tone="danger">{refusal.message}</Feedback>
+        </div>
+      ) : null}
+
       {/* Reachable here, with the Journey itself, rather than through the Map. */}
       <TurnBackControl rideFare={Boolean(rideName)} />
 
@@ -116,7 +127,13 @@ export function JourneyPanel() {
                 ) : null}
               </div>
               <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{event.detail}</p>
-              {event.interactive ? <ScavengeControl /> : null}
+              {event.interactive ? (
+                <ScavengeControl
+                  onRefusal={(message) =>
+                    setRefusal(message ? { startedAt: travel.startedAt, message } : undefined)
+                  }
+                />
+              ) : null}
             </li>
           );
         })}
