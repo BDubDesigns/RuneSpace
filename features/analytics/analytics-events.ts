@@ -315,9 +315,17 @@ export function sanitizeCapture<T extends CaptureLike>(
   // the validated host, never read from the incoming properties.
   Object.assign(properties, environmentProperties(env));
 
-  const refDomain = referrerDomainProperty(source.$referring_domain);
+  // The SDK runs with `save_referrer: false` (its native value is the raw
+  // referrer URL), so it emits no `$referring_domain` of its own. The native
+  // fields come from the sanitized landing attribution RuneSpace attaches to
+  // the landing pageview, re-validated here; any other event has no referrer
+  // to report and says `$direct`.
+  const refDomain =
+    referrerDomainProperty(source.referring_domain) ??
+    referrerDomainProperty(source.$referring_domain);
   if (refDomain) {
     properties.$referring_domain = refDomain;
+    // Native `$referrer` is a full URL; only the origin is ever known here.
     properties.$referrer = `https://${refDomain}`;
   } else {
     properties.$referring_domain = "$direct";

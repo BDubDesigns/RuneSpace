@@ -88,7 +88,7 @@ tracked at all:
 Each pageview carries `route_category` (`landing`, `updates`, `wiki`,
 `high-scores`, `auth`, `characters`, `play`, `other`) and a rewritten
 `$current_url` / `$pathname` / `$host` (origin + template only). The first
-pageview of a page load also carries the landing attribution: allowlisted
+permitted pageview of a page load also carries the landing attribution: allowlisted
 `utm_source`, `utm_medium`, `utm_campaign` (lower-cased, ≤ 64 characters of
 `a-z 0-9 space _ . -`; anything else is dropped whole) and `referring_domain`
 (domain only, never a path or query). A missing, stripped, or own-site referrer
@@ -96,6 +96,24 @@ is reported honestly as `direct_or_unknown`. First-touch copies are registered
 once per browser as `first_touch_utm_source`, `first_touch_utm_medium`,
 `first_touch_utm_campaign`, and `first_touch_referring_domain`, and ride on every
 later event so funnels can break down by acquisition source.
+
+The landing attribution belongs to the *page load*, not to the route the visitor
+happens to be on when they accept. It is reduced to the sanitized form above at
+initial load and held in memory only (see "Landing attribution before a choice"
+below); the first **permitted** pageview of that page load carries it, so a
+visitor who browses a few pages and then presses Accept is still attributed to
+the link that brought them. Pages browsed before accepting are not replayed.
+Later pageviews carry no landing attribution of their own.
+
+PostHog's native source fields are derived from the same sanitized value, on the
+landing pageview only. `posthog-js` runs with `save_referrer: false`, because
+natively `$referrer` is the **full** referring URL (path and query included), so
+the SDK emits no `$referrer` / `$referring_domain` at all. `sanitizeCapture`
+therefore sets `$referring_domain` to the referring domain and `$referrer` to
+that domain's `https://` origin (never a path, query, or the raw URL, and only
+ever an origin because that is all that is known), or `$direct` for both when
+there is no external referrer. Any other event reports `$direct`. The custom
+`referring_domain` property and the `first_touch_*` copies are unchanged.
 
 ### What the SDK is told
 
@@ -158,6 +176,8 @@ applicable" without guessing is to require it **everywhere** by default
   footer it would cover). Until they press Accept, **nothing** is loaded,
   stored, or sent: no SDK download, no `localStorage` write, no session
   request, no server-side event.
+- The one thing read before a choice is the landing attribution, **in memory
+  only** (next subsection). It touches no storage, cookie, SDK or network.
 - The choice is the first-party cookie `rs_analytics_choice=on|off` (one year,
   `SameSite=Lax`, `Secure` over HTTPS). It is a record of the preference, not
   analytics. Being a cookie, the server reporter sees it. Safety & Privacy offers
@@ -176,6 +196,29 @@ applicable" without guessing is to require it **everywhere** by default
   A decline, or a privacy signal appearing, while the SDK is loading therefore
   can never initialise tracking or emit an event; a withdrawn start is not
   cached, so a later Accept still starts cleanly.
+
+### Landing attribution before a choice
+
+On the first sync of a page load (`AnalyticsProvider` mount), when analytics could
+run on this host and the visitor has neither declined nor sent a privacy signal,
+`syncLandingAttribution()` reduces the landing URL and referrer with the same
+allowlist sanitizer as above (UTM trio plus referring domain) and keeps the
+result in a module variable. Nothing else about the URL is kept.
+
+- **No persistence, no traffic.** No cookie, `localStorage`/`sessionStorage`,
+  IndexedDB, SDK call, or request. A hard page load, reload, or opening the
+  site in a new tab starts empty; nothing is rebuilt from storage.
+- **Read once.** Only the first call of a page load reads the URL, so route
+  changes (`next/link`, `history.pushState`) never replace it with a later URL.
+- **Used once.** The first permitted pageview takes it (and registers the
+  first-touch copies if the browser has none); it is then gone.
+- **Discarded** on Decline, on turning analytics off (`stopAnalytics`), and
+  whenever the status is a privacy signal, a prior decline, or a host/config
+  where analytics cannot run. A discarded page load is never read again: a visitor
+  who declines and later accepts on the same page load is attributed from
+  that point, with no landing attribution and no first-touch registration.
+- Repeated Accept presses, or a status that stays `permitted`, change nothing:
+  the runtime is already mounted, so there is no second pageview or attribution.
 
 ### Owner decision: the cost of consent-first
 
@@ -435,7 +478,10 @@ To confirm a preview reaches PostHog without touching production results:
    consent prompt appears and **no** PostHog request or `ph_*` `localStorage`
    entry exists yet. Press **Accept**: in PostHog Live events, a `$pageview`
    appears with `route_category: landing`, `utm_source: scapelikes`,
-   `$current_url` equal to the bare origin + `/`.
+   `$current_url` equal to the bare origin + `/`. Repeat, this time clicking
+   through Wiki → Updates *before* pressing Accept: the single `$pageview` is
+   for the page you were on and still carries `utm_source: scapelikes`; a
+   reload before accepting loses it.
 3. Click through Wiki → Safety & Privacy: one `$pageview` per page; the page
    shows "Analytics is on in this browser."
 4. Register, verify the email in the same browser, create a character, enter
@@ -459,7 +505,13 @@ project.
 
 Unit tests (stubbed PostHog; CI never contacts it) live in
 `tests/unit/analytics-policy.test.ts`, `analytics-events.test.ts`,
-`analytics-client.test.ts`, and `analytics-server.test.ts`. They cover the
+`analytics-client.test.ts`, and `analytics-server.test.ts`.
+`tests/unit/analytics-attribution-sdk.test.ts` (issue #421) is the exception to
+"stubbed": it runs the **real pinned `posthog-js`** with the real
+`AnalyticsProvider` and consent prompt in jsdom, stubbing only the network
+transport, and asserts on the payloads the SDK actually builds: native referrer
+fields, late opt-in after SPA navigation, decline/GPC/DNT, a hard page load,
+return visits keeping the original first touch, and malformed UTMs. They cover the
 host/config/privacy gates, route templates and attribution sanitizing, payload
 allowlisting, event boundaries and the milestone rule, identify/reset, the
 disabled paths (localhost, loopback, an unlisted or spoofed preview host, a
