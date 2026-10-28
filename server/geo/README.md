@@ -59,17 +59,20 @@ into one `Buffer`) and a few milliseconds to open, measured on the October file.
 
 | Piece | Home |
 | --- | --- |
-| Client address: Better Auth's `getIp` plus a public-address filter | `server/client-ip.ts` |
+| Client address: Better Auth's `getIp` with the shared `authOptions`, plus a public-address filter | `server/client-ip.ts` |
 | MMDB reader (`mmdb-lib`), freshness check, bundled-file loader | `server/geo/country-lookup.ts` |
 | Pure country → `us` / `eea` / `uk` / `other` / `unknown` | `features/analytics/analytics-region.ts` |
 | Address → country → region, never throws | `server/client-region.ts` |
 
 Design rules, each covered by a test:
 
-- **One address resolver.** `resolveClientIp` calls the same Better Auth `getIp`
-  as the sign-up and verification abuse limiter (`ipBucketFor`) and takes the
-  same options, so analytics and account protection cannot disagree about the
-  visitor. Today that is `X-Forwarded-For` with exactly one valid entry, IPv6
+- **One address resolver, one configuration.** `resolveClientIp` calls the same
+  Better Auth `getIp` as the sign-up and verification abuse limiter
+  (`ipBucketFor`) with the same shared `authOptions` (`server/auth-options.ts`),
+  imported directly. Neither it nor `classifyClientRegion` has an options
+  parameter, so a caller cannot choose another proxy or IP configuration, and a
+  test fails if that changes or if the two resolvers disagree. Analytics and
+  account protection therefore cannot disagree about the visitor. Today that is `X-Forwarded-For` with exactly one valid entry, IPv6
   masked to /64, and `unknown` for a missing, malformed or multi-entry header.
   `CF-IPCountry`, `X-Real-IP`, `Forwarded` and every country-style header are
   ignored, and the country is never read from the request.
@@ -87,11 +90,18 @@ Design rules, each covered by a test:
   all yield no country, and `classifyCountry(null)` is `unknown`. A failed load
   is remembered so a missing file costs one read, not one per request.
 - **Regions** are exact: `us` is only `US`; `uk` is only `GB`; `eea` is the 27
-  EU states plus Iceland, Liechtenstein and Norway; everything else that is a
-  real country (Switzerland, Crown Dependencies, US and other overseas
-  territories included) is `other` until it has its own basis. Reserved and
-  placeholder codes (`ZZ`, `XK`, `EU`, `UK` and so on) are `unknown`.
-  The region is only a label here: it grants no tracking.
+  EU states plus Iceland, Liechtenstein and Norway; every other *assigned*
+  country (Switzerland, Crown Dependencies, US and other overseas territories
+  included) is `other` until it has its own basis. "Assigned" is an allowlist of
+  the 249 officially assigned ISO 3166-1 alpha-2 codes, not a list of codes to
+  exclude, so everything else is `unknown`: exceptional reservations (`AC`,
+  `CP`, `DG`, `EA`, `EZ`, `IC`, `TA`, `EU`, `UN`, `UK`), retired codes (`FX`,
+  `SU`, `AN`, `CS`, `YU`, ...), user-assigned and placeholder codes (`ZZ`, `XX`,
+  `AA`, `QM`-`QZ`, `XA`-`XZ`), and any unassigned pair of letters. A test sweeps
+  all 676 letter pairs. The region is only a label here: it grants no tracking.
+- **Kosovo and `ZZ`.** The October 2026 database emits `XK` (Kosovo, which has no
+  ISO code) and `ZZ` (DB-IP's "unknown"). Both are `unknown` here by design, so
+  those visitors take the opt-in path.
 - **No address handling.** Nothing logs, caches, persists or returns an address.
   The only output is a two-letter code or a region.
 
@@ -133,7 +143,11 @@ DB-IP publishes a new file around the first of each month. To refresh:
    than one copy) and update `COUNTRY_DATABASE_FILE`, the edition, size and SHA1
    above, and the size, SHA1 and anchor-address expectations in
    `tests/unit/country-lookup.test.ts`.
-3. Run `pnpm test`.
+3. Check which country codes the new file emits. Anything outside the 249
+   assigned codes (as `XK` and `ZZ` are today) is treated as `unknown`; decide
+   whether that is still right. Do not add a code to the allowlist because the
+   database emits it.
+4. Run `pnpm test`.
 
 The code treats a database older than 90 days as absent
 (`COUNTRY_DATABASE_MAX_AGE_MS`), so a forgotten refresh degrades to `unknown`

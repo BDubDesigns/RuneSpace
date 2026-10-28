@@ -3,8 +3,6 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BetterAuthOptions } from "better-auth";
-import { classifyClientRegion } from "@/server/client-region";
 import {
   COUNTRY_DATABASE_FILE,
   COUNTRY_DATABASE_MAX_AGE_MS,
@@ -22,10 +20,14 @@ import {
  * makes these tests depend on the wall clock.
  */
 
+vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+vi.stubEnv("BETTER_AUTH_SECRET", "unit-test-secret-0123456789");
+
+const { classifyClientRegion } = await import("@/server/client-region");
+
 const DB_PATH = path.join(process.cwd(), "server", "geo", COUNTRY_DATABASE_FILE);
 const NOW = new Date("2026-10-28T12:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
-const options: BetterAuthOptions = {};
 
 function loadVendored(): CountryDatabase {
   const database = openCountryDatabase(readFileSync(DB_PATH));
@@ -111,7 +113,7 @@ describe("failure handling", () => {
       },
     };
     // `classifyClientRegion` is the never-throws boundary.
-    const region = classifyClientRegion(new Headers({ "x-forwarded-for": "8.8.8.8" }), options, {
+    const region = classifyClientRegion(new Headers({ "x-forwarded-for": "8.8.8.8" }), {
       database: throwing,
       now: NOW,
     });
@@ -167,7 +169,6 @@ describe("classifyClientRegion", () => {
   const classify = (forwardedFor: string | null) =>
     classifyClientRegion(
       new Headers(forwardedFor === null ? {} : { "x-forwarded-for": forwardedFor }),
-      options,
       { database, now: NOW },
     );
 
@@ -194,7 +195,6 @@ describe("classifyClientRegion", () => {
   it("ignores country headers a client could send", () => {
     const region = classifyClientRegion(
       new Headers({ "cf-ipcountry": "US", "x-vercel-ip-country": "US", "x-country": "US" }),
-      options,
       { database, now: NOW },
     );
     expect(region).toBe("unknown");
@@ -202,9 +202,9 @@ describe("classifyClientRegion", () => {
 
   it("is unknown without a database or with a stale one", () => {
     const headers = new Headers({ "x-forwarded-for": "8.8.8.8" });
-    expect(classifyClientRegion(headers, options, { database: null, now: NOW })).toBe("unknown");
-    expect(
-      classifyClientRegion(headers, options, { database, now: new Date("2027-06-01T00:00:00Z") }),
-    ).toBe("unknown");
+    expect(classifyClientRegion(headers, { database: null, now: NOW })).toBe("unknown");
+    expect(classifyClientRegion(headers, { database, now: new Date("2027-06-01T00:00:00Z") })).toBe(
+      "unknown",
+    );
   });
 });

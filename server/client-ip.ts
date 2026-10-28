@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 import { getIp } from "better-auth/api";
-import type { BetterAuthOptions } from "better-auth";
+import { authOptions } from "@/server/auth-options";
 
 /**
  * The client address an offline country lookup may use (issue #419, part of
@@ -8,23 +8,22 @@ import type { BetterAuthOptions } from "better-auth";
  *
  * It deliberately does not read headers itself. Better Auth's `getIp` is the
  * single resolver (`X-Forwarded-For` with exactly one valid entry, IPv6 masked
- * to /64), the same one the sign-up and verification abuse limiter uses through
- * `ipBucketFor`, so analytics and account protection cannot disagree about who
- * the visitor is. Pass the shared `authOptions` when wiring it. `CF-IPCountry`,
- * `X-Real-IP`, `Forwarded` and every other header are ignored on purpose: the
- * site is DNS-only in Cloudflare and none of them is a trusted signal here.
+ * to /64), and it is always called with the shared `authOptions` that
+ * `server/auth.ts` builds the abuse limiter's `ipBucketFor` from. There is no
+ * options parameter here or on anything that calls this, so a future caller
+ * cannot select a different proxy or IP configuration: analytics and account
+ * protection cannot disagree about the visitor. `CF-IPCountry`, `X-Real-IP`,
+ * `Forwarded` and every other header are ignored on purpose: the site is
+ * DNS-only in Cloudflare and none of them is a trusted signal here.
  *
  * Anything that is not a plausible public internet address is `null`, so
  * callers treat it as an unknown location. Nothing here logs or stores an
  * address.
  */
-export function resolveClientIp(
-  source: Request | Headers | undefined,
-  options: BetterAuthOptions,
-): string | null {
+export function resolveClientIp(source: Request | Headers | undefined): string | null {
   if (!source) return null;
   try {
-    const ip = getIp(source, options);
+    const ip = getIp(source, authOptions);
     // In development and tests `getIp` falls back to loopback; that is rejected
     // below like any other non-public address.
     return ip && isPublicClientIp(ip) ? ip : null;

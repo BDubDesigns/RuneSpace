@@ -55,7 +55,7 @@ describe("classifyCountry", () => {
     ["digits", "12"],
     ["unknown placeholder", "ZZ"],
     ["user-assigned AA", "AA"],
-    ["user-assigned XK", "XK"],
+    ["user-assigned XK (Kosovo, no ISO code)", "XK"],
     ["user-assigned XX", "XX"],
     ["user-assigned QM", "QM"],
     ["user-assigned QZ", "QZ"],
@@ -63,8 +63,52 @@ describe("classifyCountry", () => {
     ["United Nations reservation", "UN"],
     ["Asia-Pacific legacy code", "AP"],
     ["UK reservation (country is GB)", "UK"],
+    ["Ascension Island (exceptional reservation)", "AC"],
+    ["Clipperton Island (exceptional reservation)", "CP"],
+    ["Diego Garcia (exceptional reservation)", "DG"],
+    ["Ceuta and Melilla (exceptional reservation)", "EA"],
+    ["Metropolitan France (retired)", "FX"],
+    ["Canary Islands (exceptional reservation)", "IC"],
+    ["Soviet Union (retired)", "SU"],
+    ["Tristan da Cunha (exceptional reservation)", "TA"],
+    ["Eurozone (exceptional reservation)", "EZ"],
+    ["Netherlands Antilles (retired)", "AN"],
+    ["Serbia and Montenegro (retired)", "CS"],
+    ["Yugoslavia (retired)", "YU"],
+    ["East Timor (retired)", "TP"],
+    ["Zaire (retired)", "ZR"],
+    ["Burma (retired)", "BU"],
+    ["unassigned AB", "AB"],
+    ["unassigned QQ", "QQ"],
+    ["unassigned JJ", "JJ"],
+    ["unassigned XQ", "XQ"],
+    ["unassigned WW", "WW"],
+    ["unassigned ZY", "ZY"],
   ])("maps %s to unknown", (_label, code) => {
     expect(classifyCountry(code)).toBe("unknown");
+  });
+
+  it("recognises exactly the 249 ISO 3166-1 assigned codes among all 676 letter pairs", () => {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const recognised: string[] = [];
+    for (const a of letters) {
+      for (const b of letters) {
+        if (classifyCountry(`${a}${b}`) !== "unknown") recognised.push(`${a}${b}`);
+      }
+    }
+    expect(recognised).toHaveLength(249);
+    // Spot checks at the alphabet's edges and for the codes most often missed.
+    for (const code of ["AD", "ZW", "AX", "BQ", "CW", "SS", "SX"]) {
+      expect(recognised, code).toContain(code);
+    }
+    expect(recognised).not.toContain("XK");
+    expect(recognised).not.toContain("ZZ");
+  });
+
+  it("never returns a region for a non-assigned code, whatever its shape", () => {
+    for (const code of ["EZ", "ac", "A", "AAA", "A1", "1A", "A ", "\u0410D", "A\u0000"]) {
+      expect(classifyCountry(code), JSON.stringify(code)).toBe("unknown");
+    }
   });
 
   it("does not coerce non-string input", () => {

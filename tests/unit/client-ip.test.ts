@@ -1,14 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BetterAuthOptions } from "better-auth";
-import { isPublicClientIp, resolveClientIp } from "@/server/client-ip";
 
 /**
  * Trusted client-address resolution for the offline country classifier
  * (issue #419). It must agree with the account abuse limiter, which resolves
- * the same address through Better Auth's `getIp`.
+ * the same address through Better Auth's `getIp` and the shared `authOptions`,
+ * and it must not be able to use any other IP configuration.
+ *
+ * `authOptions` parses the server environment on import, so the same throwaway
+ * values other server unit tests use are stubbed first.
  */
 
-const options: BetterAuthOptions = {};
+vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+vi.stubEnv("BETTER_AUTH_SECRET", "unit-test-secret-0123456789");
+
+const { isPublicClientIp, resolveClientIp } = await import("@/server/client-ip");
+const { authOptions } = await import("@/server/auth-options");
+const { ipBucketFor } = await import("@/server/account-guards");
+
+afterEach(() => {
+  vi.doUnmock("@/server/auth-options");
+  vi.resetModules();
+});
 
 function headers(entries: Record<string, string>): Headers {
   return new Headers(entries);
@@ -108,45 +123,43 @@ describe("isPublicClientIp", () => {
 
 describe("resolveClientIp", () => {
   it("returns the single X-Forwarded-For address", () => {
-    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8" }), options)).toBe("8.8.8.8");
+    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8" }))).toBe("8.8.8.8");
   });
 
   it("accepts a Request as well as Headers", () => {
     const request = new Request("https://runespace.qcfailed.com/", {
       headers: { "x-forwarded-for": "81.2.69.142" },
     });
-    expect(resolveClientIp(request, options)).toBe("81.2.69.142");
+    expect(resolveClientIp(request)).toBe("81.2.69.142");
   });
 
   it("normalizes IPv6 exactly as the abuse limiter's resolver does (/64)", () => {
-    expect(resolveClientIp(headers({ "x-forwarded-for": "2a00:1450:4001::abcd" }), options)).toBe(
+    expect(resolveClientIp(headers({ "x-forwarded-for": "2a00:1450:4001::abcd" }))).toBe(
       "2a00:1450:4001:0000:0000:0000:0000:0000",
     );
   });
 
   it("unwraps an IPv4-mapped IPv6 address", () => {
-    expect(resolveClientIp(headers({ "x-forwarded-for": "::ffff:8.8.8.8" }), options)).toBe(
-      "8.8.8.8",
-    );
+    expect(resolveClientIp(headers({ "x-forwarded-for": "::ffff:8.8.8.8" }))).toBe("8.8.8.8");
   });
 
   it("is unknown for a missing header, with no development loopback fallback", () => {
-    expect(resolveClientIp(headers({}), options)).toBeNull();
+    expect(resolveClientIp(headers({}))).toBeNull();
   });
 
   it("is unknown for a missing request", () => {
-    expect(resolveClientIp(undefined, options)).toBeNull();
+    expect(resolveClientIp(undefined)).toBeNull();
   });
 
   it("is unknown for a multi-entry header, as for the abuse limiter", () => {
-    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8, 1.1.1.1" }), options)).toBeNull();
-    expect(resolveClientIp(headers({ "x-forwarded-for": "1.2.3.4, 8.8.8.8" }), options)).toBeNull();
+    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8, 1.1.1.1" }))).toBeNull();
+    expect(resolveClientIp(headers({ "x-forwarded-for": "1.2.3.4, 8.8.8.8" }))).toBeNull();
   });
 
   it.each(["10.0.0.1", "127.0.0.1", "192.168.0.5", "100.64.0.9", "fd00::1", "203.0.113.5", "junk"])(
     "is unknown for the unsuitable forwarded value %s",
     (value) => {
-      expect(resolveClientIp(headers({ "x-forwarded-for": value }), options)).toBeNull();
+      expect(resolveClientIp(headers({ "x-forwarded-for": value }))).toBeNull();
     },
   );
 
@@ -158,20 +171,53 @@ describe("resolveClientIp", () => {
     ["true-client-ip", "8.8.8.8"],
     ["x-client-ip", "8.8.8.8"],
   ])("ignores the %s header", (name, value) => {
-    expect(resolveClientIp(headers({ [name]: value }), options)).toBeNull();
+    expect(resolveClientIp(headers({ [name]: value }))).toBeNull();
   });
 
-  it("honors the shared Better Auth options (trusted proxies)", () => {
-    const trusted: BetterAuthOptions = {
-      advanced: { ipAddress: { trustedProxies: ["10.0.0.0/8"] } },
-    };
-    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8, 10.0.0.2" }), trusted)).toBe(
-      "8.8.8.8",
-    );
+  it("is exactly the shared authOptions' IP configuration (no override, so Better Auth defaults)", () => {
+    expect((authOptions as BetterAuthOptions).advanced?.ipAddress).toBeUndefined();
   });
 
-  it("is unknown when Better Auth IP tracking is disabled", () => {
-    const disabled: BetterAuthOptions = { advanced: { ipAddress: { disableIpTracking: true } } };
-    expect(resolveClientIp(headers({ "x-forwarded-for": "8.8.8.8" }), disabled)).toBeNull();
+  it("takes no options argument, so no caller can select another IP configuration", () => {
+    expect(resolveClientIp.length).toBe(1);
+    const source = readFileSync(path.join(process.cwd(), "server", "client-ip.ts"), "utf8");
+    expect(source).toMatch(/getIp\(source, authOptions\)/);
+    expect(source).not.toMatch(/BetterAuthOptions/);
+  });
+
+  it.each([
+    ["a single public address", "8.8.8.8"],
+    ["a public IPv6 address", "2a00:1450:4001::abcd"],
+    ["an IPv4-mapped address", "::ffff:8.8.8.8"],
+    ["a multi-entry header", "8.8.8.8, 1.1.1.1"],
+    ["a private address", "10.0.0.1"],
+    ["junk", "not-an-ip"],
+    ["an empty value", ""],
+  ])("agrees with the abuse limiter's address for %s", (_label, value) => {
+    const source = headers({ "x-forwarded-for": value });
+    const bucket = ipBucketFor(source, authOptions);
+    const resolved = resolveClientIp(source);
+    // The limiter keeps any resolvable address (and buckets the rest as
+    // "unknown"); the classifier uses the same address or declines it.
+    if (resolved !== null) expect(resolved).toBe(bucket);
+    if (bucket === "unknown") expect(resolved).toBeNull();
+  });
+
+  it("follows the shared options if they ever configure trusted proxies", async () => {
+    vi.resetModules();
+    vi.doMock("@/server/auth-options", () => ({
+      authOptions: { advanced: { ipAddress: { trustedProxies: ["10.0.0.0/8"] } } },
+    }));
+    const { resolveClientIp: resolveWithProxies } = await import("@/server/client-ip");
+    expect(resolveWithProxies(headers({ "x-forwarded-for": "8.8.8.8, 10.0.0.2" }))).toBe("8.8.8.8");
+  });
+
+  it("follows the shared options if they ever disable IP tracking", async () => {
+    vi.resetModules();
+    vi.doMock("@/server/auth-options", () => ({
+      authOptions: { advanced: { ipAddress: { disableIpTracking: true } } },
+    }));
+    const { resolveClientIp: resolveDisabled } = await import("@/server/client-ip");
+    expect(resolveDisabled(headers({ "x-forwarded-for": "8.8.8.8" }))).toBeNull();
   });
 });

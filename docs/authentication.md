@@ -156,7 +156,8 @@ hold. The rollout checklist verifies this (a controlled sign-in probe with forge
 `X-Forwarded-For` values did not change the rate-limit bucket when run from the
 VPS on 2026-10-27, recorded in #417; the same probe from an off-host machine is
 still outstanding), and the offline country classifier of issue #419 resolves
-the address through this same `getIp` so the two cannot disagree. Pinning
+the address through this same `getIp` with the same shared `authOptions` (it
+takes no options of its own) so the two cannot disagree. Pinning
 `advanced.ipAddress.trustedProxies` is the fix if it does not hold. IP is a
 rate-limit signal only, never an identity key. Better Auth's own built-in rate
 limiter stays at its defaults.
