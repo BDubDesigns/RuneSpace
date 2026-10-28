@@ -11,7 +11,37 @@ import { SAFETY_PRIVACY_PATH } from "@/features/public-site/policy-links";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Only the site's own form may change the preference. A cross-site page could
+ * otherwise post `choice=on` and silently clear a visitor's objection (browsers
+ * accept `Set-Cookie` on the response to a cross-site top-level form post).
+ * Browsers state the initiator in `Sec-Fetch-Site`, and send `Origin` on form
+ * posts; either one that names another site is refused, and a request carrying
+ * neither is refused too (fail closed).
+ */
+function isSameOrigin(request: Request): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site) return site === "same-origin";
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return !!host && new URL(origin).host.toLowerCase() === host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return new Response(
+      "This choice can only be changed from RuneSpace's own Safety & Privacy page.",
+      {
+        status: 403,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      },
+    );
+  }
   let choice: string | null = null;
   try {
     const form = await request.formData();

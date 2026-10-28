@@ -146,6 +146,15 @@ and replies with a small confirmation page, so it works without JavaScript (a
 `<noscript>` form offers the undo). With JavaScript it saves in place and
 announces the result. The shared cookie string comes from `statsOptOutCookie`.
 
+Two review findings (PR #427) shaped it. The Wiki page is statically generated, so
+the server cannot read the visitor's cookie: the control therefore renders a
+neutral "can't see your saved choice yet" state (never "your visits are
+counted") until JavaScript shows the real state, and the confirmation page that
+follows a no-JS press states what was saved. And the route accepts only
+same-origin posts (`Sec-Fetch-Site: same-origin`, else a matching `Origin`,
+else refused), because browsers honor `Set-Cookie` on a cross-site form post and
+another site could otherwise clear a visitor's objection.
+
 ### Consent banner (issues #413, #425)
 
 `AnalyticsConsentPrompt` is a warm, first-person invitation from the solo

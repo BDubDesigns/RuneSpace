@@ -11,9 +11,11 @@ import {
   VISIT_COUNT_SETTINGS_ID,
 } from "./referral-counts";
 
-type VisitCountState = "counted" | "objected" | "privacy-signal";
+type VisitCountState = "unknown" | "counted" | "objected" | "privacy-signal";
 
 const MESSAGES: Record<VisitCountState, string> = {
+  unknown:
+    "This page can't see your saved choice until it has loaded in your browser. Either button below saves a choice, and the page it shows afterwards confirms what was saved.",
   counted:
     "Your visits are included in RuneSpace's anonymous daily page-load totals. Press the button and they won't be.",
   objected: "Your visits aren't counted in the daily totals in this browser.",
@@ -32,11 +34,13 @@ function readState(): VisitCountState {
  * which the server checks before it increments a daily total. It is a real
  * form, so it works without JavaScript (the POST route answers with a
  * confirmation page); with JavaScript it saves in place and announces the
- * result. The server-rendered state is "counted", the default, and the page
- * corrects it from the cookie and the browser's signals once it hydrates.
+ * result. The page is statically generated, so the server cannot read the
+ * visitor's cookie: it renders a neutral "unknown" state (never claiming
+ * visits are or are not counted), and the page shows the real state from the
+ * cookie and the browser's signals once it hydrates.
  */
 export function VisitCountControl() {
-  const [state, setState] = useState<VisitCountState>("counted");
+  const [state, setState] = useState<VisitCountState>("unknown");
 
   useEffect(() => {
     const sync = () => setState(readState());
@@ -45,7 +49,9 @@ export function VisitCountControl() {
     return () => window.removeEventListener(STATS_OPTOUT_EVENT, sync);
   }, []);
 
-  const counting = state === "counted";
+  // `unknown` (server-rendered, or no JavaScript) offers "do not count" as the
+  // main action, with the undo in <noscript>; it asserts nothing about the cookie.
+  const counting = state === "counted" || state === "unknown";
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

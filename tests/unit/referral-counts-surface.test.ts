@@ -76,6 +76,12 @@ describe("visit-count control markup", () => {
     expect(markup).toMatch(/<noscript>.*value="on".*Count my visits again.*<\/noscript>/);
     expect(text(markup)).toContain("separate from the PostHog choice");
   });
+
+  it("makes no claim about the saved choice before it can read it (no JS, static page)", () => {
+    const body = text(renderToStaticMarkup(React.createElement(VisitCountControl)));
+    expect(body).toContain("can't see your saved choice");
+    expect(body).not.toMatch(/are included|aren't counted|won't be\./);
+  });
 });
 
 describe("Safety & Privacy copy", () => {
@@ -201,7 +207,11 @@ describe("visit-count preference route", () => {
     return POST(
       new Request("https://runespace.qcfailed.com/api/visit-count-preference", {
         method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "sec-fetch-site": "same-origin",
+          ...headers,
+        },
         body,
       }),
     );
@@ -225,6 +235,41 @@ describe("visit-count preference route", () => {
       "rs_stats_optout=; Max-Age=0; Path=/; SameSite=Lax; Secure",
     );
     expect(response.headers.get("set-cookie")).not.toMatch(/analytics/);
+  });
+
+  it("refuses cross-site posts, so another site cannot clear or set an objection", async () => {
+    const forged: Record<string, string>[] = [
+      { "sec-fetch-site": "cross-site", origin: "https://evil.example" },
+      { "sec-fetch-site": "same-site", origin: "https://evil.runespace.qcfailed.com" },
+      { "sec-fetch-site": "none" },
+      { "sec-fetch-site": "", origin: "https://evil.example", host: "runespace.qcfailed.com" },
+      { "sec-fetch-site": "", origin: "null", host: "runespace.qcfailed.com" },
+      { "sec-fetch-site": "" },
+    ];
+    for (const headers of forged) {
+      for (const body of ["choice=on", "choice=off"]) {
+        const response = await post(body, headers);
+        expect(response.status, JSON.stringify(headers)).toBe(403);
+        expect(response.headers.get("set-cookie")).toBeNull();
+      }
+    }
+  });
+
+  it("accepts the site's own form, by Fetch Metadata or by a matching Origin", async () => {
+    expect((await post("choice=on")).status).toBe(200);
+    const byOrigin = await post("choice=off", {
+      "sec-fetch-site": "",
+      origin: "https://runespace.qcfailed.com",
+      host: "runespace.qcfailed.com",
+    });
+    expect(byOrigin.status).toBe(200);
+    const proxied = await post("choice=off", {
+      "sec-fetch-site": "",
+      origin: "https://runespace.qcfailed.com",
+      host: "10.0.0.2:3000",
+      "x-forwarded-host": "runespace.qcfailed.com",
+    });
+    expect(proxied.status).toBe(200);
   });
 
   it("rejects anything else without setting a cookie or echoing input", async () => {

@@ -153,6 +153,8 @@ test("the visit-count control works without JavaScript and is independent of Pos
   await expect.poll(total).toBe(1);
   await expect(page.getByTestId("visit-count-control")).toBeVisible();
 
+  // Static page, no JavaScript: it must not claim to know the saved choice.
+  await expect(page.getByTestId("visit-count-status")).toContainText("can't see your saved choice");
   await page.getByRole("button", { name: "Do not count my visits" }).click();
   await expect(page.getByRole("status")).toContainText("won't count your visits");
   const cookies = await context.cookies(ORIGIN);
@@ -164,6 +166,20 @@ test("the visit-count control works without JavaScript and is independent of Pos
   await page.goto(`${ORIGIN}/updates`);
   await page.waitForTimeout(500);
   expect(await total()).toBe(1);
+
+  // Back on the page without JavaScript after objecting: still no false claim.
+  await page.goto(`${ORIGIN}/wiki/safety-and-privacy`);
+  await expect(page.getByTestId("visit-count-status")).not.toContainText("are included");
+
+  // Another site cannot clear the objection with a cross-site form post.
+  const forged = await context.request.post(`${ORIGIN}/api/visit-count-preference`, {
+    form: { choice: "on" },
+    headers: { "Sec-Fetch-Site": "cross-site", Origin: "https://evil.example" },
+  });
+  expect(forged.status()).toBe(403);
+  expect((await context.cookies(ORIGIN)).find((c) => c.name === "rs_stats_optout")?.value).toBe(
+    "1",
+  );
 
   // Counting again is as easy as stopping, even without JavaScript.
   await page.goto(`${ORIGIN}/wiki/safety-and-privacy`);
