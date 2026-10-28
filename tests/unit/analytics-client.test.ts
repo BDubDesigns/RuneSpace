@@ -267,6 +267,7 @@ describe("analytics events", () => {
       search: "?utm_source=scapelikes&session=SECRET",
       referrer: "https://www.example.org/post?id=SECRET",
     });
+    client.syncLandingAttribution();
     client.trackAnalyticsPageview("/", true);
     client.trackAnalyticsPageview("/wiki", false);
     await settle();
@@ -299,6 +300,110 @@ describe("analytics events", () => {
       milestone: "first_xp_gained",
     });
     expect(posthog.capture).toHaveBeenNthCalledWith(2, "account_registration_succeeded", {});
+  });
+});
+
+describe("landing attribution held in memory (issue #421)", () => {
+  const LANDING = {
+    search: "?utm_source=Reddit&utm_medium=social&utm_campaign=launch&session=SECRET",
+    referrer: "https://www.reddit.com/r/runescape/comments/abc?token=SECRET",
+    choice: null,
+  } as const;
+
+  it("is read before a choice without touching the SDK, storage, or cookies", async () => {
+    const { client, document } = await load(LANDING);
+    client.syncLandingAttribution();
+    await settle();
+    expect(posthog.init).not.toHaveBeenCalled();
+    expect(posthog.register_once).not.toHaveBeenCalled();
+    expect(posthog.capture).not.toHaveBeenCalled();
+    expect(document.cookie).toBe("");
+  });
+
+  it("goes to the first permitted pageview even after the URL has moved on", async () => {
+    const { client, win } = await load(LANDING);
+    client.syncLandingAttribution();
+    win.location.search = ""; // SPA navigation: the landing query string is gone
+    client.setAnalyticsChoice("on");
+    client.trackAnalyticsPageview("/updates", true);
+    await settle();
+    const attribution = {
+      utm_source: "reddit",
+      utm_medium: "social",
+      utm_campaign: "launch",
+      referring_domain: "www.reddit.com",
+    };
+    expect(posthog.capture).toHaveBeenCalledWith("$pageview", {
+      route_category: "updates",
+      ...attribution,
+    });
+    expect(posthog.register_once).toHaveBeenCalledWith({
+      first_touch_referring_domain: "www.reddit.com",
+      first_touch_utm_source: "reddit",
+      first_touch_utm_medium: "social",
+      first_touch_utm_campaign: "launch",
+    });
+    expect(JSON.stringify(posthog.capture.mock.calls)).not.toContain("SECRET");
+  });
+
+  it("is used once", async () => {
+    const { client } = await load(LANDING);
+    client.syncLandingAttribution();
+    client.setAnalyticsChoice("on");
+    client.trackAnalyticsPageview("/", true);
+    client.trackAnalyticsPageview("/wiki", true);
+    await settle();
+    expect(posthog.register_once).toHaveBeenCalledTimes(1);
+    expect(posthog.capture).toHaveBeenNthCalledWith(2, "$pageview", { route_category: "wiki" });
+  });
+
+  it("reads the page load once: a later sync never reads a later URL", async () => {
+    const { client, win } = await load({ ...LANDING, search: "", referrer: "" });
+    client.syncLandingAttribution();
+    win.location.search = "?utm_source=elsewhere";
+    client.syncLandingAttribution();
+    client.setAnalyticsChoice("on");
+    client.trackAnalyticsPageview("/wiki", true);
+    await settle();
+    expect(posthog.capture).toHaveBeenCalledWith("$pageview", {
+      route_category: "wiki",
+      referring_domain: "direct_or_unknown",
+    });
+  });
+
+  it("is discarded when the visitor declines, and a later yes starts without it", async () => {
+    const { client } = await load(LANDING);
+    client.syncLandingAttribution();
+    client.setAnalyticsChoice("off");
+    client.syncLandingAttribution();
+    client.setAnalyticsChoice("on");
+    client.trackAnalyticsPageview("/wiki", true);
+    await settle();
+    expect(posthog.capture).toHaveBeenCalledWith("$pageview", { route_category: "wiki" });
+    expect(posthog.register_once).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Global Privacy Control", { gpc: true }],
+    ["Do Not Track", { dnt: "1" }],
+    ["a visitor who already declined", { choice: "off" as const }],
+  ])("is never read under %s, even if that is lifted later", async (_name, blocked) => {
+    const { client, navigator } = await load({ ...LANDING, ...blocked });
+    client.syncLandingAttribution();
+    Object.assign(navigator, { globalPrivacyControl: false, doNotTrack: null });
+    client.setAnalyticsChoice("on");
+    client.trackAnalyticsPageview("/wiki", true);
+    await settle();
+    expect(posthog.capture).toHaveBeenCalledWith("$pageview", { route_category: "wiki" });
+    expect(posthog.register_once).not.toHaveBeenCalled();
+  });
+
+  it("is never read where analytics cannot run", async () => {
+    const { client } = await load({ ...LANDING, hostname: "localhost" });
+    client.syncLandingAttribution();
+    await settle();
+    expect(posthog.init).not.toHaveBeenCalled();
+    expect(posthog.capture).not.toHaveBeenCalled();
   });
 });
 

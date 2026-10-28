@@ -688,8 +688,13 @@ retained with shard-specific artifact names.
 
 ### Product analytics (issue #413)
 
-Analytics is proved at the unit layer with a stubbed PostHog: CI never contacts
-PostHog and no E2E spec enables it (the canonical build has no token, and the
+Analytics is proved at the unit layer, mostly with a stubbed PostHog, plus one
+real-SDK file (`analytics-attribution-sdk.test.ts`, issue #421) that runs the
+pinned `posthog-js` and the real provider in jsdom (`@vitest-environment jsdom`)
+with `fetch`/XHR stubbed, because attribution depends on what the SDK itself
+builds and a hand-written SDK stub cannot show that. `vitest.config.ts` inlines
+`posthog*` for that file so `vi.resetModules()` yields a fresh SDK per page
+load. CI never contacts PostHog and no E2E spec enables it (the canonical build has no token, and the
 tracking gate also requires the host `runespace.qcfailed.com` or an explicitly
 listed preview host). `tests/unit/analytics-*.test.ts`
 cover the config/host/privacy gates, route-template and attribution sanitizing,

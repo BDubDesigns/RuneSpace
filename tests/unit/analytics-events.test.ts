@@ -195,6 +195,52 @@ describe("sanitizeCapture", () => {
     expect(result.properties.$referring_domain).toBe("$direct");
   });
 
+  describe("native referrer fields for a landing pageview", () => {
+    // The SDK runs with `save_referrer: false`, so it emits no native referrer
+    // fields at all; RuneSpace's own sanitized `referring_domain` is the source.
+    const landing = (properties: Record<string, unknown>) =>
+      sanitizeCapture({
+        event: "$pageview",
+        properties: { $current_url: "https://runespace.qcfailed.com/", ...properties },
+      })!.properties;
+
+    it("derives them from the sanitized referring domain", () => {
+      expect(landing({ referring_domain: "www.linkedin.com" })).toMatchObject({
+        $referring_domain: "www.linkedin.com",
+        $referrer: "https://www.linkedin.com",
+        referring_domain: "www.linkedin.com",
+      });
+    });
+
+    it("never takes a raw referrer URL from the SDK payload", () => {
+      const properties = landing({
+        referring_domain: "www.reddit.com",
+        $referrer: "https://www.reddit.com/r/x/comments/SECRET?token=SECRET",
+      });
+      expect(properties.$referrer).toBe("https://www.reddit.com");
+      expect(JSON.stringify(properties)).not.toContain("SECRET");
+    });
+
+    it.each([
+      ["the direct marker", DIRECT_OR_UNKNOWN_REFERRER],
+      ["a RuneSpace deployment", "pr-414.runespace.qcfailed.com"],
+      ["something that is not a hostname", "https://www.reddit.com/r/x"],
+      ["a non-string", 42],
+    ])("reports $direct for %s", (_label, value) => {
+      expect(landing({ referring_domain: value })).toMatchObject({
+        $referring_domain: "$direct",
+        $referrer: "$direct",
+      });
+    });
+
+    it("does not let the first-touch copy stand in for a pageview's own referrer", () => {
+      expect(landing({ first_touch_referring_domain: "www.reddit.com" })).toMatchObject({
+        $referring_domain: "$direct",
+        $referrer: "$direct",
+      });
+    });
+  });
+
   it("drops events outside the allowlist", () => {
     for (const event of [
       "$autocapture",

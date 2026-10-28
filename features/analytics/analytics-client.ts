@@ -20,6 +20,7 @@ import {
   sanitizeCapture,
   type AnalyticsEventName,
   type AnalyticsEventProperties,
+  type LandingAttribution,
 } from "./analytics-events";
 
 /**
@@ -38,6 +39,9 @@ import {
  * autocapture, pageviews, pageleaves, heatmaps, dead clicks, exceptions,
  * performance, session replay, surveys or remote config. Every event is
  * explicit, and `sanitizeCapture` rebuilds each payload from an allowlist.
+ *
+ * Landing attribution is the one thing read before a visitor has chosen, and
+ * only into memory (see `syncLandingAttribution`).
  */
 
 export type AnalyticsPermission =
@@ -200,8 +204,9 @@ export function startAnalytics(): Promise<PostHog | null> {
   return attempt;
 }
 
-/** Stop capturing and forget this browser's analytics identity. */
+/** Stop capturing and forget this browser's analytics identity and any held attribution. */
 export function stopAnalytics(): void {
+  landingAttribution = undefined;
   const pending = loading;
   loading = undefined;
   void pending
@@ -234,25 +239,66 @@ export function trackAnalyticsEvent<E extends AnalyticsEventName>(
   withClient((posthog) => posthog.capture(event, eventProperties(event, properties)));
 }
 
-let attributionRegistered = false;
+// -- Landing attribution ------------------------------------------------------
 
 /**
- * Record a sanitized pageview. The first one in a page load also carries the
- * landing attribution (allowlisted UTM trio plus referring domain) and
- * registers first-touch copies once per browser.
+ * The page load's sanitized landing attribution, held only in this variable
+ * while the visitor has not yet chosen. It is never written to storage or a
+ * cookie, never sent, and not rebuilt: a hard page load starts empty.
+ */
+let landingAttribution: LandingAttribution | undefined;
+let landingObserved = false;
+
+/**
+ * Called by the provider on mount and on every change of the visitor's choice.
+ * The first call of a page load, if analytics could run here and the visitor
+ * has neither declined nor sent a privacy signal, reduces the landing URL and
+ * referrer to the allowlisted UTM trio plus a referring domain and holds that
+ * until the first permitted pageview uses it. The page load is observed only
+ * once, so a later call never reads a later (SPA-navigated) URL. A refusal or
+ * privacy signal discards what is held, and it is not read again that page
+ * load: saying yes afterwards starts without it.
+ */
+export function syncLandingAttribution(): void {
+  try {
+    const status = analyticsStatus();
+    if (status !== "needs-consent" && status !== "permitted") {
+      landingAttribution = undefined;
+      landingObserved = true;
+      return;
+    }
+    if (landingObserved) return;
+    landingObserved = true;
+    landingAttribution = parseLandingAttribution(window.location.search, document.referrer);
+  } catch {
+    landingAttribution = undefined;
+  }
+}
+
+/** Hand over the held attribution exactly once. */
+function takeLandingAttribution(): LandingAttribution | undefined {
+  const attribution = landingAttribution;
+  landingAttribution = undefined;
+  return attribution;
+}
+
+// -- Pageviews ----------------------------------------------------------------
+
+/**
+ * Record a sanitized pageview. The first permitted one of a page load (the
+ * runtime's first, `landing`) also carries the held landing attribution, which
+ * may predate the route it is sent from if the visitor accepted after
+ * navigating, and registers first-touch copies once per browser.
  */
 export function trackAnalyticsPageview(pathname: string, landing: boolean): void {
   const template = analyticsRouteTemplate(pathname);
   if (!template) return;
   withClient((posthog) => {
     const properties: Record<string, string> = { route_category: template.category };
-    if (landing) {
-      const attribution = parseLandingAttribution(window.location.search, document.referrer);
+    const attribution = landing ? takeLandingAttribution() : undefined;
+    if (attribution) {
       Object.assign(properties, attribution);
-      if (!attributionRegistered) {
-        attributionRegistered = true;
-        posthog.register_once(firstTouchProperties(attribution));
-      }
+      posthog.register_once(firstTouchProperties(attribution));
     }
     posthog.capture("$pageview", properties);
   });
