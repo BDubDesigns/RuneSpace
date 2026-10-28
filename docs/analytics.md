@@ -189,11 +189,29 @@ changes to `ANALYTICS_CONSENT_MODEL` or a small follow-up:
    and the Safety & Privacy control honored. Highest numbers, but collects before
    consent from visitors in regions that require it.
 3. **Region-aware**: opt-in only for regions requiring it, which needs a trusted
-   country signal at the edge (for example Cloudflare's `CF-IPCountry`, if the
-   site is proxied) and a decision on the default for unknown regions.
+   country signal (Cloudflare's `CF-IPCountry` does not exist while the site is
+   DNS-only; see "Offline country classifier" below) and a decision on the
+   default for unknown regions.
 
 Do not ship option 2 or 3 without a deliberate decision, and have counsel confirm
 the Safety & Privacy copy for whichever model is chosen.
+
+### Offline country classifier (issue #419, unwired)
+
+Option 3 needs a trusted country. The site is DNS-only in Cloudflare, so there is
+no `CF-IPCountry`; the country is instead derived offline from the client address
+Better Auth already resolves for the sign-up abuse limiter, using the vendored
+DB-IP Country Lite database. This foundation exists but **nothing imports it**:
+the consent model is unchanged (opt-in worldwide), no PostHog setting changed, no
+endpoint or browser code was added, and a unit test fails if live code starts
+using it. Unknown, untrusted, private, malformed, stale-data or failed lookups are
+region `unknown`, which must always take the opt-in path. The regions
+(`us`, `eea`, `uk`, `other`, `unknown`) are labels only and grant no tracking.
+
+Design, data source and licence, the proxy evidence this relies on, what is still
+unverified, and the monthly refresh procedure are in `server/geo/README.md`. DB-IP
+requires a public "IP Geolocation by DB-IP" link; it must be added to the Safety &
+Privacy disclosure before the classifier is wired into production.
 
 ## Configuration
 

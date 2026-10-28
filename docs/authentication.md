@@ -152,7 +152,11 @@ production proxy **replaces** any client-supplied `X-Forwarded-For` with the
 real client address (Traefik's default for untrusted sources). If it ever
 passed a client's single-value header through unchanged, a client could rotate
 its bucket; the per-address resend limits and the global circuit would still
-hold. The rollout checklist verifies this, and pinning
+hold. The rollout checklist verifies this (a controlled sign-in probe with forged
+`X-Forwarded-For` values did not change the rate-limit bucket when run from the
+VPS on 2026-10-27, recorded in #417; the same probe from an off-host machine is
+still outstanding), and the offline country classifier of issue #419 resolves
+the address through this same `getIp` so the two cannot disagree. Pinning
 `advanced.ipAddress.trustedProxies` is the fix if it does not hold. IP is a
 rate-limit signal only, never an identity key. Better Auth's own built-in rate
 limiter stays at its defaults.
