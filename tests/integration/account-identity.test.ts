@@ -26,6 +26,11 @@ import { cleanupTestUser, createTestUser } from "./fixtures";
 
 const requestHeaders = vi.hoisted(() => ({ current: new Headers() }));
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders.current }));
+// Issue #413: the best-effort analytics report is observed, never sent.
+const reportCharacterCreation = vi.hoisted(() => vi.fn());
+vi.mock("@/server/analytics", () => ({
+  reportCharacterCreationSucceeded: reportCharacterCreation,
+}));
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -439,6 +444,8 @@ suite("Issue #221 verified Player identity (real PostgreSQL)", () => {
     expect(await actions.createCharacterAction(form)).toEqual({
       error: ownership.EMAIL_VERIFICATION_REQUIRED_MESSAGE,
     });
+    // A refused creation reports nothing to analytics (issue #413).
+    expect(reportCharacterCreation).not.toHaveBeenCalled();
     const accounts = await db
       .select({ id: rune.playerAccounts.id })
       .from(rune.playerAccounts)
@@ -462,6 +469,9 @@ suite("Issue #221 verified Player identity (real PostgreSQL)", () => {
       .set({ emailVerified: true })
       .where(eq(authSchema.user.id, userId));
     await expect(actions.createCharacterAction(form)).rejects.toThrow(/NEXT_REDIRECT/);
+    // Exactly one report, for the stable account ID, after the committed creation.
+    expect(reportCharacterCreation).toHaveBeenCalledTimes(1);
+    expect(reportCharacterCreation).toHaveBeenCalledWith(requestHeaders.current, userId);
     const account = await ownership.requirePlayerAccount(userId);
     const reserved = await db
       .select()

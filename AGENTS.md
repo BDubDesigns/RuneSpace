@@ -34,6 +34,8 @@ boundary.** This file is the repository's normative agent-behavior contract;
   - Chat moderation, sanctions, appeals, and privileged-access audit:
     `docs/moderation.md`; the Community Rules and Safety & Privacy Wiki pages
     must stay true to shipped safety-data storage and access.
+  - Product analytics (PostHog), its events, and its privacy gates:
+    `docs/analytics.md`; the Safety & Privacy Wiki disclosure must stay true to it.
   - Tests and canonical E2E: `docs/testing-strategy.md`.
   - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
   - Database and deployment operations: `docs/deployment-database.md`.

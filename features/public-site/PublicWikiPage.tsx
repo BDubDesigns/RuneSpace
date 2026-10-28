@@ -9,6 +9,8 @@ import {
   type WikiArticle,
 } from "./public-wiki";
 
+import { AnalyticsPrivacyControl } from "@/features/analytics/AnalyticsPrivacyControl";
+import { SAFETY_PRIVACY_SLUG } from "./policy-links";
 import { publicSiteFooterLinks, publicSiteNavigation } from "./public-site-content";
 import { WikiLinkedText } from "./WikiLinkedText";
 
@@ -173,6 +175,7 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
               ) : null}
             </section>
           ))}
+          {article.slug === SAFETY_PRIVACY_SLUG ? <AnalyticsPrivacyControl /> : null}
         </div>
       </article>
     </PublicWikiFrame>

@@ -6,6 +6,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { FormField } from "@/components/ui/FormField";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { TextLink } from "@/components/ui/TextLink";
+import { trackAnalyticsEvent } from "@/features/analytics/analytics-client";
+import { ANALYTICS_EVENTS } from "@/features/analytics/analytics-events";
 import { PLAYER_NAME_MAX, validatePlayerName } from "@/game/domain/player-name";
 import { authClient, VERIFIED_CALLBACK_PATH } from "./auth-client";
 import { authErrorMessage, type AuthClientError } from "./auth-errors";
@@ -81,6 +83,8 @@ export function RegisterForm({ siteKey }: { siteKey: string }) {
       setError(authErrorMessage(error as AuthClientError, "Could not create account."));
       return;
     }
+    // Better Auth confirmed the account; no email, name, or challenge data.
+    trackAnalyticsEvent(ANALYTICS_EVENTS.accountRegistrationSucceeded);
     setRegisteredEmail(email);
   }
 

@@ -46,6 +46,7 @@
     "@better-auth/drizzle-adapter": "1.6.23",
     "pg": "8.13.1",
     "lucide-react": "^1.40.0",
+    "posthog-js": "1.440.0",
     "zod": "3.24.1"
   },
   "devDependencies": {

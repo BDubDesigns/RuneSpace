@@ -7,6 +7,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
+import { PlayAnalytics } from "@/features/analytics/PlayAnalytics";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayPresence } from "@/features/presence/PlayPresence";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
@@ -225,6 +226,7 @@ export function PlayScreen({
 }) {
   return (
     <PlayProvider initialState={initialState}>
+      <PlayAnalytics />
       <PlayWorkspace
         adminInspectorHref={adminInspectorHref}
         characterName={characterName}

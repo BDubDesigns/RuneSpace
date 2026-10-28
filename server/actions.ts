@@ -13,6 +13,7 @@ import { FabricationReservationError } from "@/server/fabrication-reservation";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import { GameplayAccessError, loadAccountGameplayAccess } from "@/server/gameplay-access";
 import { db } from "@/db";
+import { reportCharacterCreationSucceeded } from "@/server/analytics";
 import { acknowledgeNews } from "@/server/account-news";
 import { SubmitAppealRequestSchema, type SubmitAppealResult } from "@/game/schemas/moderation";
 import { submitAppeal } from "@/server/moderation-notices";
@@ -309,9 +310,12 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
   try {
     // Character reservation requires a verified email (issue #221), enforced
     // here independently of the page so a forged submission is refused too.
-    const user = await requireVerifiedUser(await headers());
+    const requestHeaders = await headers();
+    const user = await requireVerifiedUser(requestHeaders);
     const account = await ensurePlayerAccount(user.id);
     const character = await createCharacter(account.id, displayName, portraitId);
+    // Best-effort and strictly after the commit (issue #413); never awaited.
+    reportCharacterCreationSucceeded(requestHeaders, user.id);
     const access = await loadAccountGameplayAccess(db, user.id);
     // `redirect` throws NEXT_REDIRECT; let it propagate out of the action so
     // Next performs the navigation. Only domain errors are caught here.
