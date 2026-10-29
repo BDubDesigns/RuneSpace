@@ -72,7 +72,9 @@ const itemIds = {
   uncutQuartz: asContentId("uncut_quartz"),
   cutQuartz: asContentId("cut_quartz"),
   uncutTopaz: asContentId("uncut_topaz"),
+  cutTopaz: asContentId("cut_topaz"),
   uncutSapphire: asContentId("uncut_sapphire"),
+  cutSapphire: asContentId("cut_sapphire"),
   // Skatboll Oil Shale Mining (#342): the primary ore The South Cut yields, and
   // its single-specimen Ultra Rare secondary find.
   oilShale: asContentId("oil_shale"),
@@ -426,6 +428,8 @@ const dialogueIds = {
   wernerAboutTheLabTopic: asContentId("werner_topic_about_the_lab"),
   wernerTheQuarryTopic: asContentId("werner_topic_the_quarry"),
   wernerGemCuttingTopic: asContentId("werner_topic_gem_cutting"),
+  // Werner's optional Lapidary 8 conversation (#433).
+  wernerBeyondTheBasicsTopic: asContentId("werner_topic_beyond_the_basics"),
   // The Wise Old Enby's repeatable research jobs (#406). Presentation only: the
   // job registry (`game/content/research-jobs.ts`) maps each moment to a sequence.
   researchJobBlocked: asContentId("research_job_blocked"),
@@ -502,6 +506,7 @@ const conversationTopicIds = {
   wernerAboutTheLab: asContentId("werner_about_the_lab"),
   wernerTheQuarry: asContentId("werner_the_quarry"),
   wernerGemCutting: asContentId("werner_gem_cutting"),
+  wernerBeyondTheBasics: asContentId("werner_beyond_the_basics"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -556,6 +561,8 @@ const conversationBackgroundIds = {
 export const ACTION_IDS = {
   shapeStone: asContentId("shape_stone_lapidary"),
   cutQuartz: asContentId("cut_quartz_lapidary"),
+  cutTopaz: asContentId("cut_topaz_lapidary"),
+  cutSapphire: asContentId("cut_sapphire_lapidary"),
   ferriteShaleMining: asContentId("ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
   cargoHoldWelding: asContentId("cargo_hold_welding"),

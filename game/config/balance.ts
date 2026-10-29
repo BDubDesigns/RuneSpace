@@ -895,6 +895,30 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), quantity: z.literal(1) }),
         ]),
       }),
+      cutTopaz: z.object({
+        actionId: z.literal(ACTION_IDS.cutTopaz),
+        displayName: z.literal("Cut Topaz"),
+        outputItemId: z.literal(ITEM_IDS.cutTopaz),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(50),
+        baseXp: z.literal(150),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), quantity: z.literal(1) }),
+        ]),
+      }),
+      cutSapphire: z.object({
+        actionId: z.literal(ACTION_IDS.cutSapphire),
+        displayName: z.literal("Cut Sapphire"),
+        outputItemId: z.literal(ITEM_IDS.cutSapphire),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(8),
+        durationTicks: z.literal(75),
+        baseXp: z.literal(300),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), quantity: z.literal(1) }),
+        ]),
+      }),
     }),
   }),
   runeworking: z.object({
@@ -1177,6 +1201,16 @@ const balanceSchema = z.object({
      */
     cutQuartz: z.object({
       itemId: z.literal(ITEM_IDS.cutQuartz),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+    }),
+    cutTopaz: z.object({
+      itemId: z.literal(ITEM_IDS.cutTopaz),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+    }),
+    cutSapphire: z.object({
+      itemId: z.literal(ITEM_IDS.cutSapphire),
       massGrams: z.literal(100),
       stackLimit: z.literal(2),
     }),
@@ -1964,6 +1998,26 @@ const defaults = balanceSchema.parse({
         baseXp: 75,
         inputs: [{ itemId: ITEM_IDS.uncutQuartz, quantity: 1 }],
       },
+      cutTopaz: {
+        actionId: ACTION_IDS.cutTopaz,
+        displayName: "Cut Topaz",
+        outputItemId: ITEM_IDS.cutTopaz,
+        outputQuantity: 1,
+        minimumLevel: 5,
+        durationTicks: 50,
+        baseXp: 150,
+        inputs: [{ itemId: ITEM_IDS.uncutTopaz, quantity: 1 }],
+      },
+      cutSapphire: {
+        actionId: ACTION_IDS.cutSapphire,
+        displayName: "Cut Sapphire",
+        outputItemId: ITEM_IDS.cutSapphire,
+        outputQuantity: 1,
+        minimumLevel: 8,
+        durationTicks: 75,
+        baseXp: 300,
+        inputs: [{ itemId: ITEM_IDS.uncutSapphire, quantity: 1 }],
+      },
     },
   },
   runeworking: {
@@ -2082,6 +2136,8 @@ const defaults = balanceSchema.parse({
       equipment: { kind: "container", slotCapacity: 6 },
     },
     cutQuartz: { itemId: ITEM_IDS.cutQuartz, massGrams: 100, stackLimit: 2 },
+    cutTopaz: { itemId: ITEM_IDS.cutTopaz, massGrams: 100, stackLimit: 2 },
+    cutSapphire: { itemId: ITEM_IDS.cutSapphire, massGrams: 100, stackLimit: 2 },
     uncutQuartz: {
       itemId: ITEM_IDS.uncutQuartz,
       massGrams: 100,

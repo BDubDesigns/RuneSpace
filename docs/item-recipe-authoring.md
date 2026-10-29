@@ -54,7 +54,7 @@ The empty/full canisters added item IDs, balance schema/defaults, Wiki categorie
 ## Lapidary recipes (#431)
 
 The shipped Lapidary registry in balance owns Shape Stone (deliberately no output)
-and Cut Quartz. Stable action IDs, whole-tick duration, level, XP and inputs are
+Cut Quartz, Cut Topaz and Cut Sapphire (#433). Stable action IDs, whole-tick duration, level, XP and inputs are
 required. A producing recipe also authors the stack output and quantity. The
 shared deterministic craft validator checks stack inputs/outputs; no failure
 or Manual Override data exists. Register a recipe's action at Werner's Lab.

@@ -91,6 +91,8 @@ describe("Wiki item catalog", () => {
       [
         "Boulder",
         "Cut Quartz",
+        "Cut Sapphire",
+        "Cut Topaz",
         "Ferrite Shale",
         "Galvanite",
         "Motherlode Slab",

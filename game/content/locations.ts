@@ -825,9 +825,14 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Werner's Lab",
     description:
-      "A battered yellow mineral laboratory, parked on red rock with work lamps burning over its crates and awning. Werner runs a meticulous operation here: he sells Stone and buys uncut Quartz, Topaz and Sapphire as well as Cut Quartz. Speak to him for supervised Lapidary lessons and authorization to use his workbench.",
+      "A battered yellow mineral laboratory, parked on red rock with work lamps burning over its crates and awning. Werner runs a meticulous operation here: he sells Stone and buys uncut Quartz, Topaz and Sapphire as well as Cut Quartz, Topaz and Sapphire. Speak to him for supervised Lapidary lessons and authorization to use his workbench.",
     adjacentLocationIds: [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.harmonicWorkings],
-    availableActionIds: [ACTION_IDS.shapeStone, ACTION_IDS.cutQuartz],
+    availableActionIds: [
+      ACTION_IDS.shapeStone,
+      ACTION_IDS.cutQuartz,
+      ACTION_IDS.cutTopaz,
+      ACTION_IDS.cutSapphire,
+    ],
     merchantId: MERCHANT_IDS.wernerLab,
     dormantActivities: [],
     presentation: {

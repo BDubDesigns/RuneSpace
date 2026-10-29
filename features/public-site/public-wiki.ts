@@ -25,7 +25,7 @@ const authoredWikiArticles = [
     title: "Lapidary",
     category: "work",
     summary:
-      "Shape Stone, cut Quartz and earn authorization to use Werner's Lapidary Workbench on Stillreach.",
+      "Shape Stone, cut Quartz, Topaz and Sapphire, and earn authorization to use Werner's Lapidary Workbench on Stillreach.",
     sections: [
       {
         heading: "Authorization at Werner's Lab",
@@ -38,11 +38,16 @@ const authoredWikiArticles = [
         ],
       },
       {
-        heading: "Stone and Quartz",
+        heading: "Stone and the cut gems",
         list: [
           "Shape Stone — Lapidary 1. Consumes one Stone in 12 seconds for 15 Lapidary XP. Practice produces no item.",
           "Cut Quartz — Lapidary 1. Consumes one Uncut Quartz in 18 seconds for one Cut Quartz and 75 Lapidary XP. Both recipes always succeed.",
-          "Cut Quartz weighs 100g and stacks two to a tile. You can carry, stash, sell or trade it. Werner buys it for 16 Credits; he still buys Uncut Quartz for 8. He does not sell Quartz.",
+          "Cut Topaz — Lapidary 5. Consumes one Uncut Topaz in 30 seconds for one Cut Topaz and 150 Lapidary XP.",
+          "Cut Sapphire — Lapidary 8. Consumes one Uncut Sapphire in 45 seconds for one Cut Sapphire and 300 Lapidary XP.",
+          "Every cut always succeeds. Cut Quartz, Cut Topaz and Cut Sapphire each weigh 100g and stack two to a tile. You can carry, stash, sell or trade them. Werner buys Cut Quartz for 16 Credits, Cut Topaz for 36 and Cut Sapphire for 70, twice what he pays for the uncut gem. He does not sell any gem.",
+        ],
+        paragraphs: [
+          "Once you have graduated from Werner's Mission, the only thing standing between you and Topaz or Sapphire is your Lapidary level: there is no further lesson or permission. A technique appears in your Techniques list and on the Work tab once your level reaches it, so Topaz and Sapphire stay out of both until Lapidary 5 and 8. At Lapidary 8, Werner has one more thing to say; ask him about Beyond the Basics.",
         ],
       },
       {

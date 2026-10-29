@@ -185,6 +185,8 @@ const ROLE_LABELS: Record<MissionConversationRole, string> = {
  */
 export type ConversationAvailabilityContext = {
   workOrdersRefreshUnlocked?: boolean;
+  /** Current skill levels (#433), for `skill_level` topics. */
+  skillLevels?: Readonly<Partial<Record<string, number>>>;
 };
 
 export function resolveNpcConversation(
@@ -464,6 +466,11 @@ export function topicAvailable(
   if (topic.availability.kind === "always") return true;
   if (topic.availability.kind === "work_orders_refresh_unlocked") {
     return context?.workOrdersRefreshUnlocked ?? false;
+  }
+  if (topic.availability.kind === "skill_level") {
+    return (
+      (context?.skillLevels?.[topic.availability.skillId] ?? 0) >= topic.availability.minimumLevel
+    );
   }
   const gate = topic.availability.missionId;
   const accepted = topic.availability.kind === "mission_accepted";
@@ -788,8 +795,8 @@ export function validateConversationTopics(
     ) {
       throw new Error(`${where} gates on unknown mission "${topic.availability.missionId}".`);
     }
-    // "work_orders_refresh_unlocked" needs no mission lookup: it reads a
-    // server-supplied fact, not a projected Mission.
+    // "work_orders_refresh_unlocked" and "skill_level" need no mission lookup: they
+    // read server-supplied facts, not a projected Mission.
   }
   // A Mission-owned sequence must never double as a replayable social topic.
   const missionDialogueIds = new Set(missionOwnedDialogueIds(definitions));

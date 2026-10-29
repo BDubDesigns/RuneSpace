@@ -44,7 +44,7 @@ export async function projectLapidaryWorkbench(
             ? "Bring the required material."
             : check.reason === "recipe_locked"
               ? "Your Lapidary level is too low."
-              : "Make room for the finished Cut Quartz."
+              : "Make room for the finished gem."
           : undefined,
       affordableCycles: allowed
         ? access.kind === "supervised"

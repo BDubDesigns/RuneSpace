@@ -331,6 +331,22 @@ const itemPresentations = {
     artworkSrc: "/item-art/cut-quartz.webp",
     accessibleDescription: "A clear faceted quartz crystal with warm golden mineral veins.",
   },
+  [ITEM_IDS.cutTopaz]: {
+    displayName: "Cut Topaz",
+    pluralName: "Cut Topaz",
+    textFallback: "CT",
+    description: "Topaz cut into bright, jewelry-grade facets at a Lapidary Workbench.",
+    artworkSrc: "/item-art/cut-topaz.webp",
+    accessibleDescription: "A brilliant golden-yellow faceted topaz gemstone.",
+  },
+  [ITEM_IDS.cutSapphire]: {
+    displayName: "Cut Sapphire",
+    pluralName: "Cut Sapphire",
+    textFallback: "CS",
+    description: "Sapphire cut into deep, exacting facets at a Lapidary Workbench.",
+    artworkSrc: "/item-art/cut-sapphire.webp",
+    accessibleDescription: "A deep blue faceted sapphire gemstone.",
+  },
   [ITEM_IDS.uncutQuartz]: {
     displayName: "Uncut Quartz",
     accessibleDescription:

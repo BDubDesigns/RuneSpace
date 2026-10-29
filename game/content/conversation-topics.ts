@@ -3,10 +3,12 @@ import {
   DIALOGUE_IDS,
   MISSION_IDS,
   NPC_IDS,
+  SKILL_IDS,
   type ConversationTopicId,
   type DialogueId,
   type MissionId,
   type NpcId,
+  type SkillId,
 } from "@/game/config/foundations";
 
 /**
@@ -31,7 +33,12 @@ export type ConversationTopicAvailability =
    * replayable from the moment it is taken on, by either route.
    */
   | { kind: "mission_accepted"; missionId: MissionId }
-  | { kind: "work_orders_refresh_unlocked" };
+  | { kind: "work_orders_refresh_unlocked" }
+  /**
+   * Visible from a skill level onward (#433): Werner's Lapidary 8 conversation.
+   * Read from the server-projected level, never from a flag or any history.
+   */
+  | { kind: "skill_level"; skillId: SkillId; minimumLevel: number };
 
 /**
  * One authored replayable social/worldbuilding topic.
@@ -322,6 +329,15 @@ export const CONVERSATION_TOPICS = [
     label: "Gem Cutting",
     dialogueId: DIALOGUE_IDS.wernerGemCuttingTopic,
     availability: { kind: "always" },
+  },
+  {
+    // The only Werner topic with a requirement (#433): Lapidary 8, and nothing else.
+    // Purely conversational, replayable, and with no reward or recorded state.
+    id: CONVERSATION_TOPIC_IDS.wernerBeyondTheBasics,
+    npcId: NPC_IDS.werner,
+    label: "Beyond the Basics",
+    dialogueId: DIALOGUE_IDS.wernerBeyondTheBasicsTopic,
+    availability: { kind: "skill_level", skillId: SKILL_IDS.lapidary, minimumLevel: 8 },
   },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
