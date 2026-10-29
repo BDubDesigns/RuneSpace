@@ -1125,6 +1125,7 @@ const authoredWikiArticles = [
             { text: "Fuel canisters", articleSlug: "mining-and-refining" },
             "). It cannot be taken apart again in Tinkering.",
           ],
+          "Resonance Core (Fabrication 12) — 1 Runestone, 2 Galvaferrite and 1 Galvanic Wire Spool. 48 seconds, 400 Fabrication XP. A Runestone suspended in a wired Galvaferrite frame, built as the heart of a larger resonance system. It weighs 3.9 kg and stacks only two to a slot. Nobody sells one, but you can trade one, and it works the same for somebody who never touched the station.",
         ],
       },
       {
@@ -1165,6 +1166,7 @@ const authoredWikiArticles = [
           "Wheel Assembly (Fabrication 5) — 100 Fabrication XP, 43.2 seconds, 3 Scrap Metal.",
           "Drive Mount (Fabrication 8) — 200 Fabrication XP, 57.6 seconds, 2 Scrap Metal.",
           "Freight Harness (Fabrication 8) — 270 Fabrication XP, 72 seconds, 3 Scrap Metal.",
+          "Resonance Core (Fabrication 12) — 400 Fabrication XP, 96 seconds, 2 Scrap Metal.",
         ],
       },
       {

@@ -670,6 +670,12 @@ Current production conventions:
   `assets/item-art/`, SHA-256 checked) and their derivatives in `public/item-art/`, prepared by
   `scripts/prepare-research-loan-art.mjs` with the same recipe (content 576x475, 576x391 and
   488x576 on the 640x640 canvas); checked at the 80 px inventory tile
+- the Resonance Core (#436): the approved 1254x1254 transparent RGBA master (kept
+  unaltered in `assets/item-art/`, SHA-256 `b959650e…3565` checked) and its
+  derivative in `public/item-art/`, prepared by
+  `scripts/prepare-resonance-core-art.mjs` with the same recipe (content 576x574
+  on the 640x640 canvas, lossless WebP); checked at 48 px on dark and light
+  tiles and at the 80 px inventory tile
 - the Beginner Echo Seeker (#391): the approved master (1312x1199 transparent
   RGBA PNG, kept unaltered in `assets/item-art/`, SHA-256 checked) and its
   derivative in `public/item-art/`, prepared by

@@ -106,3 +106,12 @@ clients.
 still committed under `public/item-art/` at their approved sizes, because their
 measured optimized responses (78,442 B and 48,838 B at `w=828`) do not justify
 an art change. See `docs/audits/issue-117-image-delivery-evidence.md`.
+- `resonance-core.png` is the approved 1254×1254 transparent RGBA render of the
+  Resonance Core (#436), byte-identical to the owner-supplied master (SHA-256
+  `b959650e…3565`): a rugged open Galvaferrite containment cradle with visible
+  bolts, blue conductive winding and one intact purple-blue Runestone suspended
+  in clear air. The committed derivative `public/item-art/resonance-core.webp` is
+  prepared by `scripts/prepare-resonance-core-art.mjs` with the Wheel Assembly
+  convention (alpha noise below 4 cleared, near-opaque alpha snapped to 255,
+  trimmed to 1182×1178, scaled to 576×574 on a 640×640 transparent canvas,
+  lossless WebP). Nothing was regenerated, recomposed or recoloured.

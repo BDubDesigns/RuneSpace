@@ -67,6 +67,10 @@ const itemIds = {
   // Thrust Issues (#330). A Fabrication 8 stackable ship component, tradable like
   // any other stack: the Propulsion repair consumes it with no provenance check.
   driveMount: asContentId("drive_mount"),
+  // The Fabrication 12 Resonance Core (#436). An ordinary stackable manufactured
+  // component, tradable like any other stack: the future personal Resonance Rig's
+  // heart, with no Use, equipment or teleport behaviour of its own.
+  resonanceCore: asContentId("resonance_core"),
   // Mining Secondary Finds (#308): rough gemstones a successful extraction can
   // turn up alongside the source's ordinary ore.
   uncutQuartz: asContentId("uncut_quartz"),
@@ -647,6 +651,8 @@ export const ACTION_IDS = {
   // The Fabrication 8 Empty Small Fuel Canister (#343). A direct 1:1 packaging
   // recipe, not a Tinkering target.
   emptySmallFuelCanisterFabrication: asContentId("empty_small_fuel_canister_fabrication"),
+  // The Fabrication 12 Resonance Core and its ordinary Tinkering target (#436).
+  resonanceCoreFabrication: asContentId("resonance_core_fabrication"),
   // Runeworking recipes (#391), one action per authored recipe for the same
   // durable-identity reason Fabrication recipes have one: the active action IS
   // the recipe of the cycle on the Resonance Rig.
@@ -661,6 +667,7 @@ export const ACTION_IDS = {
   freightHarnessTinkering: asContentId("freight_harness_tinkering"),
   wheelAssemblyTinkering: asContentId("wheel_assembly_tinkering"),
   driveMountTinkering: asContentId("drive_mount_tinkering"),
+  resonanceCoreTinkering: asContentId("resonance_core_tinkering"),
   travel: asContentId("travel"),
   // The Rivet Utility Shuttle in flight (#358). Like Travel it is a blocking
   // one-active-action state; the flight's own route and timestamps are durable

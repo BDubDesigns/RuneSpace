@@ -1530,6 +1530,7 @@ recipe and not a Tinkering target.
 | Drive Mount | 8 | 2 Galvaferrite + 1 Galvanic Wire Spool → 1 Drive Mount (2,900 g, stack 2) | 48 ticks / 28.8 s | 200 |
 | Freight Harness | 8 | 4 Galvaferrite + 2 Mounting Brackets → 1 Freight Harness (9,000 g, unique) | 60 ticks / 36 s | 270 |
 | Empty Small Fuel Canister (#343) | 8 | 1 Galvanic Stock → 1 Empty Small Fuel Canister (800 g, stack 5) | 30 ticks / 18 s | 75 |
+| Resonance Core (#436) | 12 | 1 Runestone + 2 Galvaferrite + 1 Galvanic Wire Spool → 1 Resonance Core (3,900 g, stack 2) | 80 ticks / 48 s | 400 |
 
 Reaching the level is the whole gate: no Mission, NPC permission or personal
 Refining level is involved, so Galvanic Stock or Galvaferrite acquired from
@@ -1562,6 +1563,15 @@ none of those is an inventory item.
 - **The Freight Harness** is an advanced container attachment: +6 Inventory
   slots in either of the two existing container slots, carried at its full
   9 kg — not a carry-capacity upgrade.
+- **The Resonance Core** (#436) is an ordinary tradable manufactured component
+  and a normal Tinkering target: its 3,900 g is exactly its inputs (a 1,000 g
+  Runestone + 2 x 950 g Galvaferrite + a 1,000 g Wire Spool), and it stacks to
+  2. It is open at Fabrication 12 by level alone — no Mission, Runeworking
+  prerequisite, extra ingredient or failure roll — and consumes only carried
+  Inventory ingredients at the existing Rusk Recovery station. Holding or
+  trading one never needs Fabrication 12. It has no merchant stock, buyback or
+  price, no rarity treatment, and no Use or teleport action: it is the intended
+  heart of a future personal Resonance Rig, which this slice does not build.
 
 ### Fuel manufacturing (issue #343)
 
@@ -1709,7 +1719,8 @@ exception: Galvanic Wire Spool 45 XP / 28.8 s / 1 Scrap and Power Cells 75 XP /
 Tinkered) and Loadsteel Cutter 180 XP / 54 s / 2 Scrap, all at Fabrication 5;
 Wheel Assembly (#322) 100 XP / 43.2 s / 3 Scrap at Fabrication 5 (five input
 units, rounded up), Drive Mount (#330) 200 XP / 57.6 s / 2 Scrap and Freight
-Harness 270 XP / 72 s / 3 Scrap at Fabrication 8. Neither Direct Scrap recipe is
+Harness 270 XP / 72 s / 3 Scrap at Fabrication 8, and Resonance Core (#436)
+400 XP / 96 s / 2 Scrap (four input units, rounded up) at Fabrication 12. Neither Direct Scrap recipe is
 a target.
 
 It follows Practice Welding's cycle model: a cycle commits — destroys — its batch
