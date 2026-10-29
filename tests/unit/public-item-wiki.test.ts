@@ -90,6 +90,7 @@ describe("Wiki item catalog", () => {
     expect(groups.map((group) => group.items.map((item) => item.name))).toEqual([
       [
         "Boulder",
+        "Cut Quartz",
         "Ferrite Shale",
         "Galvanite",
         "Motherlode Slab",

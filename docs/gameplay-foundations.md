@@ -1804,6 +1804,38 @@ resolution), `server/runeworking.ts` (snapshot, resolver, persistence),
 after acceptance, then the Enby's turn-in for 150 RW XP (`docs/missions.md`).
 Later attunements are always allowed and pay their ordinary XP.
 
+## Lapidary at Werner's Lab (#431)
+
+Lapidary is the sixth skill and uses the standard level curve. Its sky-blue
+accent is `#38BDF8`; it has no icon. The visible Lapidary Workbench at Werner's
+Lab is locked before accepting They're Minerals, Marie!. Stage 1 permits one
+supervised Shape Stone; Stage 2 requires Werner's acknowledgement; Stage 3
+permits one supervised Cut Quartz; Stage 4 requires graduation. Completing the
+Mission permanently enables quantity/Max runs, derived from the completion row.
+Talk and Trade remain unrestricted throughout.
+
+Shape Stone: Level 1, 1 Stone consumed, no item output, 20 whole ticks, 15 XP.
+Cut Quartz: Level 1, 1 Uncut Quartz → 1 Cut Quartz, 30 whole ticks, 75 XP. Both
+always succeed. Cut Quartz is an ordinary tradable/stashable stack: 100 g per
+unit, stack limit 2; Werner buys it for 16 Credits, with no retail stock. His
+existing Stone allowance and uncut-gem prices are unchanged.
+
+The two real deterministic activities share the cycle/run core extracted from
+Runeworking: `game/domain/deterministic-crafting.ts`,
+`server/deterministic-crafting.ts` and `server/crafting-commands.ts`. Activity
+registries, access and run tables remain separate. Inputs stay reserved until
+one atomic completion consumes them, creates any output, pays XP and credits
+the active Mission stage. Capacity is checked after input removal; each next
+cycle reads the inventory left by the last. A started piece must finish;
+Finish Current ends a longer run after it. Operator interruption consumes no
+unfinished input and grants no output or XP. Normal cursor/offline limits apply.
+
+During supervision, numeric quantities other than one and Max are refused.
+Resolution rechecks permission and its persisted stage identity before its first
+cycle, and caps even a forged stored Max at one total lesson unit. No cancelled,
+unauthorized or incomplete piece earns XP. No Manual Override, random failure,
+Topaz/Sapphire cutting or new equipment is introduced.
+
 ## Beginner Resonance Echo hunts (issue #393)
 
 A **Beginner Echo Seeker** is used from its ordinary Inventory Item Details —

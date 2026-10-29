@@ -1,3 +1,11 @@
+import { planMissionItemGrant } from "@/server/mission-grants";
+import {
+  activeMissionStage,
+  missionAtStage,
+  missionProgressKey,
+  stageProgress,
+} from "@/game/domain/mission-stages";
+import { advanceMissionStage } from "@/server/mission-stages";
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
@@ -100,8 +108,15 @@ export type MissionAcceptance =
  * happened and the requirement holds.
  */
 export type MissionConversationAcknowledgement =
-  | { status: "acknowledged" | "already_acknowledged" }
-  | { status: "refused"; message: string };
+  | {
+      status: "acknowledged" | "already_acknowledged";
+      stageTransition?: {
+        completedStageId: string;
+        activeStageId: string;
+        presentationDialogueId?: string;
+      };
+    }
+  | { status: "refused"; message: string; reason?: "capacity"; capacityReason?: "slots" | "mass" };
 
 /**
  * What a completion did about its authored continuation (#393): accepted it
@@ -238,69 +253,6 @@ async function runMissionCommand<
       }),
     now,
   );
-}
-
-/**
- * Preflight one authored `stack_item` acceptance grant against ordinary
- * carrying capacity (#190).
- *
- * All-or-nothing by construction: this reuses the same exact-addition planner
- * the Power Annex allotment and Trade purchases use, so a grant that does not
- * wholly fit produces no plan at all rather than a partial one. It locks the
- * inventory rows it reads, so the plan it returns is still valid for the write
- * later in the same transaction.
- */
-async function planAcceptanceItemGrant(
-  transaction: DatabaseTransaction,
-  characterId: string,
-  grant: { itemId: string; quantity: number },
-): Promise<
-  | { ok: true; plan: Parameters<typeof addStackableItem>[1]["plan"] }
-  | { ok: false; reason: "slots" | "mass"; message: string }
-> {
-  const balance = getEffectiveGameBalance();
-  const itemDefinition = getItemDefinition(grant.itemId, balance);
-  if (!itemDefinition || itemDefinition.kind !== "stack") {
-    throw new Error(`Mission acceptance grant references a non-stackable item "${grant.itemId}"`);
-  }
-  const [stacks, itemState, assignments] = await Promise.all([
-    transaction
-      .select()
-      .from(inventoryStacks)
-      .where(eq(inventoryStacks.characterId, characterId))
-      .for("update"),
-    loadOwnedItemInstances(transaction, characterId),
-    transaction
-      .select()
-      .from(equippedItems)
-      .where(eq(equippedItems.characterId, characterId))
-      .for("update"),
-  ]);
-  const loadout = deriveEquipmentLoadout({
-    assignments,
-    instances: itemState.carriedInstances,
-    stacks,
-    balance,
-  });
-  const plan = planExactStackAddition(
-    stacks,
-    grant.itemId,
-    grant.quantity,
-    itemDefinition.stackLimit,
-    Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
-    Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
-    itemDefinition.massGrams,
-  );
-  if (plan.ok) return { ok: true, plan: plan.plan };
-  const itemName = resolveItemPresentation(grant.itemId, grant.itemId).displayName;
-  return {
-    ok: false,
-    reason: plan.reason,
-    message:
-      plan.reason === "mass"
-        ? `All ${grant.quantity} ${itemName} will not fit within your carried-mass capacity. Free capacity and try again.`
-        : `All ${grant.quantity} ${itemName} will not fit in your available inventory slots. Free capacity and try again.`,
-  };
 }
 
 /**
@@ -445,7 +397,7 @@ export async function acceptMission(
       // state (#190).
       const itemGrant =
         offer.acceptEffect?.kind === "stack_item"
-          ? await planAcceptanceItemGrant(transaction, context.character.id, offer.acceptEffect)
+          ? await planMissionItemGrant(transaction, context.character.id, offer.acceptEffect)
           : undefined;
       if (itemGrant && !itemGrant.ok) {
         return stateFor({
@@ -620,19 +572,10 @@ export async function acknowledgeMissionConversation(
     random,
     async ({ transaction, context, stateFor }) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const definition = getMission(missionId);
+      let definition = getMission(missionId);
       if (!definition) {
         return stateFor({ status: "refused", message: "Unknown mission." });
       }
-      const acknowledgement = findConversationAcknowledgement(definition, npcId, dialogueId);
-      if (!acknowledgement) {
-        return stateFor({
-          status: "refused",
-          message: `${definition.title} does not need that conversation.`,
-        });
-      }
-      const { requirement } = acknowledgement;
-
       const rows = await transaction
         .select()
         .from(characterMissions)
@@ -644,6 +587,26 @@ export async function acknowledgeMissionConversation(
       }
       if (existing.completedAt) return stateFor({ status: "already_acknowledged" });
 
+      const authored = definition;
+      const stage = activeMissionStage(definition, existing);
+      definition = missionAtStage(definition, stage);
+      const acknowledgement = findConversationAcknowledgement(definition, npcId, dialogueId);
+      if (!acknowledgement) {
+        const past = authored.stages
+          ?.filter((candidate) => existing.completedStageIds.includes(candidate.id))
+          .some((candidate) =>
+            findConversationAcknowledgement(missionAtStage(authored, candidate), npcId, dialogueId),
+          );
+        return stateFor(
+          past
+            ? { status: "already_acknowledged" }
+            : {
+                status: "refused",
+                message: `${definition.title} does not need that conversation now.`,
+              },
+        );
+      }
+      const { requirement } = acknowledgement;
       // Where the person has to be: a required contact is met at the Mission's
       // authored location; a lead NPC is met wherever they stand for THIS
       // character now, which their Mission-derived story position decides (#369).
@@ -670,7 +633,8 @@ export async function acknowledgeMissionConversation(
         )
         .for("update");
       const progressOf = (progressKey: string) =>
-        progressRows.find((row) => row.progressKey === progressKey)?.progress ?? 0;
+        progressRows.find((row) => row.progressKey === missionProgressKey(stage, progressKey))
+          ?.progress ?? 0;
       // A lead only points at the required contact, so once that contact has been
       // met there is nothing left for it to record.
       if (progressOf(requirement.progressKey) >= 1) {
@@ -681,13 +645,44 @@ export async function acknowledgeMissionConversation(
       if (progressOf(progressKey) >= 1) {
         return stateFor({ status: "already_acknowledged" });
       }
+      const grant = acknowledgement.kind === "required" ? stage?.onAdvance : undefined;
+      const grantPlan = grant
+        ? await planMissionItemGrant(transaction, context.character.id, grant)
+        : undefined;
+      if (grantPlan && !grantPlan.ok)
+        return stateFor({
+          status: "refused",
+          reason: "capacity",
+          capacityReason: grantPlan.reason,
+          message: grantPlan.message,
+        });
       await recordMissionConversation(transaction, {
         characterId: context.character.id,
         missionId: definition.id,
-        progressKey,
+        progressKey: missionProgressKey(stage, progressKey),
         now,
       });
-      return stateFor({ status: "acknowledged" });
+      if (grant && grantPlan?.ok)
+        await addStackableItem(transaction, {
+          characterId: context.character.id,
+          plan: grantPlan.plan,
+          now,
+        });
+      const transition = stage
+        ? await advanceMissionStage(transaction, context.character.id, authored, now, true)
+        : undefined;
+      if (grant && !transition) throw new Error("Stage gift must advance atomically");
+      return stateFor({
+        status: "acknowledged",
+        ...(transition
+          ? {
+              stageTransition: {
+                ...transition,
+                ...(grant ? { presentationDialogueId: grant.presentationDialogueId } : {}),
+              },
+            }
+          : {}),
+      });
     },
   );
 }
@@ -836,7 +831,8 @@ async function completeMissionForDefinition(input: {
   npcId: string;
   now: Date;
 }): Promise<MissionCompletionResult> {
-  const { transaction, context, stateFor, definition, npcId, now } = input;
+  const { transaction, context, stateFor, npcId, now } = input;
+  let { definition } = input;
   const rows = await transaction
     .select()
     .from(characterMissions)
@@ -851,6 +847,14 @@ async function completeMissionForDefinition(input: {
     });
   }
   if (existing.completedAt) return stateFor({ status: "already_completed" });
+  const stage = activeMissionStage(definition, existing);
+  if (definition.stages && stage !== definition.stages.at(-1))
+    return stateFor({
+      status: "refused",
+      reason: "tracked_activity",
+      message: "Complete the current Mission stage first.",
+    });
+  definition = missionAtStage(definition, stage);
 
   if (definition.prerequisiteMissionId) {
     const prerequisite = missionRow(rows, definition.prerequisiteMissionId);
@@ -924,7 +928,7 @@ async function completeMissionForDefinition(input: {
   const observation = buildCompletionObservation(
     assignmentCarriedItemIds(assignments, carriedById),
     stacks,
-    new Map(progressRows.map((row) => [row.progressKey, row.progress])),
+    stageProgress(stage, new Map(progressRows.map((row) => [row.progressKey, row.progress])))!,
     repairStates,
     handableInstances,
   );
@@ -1250,7 +1254,10 @@ async function completeMissionForDefinition(input: {
 
   await transaction
     .update(characterMissions)
-    .set({ completedAt: now })
+    .set({
+      completedAt: now,
+      ...(stage ? { completedStageIds: [...existing.completedStageIds, stage.id] } : {}),
+    })
     .where(
       and(
         eq(characterMissions.characterId, context.character.id),
@@ -1277,7 +1284,7 @@ async function completeMissionForDefinition(input: {
         : continuationGiftOffer(definition, continuation);
       const gift =
         giftOffer?.acceptEffect?.kind === "stack_item"
-          ? await planAcceptanceItemGrant(transaction, context.character.id, giftOffer.acceptEffect)
+          ? await planMissionItemGrant(transaction, context.character.id, giftOffer.acceptEffect)
           : undefined;
       if (gift && !gift.ok) {
         // No room for the gift: skip ONLY the next Mission's acceptance and its

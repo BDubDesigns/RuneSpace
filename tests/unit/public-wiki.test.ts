@@ -16,6 +16,7 @@ import { WIKI_CATEGORIES } from "@/game/schemas/public-wiki";
 
 /** The permanent slug of each shipped Mission's guide, keyed by Mission title (#339). */
 const MISSION_GUIDE_SLUGS = {
+  "They're Minerals, Marie!": "mission-theyre-minerals-marie",
   "Walk It Off": "mission-walk-it-off",
   "Cut Your Teeth": "mission-cut-your-teeth",
   "Waste Not": "mission-waste-not",
@@ -353,8 +354,8 @@ describe("Mission guides (#339)", () => {
     expect(MISSIONS.map((mission) => mission.title).sort()).toEqual(
       Object.keys(MISSION_GUIDE_SLUGS).sort(),
     );
-    expect(missionGuideSlugs).toHaveLength(20);
-    expect(new Set(missionGuideSlugs).size).toBe(20);
+    expect(missionGuideSlugs).toHaveLength(21);
+    expect(new Set(missionGuideSlugs).size).toBe(21);
 
     for (const [title, slug] of Object.entries(MISSION_GUIDE_SLUGS)) {
       const guide = getWikiArticle(slug);

@@ -1,9 +1,17 @@
 import {
+  activeMissionStage,
+  missionAtStage,
+  stageProgress,
+  allMissionRequirements,
+} from "@/game/domain/mission-stages";
+import {
   fabricationActionIds,
   fabricationRecipeForActionId,
   getEffectiveGameBalance,
   getItemDefinition,
   getShipFlightBalance,
+  lapidaryActionIds,
+  lapidaryRecipeForActionId,
   runeworkingActionIds,
   runeworkingRecipeForActionId,
   skillLevelThresholds,
@@ -58,6 +66,7 @@ const TRACKED_ACTIVITY_ACTION_IDS: Record<TrackedMissionActivity, () => readonly
   tinkering: () => tinkeringActionIds(),
   // A family like Fabrication (#391): one action per authored recipe.
   runeworking: () => runeworkingActionIds(),
+  lapidary: () => lapidaryActionIds(),
   // A Beginner Echo discovery (#393), made only by reading a Seeker.
   echo_hunt: () => [getEffectiveGameBalance().echoHunts.beginner.readingActionId],
 };
@@ -77,6 +86,7 @@ const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "com
   fabrication: "completions",
   tinkering: "completions",
   runeworking: "completions",
+  lapidary: "completions",
   // Only a discovery the server resolved counts; a wrong reading is not one.
   echo_hunt: "completions",
 };
@@ -84,6 +94,7 @@ const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "com
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
 export type MissionRecordState = {
+  completedStageIds?: readonly string[];
   acceptedAt?: Date | null;
   completedAt?: Date | null;
 };
@@ -394,6 +405,9 @@ export type MissionProjection = {
    * mission/dialogue routing.
    */
   stage?: {
+    id?: string;
+    title?: string;
+    final?: boolean;
     /** All authored requirements currently hold against authoritative state. */
     requirementsSatisfied: boolean;
     /**
@@ -658,6 +672,20 @@ export function deriveMissionState(input: {
 }): MissionState {
   if (!input.mission?.acceptedAt) return "not_accepted";
   if (input.mission.completedAt) return "completed";
+  if (input.definition.stages) {
+    const stage = activeMissionStage(input.definition, input.mission);
+    if (stage !== input.definition.stages.at(-1)) return "active";
+    input = {
+      ...input,
+      definition: { ...missionAtStage(input.definition, stage), stages: undefined },
+      observation: input.observation
+        ? {
+            ...input.observation,
+            trackedProgress: stageProgress(stage, input.observation.trackedProgress),
+          }
+        : undefined,
+    };
+  }
   // Turn-in eligibility requires stationary presence AT the authored turn-in
   // location, independently of the requirement list: `at_location`
   // requirements control objective progression, while `turnIn.locationId` is
@@ -1057,6 +1085,9 @@ export function projectMission(
   observation?: MissionObservation,
   prerequisiteCompleted = false,
 ): MissionProjection {
+  const authored = definition;
+  const activeStage = activeMissionStage(definition, mission);
+  const finalStage = !definition.stages || activeStage === definition.stages.at(-1);
   const state = deriveMissionState({
     mission,
     definition,
@@ -1064,8 +1095,15 @@ export function projectMission(
     stationary,
     observation,
   });
+  definition = missionAtStage(definition, activeStage);
+  if (activeStage && observation)
+    observation = {
+      ...observation,
+      trackedProgress: stageProgress(activeStage, observation.trackedProgress),
+    };
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
-  const requirementsSatisfied = requirementsHold(definition, currentLocationId, observation);
+  const requirementsSatisfied =
+    finalStage && requirementsHold(definition, currentLocationId, observation);
   // One eligibility answer for both authored prerequisite kinds, so every
   // consumer of `prerequisiteSatisfied` — the conversation hub, availability
   // guidance, the acceptance command — treats a missing level exactly as it
@@ -1093,6 +1131,9 @@ export function projectMission(
     earnedReward: state === "completed" ? projectEarnedReward(definition) : undefined,
     prerequisiteSatisfied,
     stage: {
+      ...(authored.stages && activeStage
+        ? { id: activeStage.id, title: activeStage.title, final: finalStage }
+        : {}),
       requirementsSatisfied,
       turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
@@ -1139,8 +1180,11 @@ function reactiveFactHolds(
  * tracked requirement can only point at the output of a real recipe.
  */
 export function craftedOutputItemId(actionId: string): string | undefined {
-  return (fabricationRecipeForActionId(actionId) ?? runeworkingRecipeForActionId(actionId))
-    ?.outputItemId;
+  const recipe =
+    fabricationRecipeForActionId(actionId) ??
+    runeworkingRecipeForActionId(actionId) ??
+    lapidaryRecipeForActionId(actionId);
+  return recipe && "outputItemId" in recipe ? recipe.outputItemId : undefined;
 }
 
 /** Projects one authored requirement with live satisfaction/progress. */
@@ -1573,6 +1617,8 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
   );
   for (const definition of definitions) {
     const where = `Mission "${definition.id}"`;
+    const authoredRequirements = allMissionRequirements(definition);
+    if (definition.stages) assertMissionStages(definition);
     if (
       definition.offers.length === 0 &&
       !continuationTargets.has(definition.id) &&
@@ -1727,7 +1773,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       }
     }
     const progressKeys = new Set<string>();
-    for (const requirement of definition.requirements) {
+    for (const requirement of authoredRequirements) {
       if (requirement.kind === "at_location") {
         if (!getLocation(requirement.locationId)) {
           throw new Error(
@@ -1856,20 +1902,25 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         // Routing at the turn-in NPC is stage-owned and an offer NPC owns its
         // own active follow-up, so a mandatory conversation at either would
         // fight an existing owner for the same hub entry.
-        if (requirement.npcId === definition.turnIn?.npcId) {
+        if (!definition.stages && requirement.npcId === definition.turnIn?.npcId) {
           throw new Error(
             `${where} conversation requirement cannot target its own turn-in NPC "${requirement.npcId}".`,
           );
         }
-        if (definition.offers.some((offer) => offer.npcId === requirement.npcId)) {
+        if (
+          !definition.stages &&
+          definition.offers.some((offer) => offer.npcId === requirement.npcId)
+        ) {
           throw new Error(
             `${where} conversation requirement cannot target offer NPC "${requirement.npcId}".`,
           );
         }
         if (
-          definition.requirements.filter(
+          authoredRequirements.filter(
             (candidate) =>
-              candidate.kind === "npc_conversation" && candidate.npcId === requirement.npcId,
+              candidate.kind === "npc_conversation" &&
+              candidate.npcId === requirement.npcId &&
+              (!definition.stages || candidate.dialogueId === requirement.dialogueId),
           ).length > 1
         ) {
           throw new Error(
@@ -1939,17 +1990,17 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
       }
     }
-    if (definition.requirements.some((requirement) => requirement.kind === "deferred_stage")) {
+    if (authoredRequirements.some((requirement) => requirement.kind === "deferred_stage")) {
       // A deliberately unfinished story stage (#369). It has no way to finish
       // yet, so every completion-shaped slot is an authoring mistake: a false
       // Turn In, an automatic completion or a reward for work that cannot happen.
-      const deferredStages = definition.requirements.filter(
+      const deferredStages = authoredRequirements.filter(
         (requirement) => requirement.kind === "deferred_stage",
       );
       if (deferredStages.length > 1) {
         throw new Error(`${where} can author at most one deferred stage.`);
       }
-      if (definition.requirements.at(-1)?.kind !== "deferred_stage") {
+      if (authoredRequirements.at(-1)?.kind !== "deferred_stage") {
         throw new Error(`${where} deferred stage must be its last requirement.`);
       }
       if (definition.turnIn || definition.autoCompletion || definition.reward) {
@@ -1979,7 +2030,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
       }
       if (
-        !definition.requirements.some(
+        !authoredRequirements.some(
           (requirement) =>
             requirement.kind === "ship_flight" &&
             requirement.routeId === definition.autoCompletion?.routeId,
@@ -2143,7 +2194,7 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
  * requirement kinds only — never from a Mission ID or prose.
  */
 export function missionLifecycleMoments(
-  definition: Pick<MissionDefinition, "requirements" | "turnIn">,
+  definition: Pick<MissionDefinition, "requirements" | "turnIn" | "stages">,
 ): readonly MissionLifecycleMoment[] {
   // A Mission with no turn-in has no turn-in-NPC conversation to be in any
   // moment of (#358).
@@ -2152,7 +2203,7 @@ export function missionLifecycleMoments(
   // A requirement waived wherever the turn-in NPC stands (#389) is never the
   // first unmet one in front of them, so it reaches no reminder there.
   const turnInLocationId = definition.turnIn.locationId;
-  for (const requirement of definition.requirements) {
+  for (const requirement of allMissionRequirements(definition)) {
     if (requirementWaived(requirement, turnInLocationId)) continue;
     const moment = reminderMomentFor(requirement.kind);
     if (moment) moments.add(moment);
@@ -2193,6 +2244,23 @@ export function missionOmitsMoment(
  * must present every authored reward grant. Prose is never inspected.
  */
 function assertLifecycleCoverage(definition: MissionDefinition): void {
+  if (definition.stages) {
+    for (const stage of definition.stages) {
+      const effective = { ...missionAtStage(definition, stage), stages: undefined };
+      const reachable = new Set(missionLifecycleMoments(effective));
+      const dialogue = { ...effective.dialogue };
+      for (const [moment, slot] of Object.entries(LIFECYCLE_DIALOGUE_SLOTS) as [
+        MissionLifecycleMoment,
+        (typeof LIFECYCLE_DIALOGUE_SLOTS)[MissionLifecycleMoment],
+      ][])
+        if (!reachable.has(moment)) delete dialogue[slot];
+      if (dialogue.omitted)
+        dialogue.omitted = dialogue.omitted.filter((entry) => reachable.has(entry.moment));
+      assertLifecycleCoverage({ ...effective, dialogue });
+    }
+    return;
+  }
+
   const where = `Mission "${definition.id}"`;
   const dialogue = definition.dialogue;
   if (!definition.turnIn) {
@@ -2203,7 +2271,7 @@ function assertLifecycleCoverage(definition: MissionDefinition): void {
     return;
   }
   const turnInNpcId = definition.turnIn.npcId;
-  for (const requirement of definition.requirements) {
+  for (const requirement of allMissionRequirements(definition)) {
     if (
       requirement.kind === "at_location" &&
       requirement.locationId !== definition.turnIn.locationId
@@ -2590,4 +2658,91 @@ export function missionChainResetScope(
   };
   add(missionId);
   return scope;
+}
+
+function assertMissionStages(definition: MissionDefinition): void {
+  const stages = definition.stages!;
+  if (definition.reactiveFacts?.length || definition.dialogue.reactive?.length)
+    throw new Error(`Mission "${definition.id}" stages do not support reactive facts yet`);
+  const fail = (reason: string): never => {
+    throw new Error(`Mission "${definition.id}" stages: ${reason}`);
+  };
+  if (stages.length === 0 || definition.requirements.length !== 0)
+    fail("author a nonempty stage list instead of top-level requirements");
+  if (!definition.turnIn || definition.autoCompletion) fail("need one final NPC turn-in");
+  const seen = new Set<string>();
+  for (const [index, stage] of stages.entries()) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(stage.id) || seen.has(stage.id))
+      fail("stage IDs must be stable, unique lowercase hyphenated text");
+    seen.add(stage.id);
+    if (!stage.title.trim()) fail("stage needs a title");
+    const conversations = stage.requirements.filter(
+      (req): req is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+        req.kind === "npc_conversation",
+    );
+    if (new Set(conversations.map((req) => req.npcId)).size !== conversations.length)
+      fail("each stage may have only one mandatory conversation per NPC");
+    const final = index === stages.length - 1;
+    if (!final && stage.requirements.length === 0) fail("intermediate stages need requirements");
+    for (const req of stage.requirements) {
+      if (req.kind === "npc_conversation" && req.appliesOnPlanetId)
+        fail("planet-waived conversations within stages are unsupported");
+      if (req.kind === "ship_flight" || req.kind === "ship_fuel" || req.kind === "deferred_stage")
+        fail("unsupported stage requirement");
+      if (
+        !final &&
+        ((req.kind === "carried_stack" && req.turnIn !== "show") ||
+          (req.kind === "carried_unique_item" && req.turnIn !== "show"))
+      )
+        fail("intermediate item consumption is unsupported");
+    }
+    for (const id of Object.values(stage.dialogue ?? {})) {
+      assertDialogue(definition.id, id, "stage reminder");
+      assertDialogueNpc(definition.id, id, definition.turnIn!.npcId, "stage reminder");
+    }
+    if (stage.onAdvance) {
+      if (
+        final ||
+        stage.requirements.length !== 1 ||
+        stage.requirements[0]?.kind !== "npc_conversation"
+      )
+        fail("a stage grant needs one explicit intermediate NPC acknowledgement");
+      const grant = stage.onAdvance;
+      const npc = (
+        stage.requirements[0] as Extract<MissionRequirement, { kind: "npc_conversation" }>
+      ).npcId;
+      if (
+        !definition.dialogue.capacitySlotsDialogueId ||
+        !definition.dialogue.capacityMassDialogueId
+      )
+        fail("stage gifts need retryable capacity refusal dialogue");
+      for (const id of [
+        definition.dialogue.capacitySlotsDialogueId,
+        definition.dialogue.capacityMassDialogueId,
+      ])
+        assertDialogueNpc(definition.id, id!, npc, "stage capacity refusal");
+      const item = getItemDefinition(grant.itemId);
+      if (
+        item?.kind !== "stack" ||
+        !Number.isInteger(grant.quantity) ||
+        grant.quantity < 1 ||
+        grant.quantity > item.stackLimit
+      )
+        fail("invalid stage stack grant");
+      const dialogue = getDialogue(grant.presentationDialogueId);
+      if (
+        !dialogue ||
+        dialogue.npcId !==
+          (stage.requirements[0] as Extract<MissionRequirement, { kind: "npc_conversation" }>)
+            .npcId ||
+        !dialogue.beats.some(
+          (beat) =>
+            beat.kind === "item" &&
+            beat.itemId === grant.itemId &&
+            beat.quantity === grant.quantity,
+        )
+      )
+        fail("stage grant must have a matching receipt-only item presentation");
+    }
+  }
 }

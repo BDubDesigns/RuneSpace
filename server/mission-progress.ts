@@ -1,3 +1,9 @@
+import {
+  activeMissionStage,
+  missionAtStage,
+  missionProgressKey,
+} from "@/game/domain/mission-stages";
+import { advanceMissionStage } from "@/server/mission-stages";
 import { and, eq, isNull } from "drizzle-orm";
 import { characterMissionProgress, characterMissions } from "@/db/rune-space";
 import {
@@ -68,7 +74,13 @@ export async function ensureMissionProgressRows(
   definition: MissionDefinition,
   now = new Date(),
 ): Promise<void> {
-  const requirements = progressKeyedRequirements(definition);
+  const requirements = definition.stages
+    ? definition.stages.flatMap((stage) =>
+        progressKeyedRequirements(missionAtStage(definition, stage)).map((req) => ({
+          progressKey: missionProgressKey(stage, req.progressKey),
+        })),
+      )
+    : progressKeyedRequirements(definition);
   if (requirements.length === 0) return;
   await transaction
     .insert(characterMissionProgress)
@@ -165,12 +177,15 @@ export async function recordTrackedActivity(
   for (const missionRow of activeRows) {
     const definition = getMission(missionRow.missionId);
     if (!definition) continue;
-    const matchingRequirements = trackedActivityRequirements(definition).filter(
-      (requirement) =>
-        requirement.activity === input.activity &&
-        requirement.metric === input.metric &&
-        (requirement.actionId === undefined || requirement.actionId === input.actionId),
-    );
+    const stage = activeMissionStage(definition, missionRow);
+    const matchingRequirements = trackedActivityRequirements(missionAtStage(definition, stage))
+      .map((req) => ({ ...req, progressKey: missionProgressKey(stage, req.progressKey) }))
+      .filter(
+        (requirement) =>
+          requirement.activity === input.activity &&
+          requirement.metric === input.metric &&
+          (requirement.actionId === undefined || requirement.actionId === input.actionId),
+      );
     for (const requirement of matchingRequirements) {
       const existing = (
         await transaction
@@ -217,6 +232,8 @@ export async function recordTrackedActivity(
           );
       }
     }
+    if (matchingRequirements.length > 0 && stage)
+      await advanceMissionStage(transaction, input.characterId, definition);
   }
   return credits;
 }

@@ -181,6 +181,15 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           accentTone: "fabrication",
         },
         {
+          displayName: "Lapidary",
+          level: 1,
+          totalXp: 0,
+          xpIntoLevel: 0,
+          xpToNextLevel: 500,
+          atMaximumLevel: false,
+          accentTone: "lapidary",
+        },
+        {
           displayName: "Mining",
           level: 2,
           totalXp: 500,
@@ -310,6 +319,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     const playedProfile = await profile.getCharacterProfile(owner, active.id, playedName);
     expect(playedProfile.skills.map((skill) => skill.displayName)).toEqual([
       "Fabrication",
+      "Lapidary",
       "Mining",
       "Refining",
       "Runeworking",
@@ -319,6 +329,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     const freshProfile = await profile.getCharacterProfile(owner, active.id, freshName);
     expect(freshProfile.skills.map((skill) => skill.displayName)).toEqual([
       "Fabrication",
+      "Lapidary",
       "Mining",
       "Refining",
       "Runeworking",
@@ -357,7 +368,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       const result = await profile.getCharacterProfile(owner, active.id, targetName);
       // Fabrication, Mining, Refining, Runeworking, and Welding have approved
       // level curves and are published.
-      expect(result.skills).toHaveLength(5);
+      expect(result.skills).toHaveLength(6);
     } finally {
       spy.mockRestore();
     }

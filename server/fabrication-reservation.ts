@@ -1,3 +1,6 @@
+import { lapidaryRecipeForActionId } from "@/game/config/balance";
+import { lapidaryActivity } from "@/server/lapidary";
+import { craftingStartCheck } from "@/game/domain/deterministic-crafting";
 import { eq } from "drizzle-orm";
 import { activeActions } from "@/db/rune-space";
 import { fabricationRecipeForActionId, runeworkingRecipeForActionId } from "@/game/config/balance";
@@ -84,6 +87,19 @@ export async function assertActiveWorkpieceResolvable(
   if (isEchoReadingAction(action.actionId)) {
     const { stacks } = await loadPlaySnapshot(transaction, characterId);
     if (!canBeginEchoReading(stacks)) throw new EchoReadingReservationError();
+    return;
+  }
+  const lapidaryRecipe = lapidaryRecipeForActionId(action.actionId);
+  if (lapidaryRecipe) {
+    if (
+      !craftingStartCheck(
+        await lapidaryActivity.loadCapacity(transaction, characterId),
+        lapidaryRecipe,
+      ).ok
+    )
+      throw new FabricationReservationError(
+        "That would take material or capacity reserved by the Lapidary lesson. Let the current piece finish first.",
+      );
     return;
   }
   const runeworkingRecipe = runeworkingRecipeForActionId(action.actionId);

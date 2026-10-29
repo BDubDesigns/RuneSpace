@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "lapidary-first-cuts",
+    title: "Lapidary: Earn Your Place at Werner’s Workbench",
+    publishedAt: "2026-10-28T20:00:00-07:00",
+    summary:
+      "Learn Stone shaping and Quartz cutting through Werner’s four-stage examination, then unlock unrestricted Lapidary workbench use.",
+    hero: {
+      src: "/location-scenes/werner-lab.webp",
+      alt: "Werner’s yellow mineral laboratory parked on red rock beneath the Stillreach sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.cutQuartz }, side: "right" },
+      "Lapidary is RuneSpace’s sixth skill. Werner’s workbench now shapes common Stone for practice and turns Uncut Quartz into Cut Quartz. Both recipes always succeed; practice produces no item.",
+      [
+        "Werner requires authorization before anyone uses his equipment. Speak to him for ",
+        { text: "They're Minerals, Marie!", articleSlug: "mission-theyre-minerals-marie" },
+        ": one supervised Stone lesson, a required conversation, one supervised Quartz lesson, and a final examination. Each step waits for the one before it. Graduation awards 150 Lapidary XP and opens normal quantity and Max runs permanently.",
+      ],
+      "The Quartz you cut belongs to you. Werner buys it for 16 Credits, and it can be carried, stashed or traded like other materials. His daily Stone supply and existing uncut-gem prices are unchanged.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Lapidary progression and Werner’s authorized workbench: Shape Stone at Level 1 for 15 XP in 12 seconds; Cut Quartz at Level 1 for 75 XP in 18 seconds.",
+          "They're Minerals, Marie! — four sequential stages, supervised single-piece lessons, one teaching Quartz after practice, and permanent workbench authorization at graduation.",
+          "Cut Quartz, with its approved artwork: 100g per piece, two per stack, and a 16-Credit Werner buyback. Item Sources and the Wiki explain its recipe.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #429 — Werner's Lab.
     slug: "werners-lab",
     title: "Werner's Lab Opens on Stillreach",

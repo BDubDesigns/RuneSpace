@@ -48,6 +48,8 @@ export function runeworkingStopMessage(
   run: { cycles: number },
 ): string {
   switch (reason) {
+    case "access_denied":
+      return "Workbench authorization changed. Speak to its owner before starting again.";
     case "run_completed":
       return `Run complete — ${plural(run.cycles, "attunement", "attunements")}.`;
     case "finished_current":

@@ -1,3 +1,6 @@
+import { and } from "drizzle-orm";
+import { characterMissions, characterSkillXp } from "@/db/rune-space";
+import { MISSION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
@@ -193,7 +196,7 @@ test("each Stillreach scene renders its own panorama with no activity, status or
 
       const scene = page.getByTestId("location-scene");
       await expect(scene).toHaveAttribute("data-location-scene", id);
-      await expect(page.getByRole("heading", { name: location.displayName })).toBeVisible();
+      await expect(scene.getByRole("heading", { level: 1 })).toBeVisible();
       const background = scene.locator('[data-scene-layer="background"]');
       await expect(background).toHaveAttribute("alt", location.presentation.scene.alt);
       // The one committed panorama decodes, and no overlay (ship) is composed on it.
@@ -288,7 +291,7 @@ test("the admin teleport returns a Stillreach character to Skatboll's map", asyn
 // ---------------------------------------------------------------------------
 // Werner's Lab (#429): Stillreach's ninth World Location, with Werner standing at
 // the location itself, three always-available topics, a Stone and uncut-gem
-// counter that needs nothing first, and no Lapidary action of any kind. The
+// counter that needs nothing first, and a separately authorized workbench. The
 // character is placed at the lab directly; flying to Stillreach is proven in
 // stillreach-flight.spec.ts.
 // ---------------------------------------------------------------------------
@@ -316,7 +319,9 @@ for (const viewport of [
     await openTestCharacter(page, testCharacter.id);
 
     const location = getLocation(LAB)!;
-    await expect(page.getByRole("heading", { name: "Werner's Lab" })).toBeVisible();
+    await expect(
+      page.getByTestId("location-scene").getByRole("heading", { level: 1 }),
+    ).toBeVisible();
     const scene = page.getByTestId("location-scene");
     await expect(scene).toHaveAttribute("data-location-scene", LAB);
     const background = scene.locator('[data-scene-layer="background"]');
@@ -335,9 +340,13 @@ for (const viewport of [
     await expect(werner.locator('[data-npc-action="talk"]')).toBeVisible();
     await expect(werner.locator('[data-npc-action="trade"]')).toBeVisible();
 
-    // No Lapidary, workstation or mining action is offered, real or disabled.
+    // The locked workbench offers guidance without permitting a crafting action.
     await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(0);
-    await expect(page.getByText(/lapidary/i)).toHaveCount(0);
+    await expect(page.locator("[data-lapidary-workbench]")).toHaveAttribute(
+      "data-lapidary-access",
+      "locked",
+    );
+    await expect(page.locator("[data-lapidary-workbench]")).toContainText("Speak to Werner");
     await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
 
     await expectNoPageOverflow(page);
@@ -437,10 +446,11 @@ test("trades at the authored prices with no Mission, and sells nothing but Stone
   const prices: Record<string, string> = {
     [ITEM_IDS.stone]: "2",
     [ITEM_IDS.uncutQuartz]: "8",
+    [ITEM_IDS.cutQuartz]: "16",
     [ITEM_IDS.uncutTopaz]: "18",
     [ITEM_IDS.uncutSapphire]: "35",
   };
-  await expect(trade.locator("[data-trade-row]")).toHaveCount(4);
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(5);
   for (const [itemId, price] of Object.entries(prices)) {
     await expect(
       trade.locator(`[data-trade-row="${itemId}"]`).locator("[data-trade-unit-price]"),
@@ -500,3 +510,99 @@ test("the map links the lab to the Quarry and Harmonic Workings but not The Surv
   await expectNoPageOverflow(page);
   await captureReviewScreenshot(page, "werners-lab-map-mobile.png");
 });
+
+// Issue #431: the rendered player journey, in both actual responsive compositions.
+for (const viewport of [
+  { name: "phone", ...PHONE },
+  { name: "desktop", ...DESKTOP },
+]) {
+  test(`Werner’s supervised Lapidary examination and permanent authorization on ${viewport.name}`, async ({
+    page,
+    testCharacter,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await standAtTheLab(testCharacter.id);
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.stone, quantity: 3 });
+    await openTestCharacter(page, testCharacter.id);
+    const bench = page.locator("[data-lapidary-workbench]");
+    await expect(bench).toHaveAttribute("data-lapidary-access", "locked");
+    const close = async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: "Werner conversation" })).toHaveCount(0);
+    };
+    const speak = async () => {
+      const c = await openNpcConversation(page, "Werner");
+      await openConversationEntry(c, /They're Minerals, Marie!/);
+      return c;
+    };
+    let conversation = await speak();
+    await playDialogueToText(conversation, /Your Stone, my supervision/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-dialogue-text]")).toContainText("One Stone");
+    await close();
+    await expect(bench).toHaveAttribute("data-lapidary-access", "supervised");
+    await expect(bench.locator("[data-bounded-run-max]")).toHaveCount(0);
+    await expect(bench.getByRole("button", { name: "Cut Quartz", exact: true })).toHaveCount(0);
+    await bench.getByRole("button", { name: "Shape Stone", exact: true }).click();
+    await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
+    const age = async (milliseconds: number) => {
+      const ago = new Date(Date.now() - milliseconds);
+      await db
+        .update(activeActions)
+        .set({ startedAt: ago, resolvedThroughAt: ago })
+        .where(eq(activeActions.characterId, testCharacter.id));
+      await page.reload();
+    };
+    await age(12_600);
+    await expect(bench).toHaveAttribute("data-lapidary-access", "locked");
+    await expect(
+      page.locator(`[data-mission-strip="${MISSION_IDS.theyreMineralsMarie}"]`),
+    ).toContainText("Speak to Werner about your Stone practice");
+    conversation = await speak();
+    await playDialogueToText(conversation, /I will provide one Uncut Quartz/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await expect(conversation.locator("[data-dialogue-text]")).toContainText(
+      "Werner hands you one Uncut Quartz",
+    );
+    await close();
+    await expect(bench).toHaveAttribute("data-lapidary-access", "supervised");
+    await bench.getByRole("button", { name: "Cut Quartz", exact: true }).click();
+    await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
+    await age(18_600);
+    await expect(bench).toHaveAttribute("data-lapidary-access", "locked");
+    conversation = await speak();
+    await playDialogueToText(conversation, /That is sufficient for authorization/);
+    await conversation.locator("[data-dialogue-action]").click();
+    await playDialogueToText(conversation, /I am the one who rocks/);
+    await close();
+    await expect(bench).toHaveAttribute("data-lapidary-access", "unrestricted");
+    await expect(bench.locator("[data-bounded-run-max]")).toBeVisible();
+    await page.reload();
+    await expect(bench).toHaveAttribute("data-lapidary-access", "unrestricted");
+    const [xp] = await db
+      .select()
+      .from(characterSkillXp)
+      .where(
+        and(
+          eq(characterSkillXp.characterId, testCharacter.id),
+          eq(characterSkillXp.skillId, SKILL_IDS.lapidary),
+        ),
+      );
+    expect(xp?.totalXp).toBe(240);
+    const [mission] = await db
+      .select()
+      .from(characterMissions)
+      .where(
+        and(
+          eq(characterMissions.characterId, testCharacter.id),
+          eq(characterMissions.missionId, MISSION_IDS.theyreMineralsMarie),
+        ),
+      );
+    expect(mission?.completedStageIds).toHaveLength(4);
+    await expectNoPageOverflow(page);
+    await page.screenshot({ path: `/tmp/runespace-431-${viewport.name}.png`, fullPage: true });
+  });
+}

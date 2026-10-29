@@ -371,6 +371,7 @@ export type TrackedMissionActivity =
   | "fabrication"
   | "tinkering"
   | "runeworking"
+  | "lapidary"
   | "echo_hunt";
 
 /**
@@ -651,6 +652,29 @@ export type MissionSkillPrerequisite = {
   level: number;
 };
 
+/** A linear, durable phase. Final turn-in/reward remain Mission-owned. */
+export type MissionStage = {
+  id: string;
+  title: string;
+  requirements: readonly MissionRequirement[];
+  /** Stage-specific reminders; other lifecycle dialogue remains Mission-owned. */
+  dialogue?: Pick<
+    MissionDialogue,
+    | "trackedActivityReminderDialogueId"
+    | "equipmentReminderDialogueId"
+    | "carriedReminderDialogueId"
+    | "repairReminderDialogueId"
+    | "conversationReminderDialogueId"
+  >;
+  /** All-or-nothing teaching grant on an explicit conversation acknowledgement. */
+  onAdvance?: {
+    kind: "stack_item";
+    itemId: ItemId;
+    quantity: number;
+    presentationDialogueId: DialogueId;
+  };
+};
+
 export type MissionDefinition = {
   id: MissionId;
   title: string;
@@ -697,6 +721,8 @@ export type MissionDefinition = {
   itemOffer?: MissionItemOffer;
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
+  /** Optional sequential phases; top-level requirements must then be empty. */
+  stages?: readonly MissionStage[];
   /**
    * The NPC hand-in that completes this Mission. Absent exactly when the
    * Mission authors `autoCompletion` instead (#358): registry validation holds
@@ -2086,6 +2112,107 @@ export const FIRST_RESONANCE_ECHO: MissionDefinition = {
   },
 };
 
+/** Stable phase IDs are also the supervised activity-access policy identities. */
+export const MINERALS_MARIE_STAGE_IDS = {
+  shape: "prove-yourself",
+  acknowledge: "earn-his-trust",
+  cut: "the-real-test",
+  graduate: "final-examination",
+} as const;
+export const THEYRE_MINERALS_MARIE: MissionDefinition = {
+  id: MISSION_IDS.theyreMineralsMarie,
+  title: "They're Minerals, Marie!",
+  summary:
+    "Werner requires a demonstration of careful work before he will authorize use of his Lapidary Workbench.",
+  offers: [
+    {
+      npcId: NPC_IDS.werner,
+      locationId: LOCATION_IDS.wernersLab,
+      dialogueId: DIALOGUE_IDS.wernerOffer,
+      actionLabel: "ACCEPT SUPERVISION",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wernerAccepted },
+    },
+  ],
+  requirements: [],
+  stages: [
+    {
+      id: MINERALS_MARIE_STAGE_IDS.shape,
+      title: "Prove Yourself",
+      requirements: [
+        {
+          kind: "tracked_activity",
+          progressKey: "shape-stone",
+          activity: "lapidary",
+          metric: "completions",
+          actionId: ACTION_IDS.shapeStone,
+          target: 1,
+          objective: "Shape one Stone under Werner's supervision — {current} / {target}",
+          recommendedActionId: ACTION_IDS.shapeStone,
+        },
+      ],
+      dialogue: { trackedActivityReminderDialogueId: DIALOGUE_IDS.wernerStoneReminder },
+    },
+    {
+      id: MINERALS_MARIE_STAGE_IDS.acknowledge,
+      title: "Earn His Trust",
+      requirements: [
+        {
+          kind: "npc_conversation",
+          progressKey: "acknowledge-practice",
+          npcId: NPC_IDS.werner,
+          locationId: LOCATION_IDS.wernersLab,
+          dialogueId: DIALOGUE_IDS.wernerQuartzLesson,
+          objective: "Speak to Werner about your Stone practice",
+          actionLabel: "RECEIVE THE QUARTZ",
+        },
+      ],
+      onAdvance: {
+        kind: "stack_item",
+        itemId: ITEM_IDS.uncutQuartz,
+        quantity: 1,
+        presentationDialogueId: DIALOGUE_IDS.wernerQuartzGranted,
+      },
+    },
+    {
+      id: MINERALS_MARIE_STAGE_IDS.cut,
+      title: "The Real Test",
+      requirements: [
+        {
+          kind: "tracked_activity",
+          progressKey: "cut-quartz",
+          activity: "lapidary",
+          metric: "completions",
+          actionId: ACTION_IDS.cutQuartz,
+          target: 1,
+          objective: "Cut one Quartz under Werner's supervision — {current} / {target}",
+          recommendedActionId: ACTION_IDS.cutQuartz,
+          presentsOutputSources: true,
+        },
+      ],
+      dialogue: { trackedActivityReminderDialogueId: DIALOGUE_IDS.wernerQuartzReminder },
+    },
+    { id: MINERALS_MARIE_STAGE_IDS.graduate, title: "Final Examination", requirements: [] },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.werner,
+    locationId: LOCATION_IDS.wernersLab,
+    requiresStationary: true,
+    objective: "Return to Werner for your final examination",
+    dialogueId: DIALOGUE_IDS.wernerGraduation,
+    actionLabel: "COMPLETE THE LESSON",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.lapidary, amount: 150 },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wernerStoneReminder,
+    conversationReminderDialogueId: DIALOGUE_IDS.wernerQuartzLesson,
+    busyDialogueId: DIALOGUE_IDS.wernerBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wernerCompleted,
+    capacitySlotsDialogueId: DIALOGUE_IDS.wernerCapacity,
+    capacityMassDialogueId: DIALOGUE_IDS.wernerCapacity,
+  },
+  completedNpcDialogue: [{ npcId: NPC_IDS.werner, dialogueId: DIALOGUE_IDS.wernerFollowUp }],
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -2129,6 +2256,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Its continuation, with the Enby's two-Seeker gift, and the same offer in
   // person for those who finished the lesson earlier or had no room (#393).
   FIRST_RESONANCE_ECHO,
+  THEYRE_MINERALS_MARIE,
 ];
 
 const missions = new Map<string, MissionDefinition>(

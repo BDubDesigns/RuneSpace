@@ -547,3 +547,6 @@ export const ContainerContentItemSchema = z.object({
 });
 
 export const ContainerContentsSchema = z.array(ContainerContentItemSchema);
+
+export const StartLapidaryRequestSchema = StartRuneworkingRequestSchema;
+export const LapidaryCommandRequestSchema = RuneworkingCommandRequestSchema;

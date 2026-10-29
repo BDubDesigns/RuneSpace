@@ -21,6 +21,39 @@ export type { WikiArticle, WikiCategoryId } from "@/game/schemas/public-wiki";
  */
 const authoredWikiArticles = [
   {
+    slug: "lapidary",
+    title: "Lapidary",
+    category: "work",
+    summary:
+      "Shape Stone, cut Quartz and earn authorization to use Werner's Lapidary Workbench on Stillreach.",
+    sections: [
+      {
+        heading: "Authorization at Werner's Lab",
+        paragraphs: [
+          [
+            "The workbench is visible at Werner's Lab, reached on foot from the Prospecting Quarry or Harmonic Workings. Speak to Werner for ",
+            { text: "They're Minerals, Marie!", articleSlug: "mission-theyre-minerals-marie" },
+            ". Before acceptance the bench is locked. The Mission permits one supervised Stone lesson, then a conversation, one supervised Quartz lesson, and a final examination. Graduation permanently opens normal runs. Talk and Trade remain open throughout.",
+          ],
+        ],
+      },
+      {
+        heading: "Stone and Quartz",
+        list: [
+          "Shape Stone — Lapidary 1. Consumes one Stone in 12 seconds for 15 Lapidary XP. Practice produces no item.",
+          "Cut Quartz — Lapidary 1. Consumes one Uncut Quartz in 18 seconds for one Cut Quartz and 75 Lapidary XP. Both recipes always succeed.",
+          "Cut Quartz weighs 100g and stacks two to a tile. You can carry, stash, sell or trade it. Werner buys it for 16 Credits; he still buys Uncut Quartz for 8. He does not sell Quartz.",
+        ],
+      },
+      {
+        heading: "After graduation",
+        paragraphs: [
+          "Choose a number of pieces or Max. A number attempts that many; Max continues until materials or capacity stop the run. Each next piece checks the inventory left by the last. A started piece reserves its material and must finish; Stop After This Piece ends a longer run after that piece. Completed work resolves when you return, including while you were away, within the ordinary one-hour offline window.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "getting-started",
     title: "Getting Started",
     category: "getting-started",
@@ -614,7 +647,7 @@ const authoredWikiArticles = [
             "). Anyone who reaches it can trade with him straight away: no Mission, level or conversation comes first. Talking and trading are separate, and reading one of his topics changes nothing about your trade.",
           ],
           "Werner sells Stone at 5 Credits a piece, and buys it back at 2. He sells each character at most 12 Stone a day, counted and reset exactly like Bix's Power Cells: the counter shows how many are left today, the count starts again at midnight Pacific time, and selling Stone back to him does not give you more for the day. Stone stacks five to a tile, and a purchase has to fit your Credits and your Inventory, or nothing is bought and nothing is charged.",
-          "He buys Uncut Quartz at 8 Credits, Uncut Topaz at 18 and Uncut Sapphire at 35, the same prices Bix pays. He does not sell any of them, and there is nothing cut for sale yet.",
+          "He buys Uncut Quartz at 8 Credits, Uncut Topaz at 18 and Uncut Sapphire at 35, the same prices Bix pays. He also buys Cut Quartz for 16 Credits. He does not sell gems. His supervised Lapidary lessons and workbench authorization are separate from trading.",
         ],
       },
     ],
@@ -1331,6 +1364,15 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Werner’s supervised lessons",
+        list: [
+          [
+            { text: "They're Minerals, Marie!", articleSlug: "mission-theyre-minerals-marie" },
+            " — speak to Werner at Werner’s Lab. Complete the two supervised lessons and their required conversations to unlock unrestricted Lapidary workbench use, with 150 Lapidary XP at graduation.",
+          ],
+        ],
+      },
+      {
         heading: "How Missions Connect",
         list: [
           "The starter chain runs from Walk It Off to Hold It Together, then through Keep the Change to 10,000 Hours.",
@@ -1497,11 +1539,11 @@ const authoredWikiArticles = [
     title: "Skills & Progression",
     category: "getting-started",
     summary:
-      "How Mining, Refining, Welding, Fabrication, and Runeworking track your progress, what your Character Level means, and what leveling up gets you.",
+      "How Mining, Refining, Welding, Fabrication, Runeworking, and Lapidary track your progress, what your Character Level means, and what leveling up gets you.",
     sections: [
       {
         paragraphs: [
-          "Five skills currently track your progress: Mining, Refining, Welding, Fabrication, and Runeworking. Each has its own experience (XP) total and level, earned separately.",
+          "Six skills currently track your progress: Mining, Refining, Welding, Fabrication, Runeworking, and Lapidary. Each has its own experience (XP) total and level, earned separately.",
         ],
       },
       {
@@ -1523,6 +1565,11 @@ const authoredWikiArticles = [
         heading: "How you earn XP",
         list: [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
+          [
+            "Lapidary — finished Stone shaping and Quartz cutting at Werner’s ",
+            { text: "Lapidary Workbench", articleSlug: "lapidary" },
+            " grant Lapidary XP. Both always succeed.",
+          ],
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
           "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear, the Propulsion System or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
           [

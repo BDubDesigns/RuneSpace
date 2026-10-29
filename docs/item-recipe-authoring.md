@@ -50,3 +50,14 @@ Start with [AGENTS.md](../AGENTS.md) and the approved issue. Use [`game/config/b
 ### Example: shipped Fuel Manufacturing [#343 / PR #346](https://github.com/BDubDesigns/RuneSpace/pull/346)
 
 The empty/full canisters added item IDs, balance schema/defaults, Wiki categories, presentation, approved art masters and runtime WebPs. Fabrication and Refining each added an action ID and recipe schema/defaults; neither needed a new station. The Refining `fixed_outputs` returns Oil Shale and the empty shell on failure; the shared Refining rules protect those returns from Auto-discard. The empty canister was **not** added to Tinkering. The item Wiki and recipe-unlock notices followed automatically. **Use this to locate owners, not copy fuel-specific balance.**
+
+## Lapidary recipes (#431)
+
+The shipped Lapidary registry in balance owns Shape Stone (deliberately no output)
+and Cut Quartz. Stable action IDs, whole-tick duration, level, XP and inputs are
+required. A producing recipe also authors the stack output and quantity. The
+shared deterministic craft validator checks stack inputs/outputs; no failure
+or Manual Override data exists. Register a recipe's action at Werner's Lab.
+Sources, public item recipes and unlock notices derive from the registry;
+practice is a Stone use rather than an invented output. Supervision/permission
+belongs to the activity policy, not an item or recipe's personal-level gate.

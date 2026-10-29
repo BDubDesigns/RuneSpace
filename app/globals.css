@@ -32,6 +32,8 @@
   --rs-skill-refining: var(--rs-accent-arcane);
   --rs-skill-welding: var(--rs-accent-primary);
   --rs-skill-fabrication: var(--rs-accent-shop-olive);
+  --rs-accent-sky-blue: #38bdf8;
+  --rs-skill-lapidary: var(--rs-accent-sky-blue);
   --rs-skill-runeworking: var(--rs-accent-electric-rose);
   --rs-comms-tint: rgb(93 151 105 / 0.2);
   --rs-comms-scanline: rgb(190 255 184 / 0.16);

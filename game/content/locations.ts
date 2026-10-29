@@ -820,14 +820,14 @@ const locationDefinitions = [
     // interactions here with no Local Place, unlock or Mission. Its two walking edges
     // (the Prospecting Quarry and Harmonic Workings) are authored; it touches The Survey
     // Line on the hex grid but has no route to it, because nothing is inferred from
-    // axial adjacency. The cutting machinery is scenery: no Lapidary action exists yet.
+    // axial adjacency. The workbench now hosts the supervised Lapidary lessons and graduate runs (#431).
     id: LOCATION_IDS.wernersLab,
     planetId: PLANET_IDS.stillreach,
     displayName: "Werner's Lab",
     description:
-      "A battered yellow mineral laboratory, parked on red rock with work lamps burning over its crates and awning. Werner runs a meticulous operation here: he sells Stone and buys uncut Quartz, Topaz and Sapphire.",
+      "A battered yellow mineral laboratory, parked on red rock with work lamps burning over its crates and awning. Werner runs a meticulous operation here: he sells Stone and buys uncut Quartz, Topaz and Sapphire as well as Cut Quartz. Speak to him for supervised Lapidary lessons and authorization to use his workbench.",
     adjacentLocationIds: [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.harmonicWorkings],
-    availableActionIds: [],
+    availableActionIds: [ACTION_IDS.shapeStone, ACTION_IDS.cutQuartz],
     merchantId: MERCHANT_IDS.wernerLab,
     dormantActivities: [],
     presentation: {

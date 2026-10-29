@@ -3,6 +3,7 @@ import {
   getEffectiveGameBalance,
   refiningRecipes,
   runeworkingRecipes,
+  lapidaryRecipes,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
 
@@ -22,7 +23,8 @@ import {
 /** The authored facts unlock derivation and its notice need from a recipe. */
 export type UnlockableRecipe = {
   actionId: string;
-  outputItemId: string;
+  outputItemId?: string;
+  displayName?: string;
   minimumLevel: number;
   inputs: readonly { itemId: string; quantity: number }[];
 };
@@ -40,6 +42,7 @@ export function skillRecipes(
     { skillId: balance.refining.skillId, recipes: refiningRecipes(balance) },
     { skillId: balance.fabrication.skillId, recipes: fabricationRecipes(balance) },
     { skillId: balance.runeworking.skillId, recipes: runeworkingRecipes(balance) },
+    { skillId: balance.lapidary.skillId, recipes: lapidaryRecipes(balance) },
   ];
   return registries
     .filter((registry) => registry.skillId === skillId)
@@ -74,6 +77,10 @@ export function recipeUnlockName(
   sameSkillRecipes: readonly UnlockableRecipe[],
   nameOf: (itemId: string) => string,
 ): string {
+  if (!recipe.outputItemId) {
+    if (!recipe.displayName) throw new Error("Practice recipe needs a display name");
+    return recipe.displayName;
+  }
   const output = nameOf(recipe.outputItemId);
   const shared = sameSkillRecipes.some(
     (other) => other.actionId !== recipe.actionId && other.outputItemId === recipe.outputItemId,

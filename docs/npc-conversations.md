@@ -638,3 +638,15 @@ server's selection at Mining 7, 8 and with no Mining XP row).
 Do not grow this into conditions on Missions, items or flags. A line that
 depends on a Mission's state is Mission dialogue (`docs/missions.md` §9); a
 topic that depends on a Mission is topic availability (§5).
+
+## Linear Mission stages (#431)
+
+Accepted staged Missions resolve the active stage before choosing dialogue.
+An unsatisfied current-stage mandatory conversation wins even when its NPC also
+offers the Mission and owns the final turn-in. Future-stage conversations are
+not entries. Stage-specific reminders use the existing semantic requirement
+routing; only the final stage can carry the ordinary completion command.
+A teaching gift reveals its item beat only after an acknowledged stage-transition
+receipt; capacity refusal leaves the conversation requirement and stage open.
+Werner's three replayable Slice A topics remain unchanged. His reserved payoff
+is confined to the new Mission's successful completion presentation.
