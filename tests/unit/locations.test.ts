@@ -15,7 +15,7 @@ describe("issue #47 location content", () => {
     expect(LOCATION_IDS.crashSite).toBe("crash_site");
   });
 
-  it("resolves exactly the approved local locations (issues #83, #159, #190, #342, #357 and #373)", () => {
+  it("resolves exactly the approved local locations (issues #83, #159, #190, #342, #357, #373 and #429)", () => {
     expect(LOCATIONS.map((l) => l.id).sort()).toEqual(
       [
         LOCATION_IDS.crashSite,
@@ -37,6 +37,7 @@ describe("issue #47 location content", () => {
         LOCATION_IDS.theSurveyLine,
         LOCATION_IDS.theDrySeam,
         LOCATION_IDS.harmonicWorkings,
+        LOCATION_IDS.wernersLab,
       ].sort(),
     );
     expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");

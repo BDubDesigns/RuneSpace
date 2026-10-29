@@ -718,6 +718,19 @@ Current production conventions:
   identifier are unchanged. Master SHA-256 (first 12 hex): neutral `eca3c7f8595e`,
   friendly `668a7776f3f8`, thoughtful `c4755d09b6be`, amused `21503b65f0cc`, interior
   `e98599a6c092`
+- Werner's Lab (#429): the seven approved masters from the owner's handoff ZIP, kept
+  unaltered and SHA-256 checked by `scripts/prepare-werner-lab-art.mjs`. Four 1086×1448
+  (3:4) transparent portraits (`assets/npc-art/werner/werner-{neutral,thoughtful,amused,
+  intense}-master.png`) are scaled uniformly to 375×500 and seated on one shared transparent
+  400×500 canvas (`public/npc-art/werner-*.png`, 12–13 px of empty margin each side, nothing
+  cropped or stretched); the 2508×627 exterior is downsampled whole to 1536×384 lossy WebP
+  q80 (`public/location-scenes/werner-lab.webp`); the 1717×916 interior is centre-cropped to
+  the exact 15:8 rectangle 1710×912 with no resampling
+  (`public/location-scenes/werner-lab-interior.webp`, q80); and the 1536×1024 grayscale
+  direct-alpha identifier goes through the direct-alpha recipe to a 512×281 lossless WebP
+  (`public/map-icons/werner-lab.webp`). Master SHA-256 (first 12 hex): neutral `e96bac935690`,
+  thoughtful `a7959c6e7fa3`, amused `88589f8cc26c`, intense `0e437862a2ac`, exterior
+  `73d35b87d57e`, interior `26fc34d06e90`, identifier `0ae3086c63ae`
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

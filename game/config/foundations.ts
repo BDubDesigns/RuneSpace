@@ -115,6 +115,8 @@ const npcIds = {
   tollKade: asContentId("toll_kade"),
   // The researcher at Hilltop Workshop on Stillreach (#389).
   wiseOldEnby: asContentId("wise_old_enby"),
+  // The mineralogist at Werner's Lab on Stillreach (#429).
+  werner: asContentId("werner"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -405,6 +407,10 @@ const dialogueIds = {
   wiseOldEnbyFirstEchoCompletion: asContentId("wise_old_enby_first_echo_completion"),
   wiseOldEnbyHowToListenTopic: asContentId("wise_old_enby_topic_how_to_listen"),
   wiseOldEnbyAboutResonanceEchoesTopic: asContentId("wise_old_enby_topic_about_resonance_echoes"),
+  // Werner's three replayable topics at Werner's Lab (#429).
+  wernerAboutTheLabTopic: asContentId("werner_topic_about_the_lab"),
+  wernerTheQuarryTopic: asContentId("werner_topic_the_quarry"),
+  wernerGemCuttingTopic: asContentId("werner_topic_gem_cutting"),
   // The Wise Old Enby's repeatable research jobs (#406). Presentation only: the
   // job registry (`game/content/research-jobs.ts`) maps each moment to a sequence.
   researchJobBlocked: asContentId("research_job_blocked"),
@@ -478,6 +484,9 @@ const conversationTopicIds = {
   wiseOldEnbyAboutTheSeekers: asContentId("wise_old_enby_about_the_seekers"),
   wiseOldEnbyHowToListen: asContentId("wise_old_enby_how_to_listen"),
   wiseOldEnbyAboutResonanceEchoes: asContentId("wise_old_enby_about_resonance_echoes"),
+  wernerAboutTheLab: asContentId("werner_about_the_lab"),
+  wernerTheQuarry: asContentId("werner_the_quarry"),
+  wernerGemCutting: asContentId("werner_gem_cutting"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -498,6 +507,9 @@ const expressionIds = {
   friendly: asContentId("friendly"),
   thoughtful: asContentId("thoughtful"),
   skeptical: asContentId("skeptical"),
+  // Werner's approved set (#429) is neutral, thoughtful, amused and this one: a
+  // controlled, unblinking stare. Everything else he does maps to existing vocabulary.
+  intense: asContentId("intense"),
 } as const satisfies Record<string, ContentId>;
 
 const conversationBackgroundIds = {
@@ -522,6 +534,8 @@ const conversationBackgroundIds = {
   lastLegTradingInterior: asContentId("last_leg_trading_interior"),
   // The Wise Old Enby's workshop interior at Hilltop Workshop (#389).
   hilltopWorkshopInterior: asContentId("hilltop_workshop_interior"),
+  // Werner's laboratory interior at Werner's Lab (#429).
+  wernersLabInterior: asContentId("werners_lab_interior"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -710,7 +724,7 @@ export const LOCATION_IDS = {
   // Skatboll's walkable landing pad (#357): an ordinary World Location, not a
   // separate planet. Its Local Place is Last Leg Trading.
   holoHollowLanding: asContentId("holo_hollow_landing"),
-  // Stillreach Slice A (#373): the eight World Locations of Stillreach's local map.
+  // Stillreach Slice A (#373): the eight World Locations of Stillreach's local map (a ninth, Werner's Lab, joined in #429).
   // Every one is scenery-only in this slice; see game/content/locations.
   stillreachLandingStation: asContentId("stillreach_landing_station"),
   windwardTrack: asContentId("windward_track"),
@@ -720,6 +734,8 @@ export const LOCATION_IDS = {
   theSurveyLine: asContentId("the_survey_line"),
   theDrySeam: asContentId("the_dry_seam"),
   harmonicWorkings: asContentId("harmonic_workings"),
+  // Werner's parked mineral laboratory (#429): Stillreach's ninth World Location.
+  wernersLab: asContentId("werners_lab"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -775,6 +791,8 @@ export const MERCHANT_IDS = {
   // affiliated outlet names the same merchant so both share one set of per-
   // character daily allowances, which the ledger keys on this ID.
   lastLegTrading: asContentId("last_leg_trading"),
+  // Werner's mineral merchant at his own World Location, Werner's Lab (#429).
+  wernerLab: asContentId("werner_lab"),
 } as const satisfies Record<string, ContentId>;
 
 /**

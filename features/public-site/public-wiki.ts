@@ -150,7 +150,7 @@ const authoredWikiArticles = [
           "The Flight Controls open on a star chart: the world your ship is on, marked You are here, and the world you can fly to, with the route between them. Tap a planet to choose it; with only one place to fly, it is already chosen. Choosing does nothing until you press LAUNCH. If the flight is not possible yet, for example with too little fuel, the planet is dimmed, marked Unavailable, and the reason is shown.",
           "Before you launch, the Flight Controls show the cost, your fuel now and your fuel after landing. If you would land with less than the 120 FU the flight back needs, they warn you. You can still go: nothing refuels the ship for free on the other side and there is no automatic return, so plan to load fuel you have bought, traded or made before you fly home.",
           "Once launched, the flight cannot be cancelled and the fuel is spent. You watch the Rivet lift off, cross a chart from Skatboll to Stillreach for most of the trip, and touch down. You can minimize the flight and still browse your Inventory, Equipment and Missions, but you cannot walk, mine, refine, trade or move anything until you land. The flight keeps going if you close the game; come back early and it picks up where it is, come back late and you have already landed.",
-          "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of eight locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
+          "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of nine locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
           "Flying the Rivet is not the only way across. Milky Waymo, a fully automated passenger shuttle, runs between Holo Hollow Landing and Stillreach Landing Station once you have flown your own Rivet to Stillreach for the first time. See Riding Milky Waymo below.",
           [
             "Two walks from the Landing Station, by way of Windward Track, is Hilltop Workshop, where ",
@@ -272,6 +272,7 @@ const authoredWikiArticles = [
           "A success can also turn up one find, and never more than one: about one success in four gives a Rune Fragment, one in six an Uncut Quartz, one in twelve an Uncut Topaz and, once in about two hundred, a Boulder. The bonus experience is the same as anywhere else: 20 for a Fragment, 10 for Quartz, 20 for Topaz and 150 for a Boulder. At Mining 1 that is roughly sixteen Rune Fragments an hour before you stop to carry anything; it is a way to replace a lost Fragment, not the best place to look for them.",
           "A Boulder is a single 5kg rock that does not stack, and it is Ultra Rare: its tile shimmers wherever you carry it, and finding one posts an ULTRA RARE FIND System line in General saying who found it and where. It cannot be broken up, bought or sold to anyone, and it does nothing. A Quarry Fragment, Quartz or Topaz is not announced.",
           "Prioritize primary resources works here as everywhere: with it Off, Mining needs room for one Stone and for any one find, the 5kg Boulder included; with it On, one Stone is enough and a find without room is lost for good, even a Boulder, with no experience and no announcement.",
+          "Werner's Lab is a short walk from the Quarry, and Werner there buys Stone at 2 Credits and sells it at 5, up to 12 a day; he also buys the Quarry's uncut gems. See Credits & Trading.",
         ],
       },
       {
@@ -300,7 +301,7 @@ const authoredWikiArticles = [
           "Now and then a successful attempt turns up something extra in the rock: a rough, uncut gemstone. It comes in addition to your ore, never instead of it, and a failed attempt never finds one. A gem is rare — you can mine for a long while without seeing one — and an attempt turns up at most one find of any kind.",
           "The Jag can give Uncut Quartz or Uncut Topaz. Deep Jag can give Uncut Topaz or Uncut Sapphire. The South Cut can give Uncut Sapphire or, far more rarely, a Motherlode Slab. A find shows on the attempt's result as a purple-framed tile beside your ore — the gems keep that purple frame in your Inventory too — and the Mining experience on that result is one total: the ore's usual amount plus a bonus for the gem. Quartz adds 10, Topaz 20 and Sapphire 30, wherever you find them.",
           "The Jag, Deep Jag and The South Cut can also turn up a Rune Fragment: about one success in twenty-five at The Jag, one in eight at Deep Jag and one in six at The South Cut. It is one of the same single find an attempt can turn up, so an attempt never gives both a Rune Fragment and a gem or a Slab, and it comes on top of your ore and its experience. A Rune Fragment adds 20 Mining experience wherever it is found. It is an ordinary 200g material that stacks ten to a tile — no purple frame — and finding one is not announced in General.",
-          "Uncut gems stack only two to a tile, and Bix will buy them — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
+          "Uncut gems stack only two to a tile, and Bix will buy them, as will Werner at Werner's Lab on Stillreach — see Credits & Trading. A Loadsteel Cutter's extra ore is only ever extra ore; it does not turn up more gems or Rune Fragments, and a low-yield attempt never finds one.",
           "Unless you turn on Prioritize primary resources, Mining only starts, and keeps going, while you have room for your ore and for a find — a Rune Fragment is 200g, so that includes room for its weight. If your Inventory is that tight when one turns up, the find is always kept; it is the ore that may come up short.",
           "Some finds are announced. When someone finds Uncut Topaz at The Jag or Uncut Sapphire at Deep Jag or Harmonic Workings, a System line appears in General chat saying who found it and where; a Motherlode Slab at The South Cut or The Dry Seam gets an ULTRA RARE FIND line. The other finds are yours alone to know about.",
           "The Prospecting Quarry on Stillreach can give a Rune Fragment, Uncut Quartz, Uncut Topaz or, very rarely, a Boulder; see Stone at the Prospecting Quarry.",
@@ -507,7 +508,7 @@ const authoredWikiArticles = [
     title: "Credits & Trading",
     category: "gear-and-credits",
     summary:
-      "Your character's Credits, buying and selling at Bix Weller's shop, Wade's scrap counter at Rusk Recovery, Toll Kade's fuel counter at Holo Hollow Landing, and trading with other players.",
+      "Your character's Credits, buying and selling at Bix Weller's shop, Wade's scrap counter at Rusk Recovery, Toll Kade's fuel counter at Holo Hollow Landing, Werner's Stone and gem counter at Werner's Lab on Stillreach, and trading with other players.",
     sections: [
       {
         paragraphs: [
@@ -602,6 +603,18 @@ const authoredWikiArticles = [
           ],
           "Step into it from the Landing Station; anyone can, and until your Thrust Issues report is in it shows Access restricted. It cannot be used from anywhere else on Stillreach, from Skatboll, or while you are in flight, and there is nobody to talk to there.",
           "The terminal also buys Stone from you at 2 Credits a piece, from what you are carrying. It does not sell Stone, and it does not buy Boulders. Toll's counter on Skatboll does not buy Stone, and selling Stone does not change the daily canister limits.",
+        ],
+      },
+      {
+        heading: "Trading with Werner at Werner's Lab",
+        paragraphs: [
+          [
+            "Werner runs a parked mineral laboratory at Werner's Lab on Stillreach, one walk from the Prospecting Quarry and from Harmonic Workings (see ",
+            { text: "Flying the Rivet to Stillreach", articleSlug: "travel-and-scavenging" },
+            "). Anyone who reaches it can trade with him straight away: no Mission, level or conversation comes first. Talking and trading are separate, and reading one of his topics changes nothing about your trade.",
+          ],
+          "Werner sells Stone at 5 Credits a piece, and buys it back at 2. He sells each character at most 12 Stone a day, counted and reset exactly like Bix's Power Cells: the counter shows how many are left today, the count starts again at midnight Pacific time, and selling Stone back to him does not give you more for the day. Stone stacks five to a tile, and a purchase has to fit your Credits and your Inventory, or nothing is bought and nothing is charged.",
+          "He buys Uncut Quartz at 8 Credits, Uncut Topaz at 18 and Uncut Sapphire at 35, the same prices Bix pays. He does not sell any of them, and there is nothing cut for sale yet.",
         ],
       },
     ],

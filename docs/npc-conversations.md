@@ -365,6 +365,9 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Toll Kade | Skatboll | always |
 | Toll Kade | Stillreach | always |
 | Toll Kade | Fuel | always |
+| Werner | About the Lab | always |
+| Werner | The Quarry | always |
+| Werner | Gem Cutting | always |
 | The Wise Old Enby | Introductions | always |
 | The Wise Old Enby | The workshop | always |
 | The Wise Old Enby | Stillreach | always |
@@ -428,6 +431,15 @@ interior background, with his four portraits kept separate from it. His **Trade*
 action is a separate control that reads the merchant's completed-Thrust-Issues
 unlock (`docs/gameplay-foundations.md`) and, while locked, says so instead of
 opening a counter.
+
+Werner (#429) stands at the World Location Werner's Lab itself, with no Local Place, so
+his three topics are listed for anyone who walks there, before any Mission, level or
+conversation. Each has three beats whose text and expression (neutral, thoughtful, amused,
+intense) are owner-approved and authored verbatim in `game/content/dialogue.ts` against the
+lab's own people-free 15:8 interior, with his four portraits kept separate from it. They are
+evergreen, written to read the same for a newcomer and for a Lapidary expert, and carry no
+Mission, item, XP, price or Trade action. His signature line stays out of them: it is
+reserved for his later introductory Mission. **Talk** and **Trade** are separate controls.
 
 Curly's **Seeing the Worlds** needs no gate for the same reason (#292): he shares
 Mara's place, so it is there whether or not his Mission is on offer yet.

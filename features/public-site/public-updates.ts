@@ -9,6 +9,51 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #429 — Werner's Lab.
+    slug: "werners-lab",
+    title: "Werner's Lab Opens on Stillreach",
+    publishedAt: "2026-10-28T12:00:00-07:00",
+    summary:
+      "Stillreach has a ninth place to walk: Werner's Lab, a parked mineral laboratory where you can talk to Werner, buy a daily supply of Stone and sell your uncut gems.",
+    hero: {
+      src: "/location-scenes/werner-lab.webp",
+      alt: "A battered yellow mobile mineral laboratory, a camper-like work vehicle with rooftop vents, antennas and work lamps, a metal stair at its open door and a canvas awning beside it, parked among tool crates and amethyst-like crystals on red desert rock under an aurora sky and a large pale moon",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "npc", npcId: NPC_IDS.werner }, side: "right" },
+      [
+        "Werner's Lab is a new place on Stillreach's map: a battered yellow laboratory, parked between the Prospecting Quarry and Harmonic Workings. You can walk there from either, a normal 24-second walk each way. It does not connect to The Survey Line, even though the two sit side by side on the map. See ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        " for how Stillreach is laid out.",
+      ],
+      "Werner is a mineralogist, meticulous and slightly alarming, and entirely above board. Anyone who reaches the lab can talk to him: About the Lab, The Quarry and Gem Cutting are there as soon as you walk up, and you can read them as often as you like. Nothing needs to be done first, and reading them changes nothing else.",
+      [
+        "Anyone can trade with him too. He sells Stone at 5 Credits a piece, up to 12 per character a day, reset at midnight Pacific time. He buys Stone at 2, and Uncut Quartz at 8, Uncut Topaz at 18 and Uncut Sapphire at 35. He does not sell gems, and the cutting machinery inside is just scenery for now. See ",
+        { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+        " for the details.",
+      ],
+      "Resonance Echoes can now hide at Werner's Lab too: a Beginner Echo Seeker works there like anywhere else, and a new search on Stillreach picks among nine places instead of eight. A search already under way keeps the place it was hiding.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Werner's Lab, a ninth Stillreach location, one walk from the Prospecting Quarry and from Harmonic Workings.",
+          "Werner, with three topics you can read any time: About the Lab, The Quarry and Gem Cutting.",
+          "Werner's counter: Stone for 5 Credits (12 a day per character) and a buyback of Stone at 2, Uncut Quartz at 8, Uncut Topaz at 18 and Uncut Sapphire at 35.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "New Beginner Resonance Echo searches on Stillreach can now hide at Werner's Lab. Searches already under way keep their target.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "high-scores",
     title: "High Scores Are Here",
     publishedAt: "2026-10-27T09:00:00-07:00",

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { readImageHeader } from "./image-header";
-import { ACTION_IDS, LOCATION_IDS, PLANET_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS, MERCHANT_IDS, PLANET_IDS } from "@/game/config/foundations";
 import {
   LOCAL_MAP_LOCATION_IDS_BY_PLANET,
   LOCATIONS,
@@ -30,10 +30,11 @@ import {
 
 /**
  * Stillreach Slice A (#373): eight scenery-only locations on a second planet, a
- * planet-scoped local map, and no route to it from Skatboll.
+ * planet-scoped local map, and no route to it from Skatboll. Werner's Lab (#429) is
+ * the ninth, with two further walking edges.
  */
 
-// The approved eight, with their axial coordinates, undirected neighbours and
+// The approved nine, with their axial coordinates, undirected neighbours and
 // shortest walk from the Landing Station.
 const STILLREACH = [
   {
@@ -68,7 +69,7 @@ const STILLREACH = [
     id: LOCATION_IDS.prospectingQuarry,
     name: "Prospecting Quarry",
     axial: { q: 1, r: 1 },
-    neighbors: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theSurveyLine],
+    neighbors: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theSurveyLine, LOCATION_IDS.wernersLab],
     legs: 2,
     slug: "prospecting-quarry",
   },
@@ -104,9 +105,18 @@ const STILLREACH = [
     id: LOCATION_IDS.harmonicWorkings,
     name: "Harmonic Workings",
     axial: { q: 2, r: 2 },
-    neighbors: [LOCATION_IDS.theSurveyLine],
+    neighbors: [LOCATION_IDS.theSurveyLine, LOCATION_IDS.wernersLab],
     legs: 4,
     slug: "harmonic-workings",
+  },
+  {
+    // Werner's Lab (#429): the ninth location, reached through the Quarry or Harmonic Workings.
+    id: LOCATION_IDS.wernersLab,
+    name: "Werner's Lab",
+    axial: { q: 1, r: 2 },
+    neighbors: [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.harmonicWorkings],
+    legs: 3,
+    slug: "werner-lab",
   },
 ] as const;
 
@@ -135,7 +145,7 @@ function shortestLegs(from: string, to: string): number {
 }
 
 describe("Stillreach planet membership (#373)", () => {
-  it("places exactly the eight approved locations on Stillreach and the original eleven on Skatboll", () => {
+  it("places exactly the nine approved locations on Stillreach and the original eleven on Skatboll", () => {
     expect(stillreachLocations.map((location) => location.id).sort()).toEqual(
       [...stillreachIds].sort(),
     );
@@ -143,8 +153,9 @@ describe("Stillreach planet membership (#373)", () => {
     expect(skatbollLocations.map((location) => location.id)).toContain(
       LOCATION_IDS.holoHollowLanding,
     );
-    expect(LOCATIONS).toHaveLength(19);
-    expect(new Set(LOCATIONS.map((location) => location.id)).size).toBe(19);
+    expect(stillreachLocations).toHaveLength(9);
+    expect(LOCATIONS).toHaveLength(20);
+    expect(new Set(LOCATIONS.map((location) => location.id)).size).toBe(20);
   });
 
   it("derives a location's planet from the registry", () => {
@@ -177,7 +188,7 @@ describe("Stillreach planet membership (#373)", () => {
 });
 
 describe("Stillreach walking graph (#373)", () => {
-  it("authors exactly the seven bidirectional edges", () => {
+  it("authors exactly the nine bidirectional edges", () => {
     for (const entry of STILLREACH) {
       expect([...(getLocation(entry.id)?.adjacentLocationIds ?? [])].sort()).toEqual(
         [...entry.neighbors].sort(),
@@ -191,7 +202,7 @@ describe("Stillreach walking graph (#373)", () => {
       (total, location) => total + location.adjacentLocationIds.length,
       0,
     );
-    expect(edges / 2).toBe(7);
+    expect(edges / 2).toBe(9);
   });
 
   it("does not infer edges from axial adjacency", () => {
@@ -211,7 +222,39 @@ describe("Stillreach walking graph (#373)", () => {
     ).toBe(false);
   });
 
-  it("has the approved shortest walk from the Landing Station (0/1/2/2/3/3/4/4 legs)", () => {
+  it("links Werner's Lab only to the Quarry and Harmonic Workings, never The Survey Line (#429)", () => {
+    // Werner's Lab touches The Survey Line (2,1) on the hex grid but has no route to it.
+    for (const [a, b] of [
+      [LOCATION_IDS.wernersLab, LOCATION_IDS.prospectingQuarry],
+      [LOCATION_IDS.wernersLab, LOCATION_IDS.harmonicWorkings],
+    ] as const) {
+      expect(areLocationsAdjacent(a, b)).toBe(true);
+      expect(areLocationsAdjacent(b, a)).toBe(true);
+    }
+    for (const other of stillreachIds) {
+      if (
+        other === LOCATION_IDS.wernersLab ||
+        other === LOCATION_IDS.prospectingQuarry ||
+        other === LOCATION_IDS.harmonicWorkings
+      ) {
+        continue;
+      }
+      expect(areLocationsAdjacent(LOCATION_IDS.wernersLab, other), other).toBe(false);
+      expect(areLocationsAdjacent(other, LOCATION_IDS.wernersLab), other).toBe(false);
+    }
+    expect(getLocation(LOCATION_IDS.wernersLab)?.adjacentLocationIds).toEqual([
+      LOCATION_IDS.prospectingQuarry,
+      LOCATION_IDS.harmonicWorkings,
+    ]);
+    // The two neighbours' other edges are exactly as they were.
+    expect(getLocation(LOCATION_IDS.theSurveyLine)?.adjacentLocationIds).toEqual([
+      LOCATION_IDS.prospectingQuarry,
+      LOCATION_IDS.theDrySeam,
+      LOCATION_IDS.harmonicWorkings,
+    ]);
+  });
+
+  it("has the approved shortest walk from the Landing Station (0/1/2/2/3/3/4/4/3 legs)", () => {
     for (const entry of STILLREACH) {
       expect(shortestLegs(LOCATION_IDS.stillreachLandingStation, entry.id), entry.name).toBe(
         entry.legs,
@@ -353,14 +396,14 @@ describe("planet-scoped coordinates (#373)", () => {
 });
 
 describe("planet-scoped local map geometry (#373)", () => {
-  it("lays out exactly eight Stillreach hexes and seven routes, with nothing from Skatboll", () => {
+  it("lays out exactly nine Stillreach hexes and nine routes, with nothing from Skatboll", () => {
     const geometry = LOCAL_MAP_GEOMETRY_BY_PLANET.stillreach;
     expect(geometry.layouts.map((layout) => layout.locationId).sort()).toEqual(
       [...stillreachIds].sort(),
     );
-    expect(geometry.undirectedRoutes).toHaveLength(7);
-    // Seven routes, each walkable both ways, and no transport-route extras.
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(14);
+    expect(geometry.undirectedRoutes).toHaveLength(9);
+    // Nine routes, each walkable both ways, and no transport-route extras.
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(18);
     for (const route of geometry.undirectedRoutes) {
       expect(stillreachIds).toContain(route.originLocationId);
       expect(stillreachIds).toContain(route.destinationLocationId);
@@ -417,6 +460,16 @@ describe("planet-scoped local map geometry (#373)", () => {
 describe("Stillreach is scenery-only (#373)", () => {
   it("authors no activity, status, merchant or state variant beyond the Landing Station's (#375)", () => {
     for (const location of stillreachLocations) {
+      // Werner's Lab (#429) hosts the one World Location merchant on Stillreach and no
+      // activity: the cutting machinery is scenery, not a Lapidary action.
+      if (location.id === LOCATION_IDS.wernersLab) {
+        expect(location.availableActionIds).toEqual([]);
+        expect(location.dormantActivities).toEqual([]);
+        expect(location.mapStatus).toBeUndefined();
+        expect(location.merchantId).toBe(MERCHANT_IDS.wernerLab);
+        expect(location.stateVariants).toEqual([]);
+        continue;
+      }
       // The Prospecting Quarry's Stone Mining (#379) is the one other activity.
       if (location.id === LOCATION_IDS.prospectingQuarry) {
         expect(location.availableActionIds).toEqual([ACTION_IDS.stoneMining]);
@@ -445,7 +498,10 @@ describe("Stillreach is scenery-only (#373)", () => {
         expect(location.dormantActivities).toEqual([]);
         expect(location.merchantId).toBeUndefined();
         expect(location.stateVariants).toEqual([]);
-        expect(location.adjacentLocationIds).toEqual([LOCATION_IDS.theSurveyLine]);
+        expect(location.adjacentLocationIds).toEqual([
+          LOCATION_IDS.theSurveyLine,
+          LOCATION_IDS.wernersLab,
+        ]);
         continue;
       }
       // Hilltop Workshop hosts the Wise Old Enby's Resonance Rig (#391): its one
@@ -531,7 +587,13 @@ describe("Stillreach art (#373)", () => {
     for (const entry of STILLREACH) {
       expect(existsSync(`assets/location-scenes/${entry.slug}-master.png`), entry.slug).toBe(true);
       const icon = readImageHeader(`assets/map-icons/${entry.slug}.png`);
-      expect({ width: icon.width, height: icon.height }).toEqual({ width: 1254, height: 1254 });
+      // Werner's Lab (#429) arrived as a 1536x1024 direct-alpha master; its masters are
+      // verified by SHA-256 in tests/unit/werners-lab.test.ts.
+      const expected =
+        entry.id === LOCATION_IDS.wernersLab
+          ? { width: 1536, height: 1024 }
+          : { width: 1254, height: 1254 };
+      expect({ width: icon.width, height: icon.height }).toEqual(expected);
     }
   });
 

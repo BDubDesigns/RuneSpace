@@ -857,7 +857,7 @@ text, and the berth already moved with each landing).
   first route's ID, so these landings complete nothing and never replay it. Each real
   landing writes its own receipt (unique on character, route and arrival instant).
 - **Planets.** Landing on Stillreach Landing Station puts the character on
-  Stillreach's eight-location map (#373), derived from the current location as before.
+  Stillreach's local map (eight locations at #373, nine with Werner's Lab at #429), derived from the current location as before.
   Walking away leaves the ship in the ring; walking edges never cross planets.
 - **Not From Around Here** completes at the Wise Old Enby on Stillreach (#389). On
   Stillreach its Toll conversation is waived, so Hilltop Workshop is the one
@@ -991,6 +991,42 @@ The terminal also carries one venue-local line, a 2-Credit Stone buyback (#379;
 `venuePrices` on the Local Place), that Toll's counter does not have.
 
 No stock, rotation, second allowance or migration.
+
+### Werner's Lab (issue #429)
+
+Stillreach's ninth World Location is Werner's parked mineral laboratory, a content-only
+change: it fits the existing registries and persisted shapes, so there is **no database
+migration**.
+
+- **Place.** `LOCATION_IDS.wernersLab`, planet Stillreach, axial (1,2), displayed as
+  "Werner's Lab". Exactly two authored, bidirectional ordinary walking edges: the
+  Prospecting Quarry (1,1) and Harmonic Workings (2,2). The hex touches The Survey Line
+  (2,1), but no route is authored there and nothing is inferred from adjacency. Legs use the
+  ordinary 24-second walk, turn-back and path validation; there is no unlock gate, Local
+  Place, ship route or NPC movement.
+- **Werner.** `NPC_IDS.werner` stands at the World Location itself, like the Wise Old
+  Enby at Hilltop Workshop. No first-meeting flag, Mission or level decides whether he is
+  there. Talk and Trade are separate controls.
+- **Topics.** Three `always` replayable topics, three beats each, authored verbatim in
+  `game/content/dialogue.ts`: About the Lab (neutral, thoughtful, intense), The Quarry
+  (neutral, thoughtful, amused) and Gem Cutting (thoughtful, intense, neutral). They record
+  nothing and grant nothing. His signature line is reserved for his later introductory
+  Mission and is not used here.
+- **Merchant.** `MERCHANT_IDS.wernerLab`, hosted by the location (`merchantId`), open to
+  anyone: Stone at 5 Credits retail with `dailySellLimit: 12`, so the existing
+  per-character Pacific-day ledger (`character_merchant_daily_purchases`) enforces twelve
+  bought and refuses the thirteenth, selling Stone back never restoring any of it; buybacks
+  of Stone 2, Uncut Quartz 8, Uncut Topaz 18 and Uncut Sapphire 35. He does not retail uncut
+  gems, and no Cut Gem item exists. Bix's own gem buybacks are unchanged, and Stone is
+  bought at no other merchant except the venue-local 2-Credit line at Last Leg Trading's
+  Stillreach terminal (#379). Werner's lines are authored on his merchant, not borrowed from
+  either.
+- **Beginner Echo.** Appended to `BEGINNER_ECHO_TARGET_POOLS` for Stillreach as its ninth
+  member. A Seeker works at the lab like anywhere else, readings from and to the hex use
+  the ordinary compass axes, and a clue never names its target.
+- **Scenery only.** The cutting machinery in the art is scenery. No Lapidary skill, XP,
+  Stone shaping, gem cutting, workstation or Cut Gem item exists, and none is advertised
+  or shown disabled.
 
 ### The Crash Site's two scenes (issue #330)
 
@@ -1790,7 +1826,11 @@ reading on a planet with no active hunt chooses a hidden target uniformly from
 that planet's **fixed** pool (`game/content/echo-hunts.ts`) and resolves against
 it at once, so the first reading may succeed where the player stands. Pools
 never grow with progression: **Skatboll** — its ten ordinary World Locations,
-Deep Jag permanently excluded; **Stillreach** — all eight. The target never
+Deep Jag permanently excluded; **Stillreach** — its eight original World Locations
+plus Werner's Lab (#429), nine in all, added by an explicit owner-approved exception to
+the earlier eight-site freeze rather than by automatically including every future
+location. A hunt already stored keeps its target and clue: nothing rerolls or
+reseats it, and there is no migration. The target never
 leaves the server; travel, flights, logins, trades and acquiring Seekers never
 touch a hunt, and each planet's hunt and clue are independent.
 

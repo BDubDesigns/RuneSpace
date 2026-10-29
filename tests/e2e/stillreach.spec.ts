@@ -1,16 +1,24 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activeActions, characters } from "@/db/rune-space";
-import { LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
+import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCAL_MAP_LOCATION_IDS_BY_PLANET, getLocation } from "@/game/content/locations";
 import { teleportCharacterAsAdmin } from "@/server/admin-command-seams";
-import { expect, openMapSurface, openTestCharacter, test } from "./fixtures";
+import {
+  expect,
+  openConversationEntry,
+  openMapSurface,
+  openNpcConversation,
+  openTestCharacter,
+  test,
+} from "./fixtures";
+import { playDialogueToText } from "./dialogue-steps";
 import { expectElementsInsideHexes } from "./map-geometry";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
- * Stillreach Slice A (#373): the eight-hex planet map, ordinary walking and the
- * eight scenes, for a character placed there by the real admin teleport command.
+ * Stillreach Slice A (#373): the planet map (eight hexes, nine with Werner's Lab, #429),
+ * ordinary walking and the scenes, for a character placed there by the real admin teleport command.
  * Nothing in ordinary play leads to Stillreach, so this is the only way in.
  */
 
@@ -41,7 +49,7 @@ async function expectNoPageOverflow(page: import("@playwright/test").Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-test("an admin-placed Stillreach character sees exactly the eight hexes and seven routes, nothing from Skatboll", async ({
+test("an admin-placed Stillreach character sees exactly the nine hexes and nine routes, nothing from Skatboll", async ({
   page,
   testCharacter,
 }) => {
@@ -58,10 +66,10 @@ test("an admin-placed Stillreach character sees exactly the eight hexes and seve
   for (const id of SKATBOLL_IDS) {
     await expect(page.locator(`[data-map-location="${id}"]`)).toHaveCount(0);
   }
-  // The canvas draws one line per authored undirected edge: seven.
-  await expect(page.locator("[data-map-scroll-viewport] svg line")).toHaveCount(7);
+  // The canvas draws one line per authored undirected edge: nine.
+  await expect(page.locator("[data-map-scroll-viewport] svg line")).toHaveCount(9);
 
-  // Standing at the Landing Station; the other seven are visible but only the
+  // Standing at the Landing Station; the other eight are visible but only the
   // Track is a leg away, and each hex has its approved identifier and no status.
   await expect(
     page.locator(`[data-map-location="${LOCATION_IDS.stillreachLandingStation}"]`),
@@ -275,4 +283,220 @@ test("the admin teleport returns a Stillreach character to Skatboll's map", asyn
     "aria-current",
     "true",
   );
+});
+
+// ---------------------------------------------------------------------------
+// Werner's Lab (#429): Stillreach's ninth World Location, with Werner standing at
+// the location itself, three always-available topics, a Stone and uncut-gem
+// counter that needs nothing first, and no Lapidary action of any kind. The
+// character is placed at the lab directly; flying to Stillreach is proven in
+// stillreach-flight.spec.ts.
+// ---------------------------------------------------------------------------
+
+const LAB = LOCATION_IDS.wernersLab;
+const LAB_DESKTOP = { width: 1280, height: 800 };
+
+async function standAtTheLab(characterId: string, credits = 1000) {
+  await db
+    .update(characters)
+    .set({ currentLocationId: LAB, credits })
+    .where(eq(characters.id, characterId));
+}
+
+for (const viewport of [
+  { name: "phone", ...PHONE },
+  { name: "desktop", ...LAB_DESKTOP },
+]) {
+  test(`shows the lab scene and Werner with independent Talk and Trade, on a ${viewport.name}`, async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await standAtTheLab(testCharacter.id);
+    await openTestCharacter(page, testCharacter.id);
+
+    const location = getLocation(LAB)!;
+    await expect(page.getByRole("heading", { name: "Werner's Lab" })).toBeVisible();
+    const scene = page.getByTestId("location-scene");
+    await expect(scene).toHaveAttribute("data-location-scene", LAB);
+    const background = scene.locator('[data-scene-layer="background"]');
+    await expect(background).toHaveAttribute("alt", location.presentation.scene.alt);
+    await expect
+      .poll(() => background.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(scene.locator('[data-scene-layer="overlay"]')).toHaveCount(0);
+
+    // Werner stands at the World Location itself: one resident, no Local Place, and
+    // Talk and Trade side by side with nothing to unlock first.
+    await expect(page.locator("[data-local-place]")).toHaveCount(0);
+    const werner = page.locator('[data-npc-interaction="werner"]');
+    await expect(werner).toHaveCount(1);
+    await expect(werner).toContainText("Werner");
+    await expect(werner.locator('[data-npc-action="talk"]')).toBeVisible();
+    await expect(werner.locator('[data-npc-action="trade"]')).toBeVisible();
+
+    // No Lapidary, workstation or mining action is offered, real or disabled.
+    await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(0);
+    await expect(page.getByText(/lapidary/i)).toHaveCount(0);
+    await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
+
+    await expectNoPageOverflow(page);
+    if (viewport.name === "phone") await captureReviewScreenshot(page, "werners-lab-mobile.png");
+  });
+}
+
+test("Werner's three topics play in order with the approved portrait on each beat", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAtTheLab(testCharacter.id);
+  await openTestCharacter(page, testCharacter.id);
+
+  const conversation = await openNpcConversation(page, "Werner");
+  for (const topic of ["About the Lab", "The Quarry", "Gem Cutting"]) {
+    await expect(conversation.getByRole("button", { name: new RegExp(topic) })).toBeVisible();
+  }
+  // Three ordinary topics and nothing else: no story entry, offer or Mission action.
+  await expect(conversation.getByRole("button", { name: /Mission|Accept|Lesson/i })).toHaveCount(0);
+
+  await openConversationEntry(conversation, /About the Lab/);
+  const plate = conversation.locator("[data-dialogue-scene-location]");
+  await expect(plate).toHaveText(/WERNER.S LAB/i);
+  const portrait = conversation.locator(".rs-dialogue-scene__npc");
+  await playDialogueToText(conversation, /It's a mineral laboratory/);
+  await expect(portrait).toHaveAttribute("src", /werner-neutral\.png/);
+  await playDialogueToText(conversation, /The quarry provides the raw material/);
+  await expect(portrait).toHaveAttribute("src", /werner-thoughtful\.png/);
+  await playDialogueToText(conversation, /don't touch my equipment/);
+  await expect(portrait).toHaveAttribute("src", /werner-intense\.png/);
+  await expect(
+    conversation.locator('[data-dialogue-background="werners_lab_interior"]'),
+  ).toBeVisible();
+
+  // The interior and each portrait really decode.
+  const interior = conversation.locator('[data-dialogue-background="werners_lab_interior"] img');
+  if ((await interior.count()) > 0) {
+    await expect
+      .poll(() => interior.first().evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
+  }
+  await expect
+    .poll(() => portrait.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+});
+
+test("The Quarry ends on the amused portrait and replays from the start", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAtTheLab(testCharacter.id);
+  await openTestCharacter(page, testCharacter.id);
+
+  const conversation = await openNpcConversation(page, "Werner");
+  await openConversationEntry(conversation, /The Quarry/);
+  const portrait = conversation.locator(".rs-dialogue-scene__npc");
+  await playDialogueToText(conversation, /Most people walk through that quarry/);
+  await expect(portrait).toHaveAttribute("src", /werner-neutral\.png/);
+  await playDialogueToText(conversation, /Every stone has a structure/);
+  await expect(portrait).toHaveAttribute("src", /werner-thoughtful\.png/);
+  await playDialogueToText(conversation, /knowing how to listen is a rare quality/);
+  await expect(portrait).toHaveAttribute("src", /werner-amused\.png/);
+});
+
+test("trades at the authored prices with no Mission, and sells nothing but Stone", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAtTheLab(testCharacter.id, 1000);
+  await db.insert(inventoryStacks).values([
+    { characterId: testCharacter.id, itemId: ITEM_IDS.uncutQuartz, quantity: 1 },
+    { characterId: testCharacter.id, itemId: ITEM_IDS.uncutTopaz, quantity: 1 },
+    { characterId: testCharacter.id, itemId: ITEM_IDS.uncutSapphire, quantity: 1 },
+  ]);
+  await openTestCharacter(page, testCharacter.id);
+
+  await page.locator('[data-npc-interaction="werner"] [data-npc-action="trade"]').click();
+  const trade = page.locator("[data-trade-panel]");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("1000 Credits");
+
+  // Buying: Stone only, 5 Credits, 12 a day.
+  const stone = trade.locator(`[data-trade-row="${ITEM_IDS.stone}"]`);
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(1);
+  await expect(stone.locator("[data-trade-unit-price]")).toHaveText("5");
+  await expect(stone.locator("[data-trade-daily-allowance]")).toHaveText("12 of 12 left today");
+
+  await stone.locator("[data-trade-commit]").click();
+  await expect(trade.locator("[data-trade-credits]")).toContainText("995 Credits");
+  await expect(stone.locator("[data-trade-daily-allowance]")).toHaveText("11 of 12 left today");
+
+  // Selling: Stone at 2 and the three uncut gems at 8, 18 and 35. No allowance shows.
+  await trade.locator('[data-trade-mode="sell"]').click();
+  const prices: Record<string, string> = {
+    [ITEM_IDS.stone]: "2",
+    [ITEM_IDS.uncutQuartz]: "8",
+    [ITEM_IDS.uncutTopaz]: "18",
+    [ITEM_IDS.uncutSapphire]: "35",
+  };
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(4);
+  for (const [itemId, price] of Object.entries(prices)) {
+    await expect(
+      trade.locator(`[data-trade-row="${itemId}"]`).locator("[data-trade-unit-price]"),
+    ).toHaveText(price);
+  }
+  await expect(trade.locator("[data-trade-daily-allowance]")).toHaveCount(0);
+
+  await trade
+    .locator(`[data-trade-row="${ITEM_IDS.uncutSapphire}"]`)
+    .locator("[data-trade-commit]")
+    .click();
+  await expect(trade.locator("[data-trade-credits]")).toContainText("1030 Credits");
+
+  // Selling Stone back does not restore the day's allowance.
+  await trade
+    .locator(`[data-trade-row="${ITEM_IDS.stone}"]`)
+    .locator("[data-trade-commit]")
+    .click();
+  await expect(trade.locator("[data-trade-credits]")).toContainText("1032 Credits");
+  await trade.locator('[data-trade-mode="buy"]').click();
+  await expect(
+    trade.locator(`[data-trade-row="${ITEM_IDS.stone}"]`).locator("[data-trade-daily-allowance]"),
+  ).toHaveText("11 of 12 left today");
+});
+
+test("the map links the lab to the Quarry and Harmonic Workings but not The Survey Line", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAtTheLab(testCharacter.id);
+  await openTestCharacter(page, testCharacter.id);
+  await openMapSurface(page);
+
+  await expect(page.locator("[data-map-location]")).toHaveCount(9);
+  await expect(page.locator(`[data-map-location="${LAB}"]`)).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  // The approved identifier is painted on the lab's hex and decodes as a WebP.
+  const icon = page.locator('svg image[href="/map-icons/werner-lab.webp"]');
+  await expect(icon).toHaveCount(1);
+  const response = await page.request.get("/map-icons/werner-lab.webp");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toContain("image/webp");
+  // No mining status on a location that mines nothing.
+  await expect(page.locator(`[data-map-location="${LAB}"] [data-map-status]`)).toHaveCount(0);
+
+  for (const name of [/Prospecting Quarry/, /Harmonic Workings/]) {
+    await page.getByRole("button", { name }).click();
+    await expect(page.getByRole("button", { name: /^Walk to / })).toBeVisible();
+  }
+  // The Survey Line touches the lab on the hex grid, but no route is authored.
+  await page.getByRole("button", { name: /The Survey Line/ }).click();
+  await expect(page.getByRole("button", { name: /^Walk to / })).toHaveCount(0);
+  await expect(page.locator("[data-map-destination-panel]")).toContainText("No route from here");
+  await expectNoPageOverflow(page);
+  await captureReviewScreenshot(page, "werners-lab-map-mobile.png");
 });

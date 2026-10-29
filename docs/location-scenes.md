@@ -312,6 +312,20 @@ A later route adds its own entry to `FLIGHT_CINEMATICS` (typed over every
 `ShipRouteId`); there is no generic cinematic engine. The interplanetary leg (#375) is two
 such entries, below.
 
+## Werner's Lab (issue #429)
+
+Werner's Lab, Stillreach's ninth World Location, is an ordinary single-scene location like
+the other eight: a native-ratio 4:1 opaque lossy WebP at 1536×384 (q80),
+`public/location-scenes/werner-lab.webp`, downsampled whole from the approved 2508×627
+master with no overlay and no state variant. Its 15:8 conversation background,
+`werner-lab-interior.webp` (1710×912, the largest exact 15:8 rectangle centred in the
+approved 1717×916 master, no resampling), is dialogue scenery only and is not reused for
+the panorama. Both are empty of people: Werner is the separate portrait. The unaltered masters
+are kept in `assets/location-scenes/` and `scripts/prepare-werner-lab-art.mjs` derives them
+after checking each SHA-256. The scene's alt text and the location description describe only
+what ships (a parked lab with a Werner who talks and trades): the cutting machinery is
+scenery, so neither mentions Lapidary.
+
 ## Stillreach Slice A scenes (issue #373)
 
 Stillreach's eight World Locations are ordinary single-scene locations: native-ratio 4:1

@@ -298,6 +298,31 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.wiseOldEnbyAboutResonanceEchoesTopic,
     availability: { kind: "mission_completed", missionId: MISSION_IDS.firstResonanceEcho },
   },
+  {
+    // Werner's three topics (#429) are ordinary and always available, with or without
+    // a Mission or any Lapidary level, and the copy is written to read the same either
+    // way. Reading one neither advances anything nor enables or triggers a transaction,
+    // and nothing records that it was read: Trade is its own button.
+    id: CONVERSATION_TOPIC_IDS.wernerAboutTheLab,
+    npcId: NPC_IDS.werner,
+    label: "About the Lab",
+    dialogueId: DIALOGUE_IDS.wernerAboutTheLabTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wernerTheQuarry,
+    npcId: NPC_IDS.werner,
+    label: "The Quarry",
+    dialogueId: DIALOGUE_IDS.wernerTheQuarryTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.wernerGemCutting,
+    npcId: NPC_IDS.werner,
+    label: "Gem Cutting",
+    dialogueId: DIALOGUE_IDS.wernerGemCuttingTopic,
+    availability: { kind: "always" },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(

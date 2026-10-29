@@ -119,9 +119,7 @@ describe("public Updates content boundary", () => {
   });
 
   it("keeps the Research Jobs Update published (#406)", () => {
-    // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getPublicUpdate("research-jobs")!;
-    expect(getLatestPublishedUpdate().slug).toBe("high-scores");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("milky-waymo")!.publishedAt),
     );
@@ -133,6 +131,34 @@ describe("public Updates content boundary", () => {
     // It never shortens the character's name to their identity.
     expect(text.replace(/The Wise Old Enby/g, "")).not.toMatch(/\bEnby\b/);
     expect(latest.hero?.src).toBe("/location-scenes/hilltop-workshop.webp");
+  });
+
+  it("publishes Werner's Lab as the newest Update, with only shipped behaviour (#429)", () => {
+    // Newest by instant, so the account news boundary surfaces it (#156).
+    const latest = getPublicUpdate("werners-lab")!;
+    expect(getLatestPublishedUpdate().slug).toBe("werners-lab");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("high-scores")!.publishedAt),
+    );
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(latest.hero).toMatchObject({
+      src: "/location-scenes/werner-lab.webp",
+      width: 1536,
+      height: 384,
+    });
+    const text = JSON.stringify(latest);
+    for (const fact of [
+      "5 Credits",
+      "12 per character",
+      "Quartz at 8",
+      "Topaz at 18",
+      "Sapphire at 35",
+    ]) {
+      expect(text).toContain(fact);
+    }
+    // Approved but unshipped design stays out of a shipped Update.
+    expect(text).not.toMatch(/lapidary|one who rocks|\bcut gems?\b|cutting skill/i);
+    expect(text).not.toContain("Survey Line to");
   });
 
   it("keeps the Milky Waymo Update published beneath it (#404)", () => {

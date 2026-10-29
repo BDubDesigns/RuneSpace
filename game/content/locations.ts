@@ -44,7 +44,7 @@ import {
  *   World Location at (1,1) with three walking edges. Its one Local Place is
  *   Last Leg Trading. The pad is empty until the character's own Rivet lands
  *   there (#358); only then does its scene carry the ship overlay.
- * - Stillreach (#373): a second planet with its own eight-location local map; each
+ * - Stillreach (#373): a second planet with its own local map (eight locations, a ninth, Werner's Lab, added in #429); each
  *   location belongs to one planet, and a walking edge never joins two. The Rivet
  *   reaches it by flight (#375) and berths at Stillreach Landing Station, whose
  *   one Local Place is Last Leg Trading's automated terminal; the rest is
@@ -695,8 +695,12 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Prospecting Quarry",
     description:
-      "A shallow quarry of pale, layered rock cut into the hillside in terraces, lit timber and metal rigs standing on its floor. The face is open to prospecting: chip loose Stone from it with a cutter.",
-    adjacentLocationIds: [LOCATION_IDS.windwardTrack, LOCATION_IDS.theSurveyLine],
+      "A shallow quarry of pale, layered rock cut into the hillside in terraces, lit timber and metal rigs standing on its floor. The face is open to prospecting: chip loose Stone from it with a cutter. Werner's Lab is parked a short walk beyond it.",
+    adjacentLocationIds: [
+      LOCATION_IDS.windwardTrack,
+      LOCATION_IDS.theSurveyLine,
+      LOCATION_IDS.wernersLab,
+    ],
     availableActionIds: [ACTION_IDS.stoneMining],
     mapStatus: "Mining",
     dormantActivities: [],
@@ -792,8 +796,8 @@ const locationDefinitions = [
     planetId: PLANET_IDS.stillreach,
     displayName: "Harmonic Workings",
     description:
-      "An old lifting frame works a fractured rock face threaded with shimmering mineral veins. Ore buckets clatter onto a short rail, and cutting usable rune fragments here takes Mining 8.",
-    adjacentLocationIds: [LOCATION_IDS.theSurveyLine],
+      "An old lifting frame works a fractured rock face threaded with shimmering mineral veins. Ore buckets clatter onto a short rail, and cutting usable rune fragments here takes Mining 8. Werner's Lab is parked a short walk away.",
+    adjacentLocationIds: [LOCATION_IDS.theSurveyLine, LOCATION_IDS.wernersLab],
     availableActionIds: [ACTION_IDS.harmonicMining],
     mapStatus: "Mining",
     dormantActivities: [],
@@ -807,6 +811,35 @@ const locationDefinitions = [
         height: 384,
         alt: "A steep fractured rock face with shimmering violet and teal crystals set in it, a wooden mine headframe with a cable bucket and loaded ore carts on a short rail, and distant aurora-lit mesas",
         focal: { x: 50, y: 50 } as const,
+      },
+    },
+  },
+  {
+    // Werner's Lab (#429): a parked mobile mineral laboratory, Stillreach's ninth World
+    // Location. Werner stands at the location itself, so Talk and Trade are separate
+    // interactions here with no Local Place, unlock or Mission. Its two walking edges
+    // (the Prospecting Quarry and Harmonic Workings) are authored; it touches The Survey
+    // Line on the hex grid but has no route to it, because nothing is inferred from
+    // axial adjacency. The cutting machinery is scenery: no Lapidary action exists yet.
+    id: LOCATION_IDS.wernersLab,
+    planetId: PLANET_IDS.stillreach,
+    displayName: "Werner's Lab",
+    description:
+      "A battered yellow mineral laboratory, parked on red rock with work lamps burning over its crates and awning. Werner runs a meticulous operation here: he sells Stone and buys uncut Quartz, Topaz and Sapphire.",
+    adjacentLocationIds: [LOCATION_IDS.prospectingQuarry, LOCATION_IDS.harmonicWorkings],
+    availableActionIds: [],
+    merchantId: MERCHANT_IDS.wernerLab,
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "werner_lab" as const,
+      layout: "werner_lab" as const,
+      localMap: { axial: { q: 1, r: 2 }, label: "Werner's Lab" },
+      scene: {
+        asset: "/location-scenes/werner-lab.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A battered yellow mobile mineral laboratory, a camper-like work vehicle with rooftop vents, antennas and work lamps, a metal stair at its open door and a canvas awning beside it, parked among tool crates and amethyst-like crystals on red desert rock under an aurora sky and a large pale moon",
+        focal: { x: 40, y: 50 } as const,
       },
     },
   },
@@ -873,6 +906,7 @@ export const LOCAL_MAP_LOCATION_IDS_BY_PLANET: Readonly<
     LOCATION_IDS.theSurveyLine,
     LOCATION_IDS.theDrySeam,
     LOCATION_IDS.harmonicWorkings,
+    LOCATION_IDS.wernersLab,
   ],
 };
 

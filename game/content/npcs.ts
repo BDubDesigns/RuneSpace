@@ -213,6 +213,24 @@ export const NPCS: readonly NpcDefinition[] = [
       [EXPRESSION_IDS.amused]: "/npc-art/wise-old-enby-amused.png",
     },
   },
+  {
+    // Werner (#429) runs his parked mineral laboratory at Werner's Lab, standing at the
+    // World Location itself (it has no Local Place). Anyone who walks there can talk to
+    // him or trade: no Mission, item, skill level or first-meeting state decides whether
+    // he is there or what he will say. Four approved expressions, each mapped to the
+    // shared vocabulary.
+    id: NPC_IDS.werner,
+    displayName: "Werner",
+    role: "Mineralogist at Werner's Lab",
+    homeLocationId: LOCATION_IDS.wernersLab,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.wernersLabInterior,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/werner-neutral.png",
+      [EXPRESSION_IDS.thoughtful]: "/npc-art/werner-thoughtful.png",
+      [EXPRESSION_IDS.amused]: "/npc-art/werner-amused.png",
+      [EXPRESSION_IDS.intense]: "/npc-art/werner-intense.png",
+    },
+  },
 ] as const satisfies readonly NpcDefinition[];
 
 const npcById = new Map<string, NpcDefinition>(NPCS.map((npc) => [npc.id, npc]));

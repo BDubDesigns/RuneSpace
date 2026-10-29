@@ -170,6 +170,15 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/hilltop-workshop-interior.webp",
     alt: "A cluttered, lamplit workshop interior: map-covered walls, shelves of glowing crystals and books, workbenches and crates, a caged machine humming with blue light at the back, and a wide window onto aurora-lit hills",
   },
+  {
+    // Werner's laboratory (#429): approved empty 15:8 interior, Werner always the
+    // separate portrait over it. Werner's Lab has no Local Place, so it is labelled by
+    // its World Location; the 4:1 exterior is the location's own scene and is not reused.
+    id: CONVERSATION_BACKGROUND_IDS.wernersLabInterior,
+    locationId: LOCATION_IDS.wernersLab,
+    asset: "/location-scenes/werner-lab-interior.webp",
+    alt: "The inside of a working mineral laboratory: a yellow, scuffed workbench lined with rough stone and gem samples, a grinding wheel and a blueprint-lit screen of crystal diagrams on the left, a stool and a drawer unit under two aurora-lit windows at the back, tool cases, a hat on a wall hook and a lantern on the right",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(
