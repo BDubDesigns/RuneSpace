@@ -444,16 +444,19 @@ test("trades at the authored prices with no Mission, and sells nothing but Stone
   await expect(trade.locator("[data-trade-credits]")).toContainText("995 Credits");
   await expect(stone.locator("[data-trade-daily-allowance]")).toHaveText("11 of 12 left today");
 
-  // Selling: Stone at 2 and the three uncut gems at 8, 18 and 35. No allowance shows.
+  // Selling: Stone at 2, the three uncut gems at 8, 18 and 35 and the cut gems at 16, 36
+  // and 70. No allowance shows.
   await trade.locator('[data-trade-mode="sell"]').click();
   const prices: Record<string, string> = {
     [ITEM_IDS.stone]: "2",
     [ITEM_IDS.uncutQuartz]: "8",
     [ITEM_IDS.cutQuartz]: "16",
     [ITEM_IDS.uncutTopaz]: "18",
+    [ITEM_IDS.cutTopaz]: "36",
     [ITEM_IDS.uncutSapphire]: "35",
+    [ITEM_IDS.cutSapphire]: "70",
   };
-  await expect(trade.locator("[data-trade-row]")).toHaveCount(5);
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(7);
   for (const [itemId, price] of Object.entries(prices)) {
     await expect(
       trade.locator(`[data-trade-row="${itemId}"]`).locator("[data-trade-unit-price]"),

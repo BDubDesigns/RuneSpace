@@ -7,6 +7,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { TradePanel } from "@/features/trade/TradePanel";
+import { SKILL_IDS } from "@/game/config/foundations";
 import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
 import { getNpc, getResidentNpcs, type NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcConversation, type NpcConversationEntry } from "@/game/domain/conversation";
@@ -132,6 +133,7 @@ export function NpcInteractionPanel({
         state,
         resolveNpcConversation(npc.id, state.missions, {
           workOrdersRefreshUnlocked: state.workOrders.refresh.unlocked,
+          skillLevels: { [SKILL_IDS.lapidary]: state.lapidary.level },
         }),
       );
       return {

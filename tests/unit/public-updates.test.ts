@@ -136,7 +136,7 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("lapidary-first-cuts");
+    expect(getLatestPublishedUpdate().slug).toBe("lapidary-topaz-sapphire");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );

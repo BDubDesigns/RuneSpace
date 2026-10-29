@@ -732,3 +732,13 @@ Runeworking and generic Mission suites protect the shared extraction.
 `tests/e2e/stillreach.spec.ts` includes the full lesson/conversation/graduation
 journey on a 390 px phone and 1440 px desktop, refresh persistence, full unlock
 and page-overflow checks. It remains in the existing canonical selection.
+
+Werner Slice C (#433) adds `tests/unit/lapidary-gems.test.ts` (recipe and item
+registries, shared level gates, Techniques/Work level filtering, Sources, buyback,
+dialogue and topic availability, art checksums),
+`tests/integration/lapidary-gems.test.ts` (direct-call level and graduation
+refusal, exactly-once conversion and XP, quantity/Max, offline resolution, capacity,
+buyback) and `tests/e2e/lapidary-gems.spec.ts` (the rendered Work/Techniques split at
+Lapidary 5 and 8, Max cutting, and the Lapidary 8 topic on a phone and desktop).
+The spec is in the canonical allowlist (`canonicalSpecPattern`, four tests) and is
+focused phase `lapidary-gems`.

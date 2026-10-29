@@ -52,6 +52,8 @@ const itemCategoryByItemId = {
   [ITEM_IDS.oilShale]: "ores-and-gemstones",
   [ITEM_IDS.motherlodeSlab]: "ores-and-gemstones",
   [ITEM_IDS.cutQuartz]: "ores-and-gemstones",
+  [ITEM_IDS.cutTopaz]: "ores-and-gemstones",
+  [ITEM_IDS.cutSapphire]: "ores-and-gemstones",
   [ITEM_IDS.uncutQuartz]: "ores-and-gemstones",
   [ITEM_IDS.uncutTopaz]: "ores-and-gemstones",
   [ITEM_IDS.uncutSapphire]: "ores-and-gemstones",

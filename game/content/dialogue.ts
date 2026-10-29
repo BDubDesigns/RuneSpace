@@ -3061,6 +3061,25 @@ const dialogue = {
       ),
     ],
   },
+  // Werner's optional Lapidary 8 topic (#433): owner-approved, verbatim, no reward.
+  [DIALOGUE_IDS.wernerBeyondTheBasicsTopic]: {
+    id: DIALOGUE_IDS.wernerBeyondTheBasicsTopic,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Quartz. Topaz. Sapphire. You can work all three now. A respectable beginning.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "But don't mistake three specimens for the full mineral record. There are gemstones out there that make these look like gravel.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.amused,
+        "When you find one, bring it to me. Preferably before you've done something regrettable with a hammer.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.wiseOldEnbyWorkshopTopic]: {
     id: DIALOGUE_IDS.wiseOldEnbyWorkshopTopic,
     npcId: NPC_IDS.wiseOldEnby,

@@ -321,7 +321,8 @@ type ConversationTopicDefinition = {
 type ConversationTopicAvailability =
   | { kind: "always" }
   | { kind: "mission_accepted"; missionId: MissionId }
-  | { kind: "mission_completed"; missionId: MissionId };
+  | { kind: "mission_completed"; missionId: MissionId }
+  | { kind: "skill_level"; skillId: SkillId; minimumLevel: number };
 ```
 
 The availability vocabulary is **closed and narrow**. `mission_completed` reads
@@ -332,6 +333,8 @@ replayable for the rest of the game once they have been given. Do not
 add a generic boolean-expression DSL, relationship/reputation meter, hidden trust
 score, or world-state scripting language. If real later content needs another
 kind, extend this closed union deliberately when that use case arrives.
+`skill_level` (#433) reads the skill level the server already projects (passed in
+the availability context) and nothing else: no flag or history is stored.
 
 Registry validation (`validateConversationTopics`, run at module load) rejects
 unknown NPCs or dialogue, an NPC/dialogue mismatch, empty or duplicate subjects
@@ -368,6 +371,7 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Werner | About the Lab | always |
 | Werner | The Quarry | always |
 | Werner | Gem Cutting | always |
+| Werner | Beyond the Basics | Lapidary level **8** |
 | The Wise Old Enby | Introductions | always |
 | The Wise Old Enby | The workshop | always |
 | The Wise Old Enby | Stillreach | always |
@@ -648,5 +652,5 @@ not entries. Stage-specific reminders use the existing semantic requirement
 routing; only the final stage can carry the ordinary completion command.
 A teaching gift reveals its item beat only after an acknowledged stage-transition
 receipt; capacity refusal leaves the conversation requirement and stage open.
-Werner's three replayable Slice A topics remain unchanged. His reserved payoff
+Werner's three replayable Slice A topics remain unchanged; the optional Lapidary 8 "Beyond the Basics" topic (#433) is the only one with a requirement. His reserved payoff
 is confined to the new Mission's successful completion presentation.

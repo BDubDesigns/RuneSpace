@@ -1016,8 +1016,8 @@ migration**.
   anyone: Stone at 5 Credits retail with `dailySellLimit: 12`, so the existing
   per-character Pacific-day ledger (`character_merchant_daily_purchases`) enforces twelve
   bought and refuses the thirteenth, selling Stone back never restoring any of it; buybacks
-  of Stone 2, Uncut Quartz 8, Uncut Topaz 18 and Uncut Sapphire 35. He does not retail uncut
-  gems, and no Cut Gem item exists. Bix's own gem buybacks are unchanged, and Stone is
+  of Stone 2, Uncut Quartz 8, Uncut Topaz 18 and Uncut Sapphire 35, plus Cut Quartz 16, Cut
+  Topaz 36 and Cut Sapphire 70 (#431, #433). He does not retail any gem. Bix's own gem buybacks are unchanged, and Stone is
   bought at no other merchant except the venue-local 2-Credit line at Last Leg Trading's
   Stillreach terminal (#379). Werner's lines are authored on his merchant, not borrowed from
   either.
@@ -1819,6 +1819,20 @@ Cut Quartz: Level 1, 1 Uncut Quartz → 1 Cut Quartz, 30 whole ticks, 75 XP. Bot
 always succeed. Cut Quartz is an ordinary tradable/stashable stack: 100 g per
 unit, stack limit 2; Werner buys it for 16 Credits, with no retail stock. His
 existing Stone allowance and uncut-gem prices are unchanged.
+
+Cut Topaz and Cut Sapphire (#433) are the same deterministic recipes in the same
+registry: Cut Topaz is Lapidary 5, 1 Uncut Topaz → 1 Cut Topaz, 50 whole ticks
+(30 s), 150 XP; Cut Sapphire is Lapidary 8, 1 Uncut Sapphire → 1 Cut Sapphire, 75
+whole ticks (45 s), 300 XP. Each output is 100 g, stack limit 2, tradable and
+stashable, and is crafted only (never a Mining find). Werner pays twice the
+uncut buyback: Cut Topaz 36 and Cut Sapphire 70 Credits, and sells neither. After
+graduation the only gate is the Lapidary level, enforced by the shared crafting
+rule at Start and at resolution, so a direct call below the level or before
+graduation is refused. Work lists only learned, authorized techniques; Techniques
+lists every level-learned technique read-only; future level-locked recipes appear
+only in the Wiki until learned. Werner's optional "Beyond the Basics" topic
+appears from Lapidary 8 (a `skill_level` availability, read from the projected
+level), is replayable, and grants nothing.
 
 The two real deterministic activities share the cycle/run core extracted from
 Runeworking: `game/domain/deterministic-crafting.ts`,

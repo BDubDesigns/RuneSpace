@@ -94,10 +94,10 @@ const merchantDefinitions = [
     // Werner's Lab (#429): a World Location merchant, open to anybody who walks in with
     // no Mission, Talk or unlock behind it. Stone is the only line that sells, twelve a
     // character per Pacific day at five Credits; selling Stone back at two never
-    // restores that allowance. The three uncut gems are buy-only: he does not retail
-    // them, and no Cut Gem item exists yet. His gem buybacks equal Bix's on purpose and
-    // are authored here rather than read from him, so a later change to one shop does
-    // not silently move the other.
+    // restores that allowance. The gems are buy-only: he does not retail uncut or cut
+    // stones. Each cut gem pays twice its uncut buyback (#431, #433). His uncut buybacks
+    // equal Bix's on purpose and are authored here rather than read from him, so a
+    // later change to one shop does not silently move the other.
     id: MERCHANT_IDS.wernerLab,
     npcId: NPC_IDS.werner,
     prices: [
@@ -105,7 +105,9 @@ const merchantDefinitions = [
       { itemId: ITEM_IDS.uncutQuartz, buyPrice: 8 },
       { itemId: ITEM_IDS.cutQuartz, buyPrice: 16 },
       { itemId: ITEM_IDS.uncutTopaz, buyPrice: 18 },
+      { itemId: ITEM_IDS.cutTopaz, buyPrice: 36 },
       { itemId: ITEM_IDS.uncutSapphire, buyPrice: 35 },
+      { itemId: ITEM_IDS.cutSapphire, buyPrice: 70 },
     ],
   },
 ] as const satisfies readonly MerchantDefinition[];

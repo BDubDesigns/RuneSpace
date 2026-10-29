@@ -322,14 +322,33 @@ const itemPresentations = {
     description:
       "Steel-reinforced work gloves that find the grip in any seam. Worn on the hands, they add one effective Mining level to your success chance, and nothing else.",
   },
-  // Mining Secondary Finds (#308).
+  // Mining Secondary Finds (#308). A cut gem keeps its uncut stone's rarity (#433).
   [ITEM_IDS.cutQuartz]: {
     displayName: "Cut Quartz",
     pluralName: "Cut Quartz",
     textFallback: "CQ",
     description: "Quartz shaped and polished into precise facets at a Lapidary Workbench.",
     artworkSrc: "/item-art/cut-quartz.webp",
+    rarity: "rare",
     accessibleDescription: "A clear faceted quartz crystal with warm golden mineral veins.",
+  },
+  [ITEM_IDS.cutTopaz]: {
+    displayName: "Cut Topaz",
+    pluralName: "Cut Topaz",
+    textFallback: "CT",
+    description: "Topaz cut into bright, jewelry-grade facets at a Lapidary Workbench.",
+    artworkSrc: "/item-art/cut-topaz.webp",
+    rarity: "rare",
+    accessibleDescription: "A brilliant golden-yellow faceted topaz gemstone.",
+  },
+  [ITEM_IDS.cutSapphire]: {
+    displayName: "Cut Sapphire",
+    pluralName: "Cut Sapphire",
+    textFallback: "CS",
+    description: "Sapphire cut into deep, exacting facets at a Lapidary Workbench.",
+    artworkSrc: "/item-art/cut-sapphire.webp",
+    rarity: "rare",
+    accessibleDescription: "A deep blue faceted sapphire gemstone.",
   },
   [ITEM_IDS.uncutQuartz]: {
     displayName: "Uncut Quartz",

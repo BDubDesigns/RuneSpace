@@ -97,6 +97,7 @@ export const FOCUSED_PHASES = [
   "milky-waymo",
   "research-jobs",
   "high-scores",
+  "lapidary-gems",
   "mission-item-destroy",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and

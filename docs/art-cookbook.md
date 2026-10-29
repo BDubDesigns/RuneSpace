@@ -875,10 +875,25 @@ its real UI, and visually belongs beside the assets around it.
 The owner supplied `1000007591.png` directly in the implementation chat. Its
 unaltered master is `assets/item-art/cut-quartz.png`: 1254×1254 RGBA PNG,
 SHA-256 `2a38007a0963f449aef58fe8e776c9a709e336deb604d179354bfd20eb9e422c`.
-`scripts/prepare-cut-quartz-art.mjs` verifies that digest and derives
+`scripts/prepare-lapidary-art.mjs` verifies that digest and derives
 `public/item-art/cut-quartz.webp` using the existing deterministic item pipeline:
 alpha below 4 cleared, alpha at least 252 snapped opaque, alpha trim, uniform
 576 px long edge, centered on a 640×640 transparent canvas, lossless WebP.
 The subject is 446×576; it was inspected at 80×80 on dark and white backgrounds.
 No image was generated, substituted, recolored or redesigned. There is no
 Lapidary skill icon or additional art asset.
+
+## Approved Cut Topaz and Cut Sapphire (#433)
+
+The owner supplied `RuneSpace_Lapidary_Slice_C_Approved_Art.zip` directly in the
+implementation chat. Its two unaltered masters are `assets/item-art/cut-topaz.png`
+(1024×1024 RGBA, SHA-256
+`3fb79c1c7c93c1f77799d06891270602dd9bfe4d6b3c67a063803b8cdb31d308`) and
+`assets/item-art/cut-sapphire.png` (1024×1024 RGBA, SHA-256
+`9444228782d4f6ca350197817362393f6d23032395e67f88f3cab9abe21b38e8`). Both have real
+transparency. `scripts/prepare-lapidary-art.mjs` verifies each digest and derives
+`public/item-art/cut-topaz.webp` and `cut-sapphire.webp` with the same deterministic
+pipeline as Cut Quartz (the Quartz derivative regenerates byte-identical). Both
+read clearly at 80 and 48 px on dark and white. The jewelry-like faceted cuts are an
+intentional distinction from the elongated Cut Quartz. No image was generated,
+substituted, recolored or redesigned, and there is no new icon, portrait or scene.

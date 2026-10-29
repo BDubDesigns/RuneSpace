@@ -179,7 +179,12 @@ describe("Werner's Lab on the Stillreach map", () => {
   });
 
   it("hosts its mineral merchant and Lapidary Workbench without another Local Place", () => {
-    expect(location.availableActionIds).toEqual([ACTION_IDS.shapeStone, ACTION_IDS.cutQuartz]);
+    expect(location.availableActionIds).toEqual([
+      ACTION_IDS.shapeStone,
+      ACTION_IDS.cutQuartz,
+      ACTION_IDS.cutTopaz,
+      ACTION_IDS.cutSapphire,
+    ]);
     expect(location.dormantActivities).toEqual([]);
     expect(location.stateVariants).toEqual([]);
     expect(location.mapStatus).toBeUndefined();
@@ -314,7 +319,10 @@ describe("Werner, the person", () => {
 });
 
 describe("Werner's three replayable topics", () => {
-  const topics = getNpcConversationTopics(werner);
+  // The three always-available topics; "Beyond the Basics" (#433) is gated on Lapidary 8.
+  const topics = getNpcConversationTopics(werner).filter(
+    (topic) => topic.availability.kind === "always",
+  );
   const beats = (dialogueId: string) =>
     getDialogue(dialogueId)!.beats.map((beat) =>
       beat.kind === "npc"
@@ -334,7 +342,7 @@ describe("Werner's three replayable topics", () => {
       CONVERSATION_TOPIC_IDS.wernerGemCutting,
     ]);
     expect(topics.every((topic) => topic.availability.kind === "always")).toBe(true);
-    expect(CONVERSATION_TOPICS.filter((topic) => topic.npcId === werner)).toHaveLength(3);
+    expect(CONVERSATION_TOPICS.filter((topic) => topic.npcId === werner)).toHaveLength(4);
   });
 
   it("lists all three with no Mission, first-meeting or unlock entry in the hub", () => {
@@ -458,15 +466,20 @@ describe("Werner's mineral merchant", () => {
     expect(merchantDailySellLimit(merchant, ITEM_IDS.stone)).toBe(12);
   });
 
-  it("buys Stone at 2 and the three uncut gems at 8, 18 and 35", () => {
+  it("buys Stone at 2, the three uncut gems at 8, 18 and 35 and the cut gems at 16, 36 and 70", () => {
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.stone)).toBe(2);
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.uncutQuartz)).toBe(8);
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.uncutTopaz)).toBe(18);
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.uncutSapphire)).toBe(35);
+    expect(merchantBuybackPrice(merchantId, ITEM_IDS.cutQuartz)).toBe(16);
+    expect(merchantBuybackPrice(merchantId, ITEM_IDS.cutTopaz)).toBe(36);
+    expect(merchantBuybackPrice(merchantId, ITEM_IDS.cutSapphire)).toBe(70);
     expect([...merchantSellableItemIds(merchant)].sort()).toEqual(
       [
         ITEM_IDS.stone,
         ITEM_IDS.cutQuartz,
+        ITEM_IDS.cutTopaz,
+        ITEM_IDS.cutSapphire,
         ITEM_IDS.uncutQuartz,
         ITEM_IDS.uncutTopaz,
         ITEM_IDS.uncutSapphire,
@@ -474,8 +487,15 @@ describe("Werner's mineral merchant", () => {
     );
   });
 
-  it("never retails a gem; Cut Quartz has its buyback only", () => {
-    for (const itemId of [ITEM_IDS.uncutQuartz, ITEM_IDS.uncutTopaz, ITEM_IDS.uncutSapphire]) {
+  it("never retails a gem; every cut gem has its buyback only, at twice its uncut price", () => {
+    for (const itemId of [
+      ITEM_IDS.uncutQuartz,
+      ITEM_IDS.uncutTopaz,
+      ITEM_IDS.uncutSapphire,
+      ITEM_IDS.cutQuartz,
+      ITEM_IDS.cutTopaz,
+      ITEM_IDS.cutSapphire,
+    ]) {
       expect(price(itemId)?.sellPrice).toBeUndefined();
       expect(price(itemId)?.dailySellLimit).toBeUndefined();
       expect(quoteTrade({ merchant, itemId, direction: "buy", quantity: 1 })).toEqual({
@@ -483,8 +503,10 @@ describe("Werner's mineral merchant", () => {
         reason: "not_traded",
       });
     }
-    expect(merchant.prices).toHaveLength(5);
+    expect(merchant.prices).toHaveLength(7);
     expect(price(ITEM_IDS.cutQuartz)).toEqual({ itemId: ITEM_IDS.cutQuartz, buyPrice: 16 });
+    expect(price(ITEM_IDS.cutTopaz)).toEqual({ itemId: ITEM_IDS.cutTopaz, buyPrice: 36 });
+    expect(price(ITEM_IDS.cutSapphire)).toEqual({ itemId: ITEM_IDS.cutSapphire, buyPrice: 70 });
   });
 
   it("has no Mission, unlock or locked message: anyone who walks in can trade", () => {

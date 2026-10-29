@@ -9,6 +9,37 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #433 — Werner Slice C.
+    slug: "lapidary-topaz-sapphire",
+    title: "Lapidary: Cut Topaz and Cut Sapphire",
+    publishedAt: "2026-10-29T12:00:00-07:00",
+    summary:
+      "Werner’s workbench now cuts Topaz at Lapidary 5 and Sapphire at Lapidary 8, and he has something more to say to anyone who can work all three starter gems.",
+    hero: {
+      src: "/location-scenes/werner-lab.webp",
+      alt: "Werner’s yellow mineral laboratory parked on red rock beneath the Stillreach sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.cutTopaz }, side: "left" },
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.cutSapphire }, side: "right" },
+      "Once you have graduated from Werner’s examination, the Lapidary Workbench keeps teaching through your level alone. Cut Topaz opens at Lapidary 5, and Cut Sapphire at Lapidary 8. Each turns one matching uncut gem into one finished gem, always succeeds, and needs no further lesson.",
+      "Werner buys Cut Topaz for 36 Credits and Cut Sapphire for 70, twice what he pays for the uncut stones. Both are 100g, stack two to a tile, and can be carried, stashed or traded. At Lapidary 8 he also has a new conversation, Beyond the Basics.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Cut Topaz at Lapidary 5 for 150 XP in 30 seconds, and Cut Sapphire at Lapidary 8 for 300 XP in 45 seconds, at Werner’s Lapidary Workbench.",
+          "Cut Topaz and Cut Sapphire, with approved artwork, Item Sources and Wiki entries.",
+          "Werner buys Cut Topaz for 36 Credits and Cut Sapphire for 70.",
+          "Beyond the Basics, a new Werner conversation from Lapidary 8.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "lapidary-first-cuts",
     title: "Lapidary: Earn Your Place at Werner’s Workbench",
     publishedAt: "2026-10-28T20:00:00-07:00",
