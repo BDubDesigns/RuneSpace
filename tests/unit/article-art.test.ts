@@ -146,6 +146,8 @@ describe("canonical article art", () => {
     expect(index).toContain("FedHex Mailboxes");
     expect(index).toContain("Milky Waymo");
     expect(index).toContain("Research Jobs at Hilltop Workshop");
+    expect(index).toContain("High Scores Are Here");
+    expect(index).toContain("Werner&#x27;s Lab Opens on Stillreach");
     // Only the Latest Update section should render an Update summary. A title
     // may also legitimately appear elsewhere on the landing page (for example,
     // the Wise Old Enby's new gameplay screenshot caption).
@@ -153,7 +155,8 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("High Scores Are Here");
+    expect(latestUpdateSection).toContain("Werner&#x27;s Lab Opens on Stillreach");
+    expect(latestUpdateSection).not.toContain("High Scores Are Here");
     expect(latestUpdateSection).not.toContain("Research Jobs at Hilltop Workshop");
     expect(latestUpdateSection).not.toContain("Milky Waymo<");
     expect(latestUpdateSection).not.toContain("FedHex Mailboxes<");
@@ -166,6 +169,7 @@ describe("canonical article art", () => {
     for (const markup of [index, landing]) {
       expect(markup).not.toContain("rune-fragment.webp");
       expect(markup).not.toContain("toll-kade-neutral.png");
+      expect(markup).not.toContain("werner-neutral.png");
       expect(markup).not.toContain("wise-old-enby-amused.png");
       expect(markup).not.toContain("wise-old-enby-friendly.png");
       expect(markup).not.toContain("beginner-echo-seeker.webp");

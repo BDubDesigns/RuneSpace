@@ -163,6 +163,7 @@ const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
 const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
 const lastLegShop = CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior;
 const hilltopWorkshop = CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior;
+const wernersLab = CONVERSATION_BACKGROUND_IDS.wernersLabInterior;
 // Curly's room before and after his mount is installed (#292). The unfinished
 // room resolves to the finished one from the mount's own completion, so a beat
 // authored against it always shows the room as it currently is.
@@ -226,6 +227,17 @@ function tollLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.tollKade,
     expressionId,
     backgroundId: lastLegShop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function wernerLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.werner,
+    expressionId,
+    backgroundId: wernersLab,
     presentationMode: "local",
     text,
   };
@@ -2851,6 +2863,63 @@ const dialogue = {
       enbyLocal(
         EXPRESSION_IDS.amused,
         "The Wise Old Enby, at your service. ‘Old’ I can prove. ‘Wise’ is still under review.",
+      ),
+    ],
+  },
+  // Werner's three replayable topics (#429). The copy, its order and the expression on
+  // every beat are owner-approved and locked verbatim in the issue and the Notion Canon:
+  // nothing here paraphrases them. They are evergreen, read the same for a newcomer and
+  // for a Lapidary expert, and are presentation only: no item, price, XP, Mission or
+  // Trade action. His signature line is reserved for his later introductory Mission
+  // and is deliberately not used here.
+  [DIALOGUE_IDS.wernerAboutTheLabTopic]: {
+    id: DIALOGUE_IDS.wernerAboutTheLabTopic,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "It's a mineral laboratory. I would have thought the equipment made that obvious.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The quarry provides the raw material. I provide the precision. There's a considerable difference.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "And don't touch my equipment. You have no idea what you're handling.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerTheQuarryTopic]: {
+    id: DIALOGUE_IDS.wernerTheQuarryTopic,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "Most people walk through that quarry looking for something valuable. They don't understand what they're looking at.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "Every stone has a structure. Every fracture tells you something. You simply have to know how to listen.",
+      ),
+      wernerLocal(EXPRESSION_IDS.amused, "Of course, knowing how to listen is a rare quality."),
+    ],
+  },
+  [DIALOGUE_IDS.wernerGemCuttingTopic]: {
+    id: DIALOGUE_IDS.wernerGemCuttingTopic,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "A gemstone doesn't become valuable because you found it. Its potential was always there.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "One wrong cut and you've destroyed something that took millions of years to form.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "You can spend a lifetime mastering the cut. The stone will still demand your full attention.",
       ),
     ],
   },

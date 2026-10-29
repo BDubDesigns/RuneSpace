@@ -14,7 +14,11 @@ import {
  * - Skatboll: its ten Beginner-accessible World Locations. Deep Jag is
  *   permanently excluded — it is Mission-gated, and stays out even once a
  *   character has opened it.
- * - Stillreach: all eight of its original walkable World Locations.
+ * - Stillreach: its eight original walkable World Locations plus Werner's Lab (#429),
+ *   nine in all. Werner's Lab joined by an explicit, owner-approved exception to the
+ *   earlier eight-site freeze; the list is still closed, so a Stillreach location added
+ *   later is not in the pool until it is authored here. A hunt already running keeps
+ *   the target it persisted, so adding a site never rerolls one.
  *
  * Only the server ever reads these to choose a hidden target. Registry
  * validation (`validateEchoHuntContent`) proves every ID is a real World
@@ -42,6 +46,7 @@ export const BEGINNER_ECHO_TARGET_POOLS: Readonly<Record<PlanetId, readonly Loca
     LOCATION_IDS.theSurveyLine,
     LOCATION_IDS.theDrySeam,
     LOCATION_IDS.harmonicWorkings,
+    LOCATION_IDS.wernersLab,
   ],
 };
 

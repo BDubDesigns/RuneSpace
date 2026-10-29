@@ -34,6 +34,8 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "the_survey_line",
         "the_dry_seam",
         "harmonic_workings",
+        // Werner's Lab (#429).
+        "werners_lab",
       ].sort(),
     );
   });

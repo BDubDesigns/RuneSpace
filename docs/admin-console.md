@@ -324,7 +324,7 @@ progress, and the recent operator history.
   `tests/unit/mission-reset-scope.test.ts`,
   `tests/unit/admin-surface.test.ts` (production surface exposes no bypass seam),
   `tests/unit/admin-destinations.test.ts` (every offered teleport destination
-  resolves canonically; since #373 that includes Stillreach's eight locations, the only
+  resolves canonically; since #373 that includes Stillreach's locations (eight, nine with Werner's Lab, #429), the only
   way onto that planet, and teleporting back returns the character to Skatboll's map), `tests/unit/admin-offered-items.test.ts` (the ADD ITEM
   catalog is derived from the canonical item definitions and restates no id), `tests/unit/operator-audit-target.test.ts` (issue
   #223 target shapes).

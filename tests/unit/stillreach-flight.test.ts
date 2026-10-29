@@ -370,8 +370,12 @@ describe("Last Leg Trading's Stillreach terminal", () => {
     ]);
   });
 
-  it("puts no merchant on any Stillreach World Location itself", () => {
+  it("puts no Last Leg Trading merchant on any Stillreach World Location itself; Werner's Lab hosts Werner's own (#429)", () => {
     for (const id of LOCAL_MAP_LOCATION_IDS_BY_PLANET.stillreach) {
+      if (id === LOCATION_IDS.wernersLab) {
+        expect(getLocationMerchant(id)?.id).toBe(MERCHANT_IDS.wernerLab);
+        continue;
+      }
       expect(getLocationMerchant(id)).toBeUndefined();
     }
   });

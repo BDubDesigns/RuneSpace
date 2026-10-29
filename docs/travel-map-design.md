@@ -181,7 +181,7 @@ than duplicating it in map tiles.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag","holo_hollow"])`.
-  …plus `rusk_recovery`, `deep_jag`, the South Access Track / South Cut / Holo Hollow Landing keys, and Stillreach's eight (#373). No second identifier field was added.
+  …plus `rusk_recovery`, `deep_jag`, the South Access Track / South Cut / Holo Hollow Landing keys, Stillreach's eight (#373) and Werner's Lab (`werner_lab`, #429). No second identifier field was added.
   **CAVE-IN and MINING are gameplay status, not identifiers**: Deep Jag has exactly one
   `mapIconKey` and one committed asset across both of its states. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
@@ -273,6 +273,17 @@ throws unless each list is exactly that planet's locations.
 - **Reaching it.** In play, by the Rivet's interplanetary flight (#375). Admin → Teleport /
   Set Location (`ADMIN_DESTINATIONS`, derived from `LOCATIONS`) still places a character
   on either planet for support and preview; it moves the character, not the ship.
+
+### Werner's Lab map identifier (issue #429)
+
+The ninth Stillreach identifier, `public/map-icons/werner-lab.webp`, is the owner-approved
+1536×1024 grayscale direct-alpha master (`assets/map-icons/werner-lab.png`) run through the
+same recipe by `scripts/prepare-werner-lab-art.mjs`: alpha under 4 cleared, near-opaque alpha
+snapped to 255, trimmed, scaled to a 512 px long edge (512×281, 80,914 bytes), lossless WebP.
+It is a distinct parked lab-ship silhouette with no baked text. The location sits at axial
+(1,2), south of the Prospecting Quarry and west of Harmonic Workings; the map draws its two
+authored routes and, although the hex touches The Survey Line (2,1), no line to it. Stillreach's
+geometry is therefore nine hexes and nine routes.
 
 ### Stillreach map identifiers (issue #373)
 

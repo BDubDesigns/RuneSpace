@@ -282,7 +282,9 @@ describe("issue #230 Scrap and Power Cell trade terms", () => {
           // Last Leg Trading's two canister lines (#357) are limited to five.
           (merchant.id === MERCHANT_IDS.lastLegTrading &&
             (price.itemId === ITEM_IDS.fullSmallFuelCanister ||
-              price.itemId === ITEM_IDS.emptySmallFuelCanister));
+              price.itemId === ITEM_IDS.emptySmallFuelCanister)) ||
+          // Werner's Stone (#429) is limited to twelve.
+          (merchant.id === MERCHANT_IDS.wernerLab && price.itemId === ITEM_IDS.stone);
         expect(price.dailySellLimit !== undefined).toBe(limited);
       }
     }
@@ -340,6 +342,9 @@ describe("issue #230 daily purchase allowance", () => {
       [MERCHANT_IDS.lastLegTrading]: {
         [ITEM_IDS.fullSmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
         [ITEM_IDS.emptySmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
+      },
+      [MERCHANT_IDS.wernerLab]: {
+        [ITEM_IDS.stone]: { limit: 12, purchased: 0, remaining: 12 },
       },
     });
   });

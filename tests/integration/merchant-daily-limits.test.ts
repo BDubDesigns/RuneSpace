@@ -368,6 +368,10 @@ suite("issue #230 merchant daily purchase limits (real PostgreSQL)", () => {
           [ITEM_IDS.fullSmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
           [ITEM_IDS.emptySmallFuelCanister]: { limit: 5, purchased: 0, remaining: 5 },
         },
+        // Werner's Stone line (#429) is projected untouched as well.
+        [MERCHANT_IDS.wernerLab]: {
+          [ITEM_IDS.stone]: { limit: 12, purchased: 0, remaining: 12 },
+        },
       });
       expect((await ledgerRows(characterId)).map((row) => row.merchantId).sort()).toEqual(
         [MERCHANT_IDS.bixWeller, MERCHANT_IDS.wadeRusk].sort(),

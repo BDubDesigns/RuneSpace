@@ -74,9 +74,9 @@ export const publicLandingContent = {
     },
     {
       src: "/landing/map-stillreach.webp",
-      alt: "RuneSpace local Map view showing the eight connected Stillreach locations",
+      alt: "RuneSpace local Map view of Stillreach, from before Werner's Lab joined it: this screenshot shows the original eight connected locations, and the planet now has nine",
       label: "Map",
-      detail: "Stillreach — 8 locations",
+      detail: "Stillreach — 9 locations",
       width: 847,
       height: 735,
     },

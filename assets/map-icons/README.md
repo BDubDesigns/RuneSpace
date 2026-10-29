@@ -40,6 +40,11 @@ served to clients.
   kept unaltered. `scripts/prepare-stillreach-art.mjs` records their derivation: the same
   direct-alpha recipe as above, to 512 px long-edge grayscale lossless WebPs.
 
+- `werner-lab.png` (#429) is the owner-approved 1536×1024 grayscale direct-alpha master of
+  Werner's parked lab-ship, kept unaltered and SHA-256 checked by
+  `scripts/prepare-werner-lab-art.mjs`, which derives `public/map-icons/werner-lab.webp`
+  (512×281, grayscale, lossless) by the same recipe. Nothing was regenerated or recoloured.
+
 The other four identifiers keep no master here: their pre-key colour sources
 live in working-art storage rather than the repository, which
 `docs/art-cookbook.md` explicitly allows.
