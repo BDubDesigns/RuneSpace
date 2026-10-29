@@ -740,3 +740,5 @@ dialogue and topic availability, art checksums),
 refusal, exactly-once conversion and XP, quantity/Max, offline resolution, capacity,
 buyback) and `tests/e2e/lapidary-gems.spec.ts` (the rendered Work/Techniques split at
 Lapidary 5 and 8, Max cutting, and the Lapidary 8 topic on a phone and desktop).
+The spec is in the canonical allowlist (`canonicalSpecPattern`, four tests) and is
+focused phase `lapidary-gems`.

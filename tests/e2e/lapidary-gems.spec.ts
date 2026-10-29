@@ -15,6 +15,7 @@ import {
   MISSION_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import { THEYRE_MINERALS_MARIE } from "@/game/content/missions";
 import { playDialogueToText } from "./dialogue-steps";
 import {
   expect,
@@ -54,10 +55,18 @@ async function graduateAtTheLab(characterId: string, lapidaryLevel: number) {
     .values({
       characterId,
       missionId: MISSION_IDS.theyreMineralsMarie,
+      // A graduate's durable record: every authored stage is complete.
+      completedStageIds: THEYRE_MINERALS_MARIE.stages!.map((stage) => stage.id),
       acceptedAt: now,
       completedAt: now,
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [characterMissions.characterId, characterMissions.missionId],
+      set: {
+        completedStageIds: THEYRE_MINERALS_MARIE.stages!.map((stage) => stage.id),
+        completedAt: now,
+      },
+    });
 }
 
 async function expectNoPageOverflow(page: import("@playwright/test").Page) {
