@@ -4,7 +4,7 @@ import { MISSION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
-import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCAL_MAP_LOCATION_IDS_BY_PLANET, getLocation } from "@/game/content/locations";
 import { teleportCharacterAsAdmin } from "@/server/admin-command-seams";
 import {
@@ -13,6 +13,9 @@ import {
   openMapSurface,
   openNpcConversation,
   openTestCharacter,
+  openUtility,
+  closeUtility,
+  utilitySurface,
   test,
 } from "./fixtures";
 import { playDialogueToText } from "./dialogue-steps";
@@ -523,12 +526,33 @@ for (const viewport of [
     test.setTimeout(90_000);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await standAtTheLab(testCharacter.id);
-    await db
-      .insert(inventoryStacks)
-      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.stone, quantity: 3 });
     await openTestCharacter(page, testCharacter.id);
     const bench = page.locator("[data-lapidary-workbench]");
     await expect(bench).toHaveAttribute("data-lapidary-access", "locked");
+    const work = bench.getByRole("button", { name: "Work", exact: true });
+    const techniques = bench.getByRole("button", { name: "Techniques", exact: true });
+    const catalog = bench.locator("[data-lapidary-techniques-catalog]");
+    const stoneTile = bench.locator(`[data-lapidary-recipe="${ACTION_IDS.shapeStone}"]`);
+    const quartzTile = bench.locator(`[data-lapidary-recipe="${ACTION_IDS.cutQuartz}"]`);
+    const start = bench.locator("[data-lapidary-start]");
+    await expect(work).toHaveAttribute("aria-pressed", "true");
+    await expect(bench.locator("[data-lapidary-recipe]")).toHaveCount(0);
+    await techniques.click();
+    await expect(techniques).toHaveAttribute("aria-pressed", "true");
+    await expect(catalog.locator("[data-lapidary-catalog-entry]")).toHaveCount(2);
+    await expect(catalog.getByRole("button")).toHaveCount(0);
+    await expect(catalog).toContainText("Werner’s authorization");
+    await expect(
+      catalog.locator(`[data-lapidary-catalog-entry="${ACTION_IDS.shapeStone}"]`),
+    ).toContainText("produces nothing (no output)");
+    await expect(start).toHaveCount(0);
+    await expect(bench.locator("[data-bounded-run-max]")).toHaveCount(0);
+    await expectNoPageOverflow(page);
+    await page.screenshot({
+      path: `/tmp/runespace-432-techniques-${viewport.name}.png`,
+      fullPage: true,
+    });
+    await work.click();
     const close = async () => {
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Werner conversation" })).toHaveCount(0);
@@ -544,9 +568,34 @@ for (const viewport of [
     await expect(conversation.locator("[data-dialogue-text]")).toContainText("One Stone");
     await close();
     await expect(bench).toHaveAttribute("data-lapidary-access", "supervised");
+    await expect(stoneTile).toContainText("Need 1 more Stone");
+    await expect(stoneTile.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    await expect(start).toBeDisabled();
+    await expect(quartzTile).toHaveCount(0);
+    await techniques.click();
+    await expect(catalog.getByRole("button")).toHaveCount(0);
+    await expect(work).toHaveAttribute("data-mission-guidance", "active");
+    await work.focus();
+    await page.keyboard.press("Enter");
+    await expect(work).toHaveAttribute("aria-pressed", "true");
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.stone, quantity: 3 });
+    await page.reload();
     await expect(bench.locator("[data-bounded-run-max]")).toHaveCount(0);
+    await expect(bench.locator("[data-bounded-run]")).toHaveCount(0);
+    await expect(stoneTile).toContainText("produces nothing (no output)");
     await expect(bench.getByRole("button", { name: "Cut Quartz", exact: true })).toHaveCount(0);
+    await page.screenshot({
+      path: `/tmp/runespace-432-supervised-${viewport.name}.png`,
+      fullPage: true,
+    });
     await bench.getByRole("button", { name: "Shape Stone", exact: true }).click();
+    await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
+    await expect(bench.locator("[data-lapidary-recipe]")).toHaveCount(0);
+    await techniques.click();
+    await page.reload();
+    await expect(work).toHaveAttribute("aria-pressed", "true");
     await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
     const age = async (milliseconds: number) => {
       const ago = new Date(Date.now() - milliseconds);
@@ -569,6 +618,24 @@ for (const viewport of [
     );
     await close();
     await expect(bench).toHaveAttribute("data-lapidary-access", "supervised");
+    await db
+      .delete(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, testCharacter.id),
+          eq(inventoryStacks.itemId, ITEM_IDS.uncutQuartz),
+        ),
+      );
+    await page.reload();
+    await expect(quartzTile).toContainText("Need 1 more Uncut Quartz");
+    await expect(stoneTile).toHaveCount(0);
+    await expect(start).toBeDisabled();
+    await expect(bench.locator("[data-bounded-run]")).toHaveCount(0);
+    // Independently supplied Quartz still qualifies for the current lesson.
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.uncutQuartz, quantity: 1 });
+    await page.reload();
     await bench.getByRole("button", { name: "Cut Quartz", exact: true }).click();
     await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
     await age(18_600);
@@ -602,7 +669,87 @@ for (const viewport of [
         ),
       );
     expect(mission?.completedStageIds).toHaveLength(4);
+    await expect(stoneTile).toBeVisible();
+    await expect(quartzTile).toHaveCount(0);
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.uncutQuartz, quantity: 2 });
+    await page.reload();
+    await expect(bench.locator("[data-lapidary-recipe]")).toHaveCount(2);
+    await bench.locator("[data-bounded-run-increase]").click();
+    await expect(bench.locator("[data-bounded-run]")).toHaveAttribute(
+      "data-bounded-run-quantity",
+      "2",
+    );
+    await quartzTile.getByRole("button").click();
+    await expect(quartzTile.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    await expect(bench.locator("[data-bounded-run]")).toHaveAttribute(
+      "data-bounded-run-quantity",
+      "1",
+    );
+    await expect(bench.locator("[data-lapidary-selected]")).toContainText("75");
+    await expect
+      .poll(() => quartzTile.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBeGreaterThan(0);
     await expectNoPageOverflow(page);
-    await page.screenshot({ path: `/tmp/runespace-431-${viewport.name}.png`, fullPage: true });
+    await page.screenshot({ path: `/tmp/runespace-432-work-${viewport.name}.png`, fullPage: true });
+    await bench.locator("[data-bounded-run-max]").click();
+    // An Inventory change can select a different affordable technique without
+    // a tile click. Its run size must not inherit the old technique's Max.
+    await openUtility(page, "inventory");
+    const inventory = utilitySurface(page, "Inventory");
+    await inventory.getByRole("button", { name: /Uncut Quartz/ }).click();
+    await inventory.getByRole("button", { name: "Drop stack (2)", exact: true }).click();
+    await inventory.getByRole("button", { name: "Confirm drop", exact: true }).click();
+    await expect(inventory).toContainText("Dropped 2 Uncut Quartz.");
+    await closeUtility(page);
+    await expect(stoneTile.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    await expect(bench.locator("[data-bounded-run]")).toHaveAttribute(
+      "data-bounded-run-quantity",
+      "1",
+    );
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId: testCharacter.id, itemId: ITEM_IDS.uncutQuartz, quantity: 2 });
+    await page.reload();
+    await quartzTile.getByRole("button").click();
+    await bench.locator("[data-bounded-run-max]").click();
+    await start.click();
+    await expect(bench.locator("[data-lapidary-cycle]")).toBeVisible();
+    await expect(bench.locator("[data-lapidary-recipe]")).toHaveCount(0);
+    await page.reload();
+    await expect(work).toHaveAttribute("aria-pressed", "true");
+    await bench.getByRole("button", { name: "Stop After This Piece", exact: true }).click();
+    await expect(
+      bench.getByRole("button", { name: "Stopping After This Piece", exact: true }),
+    ).toBeDisabled();
+    await age(18_600);
+    await expect(bench.locator("[data-lapidary-cycle]")).toHaveCount(0);
+    await expect(bench.locator("[data-lapidary-result]")).toContainText("+75 Lapidary XP");
+    // Only this disposable fixture's inputs are removed to exercise the empty view.
+    await db
+      .delete(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, testCharacter.id),
+          eq(inventoryStacks.itemId, ITEM_IDS.stone),
+        ),
+      );
+    await db
+      .delete(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, testCharacter.id),
+          eq(inventoryStacks.itemId, ITEM_IDS.uncutQuartz),
+        ),
+      );
+    await page.reload();
+    await expect(bench.locator("[data-lapidary-empty]")).toContainText("Techniques");
+    await expect(start).toHaveCount(0);
+    await techniques.click();
+    await expect(catalog.locator("[data-lapidary-catalog-entry]")).toHaveCount(2);
+    await expect(catalog.getByRole("button")).toHaveCount(0);
+    await expect(bench.locator("[data-bounded-run]")).toHaveCount(0);
+    await expectNoPageOverflow(page);
   });
 }
