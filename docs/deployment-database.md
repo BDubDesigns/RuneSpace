@@ -339,3 +339,19 @@ The local/CI isolation problem is solved and deliberately preserved:
   creates/drops its own temporary `runespace_test_*` logical database there.
 
 Do **not** rebuild, replace, or generalize this system.
+
+## Lapidary / Mission-stage migration (#431)
+
+Apply `0055_lapidary_mission_stages.sql` through the normal checked-in migration
+path before serving the new application revision. It adds the Lapidary run
+table, an empty stage-history array to existing Mission rows, and a nullable
+authorization-stage identity to Runeworking runs. Existing Runeworking rows
+retain their values and NULL identity (ordinary unrestricted activity). It
+inserts zero Lapidary XP for existing characters once with conflict protection;
+new characters receive it through normal starter provisioning. Legacy Mission
+rows keep empty histories and the unchanged single-stage interpretation. No
+production access, configuration change, data reset or owner-run repair is
+required by this slice. Roll back application code only with awareness that
+new Mission progress remains stored. Older code cannot resolve Lapidary actions;
+finish active Lapidary runs before an application rollback and leave the additive
+schema intact. Never drop player records to roll back.

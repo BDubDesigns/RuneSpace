@@ -1,3 +1,4 @@
+import { lapidaryRecipeForActionId } from "@/game/config/balance";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { miningSourceForActionId, refiningRecipeForActionId } from "@/game/config/balance";
 import { miningAwardFacts } from "@/game/domain/mining";
@@ -19,6 +20,8 @@ import { refiningAwardFacts } from "@/game/domain/refining";
 export function getActionOutputItemIds(actionId: string): readonly string[] | undefined {
   const balance = getEffectiveGameBalance();
 
+  const lapidary = lapidaryRecipeForActionId(actionId, balance);
+  if (lapidary && "outputItemId" in lapidary) return [lapidary.outputItemId];
   const source = miningSourceForActionId(actionId, balance);
   if (source) return [miningAwardFacts(balance, source).itemId];
 

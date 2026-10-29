@@ -634,3 +634,11 @@ Sizing and clear space (approved by the product owner; supersedes the earlier lo
 - Signed-out landing: override with `h-14 w-auto sm:h-16` (~56px on mobile, ~64px from the `sm` breakpoint), inside the existing `Development build` heading card.
 - Public-site header (`PublicSiteShell`): the full lockup at every width `min-[390px]` and above; below `390px`, the standalone R emblem, so the Home / Updates / Wiki nav strip fits without horizontal scrolling on narrow phones. This swap is specific to the public-site header only. Neither of the two marks is a `priority` image (issue #117): both are always rendered and a CSS breakpoint decides which one is displayed, but a preload is unconditional, so preloading made every visitor download the mark they could not see (measured 9,218 B at 390px, 32,334 B at 360px). Left to lazy loading the browser fetches only the displayed mark — which is in the initial viewport and therefore still requested immediately. The authenticated game header and the landing hero lockup are unaffected and keep their `priority`.
 - Keep the accessible brand name; do not change the approved files' contents, compression, or dimensions.
+
+## Lapidary accent (#431)
+
+Lapidary uses the canonical `lapidary` tone, `--rs-skill-lapidary` aliasing
+`--rs-accent-sky-blue: #38BDF8`. It is accent text/fill on the established dark
+surfaces, never a skill icon. Measured contrast is 9.31:1 on page, 8.58:1 on raised,
+8.38:1 on panel and 7.66:1 on control. The skill registry, progression rows and workbench
+read the same token mapping. Keep it visually distinct from Welding cyan.

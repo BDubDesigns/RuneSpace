@@ -872,6 +872,31 @@ const balanceSchema = z.object({
    * durable-identity reason every recipe does. The Beginner Echo Seeker is the
    * one shipped recipe: one Rune Fragment in, one Seeker out (200 g either way).
    */
+  lapidary: z.object({
+    skillId: z.literal(SKILL_IDS.lapidary),
+    recipes: z.object({
+      shapeStone: z.object({
+        actionId: z.literal(ACTION_IDS.shapeStone),
+        displayName: z.literal("Shape Stone"),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(20),
+        baseXp: z.literal(15),
+        inputs: z.tuple([z.object({ itemId: z.literal(ITEM_IDS.stone), quantity: z.literal(1) })]),
+      }),
+      cutQuartz: z.object({
+        actionId: z.literal(ACTION_IDS.cutQuartz),
+        displayName: z.literal("Cut Quartz"),
+        outputItemId: z.literal(ITEM_IDS.cutQuartz),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(30),
+        baseXp: z.literal(75),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), quantity: z.literal(1) }),
+        ]),
+      }),
+    }),
+  }),
   runeworking: z.object({
     skillId: z.literal(SKILL_IDS.runeworking),
     recipes: z.object({
@@ -1150,6 +1175,11 @@ const balanceSchema = z.object({
      * Topaz is worth the same at The Jag and at Deep Jag and no source restates
      * it. Two to a stack keeps a few specimens a real carrying decision.
      */
+    cutQuartz: z.object({
+      itemId: z.literal(ITEM_IDS.cutQuartz),
+      massGrams: z.literal(100),
+      stackLimit: z.literal(2),
+    }),
     uncutQuartz: z.object({
       itemId: z.literal(ITEM_IDS.uncutQuartz),
       massGrams: z.literal(100),
@@ -1913,6 +1943,29 @@ const defaults = balanceSchema.parse({
       },
     },
   },
+  lapidary: {
+    skillId: SKILL_IDS.lapidary,
+    recipes: {
+      shapeStone: {
+        actionId: ACTION_IDS.shapeStone,
+        displayName: "Shape Stone",
+        minimumLevel: 1,
+        durationTicks: 20,
+        baseXp: 15,
+        inputs: [{ itemId: ITEM_IDS.stone, quantity: 1 }],
+      },
+      cutQuartz: {
+        actionId: ACTION_IDS.cutQuartz,
+        displayName: "Cut Quartz",
+        outputItemId: ITEM_IDS.cutQuartz,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 30,
+        baseXp: 75,
+        inputs: [{ itemId: ITEM_IDS.uncutQuartz, quantity: 1 }],
+      },
+    },
+  },
   runeworking: {
     skillId: SKILL_IDS.runeworking,
     recipes: {
@@ -2028,6 +2081,7 @@ const defaults = balanceSchema.parse({
       massGrams: 9_000,
       equipment: { kind: "container", slotCapacity: 6 },
     },
+    cutQuartz: { itemId: ITEM_IDS.cutQuartz, massGrams: 100, stackLimit: 2 },
     uncutQuartz: {
       itemId: ITEM_IDS.uncutQuartz,
       massGrams: 100,
@@ -2518,6 +2572,7 @@ const skillLevelCurves = {
   [SKILL_IDS.fabrication]: standardSkillLevelThresholds,
   // A standard skill on the shared curve (#391): Level 2 at the usual 500 XP.
   [SKILL_IDS.runeworking]: standardSkillLevelThresholds,
+  [SKILL_IDS.lapidary]: standardSkillLevelThresholds,
 } as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
 
 /** The approved level-curve source for a skill, or undefined when none exists. */
@@ -2662,4 +2717,22 @@ export function getItemMaximumCharge(
   balance = getEffectiveGameBalance(),
 ): number | undefined {
   return getMiningToolDefinition(itemId, balance)?.maximumCharge;
+}
+
+/** The two shipped Lapidary recipes; practice deliberately has no item output. */
+export type LapidaryRecipeBalance =
+  EffectiveGameBalance["lapidary"]["recipes"][keyof EffectiveGameBalance["lapidary"]["recipes"]];
+export function lapidaryRecipes(
+  balance = getEffectiveGameBalance(),
+): readonly LapidaryRecipeBalance[] {
+  return Object.values(balance.lapidary.recipes);
+}
+export function lapidaryRecipeForActionId(
+  actionId: string,
+  balance = getEffectiveGameBalance(),
+): LapidaryRecipeBalance | undefined {
+  return lapidaryRecipes(balance).find((recipe) => recipe.actionId === actionId);
+}
+export function lapidaryActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return lapidaryRecipes(balance).map((recipe) => recipe.actionId);
 }

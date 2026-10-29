@@ -1,3 +1,11 @@
+import { lapidaryActivity } from "@/server/lapidary";
+import {
+  projectLapidaryWorkbench,
+  type LapidaryWorkbenchProjection,
+} from "@/server/lapidary-state";
+import type { LapidaryCommandError } from "@/server/lapidary-commands";
+import { lapidaryRecipes, lapidaryRecipeForActionId } from "@/game/config/balance";
+import { advanceObservedMissionStages } from "@/server/mission-stages";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -1008,6 +1016,9 @@ export type PlayGameplayState = {
   runeworking: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   /** The Wise Old Enby's Resonance Rig (#391). */
   resonanceRig: ResonanceRigProjection;
+  lapidary: PlayGameplayState["runeworking"];
+  lapidaryWorkbench: LapidaryWorkbenchProjection;
+  lapidaryError?: LapidaryCommandError;
   /** One current Runeworking refusal, for the Rig (#391). */
   runeworkingError?: RuneworkingCommandError;
   /**
@@ -1413,6 +1424,10 @@ export function createPlayResolver(
     // One Runeworking resolver under every authored recipe's action (#391). It
     // credits Missions from its own persistence, one completed cycle at a time,
     // in the same transaction that consumed the Fragment and made the Seeker.
+    ...lapidaryRecipes().map((recipe) => ({
+      actionId: recipe.actionId,
+      resolver: lapidaryActivity.createResolver() as PlayResolver,
+    })),
     ...runeworkingRecipes().map((recipe) => ({
       actionId: recipe.actionId,
       resolver: createRuneworkingResolver() as PlayResolver,
@@ -1481,6 +1496,7 @@ export async function ensurePlayProvisioning(
       { characterId, skillId: SKILL_IDS.refining, totalXp: 0 },
       { characterId, skillId: SKILL_IDS.welding, totalXp: 0 },
       { characterId, skillId: SKILL_IDS.strength, totalXp: 0 },
+      { characterId, skillId: SKILL_IDS.lapidary, totalXp: 0 },
     ])
     .onConflictDoNothing();
   await transaction
@@ -2233,9 +2249,15 @@ export async function stateFromTransaction(
   practiceError?: PlayGameplayState["practiceError"],
   stationErrors?: Pick<
     PlayGameplayState,
-    "fabricationError" | "tinkeringError" | "miningError" | "runeworkingError" | "echoReadingError"
+    | "fabricationError"
+    | "tinkeringError"
+    | "miningError"
+    | "runeworkingError"
+    | "lapidaryError"
+    | "echoReadingError"
   >,
 ): Promise<PlayGameplayState> {
+  await advanceObservedMissionStages(transaction, characterId, now);
   const balance = getEffectiveGameBalance();
   const snapshot = await loadPlaySnapshot(transaction, characterId);
   const resetDate = pacificResetDate(powerAnnexNow(now));
@@ -2450,6 +2472,17 @@ export async function stateFromTransaction(
     carriedByItemId,
     balance,
   });
+  const lapidaryTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.lapidary)?.totalXp ?? 0;
+  const lapidaryProgress = skillLevelProgress(
+    lapidaryTotalXp,
+    standardSkillLevelThresholds(balance),
+  );
+  const lapidaryWorkbench = await projectLapidaryWorkbench(transaction, characterId, action, {
+    skillLevel: lapidaryProgress.level,
+    stacks: snapshot.stacks,
+    slotsAvailable: snapshot.slotsAvailable,
+    massAvailableGrams: snapshot.massAvailableGrams,
+  });
   const resonanceRig = await projectResonanceRig(transaction, {
     characterId,
     action,
@@ -2576,6 +2609,9 @@ export async function stateFromTransaction(
   const activeTinkeringTarget = action
     ? tinkeringTargetForActionId(action.actionId, balance)
     : undefined;
+  const activeLapidaryRecipe = action
+    ? lapidaryRecipeForActionId(action.actionId, balance)
+    : undefined;
   const activeRuneworkingRecipe = action
     ? runeworkingRecipeForActionId(action.actionId, balance)
     : undefined;
@@ -2595,18 +2631,20 @@ export async function stateFromTransaction(
             refiningDurationMultiplier(refiningStateRows[0]?.runLocalPlaceId)
           : activeFabricationRecipe
             ? activeFabricationRecipe.durationTicks
-            : activeRuneworkingRecipe
-              ? activeRuneworkingRecipe.durationTicks
-              : activeTinkeringTarget
-                ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
-                : activeMiningSource
-                  ? miningAttemptDurationTicks(
-                      balance,
-                      activeMiningSource,
-                      equippedTool?.definition,
-                      nextAttemptBoosted,
-                    )
-                  : balance.welding.attemptDurationTicks;
+            : activeLapidaryRecipe
+              ? activeLapidaryRecipe.durationTicks
+              : activeRuneworkingRecipe
+                ? activeRuneworkingRecipe.durationTicks
+                : activeTinkeringTarget
+                  ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
+                  : activeMiningSource
+                    ? miningAttemptDurationTicks(
+                        balance,
+                        activeMiningSource,
+                        equippedTool?.definition,
+                        nextAttemptBoosted,
+                      )
+                    : balance.welding.attemptDurationTicks;
   // A workpiece's timer runs from the cursor, which always stands at its start.
   // A Tinkering cycle's cursor moves with every resolution, so its timer runs
   // from the ticks it has already had.
@@ -2704,6 +2742,7 @@ export async function stateFromTransaction(
         activeFabricationRecipe !== undefined ||
         activeTinkeringTarget !== undefined ||
         activeRuneworkingRecipe !== undefined ||
+        activeLapidaryRecipe !== undefined ||
         activeEchoReading ||
         activeResearchField ||
         isWeldingCadenceAction)
@@ -2762,6 +2801,9 @@ export async function stateFromTransaction(
       xpIntoLevel: runeworkingProgress.xpIntoLevel,
     },
     resonanceRig,
+    lapidary: lapidaryProgress,
+    lapidaryWorkbench,
+    ...(stationErrors?.lapidaryError ? { lapidaryError: stationErrors.lapidaryError } : {}),
     ...(stationErrors?.echoReadingError
       ? { echoReadingError: stationErrors.echoReadingError }
       : {}),

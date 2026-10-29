@@ -15,7 +15,13 @@ import { SKILL_IDS, type SkillId } from "@/game/config/foundations";
  * never names a color. A skill with no approved accent yet (a future skill
  * before its owner picks one) has no tone and presents neutrally.
  */
-export type SkillAccentTone = "mining" | "refining" | "welding" | "fabrication" | "runeworking";
+export type SkillAccentTone =
+  | "mining"
+  | "refining"
+  | "welding"
+  | "fabrication"
+  | "runeworking"
+  | "lapidary";
 
 export type SkillPresentation = {
   displayName: string;
@@ -29,6 +35,7 @@ const skillPresentations = {
   [SKILL_IDS.strength]: { displayName: "Strength" },
   [SKILL_IDS.fabrication]: { displayName: "Fabrication", accentTone: "fabrication" },
   // Electric Rose (#391), the fifth distinct skill accent.
+  [SKILL_IDS.lapidary]: { displayName: "Lapidary", accentTone: "lapidary" },
   [SKILL_IDS.runeworking]: { displayName: "Runeworking", accentTone: "runeworking" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;
 

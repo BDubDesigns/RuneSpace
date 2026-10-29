@@ -29,6 +29,7 @@ const skillIds = {
   // Runeworking (#391): a standard skill on the shared level curve, worked at
   // the Wise Old Enby's Resonance Rig.
   runeworking: asContentId("runeworking"),
+  lapidary: asContentId("lapidary"),
 } as const satisfies Record<string, ContentId>;
 
 const itemIds = {
@@ -69,6 +70,7 @@ const itemIds = {
   // Mining Secondary Finds (#308): rough gemstones a successful extraction can
   // turn up alongside the source's ordinary ore.
   uncutQuartz: asContentId("uncut_quartz"),
+  cutQuartz: asContentId("cut_quartz"),
   uncutTopaz: asContentId("uncut_topaz"),
   uncutSapphire: asContentId("uncut_sapphire"),
   // Skatboll Oil Shale Mining (#342): the primary ore The South Cut yields, and
@@ -120,6 +122,7 @@ const npcIds = {
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
+  theyreMineralsMarie: asContentId("theyre_minerals_marie"),
   walkItOff: asContentId("walk_it_off"),
   cutYourTeeth: asContentId("cut_your_teeth"),
   wasteNot: asContentId("waste_not"),
@@ -170,6 +173,18 @@ const missionIds = {
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
+  wernerOffer: asContentId("werner_minerals_offer"),
+  wernerAccepted: asContentId("werner_minerals_accepted"),
+  wernerStoneReminder: asContentId("werner_minerals_stonereminder"),
+  wernerQuartzLesson: asContentId("werner_minerals_quartzlesson"),
+  wernerQuartzGranted: asContentId("werner_minerals_quartzgranted"),
+  wernerQuartzReminder: asContentId("werner_minerals_quartzreminder"),
+  wernerGraduation: asContentId("werner_minerals_graduation"),
+  wernerCompleted: asContentId("werner_minerals_completed"),
+  wernerFollowUp: asContentId("werner_minerals_followup"),
+  wernerCapacity: asContentId("werner_minerals_capacity"),
+  wernerBusy: asContentId("werner_minerals_busy"),
+
   wadeOffer: asContentId("wade_rusk_walk_it_off_offer"),
   wadeFollowUp: asContentId("wade_rusk_walk_it_off_follow_up"),
   wadeWalkItOffActiveFollowUp: asContentId("wade_rusk_walk_it_off_active_follow_up"),
@@ -539,6 +554,8 @@ const conversationBackgroundIds = {
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
+  shapeStone: asContentId("shape_stone_lapidary"),
+  cutQuartz: asContentId("cut_quartz_lapidary"),
   ferriteShaleMining: asContentId("ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
   cargoHoldWelding: asContentId("cargo_hold_welding"),

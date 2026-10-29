@@ -1,6 +1,6 @@
 # Mission framework
 
-Authoritative authoring contract for the declarative single-phase mission system introduced by #124 / #125.
+Authoritative authoring contract for the declarative mission system introduced by #124 / #125.
 
 The document describes the mission framework's own contracts. It is intentionally narrow: it does not document the shared play-state assembly that hosts projection as permanent framework architecture — see §2. Since #127 that host is the generic play boundary (`server/play.ts` / `PlayContext`), not a Mining concern; this document remains valid across it.
 
@@ -8,7 +8,7 @@ Base your work on the current PR #125 implementation (`game/content/missions.ts`
 
 ## 1. Purpose and boundary
 
-RuneSpace currently supports **ordinary single-phase, server-authoritative missions expressed primarily through authored mission definitions**.
+RuneSpace supports ordinary single-phase Missions and optional linear, durable stages expressed through authored definitions.
 
 - A mission is a small declarative definition (offers, ordered requirements, turn-in, one reward, dialogue mapping) plus authored dialogue sequences. Its conversations are surfaced through the one canonical NPC conversation model (`docs/npc-conversations.md`).
 - Generic projection derives live state (`not_accepted` / `active` / `ready_for_completion` / `completed`), objective copy, and semantic guidance from authoritative character state on every command.
@@ -1193,24 +1193,23 @@ need earns its own deliberate extension.
 
 ## 14. Current limitations
 
-The framework currently models **one live-state phase** per mission. Requirements observe current authoritative state (§5), while tracked activity requirements persist only a capped current value keyed by character, mission, and authored `progressKey`. This keeps ordinary missions simple, but the following progress shapes are **not yet modelled** and must earn an explicit framework extension when a real mission needs them:
+Ordinary Missions retain one simultaneous requirement set. Optional **linear persistent stages** (§16, #431) scope that set to the current stage and durably latch completed stages. Requirements observe current authoritative state (§5), while tracked activity requirements persist a capped value keyed by character, Mission, stage (when present), and authored `progressKey`. The following progress shapes remain **unmodelled** and must earn an explicit framework extension when a real Mission needs them:
 
 - **Multi-location history** such as "visit A → visit B → return to A" when the visits leave no durable evidence in current state (e.g. two `at_location` steps that would both already be satisfied by the current location).
 - **Arbitrary dialogue memory.** Two narrow shapes are now modelled: reactive
   Mission-local facts (§9.3), and a single authored
-  mandatory conversation per NPC, marked durably by the `npc_conversation`
+  mandatory conversation per NPC within a stage, marked durably by the `npc_conversation`
   requirement (§5, §9.2, §12.3). That is a concrete gameplay requirement, not
   conversation history — nothing records which optional topics were read, in
   what order, or how often. Branching dialogue, remembered answers, and
-  multi-step conversation chains remain unmodelled.
+  optional-topic conversation history remain unmodelled.
 - **NPC schedules or movement beyond story placement** — an NPC's placement *is* Mission-derived (#190, #231: ordered `relocations` in `game/content/npcs.ts`, see `docs/npc-conversations.md`), but nothing moves anybody by time, shift, pathing, or chance. Mission location semantics remain intentionally authored on each definition rather than derived from NPC placement, so moving an NPC never silently moves where a Mission can be accepted or turned in.
 - **Arbitrary persistent per-step ledgers** beyond the narrow tracked-attempt contract (timestamps, event history, flags, provenance, or lifetime counters like "shale mined since acceptance" — current carried-stack requirements intentionally count any carried quantity (§5–§6)).
 - **Branching, repeatable, or timed mission systems.** The Wise Old Enby's three research jobs (§15) are a deliberately separate, narrow lifecycle, not a general repeatable-Mission framework.
-- **Persistent multi-stage missions.** (`deferred_stage` (§5.3) is not this: it is a placeholder objective that a later slice replaces, not a stage history.) A mission surface shows all requirements of the **current stage/leg** but never future-stage objectives. The current production framework is one stage, so authored requirements form the current simultaneous requirement set. A future mission with genuinely sequential legs (e.g. deliver one material set, then receive a new objective elsewhere) earns a deliberate multi-stage extension then — not speculatively now.
 
-The current requirement/projection vocabulary was kept reusable so a future narrow phase wrapper (`mission → phase → same requirements / dialogue / guidance vocabulary`) can layer on top without rewriting the existing missions, and mission location semantics already avoid the `homeLocationId` derivation trap.
+Stages reuse the existing requirement/projection vocabulary without rewriting legacy Missions. Mission location semantics continue to avoid the `homeLocationId` derivation trap.
 
-Future real requirements should extend the framework deliberately — a narrow, validated content + projection + guidance extension with focused coverage — rather than adding mission-specific hacks (bespoke transactions, ID branches, or prose parsing) around the current one-phase boundary.
+Future real requirements should extend the framework deliberately — a narrow, validated content + projection + guidance extension with focused coverage — rather than adding Mission-specific hacks (bespoke transactions, ID branches, or prose parsing) around the stage boundary.
 
 ## Examples
 
@@ -1395,3 +1394,59 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until the ordinary accepted record exists, even with the ship repaired and fuel loaded; the Ship panel says "Report Thrust Issues to Wade at Rusk Recovery to start Move Along." Once the Mission is complete this gates nothing.
 - **Dialogue (locked copy, verbatim):** the approved send-off is the last three beats of Wade's Thrust Issues completion scene ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."; there is no separate offer), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."
 - **Reset.** Resetting a chain from an operator console clears the Mission records (Move Along follows Thrust Issues in the reset scope) but not the ship row: where the ship is berthed is physical state, not Mission state.
+
+## 16. Linear persistent stages (#431)
+
+`MissionDefinition.stages` is optional. Legacy Missions keep their existing
+`requirements`, progress keys, lifecycle, continuations and rewards unchanged.
+A staged Mission authors `requirements: []`, a nonempty ordered stage list, and
+one final ordinary NPC `turnIn`. Each stage has a stable lowercase hyphenated
+`id`, title, requirements and optional stage-specific reminder dialogue. The
+last stage may have no requirements: its objective is the final turn-in.
+
+`character_missions.completed_stage_ids` is an exact prefix of those authored
+IDs. The first ID outside the prefix is active; completion appends the final ID
+and stamps `completed_at` with the existing reward in one transaction. Malformed
+histories fail closed. Never rename, reorder or remove persisted stage IDs.
+Counters and conversation markers stay in `character_mission_progress`, keyed
+as `stage-id/progress-key`; legacy keys are byte-for-byte unchanged.
+
+`activeMissionStage`, `missionAtStage` and `stageProgress` in
+`game/domain/mission-stages.ts` are the one selection/scoping boundary. The Log,
+strips, dialogue and guidance see only that stage. Completed history cannot
+regress when inventory or location changes. Pinning remains presentation only.
+
+Activity outcomes snapshot the active stage before applying their count. A
+batch credits that stage once, capped at its target; its remainder is never
+redistributed into later stages. `advanceMissionStage` latches one phase in the
+same character transaction. Conversation acknowledgements revalidate the
+current NPC/dialogue identity; a completed stage's replay is harmless. Live
+observations advance within locked Play reconciliation; durable activities and
+conversations advance at their own event boundary.
+
+An intermediate stage may author `onAdvance: {kind: "stack_item", itemId,
+quantity, presentationDialogueId}` only alongside one explicit required
+conversation. The acknowledgement preflights the complete grant with the
+existing exact inventory planner before writing its marker, item or history.
+Capacity refusal writes none of those and remains retryable. Only a successful
+transition receipt reveals the item scene. Optional lead acknowledgements never
+give the required conversation's gift. This is separate from offer acceptance,
+final rewards and existing continuation gifts.
+
+Authoring validation checks stage order/identities, progress keys, references,
+each effective stage's reachable reminders, final turn-in, and the gift's
+capacity-refusal/reveal scenes. Intermediate consumed-item requirements,
+planet-waived conversations, reactive facts, flight requirements, and `deferred_stage` are not
+supported inside stages. The existing `at_location` reminder constraint still
+requires that location to be the final turn-in location. No branching,
+repeatable/timed stages or event ledger are added.
+
+**First consumer:** They're Minerals, Marie! authors supervised Stone work,
+Werner's teaching conversation and one-Quartz grant, supervised Quartz work,
+then Werner's final examination for 150 Lapidary XP. The workbench owns a small
+declarative access policy in `game/content/lapidary.ts`, evaluated by
+`game/domain/activity-access.ts`: no Mission → locked; the two authored lesson
+stages → their one recipe, one unit; completed Mission → unrestricted. The
+Mission engine contains no Werner/workbench permission branch. Start and lazy
+resolution both recheck durable permission; the run records the supervision
+stage identity, so a stale action cannot cross a stage boundary.

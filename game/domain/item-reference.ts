@@ -1,3 +1,5 @@
+import { allMissionRequirements } from "@/game/domain/mission-stages";
+import { LAPIDARY_WORKBENCH } from "@/game/content/lapidary";
 import {
   fabricationRecipes,
   getEffectiveGameBalance,
@@ -8,6 +10,7 @@ import {
   refiningRecipes,
   repairTargetBalances,
   runeworkingRecipes,
+  lapidaryRecipes,
   tinkeringTargets,
   type EffectiveGameBalance,
   type EquipmentDefinition,
@@ -124,12 +127,29 @@ export type ItemReferenceRecipe =
       locations: readonly ItemReferenceLocation[];
       inputs: readonly ItemReferenceInput[];
       outputQuantity: number;
+    }
+  | {
+      /** Runeworking at the Wise Old Enby's Resonance Rig (#391). It never fails. */
+      kind: "lapidary";
+      actionId: string;
+      outputItemId: string;
+      skillId: string;
+      minimumLevel: number;
+      /**
+       * The Mission whose COMPLETION puts the player on the Resonance Rig. A
+       * separate requirement from `minimumLevel`: both must hold, independently.
+       */
+      stationOpensAfterCompletedMissionId: string;
+      locations: readonly ItemReferenceLocation[];
+      inputs: readonly ItemReferenceInput[];
+      outputQuantity: number;
     };
 
 export type ItemReferenceSource =
   | { kind: "fabricate"; recipe: Extract<ItemReferenceRecipe, { kind: "fabricate" }> }
   | { kind: "refine"; recipe: Extract<ItemReferenceRecipe, { kind: "refine" }> }
   | { kind: "runework"; recipe: Extract<ItemReferenceRecipe, { kind: "runework" }> }
+  | { kind: "lapidary"; recipe: Extract<ItemReferenceRecipe, { kind: "lapidary" }> }
   | {
       kind: "mine";
       actionId: string;
@@ -217,7 +237,8 @@ export type ItemReferenceSource =
 
 export type ItemReferenceOneTime =
   | { kind: "mission_reward"; missionId: string; quantity: number }
-  | { kind: "mission_hand_over"; missionId: string; quantity: number };
+  | { kind: "mission_hand_over"; missionId: string; quantity: number }
+  | { kind: "mission_stage_grant"; missionId: string; quantity: number };
 
 export type ItemReferenceByproduct = {
   /** The Refining recipe whose failure can leave this item behind. */
@@ -228,11 +249,13 @@ export type ItemReferenceByproduct = {
 };
 
 export type ItemReferenceUse =
+  | { kind: "lapidary_practice"; quantity: number; durationTicks: number; baseXp: number }
+
   /** Used up by one Resonance Echo reading (#393). */
   | { kind: "echo_reading"; quantity: number }
   | {
       kind: "recipe_input";
-      recipeKind: "fabricate" | "refine" | "runework";
+      recipeKind: "fabricate" | "refine" | "runework" | "lapidary";
       actionId: string;
       outputItemId: string;
       quantity: number;
@@ -409,6 +432,20 @@ export function publicRecipes(registries: ItemReferenceRegistries): readonly Ite
       outputQuantity: recipe.outputQuantity,
     });
   }
+  for (const recipe of lapidaryRecipes(balance)) {
+    if (!("outputItemId" in recipe)) continue;
+    recipes.push({
+      kind: "lapidary",
+      actionId: recipe.actionId,
+      outputItemId: recipe.outputItemId,
+      skillId: balance.lapidary.skillId,
+      minimumLevel: recipe.minimumLevel,
+      stationOpensAfterCompletedMissionId: LAPIDARY_WORKBENCH.access.missionId,
+      locations: locationsHostingAction(recipe.actionId, locations),
+      inputs: inputsOf(recipe.inputs),
+      outputQuantity: recipe.outputQuantity,
+    });
+  }
   return recipes;
 }
 
@@ -424,7 +461,7 @@ function missionItemUses(
 ) {
   const uses: ItemReferenceUse[] = [];
   for (const mission of missions) {
-    for (const requirement of mission.requirements) {
+    for (const requirement of allMissionRequirements(mission)) {
       if (requirement.kind === "equipped_item" && requirement.itemId === itemId) {
         uses.push({
           kind: "mission_requirement",
@@ -462,6 +499,13 @@ function missionItemUses(
 function oneTimeFor(itemId: string, missions: readonly MissionDefinition[]) {
   const oneTime: ItemReferenceOneTime[] = [];
   for (const mission of missions) {
+    for (const stage of mission.stages ?? [])
+      if (stage.onAdvance?.itemId === itemId)
+        oneTime.push({
+          kind: "mission_stage_grant",
+          missionId: mission.id,
+          quantity: stage.onAdvance.quantity,
+        });
     const { reward } = mission;
     if (reward?.kind === "item" && reward.itemId === itemId) {
       oneTime.push({ kind: "mission_reward", missionId: mission.id, quantity: 1 });
@@ -514,7 +558,9 @@ export function buildItemReference(
       ? { kind: "fabricate" as const, recipe }
       : recipe.kind === "refine"
         ? { kind: "refine" as const, recipe }
-        : { kind: "runework" as const, recipe },
+        : recipe.kind === "lapidary"
+          ? { kind: "lapidary" as const, recipe }
+          : { kind: "runework" as const, recipe },
   );
 
   for (const source of miningSources(balance)) {
@@ -665,6 +711,15 @@ export function buildItemReference(
       uses.push({ kind: "repair", repairTargetId: target.id, quantity: material.quantity });
     }
   }
+  const practice = balance.lapidary.recipes.shapeStone;
+  const practiceInput = practice.inputs.find((input) => input.itemId === itemId);
+  if (practiceInput)
+    uses.push({
+      kind: "lapidary_practice",
+      quantity: practiceInput.quantity,
+      durationTicks: practice.durationTicks,
+      baseXp: practice.baseXp,
+    });
   uses.push(...missionItemUses(itemId, registries.missions, balance));
   if (itemId === balance.echoHunts.beginner.seekerItemId) {
     uses.push({ kind: "echo_reading", quantity: balance.echoHunts.beginner.seekersPerReading });

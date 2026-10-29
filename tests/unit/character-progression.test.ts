@@ -169,6 +169,7 @@ describe("character progression projection (issue #213)", () => {
     // per-surface edit.
     expect(result.skills.map((skill) => skill.displayName)).toEqual([
       "Fabrication",
+      "Lapidary",
       "Mining",
       "Refining",
       "Runeworking",

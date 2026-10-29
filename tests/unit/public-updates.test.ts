@@ -133,10 +133,10 @@ describe("public Updates content boundary", () => {
     expect(latest.hero?.src).toBe("/location-scenes/hilltop-workshop.webp");
   });
 
-  it("publishes Werner's Lab as the newest Update, with only shipped behaviour (#429)", () => {
+  it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("werners-lab");
+    expect(getLatestPublishedUpdate().slug).toBe("lapidary-first-cuts");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );

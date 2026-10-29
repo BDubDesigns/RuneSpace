@@ -103,6 +103,7 @@ const merchantDefinitions = [
     prices: [
       { itemId: ITEM_IDS.stone, buyPrice: 2, sellPrice: 5, dailySellLimit: 12 },
       { itemId: ITEM_IDS.uncutQuartz, buyPrice: 8 },
+      { itemId: ITEM_IDS.cutQuartz, buyPrice: 16 },
       { itemId: ITEM_IDS.uncutTopaz, buyPrice: 18 },
       { itemId: ITEM_IDS.uncutSapphire, buyPrice: 35 },
     ],

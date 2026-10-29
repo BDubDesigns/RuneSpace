@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getItemDefinition } from "@/game/config/balance";
 import {
+  ACTION_IDS,
   CONVERSATION_BACKGROUND_IDS,
   CONVERSATION_TOPIC_IDS,
   DIALOGUE_IDS,
@@ -177,8 +178,8 @@ describe("Werner's Lab on the Stillreach map", () => {
     ).toMatchObject({ ok: false });
   });
 
-  it("hosts a merchant but no activity, workstation or Local Place", () => {
-    expect(location.availableActionIds).toEqual([]);
+  it("hosts its mineral merchant and Lapidary Workbench without another Local Place", () => {
+    expect(location.availableActionIds).toEqual([ACTION_IDS.shapeStone, ACTION_IDS.cutQuartz]);
     expect(location.dormantActivities).toEqual([]);
     expect(location.stateVariants).toEqual([]);
     expect(location.mapStatus).toBeUndefined();
@@ -187,11 +188,11 @@ describe("Werner's Lab on the Stillreach map", () => {
     expect(getLocationMerchant(lab)?.id).toBe(merchantId);
   });
 
-  it("describes the parked lab and what it actually does today, with no Lapidary promise", () => {
+  it("describes the parked lab and what it actually does today, with its shipped Lapidary authorization", () => {
     expect(location.description).toMatch(/mineral laboratory/i);
     expect(location.description).toContain("Werner");
     expect(location.description).toContain("Stone");
-    expect(location.description).not.toMatch(/lapidary|cut gem|cutting|workstation|train/i);
+    expect(location.description).toMatch(/supervised Lapidary lessons/i);
     expect(location.presentation.scene.alt).not.toMatch(/lapidary/i);
   });
 
@@ -416,7 +417,9 @@ describe("Werner's three replayable topics", () => {
   });
 
   it("is presentation only: every beat is Werner speaking in his lab, nothing is granted", () => {
-    const all = DIALOGUE_SEQUENCES.filter((sequence) => sequence.npcId === werner);
+    const all = DIALOGUE_SEQUENCES.filter((sequence) =>
+      topics.some((topic) => topic.dialogueId === sequence.id),
+    );
     expect(all).toHaveLength(3);
     for (const sequence of all) {
       expect(sequence.beats).toHaveLength(3);
@@ -434,7 +437,9 @@ describe("Werner's three replayable topics", () => {
   });
 
   it("keeps the signature line for his later introductory Mission", () => {
-    const text = DIALOGUE_SEQUENCES.filter((sequence) => sequence.npcId === werner)
+    const text = DIALOGUE_SEQUENCES.filter((sequence) =>
+      topics.some((topic) => topic.dialogueId === sequence.id),
+    )
       .flatMap((sequence) => sequence.beats)
       .map((beat) => ("text" in beat ? beat.text : ""))
       .join("\n");
@@ -459,11 +464,17 @@ describe("Werner's mineral merchant", () => {
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.uncutTopaz)).toBe(18);
     expect(merchantBuybackPrice(merchantId, ITEM_IDS.uncutSapphire)).toBe(35);
     expect([...merchantSellableItemIds(merchant)].sort()).toEqual(
-      [ITEM_IDS.stone, ITEM_IDS.uncutQuartz, ITEM_IDS.uncutTopaz, ITEM_IDS.uncutSapphire].sort(),
+      [
+        ITEM_IDS.stone,
+        ITEM_IDS.cutQuartz,
+        ITEM_IDS.uncutQuartz,
+        ITEM_IDS.uncutTopaz,
+        ITEM_IDS.uncutSapphire,
+      ].sort(),
     );
   });
 
-  it("never retails an uncut gem and authors no Cut Gem line", () => {
+  it("never retails a gem; Cut Quartz has its buyback only", () => {
     for (const itemId of [ITEM_IDS.uncutQuartz, ITEM_IDS.uncutTopaz, ITEM_IDS.uncutSapphire]) {
       expect(price(itemId)?.sellPrice).toBeUndefined();
       expect(price(itemId)?.dailySellLimit).toBeUndefined();
@@ -472,8 +483,8 @@ describe("Werner's mineral merchant", () => {
         reason: "not_traded",
       });
     }
-    expect(merchant.prices).toHaveLength(4);
-    expect(Object.keys(ITEM_IDS).filter((key) => /^cut/i.test(key))).toEqual([]);
+    expect(merchant.prices).toHaveLength(5);
+    expect(price(ITEM_IDS.cutQuartz)).toEqual({ itemId: ITEM_IDS.cutQuartz, buyPrice: 16 });
   });
 
   it("has no Mission, unlock or locked message: anyone who walks in can trade", () => {

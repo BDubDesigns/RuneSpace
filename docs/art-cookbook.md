@@ -869,3 +869,16 @@ Finally, check the assets in the actual game surface at mobile width.
 
 The asset is done when it communicates the intended RuneSpace content, works in
 its real UI, and visually belongs beside the assets around it.
+
+## Approved Cut Quartz (#431)
+
+The owner supplied `1000007591.png` directly in the implementation chat. Its
+unaltered master is `assets/item-art/cut-quartz.png`: 1254×1254 RGBA PNG,
+SHA-256 `2a38007a0963f449aef58fe8e776c9a709e336deb604d179354bfd20eb9e422c`.
+`scripts/prepare-cut-quartz-art.mjs` verifies that digest and derives
+`public/item-art/cut-quartz.webp` using the existing deterministic item pipeline:
+alpha below 4 cleared, alpha at least 252 snapped opaque, alpha trim, uniform
+576 px long edge, centered on a 640×640 transparent canvas, lossless WebP.
+The subject is 446×576; it was inspected at 80×80 on dark and white backgrounds.
+No image was generated, substituted, recolored or redesigned. There is no
+Lapidary skill icon or additional art asset.

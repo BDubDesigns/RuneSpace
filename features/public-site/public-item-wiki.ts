@@ -1,3 +1,4 @@
+import { GAME_TICK_MS } from "@/game/config/foundations";
 import { getPlanetPresentation } from "@/game/content/planets";
 import type { PlanetId } from "@/game/config/foundations";
 import { getItemDefinition, inventoryItemDefinitions } from "@/game/config/balance";
@@ -207,12 +208,18 @@ function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
   ];
   // The station is a separate gate from the recipe's level: both apply.
   if (recipe.kind === "fabricate") facts.push(stationRequirement(recipe.stationOpensWithMissionId));
+  if (recipe.kind === "lapidary")
+    facts.push([
+      "Supervised lessons during ",
+      missionLink(recipe.stationOpensAfterCompletedMissionId),
+      "; unrestricted runs after graduation.",
+    ]);
   if (recipe.kind === "runework") {
     facts.push(rigRequirement(recipe.stationOpensAfterCompletedMissionId));
   }
   facts.push(["Where: ", ...locationPhrase(recipe.locations)]);
   // Runeworking has no failure: every attunement makes its piece (#391).
-  if (recipe.kind === "runework") facts.push(["Always succeeds"]);
+  if (recipe.kind === "runework" || recipe.kind === "lapidary") facts.push(["Always succeeds"]);
   if (recipe.kind === "refine") {
     if (recipe.deterministic) {
       facts.push(["Always succeeds"]);
@@ -259,7 +266,9 @@ function recipeView(recipe: ItemReferenceRecipe): WikiItemRecipeView {
         ? "Fabrication"
         : recipe.kind === "refine"
           ? "Refining"
-          : "Runeworking",
+          : recipe.kind === "lapidary"
+            ? "Lapidary"
+            : "Runeworking",
     facts: recipeFacts(recipe),
     inputs: recipe.inputs.map((input) => [itemLink(input.itemId, input.quantity)]),
     yields: `Makes ${itemQuantityLabel(recipe.outputItemId, recipe.outputQuantity, itemName(recipe.outputItemId))}`,
@@ -286,16 +295,19 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
           : []),
       ];
     }
+    case "lapidary":
     case "runework": {
       const { recipe } = source;
       return [
-        "Attune it from ",
+        source.kind === "lapidary" ? "Cut it from " : "Attune it from ",
         ...joinLinks(recipe.inputs.map((input) => itemLink(input.itemId, input.quantity))),
-        ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) at the Resonance Rig — `,
+        ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) at ${source.kind === "lapidary" ? "the Lapidary Workbench" : "the Resonance Rig"} — `,
         ...locationPhrase(recipe.locations),
-        ". Always succeeds. The Rig opens once you have completed ",
+        source.kind === "lapidary"
+          ? ". Always succeeds. Supervised lessons are available during "
+          : ". Always succeeds. The Rig opens once you have completed ",
         missionLink(recipe.stationOpensAfterCompletedMissionId),
-        ".",
+        source.kind === "lapidary" ? "; graduation permanently unlocks normal runs." : ".",
       ];
     }
     case "tinkering":
@@ -415,6 +427,15 @@ function sourceLines(itemId: string, source: ItemReferenceSource): readonly Wiki
 
 function useLine(itemId: string, use: ItemReferenceUse): { group: string; line: WikiItemLine } {
   switch (use.kind) {
+    case "lapidary_practice":
+      return {
+        group: "Lapidary",
+        line: [
+          `Shape Stone at Werner's Lab — consumes ${use.quantity} Stone in ${(use.durationTicks * GAME_TICK_MS) / 1000} seconds for ${use.baseXp} Lapidary XP, with no output item. See `,
+          { text: "Lapidary", href: "/wiki/lapidary" },
+          " for supervised lessons and workbench authorization.",
+        ],
+      };
     case "echo_reading":
       return {
         group: "Echo hunting",
@@ -428,7 +449,7 @@ function useLine(itemId: string, use: ItemReferenceUse): { group: string; line: 
       return {
         group: "Recipes",
         line: [
-          `${use.recipeKind === "fabricate" ? "Fabricating" : use.recipeKind === "refine" ? "Refining" : "Attuning"} `,
+          `${use.recipeKind === "fabricate" ? "Fabricating" : use.recipeKind === "refine" ? "Refining" : use.recipeKind === "lapidary" ? "Cutting" : "Attuning"} `,
           itemLink(use.outputItemId),
           ` — uses ${use.quantity}.`,
         ],
@@ -532,6 +553,12 @@ export function buildWikiItemPage(
 
   const oneTime = reference.oneTime.map((entryLine): WikiItemLine => {
     const label = itemQuantityLabel(itemId, entryLine.quantity, entry.name);
+    if (entryLine.kind === "mission_stage_grant")
+      return [
+        `Receive ${entryLine.quantity} during a required conversation in `,
+        missionLink(entryLine.missionId),
+        " — once, after the preceding stage. Make room and retry if it cannot fit.",
+      ];
     return entryLine.kind === "mission_reward"
       ? [
           "Mission reward: ",

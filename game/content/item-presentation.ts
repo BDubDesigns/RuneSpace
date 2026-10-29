@@ -323,6 +323,14 @@ const itemPresentations = {
       "Steel-reinforced work gloves that find the grip in any seam. Worn on the hands, they add one effective Mining level to your success chance, and nothing else.",
   },
   // Mining Secondary Finds (#308).
+  [ITEM_IDS.cutQuartz]: {
+    displayName: "Cut Quartz",
+    pluralName: "Cut Quartz",
+    textFallback: "CQ",
+    description: "Quartz shaped and polished into precise facets at a Lapidary Workbench.",
+    artworkSrc: "/item-art/cut-quartz.webp",
+    accessibleDescription: "A clear faceted quartz crystal with warm golden mineral veins.",
+  },
   [ITEM_IDS.uncutQuartz]: {
     displayName: "Uncut Quartz",
     accessibleDescription:

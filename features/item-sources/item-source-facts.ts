@@ -17,7 +17,8 @@ export function itemSourceFactsFromState(
   state: Pick<
     PlayGameplayState,
     "skillTotalXp" | "missions" | "locationStates" | "fabricationStation" | "resonanceRig"
-  >,
+  > &
+    Partial<Pick<PlayGameplayState, "lapidaryWorkbench">>,
 ): ItemSourceFacts {
   const skillLevels: Record<string, number> = {};
   for (const skillId of Object.values(SKILL_IDS)) {
@@ -32,6 +33,7 @@ export function itemSourceFactsFromState(
     completedMissionIds: deriveCompletedMissionIds(state.missions),
     fabricationStationUnlocked: state.fabricationStation.unlocked,
     resonanceRigUnlocked: state.resonanceRig.unlocked,
+    lapidaryAccess: state.lapidaryWorkbench?.access,
     locationStates: state.locationStates,
   };
 }

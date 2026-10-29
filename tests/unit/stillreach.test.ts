@@ -463,7 +463,7 @@ describe("Stillreach is scenery-only (#373)", () => {
       // Werner's Lab (#429) hosts the one World Location merchant on Stillreach and no
       // activity: the cutting machinery is scenery, not a Lapidary action.
       if (location.id === LOCATION_IDS.wernersLab) {
-        expect(location.availableActionIds).toEqual([]);
+        expect(location.availableActionIds).toEqual([ACTION_IDS.shapeStone, ACTION_IDS.cutQuartz]);
         expect(location.dormantActivities).toEqual([]);
         expect(location.mapStatus).toBeUndefined();
         expect(location.merchantId).toBe(MERCHANT_IDS.wernerLab);

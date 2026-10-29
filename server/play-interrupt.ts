@@ -1,3 +1,4 @@
+import { lapidaryActivity } from "@/server/lapidary";
 import { eq } from "drizzle-orm";
 import {
   activeActions,
@@ -145,6 +146,10 @@ export async function forceIdleResolvedAction(
     return { interrupted: true, interruptedActionId: actionId };
   }
 
+  if (lapidaryActivity.isAction(actionId)) {
+    await lapidaryActivity.clearCycle(transaction, character.id, "manually_stopped", now);
+    return { interrupted: true, interruptedActionId: actionId };
+  }
   if (isRuneworkingAction(actionId)) {
     await clearRuneworkingCycle(transaction, character.id, "manually_stopped", now);
     return { interrupted: true, interruptedActionId: actionId };

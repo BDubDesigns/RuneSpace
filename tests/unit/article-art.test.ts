@@ -155,7 +155,7 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("Werner&#x27;s Lab Opens on Stillreach");
+    expect(latestUpdateSection).toContain("Lapidary: Earn Your Place at Werner’s Workbench");
     expect(latestUpdateSection).not.toContain("High Scores Are Here");
     expect(latestUpdateSection).not.toContain("Research Jobs at Hilltop Workshop");
     expect(latestUpdateSection).not.toContain("Milky Waymo<");

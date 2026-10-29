@@ -1,3 +1,5 @@
+import { LAPIDARY_WORKBENCH } from "@/game/content/lapidary";
+import type { MissionActivityAccess } from "@/game/domain/activity-access";
 import {
   fabricationRecipes,
   getEffectiveGameBalance,
@@ -5,6 +7,7 @@ import {
   refiningRecipeIsDeterministic,
   refiningRecipes,
   runeworkingRecipes,
+  lapidaryRecipes,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
@@ -59,7 +62,9 @@ import type { MerchantDefinition } from "@/game/schemas/merchants";
  */
 
 /** What a source asks of the character that they do not yet have. */
-export type ItemSourceGate = { kind: "skill_level"; skillId: string; level: number };
+export type ItemSourceGate =
+  | { kind: "skill_level"; skillId: string; level: number }
+  | { kind: "mission"; missionId: string };
 
 export type ItemSourceAccess =
   | { state: "available" }
@@ -92,7 +97,7 @@ export type ItemSourceBody =
     }
   | {
       /** Runeworking at the Resonance Rig (#391). It never fails. */
-      kind: "runework";
+      kind: "runework" | "lapidary";
       recipeActionId: string;
       skillId: string;
       minimumLevel: number;
@@ -175,6 +180,7 @@ export type ItemSourceFacts = {
    * never re-derived here.
    */
   resonanceRigUnlocked: boolean;
+  lapidaryAccess?: MissionActivityAccess;
   /**
    * Each World Location's actions as THIS character's state resolves them
    * (`PlayGameplayState.locationStates`), so a source that exists only in an
@@ -282,6 +288,32 @@ export function resolveItemSources(
     }
   }
 
+  for (const recipe of lapidaryRecipes(balance)) {
+    if (!("outputItemId" in recipe) || recipe.outputItemId !== itemId) continue;
+    const access = facts.lapidaryAccess;
+    const allowed =
+      access?.kind === "unrestricted" ||
+      (access?.kind === "supervised" && access.actionId === recipe.actionId);
+    sources.push({
+      kind: "lapidary",
+      recipeActionId: recipe.actionId,
+      skillId: balance.lapidary.skillId,
+      minimumLevel: recipe.minimumLevel,
+      locationIds: [LAPIDARY_WORKBENCH.locationId],
+      inputs: recipe.inputs,
+      outputQuantity: recipe.outputQuantity,
+      access: allowed
+        ? skillGateAccess(
+            itemSourceSkillLevel(facts, balance.lapidary.skillId) >= recipe.minimumLevel,
+            balance.lapidary.skillId,
+            recipe.minimumLevel,
+          )
+        : {
+            state: "locked",
+            gates: [{ kind: "mission", missionId: LAPIDARY_WORKBENCH.access.missionId }],
+          },
+    });
+  }
   // Runeworking (#391): the Enby's Rig is theirs to show, so the whole kind is
   // hidden until Not From Around Here is complete — a character who has not been
   // told about RuneSpace is not told the Rig exists. Each recipe is placed by its

@@ -1,3 +1,4 @@
+import { getMission } from "@/game/content/missions";
 import { getPlanetPresentation } from "@/game/content/planets";
 import type { PlanetId } from "@/game/config/foundations";
 import { itemQuantityLabel, resolveItemPresentation } from "@/game/content/item-presentation";
@@ -66,6 +67,8 @@ function lockedReason(source: ItemSource, facts: ItemSourceFacts): string | unde
   if (source.access.state !== "locked") return undefined;
   return source.access.gates
     .map((gate) => {
+      if (gate.kind === "mission")
+        return `Requires supervised authorization or completion of ${getMission(gate.missionId)?.title ?? "the workbench lesson"}`;
       const have = itemSourceSkillLevel(facts, gate.skillId);
       return `Requires ${skillRequirement(gate.skillId, gate.level)} — you are ${have}`;
     })
@@ -111,12 +114,13 @@ export function describeItemSource(
         inputs: inputLines(source.inputs),
         yields: `Makes ${itemQuantityLabel(itemId, source.outputQuantity, itemName(itemId))}`,
       };
+    case "lapidary":
     case "runework":
       return {
         ...base,
         key: source.recipeActionId,
         kind: source.kind,
-        title: "Runeworking",
+        title: source.kind === "lapidary" ? "Lapidary" : "Runeworking",
         where: locationNames(source.locationIds),
         requirement: skillRequirement(source.skillId, source.minimumLevel),
         notes: ["Never fails"],

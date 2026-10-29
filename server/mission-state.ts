@@ -1,3 +1,4 @@
+import { allMissionRequirements } from "@/game/domain/mission-stages";
 import { and, eq, isNotNull } from "drizzle-orm";
 import {
   characterMissionProgress,
@@ -298,7 +299,7 @@ function prerequisiteCompletedFor(
 /** Every item an authored equipped/carried requirement observes. */
 function requirementItemIds(definitions: readonly MissionDefinition[]): readonly string[] {
   return definitions.flatMap((mission) =>
-    mission.requirements
+    allMissionRequirements(mission)
       .filter(
         (requirement): requirement is Extract<typeof requirement, { itemId: string }> =>
           requirement.kind === "equipped_item" ||

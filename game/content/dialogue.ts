@@ -2872,6 +2872,144 @@ const dialogue = {
   // for a Lapidary expert, and are presentation only: no item, price, XP, Mission or
   // Trade action. His signature line is reserved for his later introductory Mission
   // and is deliberately not used here.
+  [DIALOGUE_IDS.wernerOffer]: {
+    id: DIALOGUE_IDS.wernerOffer,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "You may look at the workbench. You may not use it. Precision equipment is not improved by enthusiasm.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "If you want my authorization, begin with one Stone. Your Stone, my supervision. We will discuss Quartz when the Stone gives me no reason to object.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerAccepted]: {
+    id: DIALOGUE_IDS.wernerAccepted,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "One Stone. Shape it at the workbench, then return to me. Supervision is permission for this lesson, not a standing invitation.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerStoneReminder]: {
+    id: DIALOGUE_IDS.wernerStoneReminder,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "The first demonstration is Stone. One piece, at the workbench. Then speak to me before touching anything else.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerQuartzLesson]: {
+    id: DIALOGUE_IDS.wernerQuartzLesson,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You respected the structure. A modest achievement, but a measurable one.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "I will provide one Uncut Quartz for the next demonstration. Make room for it first. Once you have it, you may make one supervised cut; any sound Quartz will do.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerQuartzReminder]: {
+    id: DIALOGUE_IDS.wernerQuartzReminder,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "One Quartz, one careful cut at the workbench. Then return to me. The finished piece is yours; I am examining the work, not collecting specimens.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerGraduation]: {
+    id: DIALOGUE_IDS.wernerGraduation,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The cut is complete. You have demonstrated that you can follow a structure instead of merely imposing yourself on it.",
+      ),
+      wernerLocal(
+        EXPRESSION_IDS.amused,
+        "That is sufficient for authorization. Not a license to be careless. There is a distinction.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerFollowUp]: {
+    id: DIALOGUE_IDS.wernerFollowUp,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "Your authorization stands. Stone or Quartz, as your materials permit. The equipment still expects your full attention.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerCapacity]: {
+    id: DIALOGUE_IDS.wernerCapacity,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "Make room for one Uncut Quartz. We will continue when you can carry it. I do not leave teaching specimens on the floor.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerBusy]: {
+    id: DIALOGUE_IDS.wernerBusy,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(
+        EXPRESSION_IDS.intense,
+        "Finish what you are doing. An examination deserves your undivided attention.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerQuartzGranted]: {
+    id: DIALOGUE_IDS.wernerQuartzGranted,
+    npcId: NPC_IDS.werner,
+    beats: [
+      {
+        kind: "item",
+        itemId: ITEM_IDS.uncutQuartz,
+        quantity: 1,
+        isRewardTotal: true,
+        backgroundId: CONVERSATION_BACKGROUND_IDS.wernersLabInterior,
+        text: "Werner hands you one Uncut Quartz.",
+      },
+      wernerLocal(
+        EXPRESSION_IDS.thoughtful,
+        "The Quartz lesson is authorized. One cut, then return to me.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wernerCompleted]: {
+    id: DIALOGUE_IDS.wernerCompleted,
+    npcId: NPC_IDS.werner,
+    beats: [
+      wernerLocal(EXPRESSION_IDS.amused, "I am the one who rocks."),
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.lapidary,
+        amount: 150,
+        backgroundId: CONVERSATION_BACKGROUND_IDS.wernersLabInterior,
+        text: "Werner's examination is complete.",
+      },
+      wernerLocal(
+        EXPRESSION_IDS.neutral,
+        "You may use the Lapidary Workbench whenever you return. Choose your own run size. Keep the precision.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.wernerAboutTheLabTopic]: {
     id: DIALOGUE_IDS.wernerAboutTheLabTopic,
     npcId: NPC_IDS.werner,

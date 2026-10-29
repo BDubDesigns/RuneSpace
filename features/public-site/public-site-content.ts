@@ -189,7 +189,7 @@ export const publicLandingContent = {
     {
       number: "04",
       title: "Progress",
-      copy: "Take on authored missions, meet Wade, Tansy, and the Wise Old Enby, attune Echo Seekers at the Resonance Rig, and hunt hidden Echoes across two planets while progressing in five skills: Mining, Refining, Welding, Fabrication, and Runeworking.",
+      copy: "Take on authored missions, meet Wade, Tansy, and the Wise Old Enby, attune Echo Seekers at the Resonance Rig, and hunt hidden Echoes across two planets while progressing in six skills: Mining, Refining, Welding, Fabrication, Runeworking, and Lapidary.",
     },
     {
       number: "05",

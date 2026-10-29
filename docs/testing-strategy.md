@@ -716,3 +716,19 @@ production server: an initial load is counted once and in-app navigation is not,
 static pages are counted, other hosts/GPC/DNT/crawlers are not, and the control
 works with and without JavaScript. The disposable E2E runtime counts the exact
 host `localhost` for it; production and previews never do.
+
+### Lapidary and linear Mission phases (#431)
+
+`tests/unit/lapidary-stages.test.ts` owns stage validation/scoping, active-only
+projection, same-NPC acknowledgement routing, grant receipts, malformed history,
+declarative permissions and deterministic no-output practice. It includes a
+second synthetic staged definition to prove stage-only reminder authoring.
+`tests/integration/lapidary-stages.test.ts` owns authority, exactly-once inputs,
+XP/gifts, chronological transitions, full inventory and retry, concurrent starts,
+acknowledgements and graduation, forged/stale supervised actions, offline
+resolution, graduated numeric/Max/Finish Current runs, actual merchant sale
+before turn-in, interruption and persisted legacy Mission rows. Existing
+Runeworking and generic Mission suites protect the shared extraction.
+`tests/e2e/stillreach.spec.ts` includes the full lesson/conversation/graduation
+journey on a 390 px phone and 1440 px desktop, refresh persistence, full unlock
+and page-overflow checks. It remains in the existing canonical selection.

@@ -62,6 +62,50 @@ const runeworking = (text: string) => link(text, "runeworking");
 
 export const missionGuideArticles = [
   {
+    slug: "mission-theyre-minerals-marie",
+    title: "They're Minerals, Marie!",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "Werner's four supervised lessons and conversations unlock his Lapidary Workbench permanently.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "See ",
+            { text: "Missions", articleSlug: "missions" },
+            " for the Mission Log and pinning.",
+          ],
+        ],
+      },
+      {
+        heading: "Beginning",
+        paragraphs: [
+          "Speak to Werner at Werner's Lab on Stillreach. No earlier Mission or skill level is required. Accepting grants only supervised access; it does not hand over Quartz or open unrestricted training.",
+        ],
+      },
+      {
+        heading: "Four steps, in order",
+        list: [
+          "Shape one Stone while the first lesson is active. Bring your own Stone; mining, buying or trading for it all work. The supervised lesson consumes one Stone, takes 12 seconds and earns 15 Lapidary XP.",
+          "Return to Werner. Acknowledge the required conversation to receive one Uncut Quartz and open the Quartz lesson together. If you cannot carry his gift, make room and try again; the lesson stays paused.",
+          "Cut one Quartz while that lesson is active: 18 seconds, one Cut Quartz and 75 Lapidary XP. Any Uncut Quartz works, including one you already owned. You may sell, stash or trade the finished piece before returning.",
+          "Return to Werner for the final examination. Completion grants 150 Lapidary XP once and permanently opens unrestricted workbench runs, including quantity and Max.",
+        ],
+      },
+      {
+        heading: "Permission and progress",
+        paragraphs: [
+          [
+            "Only the current lesson counts. During the Mission, each lesson permits one piece; the bench pauses for Werner's conversation between them. Refreshing or leaving and returning preserves your place. After graduation the workbench remains authorized. See ",
+            { text: "Lapidary", articleSlug: "lapidary" },
+            " for recipes and normal runs.",
+          ],
+        ],
+      },
+    ],
+  },
+  {
     slug: "mission-walk-it-off",
     title: "Walk It Off",
     category: "getting-started",

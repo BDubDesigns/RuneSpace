@@ -11,6 +11,7 @@ import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWor
 import { ResearchDelivery } from "@/features/research/ResearchDelivery";
 import { ResearchFieldAction } from "@/features/research/ResearchFieldAction";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { LapidaryWorkbench } from "@/features/lapidary/LapidaryWorkbench";
 import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
@@ -164,6 +165,8 @@ function primaryActivity(
       // authoritative Workbench occupancy (#207) — and, once Tansy opens it,
       // the Fabrication Station beside it (#232).
       return <RuskRecoveryWorkAreas />;
+    case LOCATION_IDS.wernersLab:
+      return <LapidaryWorkbench />;
     case LOCATION_IDS.hilltopWorkshop:
       // The Wise Old Enby's Resonance Rig (#391), once Not From Around Here is
       // complete. Talking to the Enby stays in their own card above it.

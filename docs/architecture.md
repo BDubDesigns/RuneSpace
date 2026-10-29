@@ -80,6 +80,25 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
 
 See `docs/gameplay-foundations.md` for timing/progression/inventory contracts, `docs/missions.md` for the declarative mission framework, and `docs/npc-conversations.md` for the one canonical NPC conversation model (conversation hub, Mission-derived entries, and replayable topics).
 
+### Shared deterministic crafting and linear Missions (#431)
+
+Runeworking and Lapidary share the deterministic cycle/run domain, resolver,
+persistence helpers and Start/Finish Current commands in
+`game/domain/deterministic-crafting.ts`, `server/deterministic-crafting.ts` and
+`server/crafting-commands.ts`. Each keeps its own recipe registry, activity ID,
+skill, access policy and run table; Runeworking's public API and stored run data
+are retained. Lapidary's supervised access is a declarative policy over durable
+Mission state, checked on Start and resolution, including the stored lesson
+stage identity. Inventory reservations use the existing guard.
+
+Optional Mission stages wrap the same requirement vocabulary. The generic stage
+helper owns prefix history and scoped progress keys; normal projection and NPC
+routing consume only the active stage. `server/mission-stages.ts` latches an
+intermediate stage within the event's character transaction. Final rewards stay
+in the established completion command. Stage gift capacity and receipt ordering
+are documented in `docs/missions.md`; the Mission engine has no NPC-specific
+state machine.
+
 ### Play surfaces (Issue #145)
 
 This section is the single source of truth for the player-facing Play surface

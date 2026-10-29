@@ -1,5 +1,7 @@
 "use server";
 
+import { startLapidary, finishCurrentLapidary } from "@/server/lapidary-commands";
+import { StartLapidaryRequestSchema, LapidaryCommandRequestSchema } from "@/game/schemas/gameplay";
 import { headers } from "next/headers";
 import type { z } from "zod";
 import { redirect } from "next/navigation";
@@ -1866,5 +1868,20 @@ export async function changeTradeOfferAction(input: unknown): Promise<PlayerTrad
 export async function confirmTradeAction(input: unknown): Promise<PlayerTradeActionResult> {
   return runTradeOfferAction(input, TradeConsentCommandSchema, (userId, request) =>
     confirmTrade(userId, request.characterId, request.sessionId, request.offerVersion),
+  );
+}
+
+export async function startLapidaryAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartLapidaryRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Lapidary command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startLapidary(userId, characterId, request.data.recipeActionId, request.data.quantity),
+  );
+}
+export async function finishCurrentLapidaryAction(input: unknown): Promise<PlayActionResult> {
+  const request = LapidaryCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Lapidary command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    finishCurrentLapidary(userId, characterId),
   );
 }

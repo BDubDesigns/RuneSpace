@@ -45,6 +45,8 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Holo Hollow, Local Places & Credits** — the first settlement, one-level Local Places inside it, character-scoped Credits, and Bix's authored merchant Trade (`docs/gameplay-foundations.md`, `docs/holo-hollow.md`).
 - **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / Wheel Be Right Back / Thrust Issues / Move Along / A Cut Above / Not From Around Here / First Runeworking Lesson, plus the optional Out of the Weather, Cutting Costs and Curly Must-Stash), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
+- **Lapidary (#431)** — Stone practice and Quartz cutting at Werner’s Lapidary Workbench, unlocked through the four sequential stages of They’re Minerals, Marie!; supervised one-piece lessons precede permanent quantity/Max access.
+
 ## World & skills
 
 - The opening direction is a **one-way crash-site tutorial planet**.

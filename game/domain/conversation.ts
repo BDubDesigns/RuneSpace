@@ -1,3 +1,4 @@
+import { missionAtStage, allMissionRequirements } from "@/game/domain/mission-stages";
 import type { DialogueId } from "@/game/config/foundations";
 import {
   CONVERSATION_TOPICS,
@@ -64,6 +65,9 @@ export type NpcConversationProjection = {
   state: MissionState;
   prerequisiteSatisfied: boolean;
   stage?: {
+    id?: string;
+    title?: string;
+    final?: boolean;
     requirementsSatisfied: boolean;
     turnInAvailable: boolean;
     nextObjectiveKind?: MissionRequirementKind;
@@ -269,6 +273,39 @@ function activeEntry(
   definition: MissionDefinition,
   projection: NpcConversationProjection,
 ): NpcConversationEntry | undefined {
+  if (definition.stages) {
+    const stage = definition.stages.find((candidate) => candidate.id === projection.stage?.id);
+    if (!stage) return undefined;
+    definition = missionAtStage(definition, stage);
+  }
+  // A mandatory authored conversation is a one-time story event, not idle
+  // dialogue: it is offered while its authoritative requirement is unsatisfied
+  // and disappears from the hub once the scene has genuinely happened. Backing
+  // out before the terminal control leaves the requirement unsatisfied, so the
+  // encounter can be entered again until it actually commits.
+  const conversation = definition.requirements.find(
+    (candidate): candidate is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+      candidate.kind === "npc_conversation" && candidate.npcId === npcId,
+  );
+  if (conversation && !conversationRequirementSatisfied(projection, npcId)) {
+    if (!getDialogue(conversation.dialogueId)) return undefined;
+    return {
+      kind: "mission",
+      id: `${definition.id}:conversation`,
+      label: definition.title,
+      role: "active",
+      roleLabel: ROLE_LABELS.active,
+      dialogueId: conversation.dialogueId,
+      missionId: definition.id,
+      guidance: guidanceFor(npcId, projection),
+      action: {
+        kind: "acknowledge_conversation",
+        label: conversation.actionLabel ?? DEFAULT_ACKNOWLEDGE_ACTION_LABEL,
+        dialogueId: conversation.dialogueId,
+      },
+    };
+  }
+
   const turnInSpec = definition.turnIn;
   if (turnInSpec?.npcId === npcId) {
     const dialogueId = turnInStageDialogueId(
@@ -296,34 +333,6 @@ function activeEntry(
       missionId: definition.id,
       guidance: guidanceFor(npcId, projection),
       ...(isTurnIn ? { action: completionAction(turnInSpec) } : {}),
-    };
-  }
-
-  // A mandatory authored conversation is a one-time story event, not idle
-  // dialogue: it is offered while its authoritative requirement is unsatisfied
-  // and disappears from the hub once the scene has genuinely happened. Backing
-  // out before the terminal control leaves the requirement unsatisfied, so the
-  // encounter can be entered again until it actually commits.
-  const conversation = definition.requirements.find(
-    (candidate): candidate is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
-      candidate.kind === "npc_conversation" && candidate.npcId === npcId,
-  );
-  if (conversation && !conversationRequirementSatisfied(projection, npcId)) {
-    if (!getDialogue(conversation.dialogueId)) return undefined;
-    return {
-      kind: "mission",
-      id: `${definition.id}:conversation`,
-      label: definition.title,
-      role: "active",
-      roleLabel: ROLE_LABELS.active,
-      dialogueId: conversation.dialogueId,
-      missionId: definition.id,
-      guidance: guidanceFor(npcId, projection),
-      action: {
-        kind: "acknowledge_conversation",
-        label: conversation.actionLabel ?? DEFAULT_ACKNOWLEDGE_ACTION_LABEL,
-        dialogueId: conversation.dialogueId,
-      },
     };
   }
 
@@ -654,7 +663,16 @@ export function resolveMissionSuccessView(input: {
   /** The sequence the command was run from. */
   dialogueId: DialogueId;
   acceptedContinuation?: MissionConversationContinuation;
-  mission: { status: string; creditsPaid?: number; continuation?: MissionContinuationReceipt };
+  mission: {
+    status: string;
+    creditsPaid?: number;
+    continuation?: MissionContinuationReceipt;
+    stageTransition?: {
+      completedStageId: string;
+      activeStageId: string;
+      presentationDialogueId?: string;
+    };
+  };
 }): MissionSuccessView {
   const { mission } = input;
   const paid =
@@ -662,6 +680,14 @@ export function resolveMissionSuccessView(input: {
   const receipt = (placement: CreditsReceipt["placement"]) =>
     paid ? { creditsReceipt: { amount: paid, placement } } : {};
 
+  if (mission.status === "acknowledged" && mission.stageTransition?.presentationDialogueId) {
+    const stage = getMission(input.missionId)?.stages?.find(
+      (candidate) => candidate.id === mission.stageTransition!.completedStageId,
+    );
+    const id = stage?.onAdvance?.presentationDialogueId;
+    if (id && id === mission.stageTransition.presentationDialogueId)
+      return { kind: "dialogue", dialogueId: id };
+  }
   if (mission.status === "accepted") {
     // An offer may author an immediate continuation (e.g. the remote acceptance
     // follow-up that leads straight to the Cutter claim).
@@ -779,7 +805,11 @@ export function validateConversationTopics(
 function missionOwnedDialogueIds(definitions: readonly MissionDefinition[]): readonly string[] {
   return definitions.flatMap((definition) => [
     ...(definition.turnIn ? [definition.turnIn.dialogueId] : []),
-    ...definition.requirements
+    ...(definition.stages ?? []).flatMap((stage) => [
+      ...Object.values(stage.dialogue ?? {}),
+      ...(stage.onAdvance ? [stage.onAdvance.presentationDialogueId] : []),
+    ]),
+    ...allMissionRequirements(definition)
       .filter(
         (requirement): requirement is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
           requirement.kind === "npc_conversation",
