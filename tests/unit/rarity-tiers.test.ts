@@ -79,6 +79,18 @@ describe("the tile treatment", () => {
     );
     expect(sapphire).toContain('data-item-rarity="rare"');
     expect(sapphire).not.toContain("data-item-shimmer");
+    // A cut gem (#433) draws the same rare treatment as the stone it is cut from.
+    for (const [itemId, name] of [
+      [ITEM_IDS.cutQuartz, "Cut Quartz"],
+      [ITEM_IDS.cutTopaz, "Cut Topaz"],
+      [ITEM_IDS.cutSapphire, "Cut Sapphire"],
+    ] as const) {
+      const cut = render(
+        React.createElement(StackItemVisual, { itemId, name, quantity: 1, stackLimit: 2 }),
+      );
+      expect(cut).toContain('data-item-rarity="rare"');
+      expect(cut).not.toContain("data-item-shimmer");
+    }
   });
 
   it("gives each tier its own accent and a readable label", () => {

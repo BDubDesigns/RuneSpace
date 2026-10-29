@@ -516,11 +516,13 @@ describe("the reward cards for an attempt", () => {
 });
 
 describe("rarity is the item's own presentation", () => {
-  it("authors the three uncut gems as rare, and nothing else", () => {
+  it("authors the three uncut gems and their three cut gems (#433) as rare, and nothing else", () => {
     const rare = Object.values(ITEM_IDS).filter(
       (itemId) => getItemPresentation(itemId)?.rarity === "rare",
     );
-    expect(rare.sort()).toEqual([QUARTZ, SAPPHIRE, TOPAZ].sort());
+    expect(rare.sort()).toEqual(
+      [QUARTZ, SAPPHIRE, TOPAZ, ITEM_IDS.cutQuartz, ITEM_IDS.cutSapphire, ITEM_IDS.cutTopaz].sort(),
+    );
   });
 
   it("does not depend on any source's table or on announcements", () => {

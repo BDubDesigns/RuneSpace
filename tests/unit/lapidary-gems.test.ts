@@ -200,6 +200,21 @@ describe("Cut Topaz and Cut Sapphire items", () => {
     }
   });
 
+  it("give every cut gem the same rarity treatment as the uncut gem it is cut from", () => {
+    const cuts = lapidaryRecipes().filter((recipe) => "outputItemId" in recipe);
+    expect(cuts.map((recipe) => recipe.displayName)).toEqual([
+      "Cut Quartz",
+      "Cut Topaz",
+      "Cut Sapphire",
+    ]);
+    for (const recipe of cuts) {
+      const uncut = getItemPresentation(recipe.inputs[0]!.itemId)!;
+      const cut = getItemPresentation(recipe.outputItemId!)!;
+      expect(uncut.rarity).toBe("rare");
+      expect(cut.rarity).toBe(uncut.rarity);
+    }
+  });
+
   it("derive a Lapidary Workbench source gated on the level, not on another permission", () => {
     const facts = (level: number): ItemSourceFacts => ({
       skillLevels: { [SKILL_IDS.lapidary]: level },
