@@ -72,6 +72,7 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   // the canonical source rather than a list this screen keeps.
   const expectedSkills = [
     SKILL_IDS.fabrication,
+    SKILL_IDS.lapidary,
     SKILL_IDS.mining,
     SKILL_IDS.refining,
     SKILL_IDS.runeworking,
