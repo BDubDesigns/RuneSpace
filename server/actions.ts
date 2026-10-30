@@ -1163,7 +1163,7 @@ export async function acknowledgeRuneTeleportArrivalAction(
   const request = AcknowledgeRuneTeleportArrivalRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid arrival acknowledgment." };
   return runPlayAction(request.data.characterId, (userId, id) =>
-    acknowledgeRuneTeleportArrival(userId, id),
+    acknowledgeRuneTeleportArrival(userId, id, request.data.intentId),
   );
 }
 
