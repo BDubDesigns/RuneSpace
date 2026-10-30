@@ -2778,6 +2778,14 @@ body {
       rotate(calc(var(--tp-r) * -0.3)) scale(1);
     opacity: 1;
   }
+  /* Most of the way out, still plainly the interface, so the breakup reads as
+     the screen tearing apart rather than simply fading. */
+  62% {
+    transform: translate3d(calc(var(--tp-x) * 0.6), calc(var(--tp-y) * 0.6), 0)
+      rotate(calc(var(--tp-r) * 0.6)) skewX(calc(var(--tp-k) * 0.6))
+      scale(calc(1 + (var(--tp-s) - 1) * 0.6));
+    opacity: 0.78;
+  }
   100% {
     transform: translate3d(var(--tp-x), var(--tp-y), 0) rotate(var(--tp-r)) skewX(var(--tp-k))
       scale(var(--tp-s));
