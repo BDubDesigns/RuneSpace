@@ -84,6 +84,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/location-population/route.ts": "GAMEPLAY: location population read",
   "app/api/character-profile/route.ts": "GAMEPLAY: same-location profile read",
   "app/api/realtime/route.ts": "GAMEPLAY: realtime/social stream (#245)",
+  "app/api/integrations/scapelikes-presence/route.ts": "secret-protected aggregate reporting task",
   "app/api/player-presence/route.ts": "public aggregate GET; authenticated gameplay-owned POST",
   "app/api/e2e/realtime/route.ts": "local E2E hook (404 outside the gate)",
   "app/api/chat/route.ts": "GAMEPLAY: public chat history read (#246)",
