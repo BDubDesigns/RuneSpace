@@ -254,6 +254,7 @@ import type { TinkeringCommandError } from "@/server/tinkering-commands";
 import {
   createRuneworkingResolver,
   isRuneworkingAction,
+  loadOpenRuneworkingStationLocationIds,
   loadResonanceRigUnlocked,
   loadRuneworkingRow,
   runeworkingRunStateFromRow,
@@ -775,8 +776,18 @@ export type RuneworkingRecipeProjection = {
  * never fails, so there is nothing here about chance or failure.
  */
 export type ResonanceRigProjection = {
-  /** Not From Around Here is complete: the Rig is the player's to use. */
+  /**
+   * The Resonance Rig at the character's current location is theirs to use (#391,
+   * #441): Hilltop Workshop's once Not From Around Here is complete, or their own
+   * at the Crash Site once it is built. False anywhere else.
+   */
   unlocked: boolean;
+  /**
+   * Every Rig station the character may use, by location, wherever they stand
+   * (#441). Item Sources reads this: a Rig's recipes are sources everywhere, not
+   * only while the player is beside it.
+   */
+  openStationLocationIds: readonly string[];
   recipes: readonly RuneworkingRecipeProjection[];
   /** The cycle on the Rig, when there is one. */
   cycle?: {
@@ -2111,6 +2122,10 @@ async function projectResonanceRig(
       transaction,
       input.characterId,
       input.currentLocationId,
+    ),
+    openStationLocationIds: await loadOpenRuneworkingStationLocationIds(
+      transaction,
+      input.characterId,
     ),
     // Only the recipes the station the character stands at authors (#441): the
     // Hilltop Rig attunes Seekers, a personal Rig at the Crash Site attunes TP Runes.

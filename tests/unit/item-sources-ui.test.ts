@@ -205,7 +205,7 @@ describe("facts from the Play projection", () => {
         [SKILL_IDS.fabrication]: xpFor(SKILL_IDS.fabrication, 6),
       },
       fabricationStation: { unlocked: true },
-      resonanceRig: { unlocked: true },
+      resonanceRig: { unlocked: true, openStationLocationIds: ["hilltop_workshop", "crash_site"] },
       missions: [
         { missionId: "a", state: "active" },
         { missionId: "b", state: "completed" },
@@ -222,6 +222,11 @@ describe("facts from the Play projection", () => {
     expect([...built.completedMissionIds]).toEqual(["b"]);
     expect(built.fabricationStationUnlocked).toBe(true);
     expect(built.resonanceRigUnlocked).toBe(true);
+    // Every open Rig station, wherever the player stands (#441).
+    expect([...built.resonanceStationLocationIds!].sort()).toEqual([
+      "crash_site",
+      "hilltop_workshop",
+    ]);
     expect(built.locationStates).toBe(state.locationStates);
   });
 
@@ -229,7 +234,7 @@ describe("facts from the Play projection", () => {
     const built = itemSourceFactsFromState({
       skillTotalXp: {},
       fabricationStation: { unlocked: false },
-      resonanceRig: { unlocked: false },
+      resonanceRig: { unlocked: false, openStationLocationIds: [] },
       missions: [],
       locationStates: {},
     } as unknown as PlayGameplayState);

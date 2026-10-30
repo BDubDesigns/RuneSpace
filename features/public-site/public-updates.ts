@@ -12,7 +12,7 @@ const authoredUpdates = [
     // Issue #441 — the personal Resonance Rig chapter.
     slug: "a-resonance-rig-of-your-own",
     title: "A Resonance Rig of Your Own",
-    publishedAt: "2026-10-30T12:00:00-07:00",
+    publishedAt: "2026-10-30T09:00:00-07:00",
     summary:
       "The Wise Old Enby will help you build a Resonance Rig on your own Crash Site. Weld it, welcome them for a visit, and attune a Skatboll TP Rune of your very own.",
     body: [

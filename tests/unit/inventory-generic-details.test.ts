@@ -110,6 +110,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     },
     resonanceRig: {
       unlocked: false,
+      openStationLocationIds: [],
       recipes: [],
       run: {
         selection: 1,

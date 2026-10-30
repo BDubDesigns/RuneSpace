@@ -629,6 +629,16 @@ Current production conventions:
   panoramas (#330, `crash-site-crashed.webp`, `crash-site-repaired.webp`) are no
   longer shown in the game but stay committed: a published Update hero references
   the repaired one. See "Transparent overlay layers" below
+- the finished personal Resonance Rig (#441): one approved 1536x1024 RGBA master,
+  kept unaltered as `assets/location-scenes/resonance-rig-master.png` (SHA-256
+  `2d873b23405a111760ae815e90822727b9b5984ddc80c5f11210d29c6e474d30`), and one
+  runtime overlay `public/location-scenes/resonance-rig.webp` (1152x768, lossy q85 with
+  `alphaQuality: 100`) from `scripts/prepare-resonance-rig-art.mjs`. Unlike the Rivets
+  it is **not trimmed on its alpha bounds**, because the owner approved its placement
+  (`{ left: 36.5, top: 20, width: 29 }` of the shared 1536x384 stage) against the full
+  3:2 canvas; it is only scaled down by 0.75, never up, and the script refuses any
+  master whose hash differs from the approved one. It is composed only over the empty
+  background (no ship), in the 4:1 header and the 15:8 dialogue frame alike
 - the Oil Shale Mining slice's approved art (#342): the South Access Track and
   The South Cut 1536x384 scenes (`public/location-scenes/south-access-track.webp`,
   `the-south-cut.webp`, lossy WebP q85; the delivered masters were JPEG-encoded and

@@ -91,7 +91,10 @@ the server.
 **When a resident moves (#190, #231).** An NPC authors a home placement
 (`homeLocationId`, optional `localPlaceId`) and zero or more ordered
 Mission-derived relocations:
-`relocations: [{ afterCompletedMissionId, locationId, localPlaceId?, conversationBackgroundId? }]`.
+`relocations: [{ afterCompletedMissionId | afterCompletedRepairTargetId, untilCompletedMissionId?, locationId, localPlaceId?, conversationBackgroundId? }]`.
+A move may start on a completed repair target and end on a completed Mission (#441: the
+Wise Old Enby visits a character's finished Resonance Rig from its last weld until *A Rune
+of Your Own* is turned in); both ends are facts the game already records.
 `resolveNpcPlacement` takes the character's own completed Missions and returns
 the **latest entry in authored order** whose Mission is complete, or the home
 placement when none is. A later entry wins over an earlier one whichever Mission
@@ -511,6 +514,17 @@ accept/complete path, prose parsing, or a per-NPC conversation adapter, stop and
 inspect whether this model is being bypassed.
 
 Adding skill-level-dependent lines: follow §8.
+
+### A speaker who leaves, and scene cues (issue #441)
+
+A completion that relocates its speaker keeps the conversation mounted (the
+`departed` contact in `NpcInteractionPanel`), so its confirmed reward scene plays to the
+end even though the server has already moved them. A sequence may add
+`exitCueSequenceId`: once its last beat is finished the named scene-cue sequence plays
+over that beat (a rift opens, the portrait moves **sideways only** into it while
+fading), Skip finishes it at once, reduced motion skips straight to the end, and
+`onDepart` then closes the conversation, since the speaker is gone and there is no hub
+to return to. It is presentation only. See `docs/gameplay-foundations.md`, "Scene cues".
 
 ### Dialogue scene location labels (issue #357 follow-up)
 

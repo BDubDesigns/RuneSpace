@@ -47,6 +47,18 @@ export async function loadResonanceRigUnlocked(
   }
   return false;
 }
+/** Every Resonance Rig station this character may use, by location (#441). */
+export async function loadOpenRuneworkingStationLocationIds(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<readonly string[]> {
+  const open: string[] = [];
+  for (const station of RUNEWORKING_STATIONS) {
+    if (await stationUnlocked(transaction, characterId, station)) open.push(station.locationId);
+  }
+  return open;
+}
+
 export const runeworkingActivity = createCraftingActivity({
   table: characterRuneworkingState,
   skillId: SKILL_IDS.runeworking,

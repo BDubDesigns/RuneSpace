@@ -46,6 +46,12 @@ import {
   validateMissionDefinitions,
   type MissionObservation,
 } from "@/game/domain/missions";
+import { LOCATIONS } from "@/game/content/locations";
+import {
+  resolveItemSources,
+  type ItemSource,
+  type ItemSourceFacts,
+} from "@/game/domain/item-sources";
 import { readImageHeader } from "./image-header";
 
 /**
@@ -568,5 +574,126 @@ describe("the conversation routing", () => {
       DIALOGUE_IDS.wiseOldEnbyRuneReminder,
     ]);
     expect(missionEntries.every((entry) => entry.action === undefined)).toBe(true);
+  });
+});
+
+describe("item sources follow the Rig stations the character has", () => {
+  const facts = (stations: readonly string[], rigBuilt: boolean): ItemSourceFacts => ({
+    skillLevels: { [SKILL_IDS.runeworking]: 5 },
+    acceptedMissionIds: new Set(),
+    completedMissionIds: new Set(),
+    fabricationStationUnlocked: false,
+    resonanceRigUnlocked: stations.length > 0,
+    resonanceStationLocationIds: new Set(stations),
+    locationStates: Object.fromEntries(
+      LOCATIONS.map((location) => [
+        location.id,
+        resolveLocationState(location, {
+          acceptedMissionIds: new Set(),
+          completedRepairTargetIds: new Set(rigBuilt ? [REPAIR_TARGET_IDS.resonanceRig] : []),
+        }),
+      ]),
+    ),
+  });
+  const runework = (itemId: string, source: ItemSourceFacts) =>
+    resolveItemSources(itemId, source).filter(
+      (entry): entry is Extract<ItemSource, { locationIds: readonly string[] }> =>
+        entry.kind === "runework" && "locationIds" in entry,
+    );
+
+  it("offers the TP Rune only from the character's own Rig, at the Crash Site", () => {
+    const own = runework(
+      ITEM_IDS.skatbollTpRune,
+      facts([LOCATION_IDS.hilltopWorkshop, LOCATION_IDS.crashSite], true),
+    );
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatchObject({
+      recipeActionId: ACTION_IDS.skatbollTpRuneRuneworking,
+      locationIds: [LOCATION_IDS.crashSite],
+      minimumLevel: 5,
+      access: { state: "available" },
+    });
+    // Without the Rig it is not a source at all: the Wise Old Enby's Rig does not make it.
+    expect(runework(ITEM_IDS.skatbollTpRune, facts([LOCATION_IDS.hilltopWorkshop], false))).toEqual(
+      [],
+    );
+  });
+
+  it("keeps the Seeker at Hilltop whichever Rigs the character has, wherever they stand", () => {
+    for (const stations of [
+      [LOCATION_IDS.hilltopWorkshop],
+      [LOCATION_IDS.hilltopWorkshop, LOCATION_IDS.crashSite],
+    ]) {
+      const seeker = runework(ITEM_IDS.beginnerEchoSeeker, facts(stations, stations.length > 1));
+      expect(seeker.map((entry) => entry.locationIds)).toEqual([[LOCATION_IDS.hilltopWorkshop]]);
+    }
+  });
+});
+
+describe("the Enby's Mission 1 conversations follow the live objective", () => {
+  const observe = (welding: number, rigComplete: boolean): MissionObservation => ({
+    equippedItemIds: new Set(),
+    carriedQuantities: new Map(),
+    stackLimits: new Map(),
+    itemNames: new Map(),
+    skillLevels: new Map([[SKILL_IDS.welding, welding]]),
+    repairTargets: new Map([
+      [
+        REPAIR_TARGET_IDS.resonanceRig,
+        {
+          complete: rigComplete,
+          materials: [],
+          welding: { completed: rigComplete ? 24 : 0, required: 24 },
+        },
+      ],
+    ]),
+  });
+  const entriesAt = (welding: number, rigComplete: boolean, at: string) => {
+    const projection = projectMission(
+      A_PLACE_TO_CALL_HOME,
+      { acceptedAt: new Date() },
+      at,
+      true,
+      observe(welding, rigComplete),
+      true,
+    );
+    return resolveNpcConversation(NPC_IDS.wiseOldEnby, [projection]).filter(
+      (entry) => entry.kind === "mission",
+    );
+  };
+
+  it("plays the Welding reminder below 12, with no command and no travel to the Enby needed", () => {
+    const [entry] = entriesAt(8, false, LOCATION_IDS.hilltopWorkshop);
+    expect(entry?.dialogueId).toBe(DIALOGUE_IDS.wiseOldEnbyHomeSkillReminder);
+    expect(entry?.action).toBeUndefined();
+  });
+
+  it("plays the build reminder at Welding 12 until the Rig is finished", () => {
+    const [entry] = entriesAt(12, false, LOCATION_IDS.hilltopWorkshop);
+    expect(entry?.dialogueId).toBe(DIALOGUE_IDS.wiseOldEnbyHomeRepairReminder);
+    expect(entry?.action).toBeUndefined();
+  });
+
+  it("opens the explicit turn-in once the Rig is finished, carrying the complete command", () => {
+    const [entry] = entriesAt(12, true, LOCATION_IDS.crashSite);
+    expect(entry?.dialogueId).toBe(DIALOGUE_IDS.wiseOldEnbyHomeTurnIn);
+    expect(entry?.action).toMatchObject({
+      kind: "complete_mission",
+      label: "Complete A Place to Call Home",
+    });
+  });
+
+  it("is not performable anywhere but the Crash Site, however ready the Mission is", () => {
+    const projection = projectMission(
+      A_PLACE_TO_CALL_HOME,
+      { acceptedAt: new Date() },
+      LOCATION_IDS.hilltopWorkshop,
+      true,
+      observe(12, true),
+      true,
+    );
+    expect(projection.state).not.toBe("ready_for_completion");
+    expect(projection.stage?.requirementsSatisfied).toBe(true);
+    expect(projection.stage?.turnInAvailable).toBe(false);
   });
 });

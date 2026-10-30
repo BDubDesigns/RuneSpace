@@ -32,7 +32,10 @@ export function itemSourceFactsFromState(
     acceptedMissionIds: deriveAcceptedMissionIds(state.missions),
     completedMissionIds: deriveCompletedMissionIds(state.missions),
     fabricationStationUnlocked: state.fabricationStation.unlocked,
-    resonanceRigUnlocked: state.resonanceRig.unlocked,
+    // Any Rig the character may use, wherever they stand (#441): the Seeker is a source
+    // from the Wise Old Enby's Rig and the TP Rune from the character's own.
+    resonanceRigUnlocked: state.resonanceRig.openStationLocationIds.length > 0,
+    resonanceStationLocationIds: new Set(state.resonanceRig.openStationLocationIds),
     lapidaryAccess: state.lapidaryWorkbench?.access,
     locationStates: state.locationStates,
   };

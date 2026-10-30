@@ -24,6 +24,7 @@ import { MERCHANTS } from "@/game/content/merchants";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { HILLTOP_WORKSHOP_CONTENT } from "@/game/content/hilltop-workshop";
+import { PERSONAL_RESONANCE_RIG } from "@/game/content/resonance-rig";
 import { REPAIR_TARGETS, type RepairTargetDefinition } from "@/game/content/repair-targets";
 import { SCAVENGE_OUTCOMES, type ScavengeOutcome } from "@/game/content/scavenge";
 import { beginnerEchoRewardPlanets } from "@/game/domain/echo-hunts";
@@ -124,6 +125,11 @@ export type ItemReferenceRecipe =
        * separate requirement from `minimumLevel`: both must hold, independently.
        */
       stationOpensAfterCompletedMissionId: string;
+      /**
+       * Set for a recipe attuned at the character's OWN Resonance Rig (#441), where
+       * `stationOpensAfterCompletedMissionId` is instead the Mission that builds it.
+       */
+      personalRig?: true;
       locations: readonly ItemReferenceLocation[];
       inputs: readonly ItemReferenceInput[];
       outputQuantity: number;
@@ -420,13 +426,22 @@ export function publicRecipes(registries: ItemReferenceRegistries): readonly Ite
   }
   // Runeworking (#391): each recipe is hosted by its own action at the Rig.
   for (const recipe of runeworkingRecipes(balance)) {
+    // A recipe hosted at the Crash Site is attuned at the character's own Rig (#441).
+    const personalRig = registries.locations.some(
+      (location) =>
+        location.id === PERSONAL_RESONANCE_RIG.locationId &&
+        (location.availableActionIds as readonly string[]).includes(recipe.actionId),
+    );
     recipes.push({
       kind: "runework",
       actionId: recipe.actionId,
       outputItemId: recipe.outputItemId,
       skillId: balance.runeworking.skillId,
       minimumLevel: recipe.minimumLevel,
-      stationOpensAfterCompletedMissionId: registries.workstations.resonanceRigUnlockMissionId,
+      stationOpensAfterCompletedMissionId: personalRig
+        ? PERSONAL_RESONANCE_RIG.buildMissionId
+        : registries.workstations.resonanceRigUnlockMissionId,
+      ...(personalRig ? { personalRig: true as const } : {}),
       locations: locationsHostingAction(recipe.actionId, locations),
       inputs: inputsOf(recipe.inputs),
       outputQuantity: recipe.outputQuantity,

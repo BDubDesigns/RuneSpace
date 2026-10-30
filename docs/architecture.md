@@ -790,7 +790,7 @@ the content that already owns each way of getting an item.
 | Source | Derived from |
 | --- | --- |
 | Fabricate / Refine | `fabricationRecipes()` / `refiningRecipes()` in `game/config/balance.ts` |
-| Runework (#391) | `runeworkingRecipes()` in `game/config/balance.ts`; hidden until the Resonance Rig is open (`resonanceRigUnlocked`, from Not From Around Here's completion), listed locked above the character's Runeworking level, and noted as never failing |
+| Runework (#391) | `runeworkingRecipes()` in `game/config/balance.ts`; hidden until a Resonance Rig is open (`resonanceRigUnlocked`), placed only at the open stations that host the recipe (`resonanceStationLocationIds`, #441: Hilltop Workshop for the Seeker, the character's own Rig at the Crash Site for the Skatboll TP Rune), listed locked above the character's Runeworking level, and noted as never failing |
 | Mine (primary and Secondary Find) | `miningSources()` and each source's `secondaryFinds`; access from `requiredMiningLevel` via `miningSourceUnlocked` |
 | Buy | `MERCHANTS` (what the merchant **sells** to the player; buying from the player is not a source), one entry per venue of the business (`merchantVenues`, `game/domain/merchant-venues.ts`, #375) |
 | Daily claim | `POWER_ANNEX_CLAIM` in `game/domain/power-annex.ts`, which `server/power-annex.ts` also reads |

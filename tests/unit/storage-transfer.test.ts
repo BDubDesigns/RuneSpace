@@ -130,6 +130,7 @@ function cargoState(): PlayGameplayState {
     },
     resonanceRig: {
       unlocked: false,
+      openStationLocationIds: [],
       recipes: [],
       run: {
         selection: 1,
