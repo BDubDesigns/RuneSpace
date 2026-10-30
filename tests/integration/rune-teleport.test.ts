@@ -445,7 +445,9 @@ suite("issue #438 Skatboll TP Rune (real PostgreSQL)", () => {
       );
       expect(staleDismissal.runeTeleport.arrival?.intentId).toBe(currentIntentId);
       const rows = await receipts(who);
-      expect(rows.find((row) => row.intentId === currentIntentId)?.arrivalAcknowledgedAt).toBeNull();
+      expect(
+        rows.find((row) => row.intentId === currentIntentId)?.arrivalAcknowledgedAt,
+      ).toBeNull();
       expect(await untouched(who)).toEqual(before);
       expect(await held(who)).toBe(0);
       expect(await locationOf(who)).toBe(CRASH_SITE);
