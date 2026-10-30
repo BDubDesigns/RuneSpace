@@ -9,6 +9,57 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #441 — the personal Resonance Rig chapter.
+    slug: "a-resonance-rig-of-your-own",
+    title: "A Resonance Rig of Your Own",
+    publishedAt: "2026-10-30T12:00:00-07:00",
+    summary:
+      "The Wise Old Enby will help you build a Resonance Rig on your own Crash Site. Weld it, welcome them for a visit, and attune a Skatboll TP Rune of your very own.",
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.wiseOldEnby, expressionId: "friendly" },
+        side: "right",
+      },
+      [
+        "Once you have finished ",
+        { text: "Seeker? I Hardly Know Her!", articleSlug: "mission-first-runeworking-lesson" },
+        " and reached Runeworking 5, the Wise Old Enby at Hilltop Workshop has a new idea for your Crash Site: there is a natural resonance point beneath the wreckage, and a Rig built on it could attune teleport runes. ",
+        { text: "A Place to Call Home", articleSlug: "mission-a-place-to-call-home" },
+        " is offered by hand, and it does not wait for First Resonance Echo.",
+      ],
+      [
+        "Build it with a Resonance Core, some metalwork and Welding 12: install the parts once, then weld 24 sections, the same way as any other repair. When the last weld lands, your Crash Site becomes your Resonance Site and the Wise Old Enby arrives to see it. Talk to them and they will hand you two Skatboll TP Runes, then set you a lesson.",
+      ],
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.skatbollTpRune }, side: "left" },
+      [
+        { text: "A Rune of Your Own", articleSlug: "mission-a-rune-of-your-own" },
+        " starts by itself. Find a Cut Quartz and an intact Runestone and attune a Skatboll TP Rune at your Rig: 28.8 seconds and 125 Runeworking XP, from Runeworking 5. Tell the Wise Old Enby and they pay 500 more, then head home. The rune is yours to keep, and the Rig keeps making them. See ",
+        { text: "Runeworking", articleSlug: "runeworking" },
+        " for the details.",
+      ],
+      "While they are visiting you, the Wise Old Enby is not at Hilltop Workshop, so their Research Jobs wait until they are home. Any job you already hold is kept.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A Place to Call Home: a Mission from the Wise Old Enby to build your own Resonance Rig at your Crash Site (Welding 12, one Resonance Core, 3 Galvaferrite, 4 Mounting Brackets, a Galvanic Wire Spool, 2 Power Cells and 24 welds). It pays two Skatboll TP Runes.",
+          "A Rune of Your Own, which starts by itself: attune one Skatboll TP Rune at your Rig for 500 Runeworking XP. You keep the rune.",
+          "Your personal Resonance Rig: Skatboll TP Runes are attuned there, from one Cut Quartz and one intact Runestone, at Runeworking 5.",
+          "A short, skippable scene for the Wise Old Enby’s arrival and departure.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Once your Rig is built, your Crash Site is known to you as your Resonance Site, on the Map, in the scene header and when you use a Skatboll TP Rune. It is the same place, and other characters’ Crash Sites are unchanged.",
+          "The Wise Old Enby’s Research Jobs are unavailable while they are visiting your Resonance Site.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #433 — Werner Slice C.
     slug: "lapidary-topaz-sapphire",
     title: "Lapidary: Cut Topaz and Cut Sapphire",

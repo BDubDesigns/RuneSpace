@@ -58,6 +58,8 @@ const toFirstRuneworkingLesson = link(
   "mission-first-runeworking-lesson",
 );
 const toFirstResonanceEcho = link("First Resonance Echo", "mission-first-resonance-echo");
+const toAPlaceToCallHome = link("A Place to Call Home", "mission-a-place-to-call-home");
+const toARuneOfYourOwn = link("A Rune of Your Own", "mission-a-rune-of-your-own");
 const runeworking = (text: string) => link(text, "runeworking");
 
 export const missionGuideArticles = [
@@ -1445,6 +1447,156 @@ export const missionGuideArticles = [
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
+  {
+    slug: "mission-a-place-to-call-home",
+    title: "A Place to Call Home",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "The Wise Old Enby asks you to build a Resonance Rig of your own at your Crash Site. It needs Welding 12, 24 welds and a Resonance Core, and hands you two Skatboll TP Runes.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Your own Resonance Rig, built on the resonance point beneath your Crash Site on Skatboll. ",
+            enby,
+            " offers it at Hilltop Workshop on Stillreach once you have finished ",
+            toFirstRuneworkingLesson,
+            " and reached Runeworking 5. You do not need ",
+            toFirstResonanceEcho,
+            ", and you do not need Welding 12 to accept it.",
+          ],
+        ],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "Talk to ",
+            enby,
+            " at Hilltop Workshop and choose A Place to Call Home, then Accept Mission (or Not Now, which changes nothing). It is offered by hand: there is nothing to accept anywhere else.",
+          ],
+        ],
+      },
+      {
+        heading: "What it needs",
+        list: [
+          [
+            "Welding level 12. This is the first objective, not a requirement to accept: if you are already Welding 12 it is met at once, and below it the Mission waits while you ",
+            welding("practise your Welding"),
+            ". Any proper Welding work counts, and ",
+            wade,
+            " has a workbench at Rusk Recovery for it.",
+          ],
+          "Installed once at the Crash Site: 1 Resonance Core, 3 Galvaferrite, 4 Mounting Brackets, 1 Galvanic Wire Spool and 2 Power Cells. The Galvaferrite and Wire Spool are on top of whatever went into making the Core. Parts can be fabricated, bought or traded, and you can install them in stages.",
+          "24 Welding sections to secure the Rig. They are ordinary Welding: the same controls, progress and Clean Pass as any repair, and they carry on while you are away.",
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          [
+            "Work up to Welding 12 and gather the parts, then travel back to your Crash Site on Skatboll. A Skatboll TP Rune, if you have one, lands you there and leaves your ship where it is (see ",
+            { text: "Inventory & Equipment", articleSlug: "inventory-and-equipment" },
+            ").",
+          ],
+          "Install the parts, then start welding. The 24th weld finishes your Rig for good.",
+          [
+            "The place is now your Resonance Site, and ",
+            enby,
+            " arrives. A short scene shows it; you can skip it and nothing is lost, and if you were away when the last weld finished it is waiting for you. They do not start talking by themselves: talk to them and choose Complete A Place to Call Home.",
+          ],
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "1,200 base Welding XP, from the 24 welds themselves as you do them. The Mission adds no Welding XP of its own.",
+          "Two Skatboll TP Runes when you complete it, handed over together. You need room for both in your Inventory (slots and carrying capacity). If they will not fit, nothing happens at all: no runes, and the Mission is not complete. Make room and talk to them again.",
+          [
+            "It starts ",
+            toARuneOfYourOwn,
+            " for you at the same moment, with nothing further to accept.",
+          ],
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "The Rig is yours alone: another character's Crash Site is still the Crash Site. It stays on its resonance point and never travels with your ship.",
+          "While the Wise Old Enby is visiting your Resonance Site they are not at Hilltop Workshop, so their Research Jobs cannot be offered or handed in. A job you already hold is kept and waits for them to come home.",
+          ["Following ", toFirstRuneworkingLesson, ". Back to all ", missions, "."],
+        ],
+      },
+    ],
+  },
+  {
+    slug: "mission-a-rune-of-your-own",
+    title: "A Rune of Your Own",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "Craft one Skatboll TP Rune at your own Resonance Rig. It starts by itself when you finish A Place to Call Home and pays 500 Runeworking XP.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "The lesson that follows ",
+            toAPlaceToCallHome,
+            ": make a Skatboll TP Rune yourself, at your own Resonance Rig. It starts by itself when you finish that Mission, so there is no offer and nothing to accept. ",
+            enby,
+            " is still at your Resonance Site, waiting.",
+          ],
+        ],
+      },
+      {
+        heading: "What it needs",
+        list: [
+          [
+            "Runeworking 5 and one Cut Quartz and one intact Runestone, which you find yourself (",
+            { text: "Lapidary", articleSlug: "lapidary" },
+            " cuts the Quartz). No materials are provided. The two runes you were just given do not count, and neither does a rune you were handed, traded or found.",
+          ],
+          [
+            "Only a rune you genuinely attune at your Rig counts, after this Mission has started. Attuning takes 28.8 seconds and pays 125 ",
+            runeworking("Runeworking"),
+            " XP on its own. The recipe works the same as any other Rig run, including its numbers and Max, and Stop After This Attunement.",
+          ],
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          "Gather a Cut Quartz and an intact Runestone and carry them to your Resonance Site.",
+          "Choose Attune at your Rig and start the Skatboll TP Rune. When it finishes, the objective reads 1 of 1.",
+          [
+            "Talk to ",
+            enby,
+            " and choose Complete A Rune of Your Own. Crafting alone never finishes it.",
+          ],
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "500 Runeworking XP when you complete the Mission, once. The attunement already paid its own 125.",
+          "The rune you made is yours to keep. The Wise Old Enby asks for nothing back, and the Mission does not mind if you have already used, stored or traded it.",
+          [
+            "They then take their own rune to The Low Hum and walk home to Hilltop Workshop, so their ",
+            { text: "Research Jobs", articleSlug: "the-wise-old-enby" },
+            " are open again.",
+          ],
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "Your Rig keeps making Skatboll TP Runes after the Mission, as often as you like, for as long as you have the ingredients.",
+          ["Following ", toAPlaceToCallHome, ". Back to all ", missions, "."],
+        ],
+      },
     ],
   },
 ];

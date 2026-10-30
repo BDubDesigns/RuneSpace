@@ -6,6 +6,7 @@ import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { PassengerArrivalModal } from "@/features/passenger/PassengerArrivalModal";
 import { ResearchArrivalModal } from "@/features/research/ResearchArrivalModal";
+import { ResonanceArrival } from "@/features/resonance-site/ResonanceArrival";
 import { RuneTeleportArrivalModal } from "@/features/rune-teleport/RuneTeleportArrivalModal";
 import { PassengerJourneyPanel } from "@/features/passenger/PassengerJourneyPanel";
 import { FlightPanel } from "@/features/ship/FlightPanel";
@@ -156,6 +157,8 @@ export function PlayConsole({
       <ResearchArrivalModal />
       {/* A teleport rune's durable arrival, once the cinematic has finished (#438). */}
       <RuneTeleportArrivalModal />
+      {/* The Wise Old Enby's arrival at a finished personal Rig, until it is acknowledged (#441). */}
+      <ResonanceArrival />
       {/* A Seeker reading's durable result, wherever the player is (#393). */}
       <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getSceneCueSequence } from "@/game/content/scene-cues";
+import { SCENE_CUE_REST } from "@/game/domain/scene-cues";
+import { useSceneCuePlayer } from "@/features/scene-cues/use-scene-cue-player";
 import { ActionButton } from "@/components/ui/ActionButton";
 import type { ConversationBackgroundId } from "@/game/config/foundations";
 import { resolveConversationBackgroundId } from "@/game/content/conversation-backgrounds";
@@ -34,6 +37,12 @@ import { CHARACTER_REVEAL_MS } from "./typewriter";
  * set there, replayable topics included. It is applied after the venue, so
  * the two never undo each other.
  *
+ * `exitCueSequenceId` (#441) names a scene-cue sequence the sequence plays over its
+ * last beat when the player finishes it: the speaker leaving. It is presentation
+ * only and skippable, reduced motion goes straight to its end, and once it ends the
+ * conversation closes through `onDepart` (the speaker is gone, so there is no hub to
+ * return to). Everything the speaker leaving means is already settled server-side.
+ *
  * `declineLabel` adds an explicit decline control beside the terminal command
  * (#389: "Not now" on an offer). Declining is `onFinish`: it returns to the
  * hub and runs nothing.
@@ -55,6 +64,7 @@ export function DialoguePlayer({
   actionMessage,
   onBack,
   onFinish,
+  onDepart,
   venueBackgroundId,
   completedRepairTargetIds,
   receipt,
@@ -69,6 +79,8 @@ export function DialoguePlayer({
   actionMessage?: string;
   onBack: () => void;
   onFinish: () => void;
+  /** Called, instead of `onFinish`, once an exit-cue sequence has ended (#441). */
+  onDepart?: () => void;
   /** Where this NPC is standing now; only read by `presentsAtCurrentVenue`. */
   venueBackgroundId?: ConversationBackgroundId;
   /** Repairs this character has finished; only read by `repaired` backgrounds. */
@@ -87,6 +99,14 @@ export function DialoguePlayer({
     : sequence.id;
   const [presentedSequenceId, setPresentedSequenceId] = useState(presentationKey);
   const viewedBeats = useRef(new Set<number>());
+  // Scene cues (#441): only a sequence that authors an exit gets the cue layers, so
+  // every other conversation renders exactly the elements it always did.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const exitSequence = sequence.exitCueSequenceId
+    ? getSceneCueSequence(sequence.exitCueSequenceId)
+    : undefined;
+  const cuePlayer = useSceneCuePlayer(frameRef, reducedMotion);
+  const departing = cuePlayer.phase !== "idle";
 
   // A new sequence starts at its first beat in the same render that presents
   // it. Resetting from an effect instead let one commit show the previous
@@ -183,6 +203,10 @@ export function DialoguePlayer({
       return;
     }
     if (isLastBeat) {
+      if (exitSequence) {
+        if (!departing) cuePlayer.play(exitSequence, onDepart ?? onFinish);
+        return;
+      }
       onFinish();
       return;
     }
@@ -197,52 +221,69 @@ export function DialoguePlayer({
         actionMessage={actionMessage}
         beat={beat}
         beatIndex={beatIndex}
+        sceneCues={
+          exitSequence ? { frameRef, state: cuePlayer.state ?? SCENE_CUE_REST } : undefined
+        }
         controls={
-          <>
-            <ActionButton
-              aria-label="Restart dialogue"
-              className="px-3"
-              intent="secondary"
-              onClick={restart}
-            >
-              ↻ <span className="sr-only">Restart dialogue</span>
-            </ActionButton>
-            <div className="flex flex-wrap justify-end gap-2">
+          departing ? (
+            // The speaker is leaving (#441): the only control is to skip the show.
+            <div className="flex w-full justify-end">
               <ActionButton
-                aria-label={beatIndex === 0 ? "Back to conversation topics" : "Back"}
-                data-dialogue-back
+                data-dialogue-skip
                 intent="secondary"
-                onClick={goBack}
+                onClick={cuePlayer.skip}
+                disabled={cuePlayer.phase === "done"}
               >
-                Back
+                Skip
               </ActionButton>
-              {declineLabel && actionLabel && isLastBeat && isComplete ? (
-                <ActionButton
-                  data-dialogue-decline
-                  disabled={actionBusy}
-                  intent="secondary"
-                  onClick={onFinish}
-                >
-                  {declineLabel}
-                </ActionButton>
-              ) : null}
-              {actionLabel && isLastBeat && isComplete ? (
-                <ActionButton
-                  data-dialogue-action
-                  disabled={actionBusy}
-                  loading={actionBusy}
-                  intent="primary"
-                  onClick={onAction}
-                >
-                  {actionLabel}
-                </ActionButton>
-              ) : (
-                <ActionButton data-dialogue-next intent="primary" onClick={goNext}>
-                  {nextLabel}
-                </ActionButton>
-              )}
             </div>
-          </>
+          ) : (
+            <>
+              <ActionButton
+                aria-label="Restart dialogue"
+                className="px-3"
+                intent="secondary"
+                onClick={restart}
+              >
+                ↻ <span className="sr-only">Restart dialogue</span>
+              </ActionButton>
+              <div className="flex flex-wrap justify-end gap-2">
+                <ActionButton
+                  aria-label={beatIndex === 0 ? "Back to conversation topics" : "Back"}
+                  data-dialogue-back
+                  intent="secondary"
+                  onClick={goBack}
+                >
+                  Back
+                </ActionButton>
+                {declineLabel && actionLabel && isLastBeat && isComplete ? (
+                  <ActionButton
+                    data-dialogue-decline
+                    disabled={actionBusy}
+                    intent="secondary"
+                    onClick={onFinish}
+                  >
+                    {declineLabel}
+                  </ActionButton>
+                ) : null}
+                {actionLabel && isLastBeat && isComplete ? (
+                  <ActionButton
+                    data-dialogue-action
+                    disabled={actionBusy}
+                    loading={actionBusy}
+                    intent="primary"
+                    onClick={onAction}
+                  >
+                    {actionLabel}
+                  </ActionButton>
+                ) : (
+                  <ActionButton data-dialogue-next intent="primary" onClick={goNext}>
+                    {nextLabel}
+                  </ActionButton>
+                )}
+              </div>
+            </>
+          )
         }
         isComplete={isComplete}
         onTextClick={() => setRevealedChars(currentBeatTextLength)}

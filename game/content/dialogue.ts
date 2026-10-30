@@ -115,6 +115,14 @@ export type DialogueSequence = {
    * is the level-dependent advice — authors no beats of its own.
    */
   skillLevelDialogueId?: SkillLevelDialogueId;
+  /**
+   * A scene-cue sequence (`game/content/scene-cues.ts`) played over this scene once
+   * its last beat is finished, before the conversation ends (#441): the Wise Old
+   * Enby leaving through their own rift. Presentation only — whoever is leaving has
+   * already been placed elsewhere by the server, and skipping or interrupting the
+   * cues changes nothing. Absent for every other sequence.
+   */
+  exitCueSequenceId?: string;
   beats: readonly DialogueBeat[];
 };
 
@@ -4358,6 +4366,7 @@ const dialogue = {
   [DIALOGUE_IDS.wiseOldEnbyRuneCompletion]: {
     id: DIALOGUE_IDS.wiseOldEnbyRuneCompletion,
     npcId: NPC_IDS.wiseOldEnby,
+    exitCueSequenceId: "resonance_rig_departure",
     beats: [
       {
         kind: "skill_xp",
