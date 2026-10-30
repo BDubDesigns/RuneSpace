@@ -35,6 +35,9 @@ export function RuneTeleportArrivalModal() {
 
   // One arrival at a time: a pending Resonance Calibration arrival goes first.
   if (!mounted || !arrival || cinematic.active || state.research.arrival) return null;
+  // Snapshot the visible receipt before the async callback; a different tab may
+  // have already produced a newer arrival by the time this request is handled.
+  const displayedIntentId = arrival.intentId;
 
   function acknowledge() {
     enqueueForeground(() => {
@@ -42,7 +45,7 @@ export function RuneTeleportArrivalModal() {
         try {
           const result = await acknowledgeRuneTeleportArrivalAction({
             characterId: state.characterId,
-            intentId: arrival.intentId,
+            intentId: displayedIntentId,
           });
           if (result.error || !result.state) {
             setMessage(result.error ?? "Comms interruption. The notice is still here; try again.");
