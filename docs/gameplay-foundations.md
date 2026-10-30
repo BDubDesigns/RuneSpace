@@ -2098,6 +2098,71 @@ buys, not a Rivet flight with the ship hidden.
 `game/content/passenger-kiosk.ts`, `server/passenger-state.ts`,
 `server/passenger-commands.ts`, `features/passenger/`.
 
+## Skatboll TP Rune (issue #438)
+
+The first teleport rune is an ordinary carried, stashable, Cargo-Hold-storable and
+**tradable** stack: 1,100 g, stack limit 5, category Components & Supplies, with the
+owner-approved art (`assets/item-art/skatboll-tp-rune.png`, byte-identical,
+SHA-256 `aeff8beb…3644`). No merchant sells or buys it back, and it has no
+repeatable source yet: today it arrives only from the existing Admin Console
+ADD ITEM (or a trade). Manufacture (Runeworking 5, at a personal Resonance Rig,
+1 Cut Quartz + 1 Intact Runestone), the personal Rig, the Crash Site's later
+"Resonance Site" name and the Enby's missions are **not** part of this slice.
+
+**Use** is from ordinary Inventory Item Details: **USE RUNE** → a RuneSpace
+confirmation (**Teleport to Skatboll?**, naming the destination, that one rune is
+used up, that only the character with everything carried and worn travels, and
+that the ship, its fuel and its Cargo Hold stay parked) → **CANCEL** / **TELEPORT**.
+Cancel, Escape and an outside tap send no command and cost nothing.
+
+- **Eligibility is the carrying alone.** Any character holding a valid carried
+  rune can use it: no level (Runeworking 5 applies to future *manufacture* only),
+  Rig, Mission or prior visit. A received, traded or admin-granted rune works the
+  same. The destination is the existing `LOCATION_IDS.crashSite`, resolved through
+  `game/content/rune-teleports.ts`, the one place its player-facing label is
+  chosen, so a character-specific name can arrive later without a second location.
+- **The command** (`teleportWithRune` in `server/rune-teleport-commands.ts`,
+  rules in `game/domain/rune-teleport.ts`) runs inside the shared owned-character
+  lock after due work has reconciled. The shared boundary already refuses
+  trade-engaged characters, ship flight and Milky Waymo travel; the domain
+  refuses an unknown or non-rune stack, a stale quantity, any running activity
+  (including walking; a teleport never cancels or minimizes one) and a character
+  already at the destination. A refusal writes nothing.
+- **Exactly once.** One transaction consumes one rune from the named carried
+  stack, moves *only* the character, and inserts the intent's row in
+  `character_rune_teleports` (migration `0056_rune_teleports`, justified because
+  settlement and the durable arrival must both survive a lost response, a
+  second tab and a refresh, and no existing table can key them to an intent). The
+  browser mints one `intentId` per TELEPORT press; a duplicate, retry or
+  concurrent request for the same intent finds that row and returns the
+  already-settled result without spending or moving again. Different intents
+  from several tabs cannot overspend: the character lock serializes them and the
+  later ones refuse (`already_there` or a vanished stack). No cooldown, casting
+  timer or Runeworking XP.
+- **Arrival.** The same row is the durable receipt (`arrival_acknowledged_at`
+  null = owed), projected as `state.runeTeleport.arrival` and shown as a
+  RuneSpace-native dismissible modal over the real destination. Acknowledging it
+  (`acknowledgeRuneTeleportArrival`, allowed during a trade or flight like the
+  other dismissals) is presentation only. It waits for the cinematic to finish
+  and yields to a pending Resonance Calibration arrival.
+
+**The cinematic** (`features/rune-teleport/`, CSS "Teleport cinematic" in
+`app/globals.css`) is presentation sequenced around the one foreground command
+gate: gate acquired → **A** the visible UI breaks apart (~1.2 s; header,
+guidance, scene, activity, rail, docked workspace, footer, launcher and any
+portaled Drawer each take their own authored pose) → **B** fully opaque black
+(~0.35 s) → the guarded command is issued → the confirmed state is accepted
+*behind the black* → **C** the black lifts and the world reassembles (~0.6 s) →
+gate released → arrival modal. The departure scene is never replaced before
+black and the destination is never rendered before it. Success is the server's
+answer alone: an uncertain transport is settled by re-reading location,
+Inventory and the receipt for the same `intentId`, never by a blind retry or an
+assumed refund. A refusal, error, timeout or unmount always lifts the black and
+releases the gate; a reload discards the cinematic entirely. Reduced motion skips
+the breakup for a ~0.2 s fade. Phases are the `data-rs-teleport` attribute on
+`<html>`; regions are marked `data-rs-region` (and the existing rail/workspace
+hooks).
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are

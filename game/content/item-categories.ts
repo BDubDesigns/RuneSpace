@@ -71,6 +71,7 @@ const itemCategoryByItemId = {
   [ITEM_IDS.wheelAssembly]: "components-and-supplies",
   [ITEM_IDS.driveMount]: "components-and-supplies",
   [ITEM_IDS.resonanceCore]: "components-and-supplies",
+  [ITEM_IDS.skatbollTpRune]: "components-and-supplies",
   [ITEM_IDS.powerCell]: "components-and-supplies",
   [ITEM_IDS.beginnerEchoSeeker]: "components-and-supplies",
   [ITEM_IDS.sealedResearchPacket]: "components-and-supplies",

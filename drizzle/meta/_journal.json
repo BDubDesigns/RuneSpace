@@ -393,6 +393,13 @@
       "when": 1793245347482,
       "tag": "0055_lapidary_mission_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1793339442185,
+      "tag": "0056_rune_teleports",
+      "breakpoints": true
     }
   ]
 }

@@ -270,6 +270,8 @@ import {
   loadResearchHistory,
 } from "@/server/research-jobs";
 import type { ResearchProjection } from "@/game/domain/research-jobs";
+import type { RuneTeleportProjection } from "@/game/domain/rune-teleport";
+import { loadRuneTeleportProjection } from "@/server/rune-teleport-state";
 import {
   createEchoReadingResolver,
   echoRandomFrom,
@@ -1036,6 +1038,11 @@ export type PlayGameplayState = {
    * Mission Log, strips and guidance render it with no second path.
    */
   research: ResearchProjection;
+  /**
+   * Teleport runes (#438): each rune's labelled destination and the durable
+   * arrival receipt still owed, so the modal survives refresh and other devices.
+   */
+  runeTeleport: RuneTeleportProjection;
   /** One current Seeker reading refusal, for its Item Details (#393). */
   echoReadingError?: EchoReadingCommandError;
   /**
@@ -2716,6 +2723,7 @@ export async function stateFromTransaction(
     carriedInstanceIds: new Set(snapshot.carriedInstances.map((instance) => instance.id)),
     completedMissionIds: deriveCompletedMissionIds(missions),
   });
+  const runeTeleport = await loadRuneTeleportProjection(transaction, characterId);
   return {
     characterId,
     serverNow: now.toISOString(),
@@ -2723,6 +2731,7 @@ export async function stateFromTransaction(
     echoHunt,
     fedhex,
     research,
+    runeTeleport,
     location: { currentLocationId },
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,

@@ -336,7 +336,7 @@ export function Drawer({
       onClick={onBackdropClick}
       role="presentation"
     >
-      <div className={`relative w-full ${frameSize}`}>
+      <div className={`relative w-full ${frameSize}`} data-rs-region="drawer">
         <section
           aria-describedby={describedById}
           aria-label={label}

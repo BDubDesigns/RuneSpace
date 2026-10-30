@@ -169,6 +169,24 @@ export const BreakApartRunestoneRequestSchema = z.object({
 });
 
 /**
+ * Using a teleport rune (#438) names only intent: the id minted for this one
+ * confirmation (so a retry or duplicate settles to the same single teleport), the
+ * carried stack selected and the quantity confirmed against. The item, its
+ * destination, the cost and every eligibility rule are server-resolved.
+ */
+export const TeleportWithRuneRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  intentId: z.string().uuid(),
+  stackId: z.string().uuid(),
+  expectedQuantity: z.number().int().positive(),
+});
+
+export const AcknowledgeRuneTeleportArrivalRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  intentId: z.string().uuid(),
+});
+
+/**
  * The confirmed, exact useful quantities for one irreversible repair commit,
  * plus which repair target is being worked on. The target's recipe, its
  * location, and the Mission that authorizes it are all revalidated server-side.

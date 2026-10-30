@@ -17,6 +17,7 @@ import { PlayerTradeProvider } from "@/features/player-trade/PlayerTradeContext"
 import { PlayerTradeSurface } from "@/features/player-trade/PlayerTradeSurface";
 import { SocialLauncher } from "@/features/social/ChatSocialLauncher";
 import { SocialProvider } from "@/features/social/SocialContext";
+import { TeleportCinematicProvider } from "@/features/rune-teleport/TeleportCinematic";
 import { MissionObjectivesRegion } from "@/features/missions/MissionObjectivesRegion";
 import { acknowledgeNewsAction } from "@/server/actions";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
@@ -289,44 +290,48 @@ function PlayWorkspace({
         <ChatProvider characterId={characterId}>
           <PlayerTradeProvider characterId={characterId}>
             <PlayReleaseWatch releaseId={releaseId} />
-            <GameShell
-              bottomNav={<PlayFooter />}
-              desktopRail={
-                <PlayRail
-                  adminInspectorHref={adminInspectorHref}
-                  characterId={characterId}
+            {/* The Skatboll TP Rune's cinematic owns one timeline over the whole shell
+                and every portaled Drawer, behind the same foreground command gate (#438). */}
+            <TeleportCinematicProvider onTeleported={onMapExit}>
+              <GameShell
+                bottomNav={<PlayFooter />}
+                desktopRail={
+                  <PlayRail
+                    adminInspectorHref={adminInspectorHref}
+                    characterId={characterId}
+                    characterName={characterName}
+                    characterPortrait={characterPortrait}
+                  />
+                }
+                floatingAction={<SocialLauncher />}
+                // The Map control is not mounted at all below desktop width (where
+                // the footer's Map is the destination); before the browser has
+                // answered it renders, hidden by CSS below `xl`.
+                topBar={
+                  <PlayTopBar
+                    mapControl={
+                      desktop === false ? undefined : (
+                        <PlayViewSwitch
+                          inTransit={isPlayInTransit(state)}
+                          mapActive={mapActive}
+                          onMapExit={onMapExit}
+                        />
+                      )
+                    }
+                    newsUnread={newsUnread}
+                  />
+                }
+              >
+                <PlayBoundaryTestTrigger />
+                <PlayConsole
                   characterName={characterName}
-                  characterPortrait={characterPortrait}
+                  localPlaceId={localPlaceId}
+                  onMapExit={onMapExit}
+                  surface={mapActive ? "map" : "primary"}
                 />
-              }
-              floatingAction={<SocialLauncher />}
-              // The Map control is not mounted at all below desktop width (where
-              // the footer's Map is the destination); before the browser has
-              // answered it renders, hidden by CSS below `xl`.
-              topBar={
-                <PlayTopBar
-                  mapControl={
-                    desktop === false ? undefined : (
-                      <PlayViewSwitch
-                        inTransit={isPlayInTransit(state)}
-                        mapActive={mapActive}
-                        onMapExit={onMapExit}
-                      />
-                    )
-                  }
-                  newsUnread={newsUnread}
-                />
-              }
-            >
-              <PlayBoundaryTestTrigger />
-              <PlayConsole
-                characterName={characterName}
-                localPlaceId={localPlaceId}
-                onMapExit={onMapExit}
-                surface={mapActive ? "map" : "primary"}
-              />
-              <PlayerTradeSurface />
-            </GameShell>
+                <PlayerTradeSurface />
+              </GameShell>
+            </TeleportCinematicProvider>
             {/* Preview experiment (#345): remove with PlayPageScrollHints.tsx. */}
             <PlayPageScrollHints />
           </PlayerTradeProvider>

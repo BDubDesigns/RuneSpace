@@ -84,6 +84,7 @@ export const FOCUSED_PHASES = [
   "harmonic-mining",
   "fuel-manufacturing",
   "rune-materials",
+  "rune-teleport",
   "last-leg-trading",
   "not-from-around-here",
   "first-runeworking-lesson",

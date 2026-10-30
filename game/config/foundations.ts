@@ -71,6 +71,10 @@ const itemIds = {
   // component, tradable like any other stack: the future personal Resonance Rig's
   // heart, with no Use, equipment or teleport behaviour of its own.
   resonanceCore: asContentId("resonance_core"),
+  // The Skatboll TP Rune (#438). An ordinary stackable, tradable consumable: Use
+  // from Inventory teleports whoever carries it to the Skatboll Crash Site. It
+  // has no level, Rig, Mission or visit gate; only its manufacture will.
+  skatbollTpRune: asContentId("skatboll_tp_rune"),
   // Mining Secondary Finds (#308): rough gemstones a successful extraction can
   // turn up alongside the source's ordinary ore.
   uncutQuartz: asContentId("uncut_quartz"),

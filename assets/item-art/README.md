@@ -115,3 +115,13 @@ an art change. See `docs/audits/issue-117-image-delivery-evidence.md`.
   convention (alpha noise below 4 cleared, near-opaque alpha snapped to 255,
   trimmed to 1182×1178, scaled to 576×574 on a 640×640 transparent canvas,
   lossless WebP). Nothing was regenerated, recomposed or recoloured.
+- `skatboll-tp-rune.png` is the approved 1284×1225 transparent RGBA render of the
+  Skatboll TP Rune (#438), byte-identical to the owner-supplied master (SHA-256
+  `aeff8beb…3644`): a thick, rugged, chipped dark Runestone tablet with a faceted
+  Cut Quartz inset and cyan/violet illuminated destination glyphs. The committed
+  derivative `public/item-art/skatboll-tp-rune.webp` is prepared by
+  `scripts/prepare-skatboll-tp-rune-art.mjs` with the Wheel Assembly convention
+  (alpha noise below 4 cleared, near-opaque alpha snapped to 255, trimmed to
+  1067×1117, scaled to 550×576 on a 640×640 transparent canvas, lossless WebP).
+  The owner's QA contact sheet was not a runtime asset and is not committed.
+  Nothing was regenerated, recomposed or recoloured.

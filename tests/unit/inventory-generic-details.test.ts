@@ -101,6 +101,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     },
     fedhex: { pendingCount: 0, parcels: [] },
     research: { offers: [] },
+    runeTeleport: { runes: {} },
     echoHunt: {
       seekerItemId: "beginner_echo_seeker",
       readingActionId: "beginner_echo_reading",

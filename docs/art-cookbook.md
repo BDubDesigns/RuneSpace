@@ -670,6 +670,12 @@ Current production conventions:
   `assets/item-art/`, SHA-256 checked) and their derivatives in `public/item-art/`, prepared by
   `scripts/prepare-research-loan-art.mjs` with the same recipe (content 576x475, 576x391 and
   488x576 on the 640x640 canvas); checked at the 80 px inventory tile
+- the Skatboll TP Rune (#438): the approved 1284x1225 transparent RGBA master (kept
+  unaltered in `assets/item-art/`, SHA-256 `aeff8beb…3644` checked) and its
+  derivative in `public/item-art/`, prepared by
+  `scripts/prepare-skatboll-tp-rune-art.mjs` with the same recipe (content 550x576
+  on the 640x640 canvas, lossless WebP); checked on dark, light and mid-gray tiles at
+  80 px and 48 px
 - the Resonance Core (#436): the approved 1254x1254 transparent RGBA master (kept
   unaltered in `assets/item-art/`, SHA-256 `b959650e…3565` checked) and its
   derivative in `public/item-art/`, prepared by
