@@ -32,10 +32,7 @@ import {
 } from "@/game/content/missions";
 import { getNpc, getResidentNpcs, resolveNpcPlacement } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
-import {
-  RUNEWORKING_STATIONS,
-  getRuneworkingStation,
-} from "@/game/content/resonance-rig";
+import { RUNEWORKING_STATIONS, getRuneworkingStation } from "@/game/content/resonance-rig";
 import { teleportDestinationPresentation } from "@/game/content/rune-teleports";
 import { resolveNpcConversation, type NpcConversationProjection } from "@/game/domain/conversation";
 import { resolveLocationState } from "@/game/domain/location-state";
