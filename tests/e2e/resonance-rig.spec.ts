@@ -357,17 +357,60 @@ test("a genuine craft, the +500 XP scene that survives the relocation, and the d
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: `${ENBY} conversation` })).toHaveCount(0);
 
-  // The personal Rig's own recipe, with the existing quantity/Max controls.
+  // The personal Rig's one local recipe: no mode switch, no tile to select, no Seeker.
   const station = page.locator("[data-resonance-rig]");
   await expect(station).toBeVisible();
-  await expect(
-    station.locator(`[data-attune-recipe="${ACTION_IDS.beginnerEchoSeekerRuneworking}"]`),
-  ).toHaveCount(0);
-  const recipe = station.locator(`[data-attune-recipe="${ACTION_IDS.skatbollTpRuneRuneworking}"]`);
-  await expect(recipe).toBeVisible();
-  await expect(recipe).toHaveAttribute("data-attune-recipe-ready", "true");
-  await recipe.click();
-  await station.locator("[data-attune-start]").click();
+  await expect(station.locator("[data-rig-mode-select]")).toHaveCount(0);
+  await expect(station.locator("[data-attune-recipe]")).toHaveCount(0);
+  await expect(station.locator("[data-attune-selected]")).toHaveAttribute(
+    "data-attune-selected",
+    ACTION_IDS.skatbollTpRuneRuneworking,
+  );
+  await expect(station.locator("[data-attune-recipe-line]")).toHaveText(
+    "1 Cut Quartz + 1 Runestone → 1 Skatboll TP Rune",
+  );
+  await expect(station.locator("[data-rig-wiki-link]")).toHaveAttribute(
+    "href",
+    "/wiki/runeworking",
+  );
+  await expect(station).toContainText("Cut Quartz and Runestone stay reserved");
+  await expect(station).not.toContainText("Rune Fragment");
+  const start = station.locator("[data-attune-start]");
+
+  // Carrying a Cut Quartz but no Runestone: Start is disabled, says why, shows no run
+  // size, and is NOT lit by the Mission that points at this recipe.
+  await db
+    .delete(inventoryStacks)
+    .where(
+      and(
+        eq(inventoryStacks.characterId, characterId),
+        eq(inventoryStacks.itemId, ITEM_IDS.runestone),
+      ),
+    );
+  await page.reload();
+  await expect(start).toBeDisabled();
+  await expect(start).not.toHaveAttribute("data-mission-guidance", /.+/);
+  await expect(station.locator("[data-attune-unmet]")).toContainText("Need 1 more Runestone");
+  await expect(station.locator("[data-bounded-run-affordable]")).toHaveCount(0);
+  await station.scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, "resonance-rig-missing-mobile.png");
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.runestone, quantity: 1 });
+  await page.reload();
+
+  // With both ingredients the very same control is enabled and guided, with the run size.
+  await expect(start).toBeEnabled();
+  await expect(start).toHaveAttribute("data-mission-guidance", "active");
+  await expect(station.locator("[data-bounded-run-affordable]")).toHaveAttribute(
+    "data-bounded-run-affordable",
+    "1",
+  );
+  await expect(station.locator("[data-attune-unmet]")).toHaveCount(0);
+  // Quantity stepping and Max are the existing bounded-run controls, unchanged.
+  await expect(station.locator("[data-bounded-run-max]")).toBeEnabled();
+  await expect(station.locator("[data-bounded-run-decrease]")).toBeVisible();
+  await station.scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, "resonance-rig-ready-mobile.png");
+  await start.click();
   await expect(station.locator("[data-rig-cycle]")).toBeVisible();
   // Committed at once: the ingredients are set aside, not yet consumed.
   await fastForward(characterId, tp.durationTicks * 1_000 + 2_000);

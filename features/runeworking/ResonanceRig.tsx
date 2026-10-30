@@ -1,27 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ActionButton } from "@/components/ui/ActionButton";
+import Link from "next/link";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { AttuneMode } from "@/features/runeworking/AttuneMode";
-import { RuneworkingRecipesCatalog } from "@/features/runeworking/RuneworkingRecipesCatalog";
-import { runeworkingResultLine } from "@/features/runeworking/rig-copy";
+import { RUNEWORKING_WIKI_PATH, runeworkingResultLine } from "@/features/runeworking/rig-copy";
 import { usePlay } from "@/features/play/PlayContext";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import type { RuneworkingRunState } from "@/server/runeworking";
 
-type RigMode = "attune" | "recipes";
-
-const MODE_TITLES: Record<RigMode, string> = {
-  attune: "Attune",
-  recipes: "Recipes",
-};
-
 /**
- * The Wise Old Enby's Resonance Rig at Hilltop Workshop (#391): Attune, where a
- * cycle is started and watched, beside Recipes, the read-only reference of the
- * Runeworking recipes the character has learned.
+ * A Resonance Rig station (#391, #441): the Wise Old Enby's at Hilltop Workshop and a
+ * character's own at the Crash Site are this one component. The server projects only
+ * the recipe its station makes (`state.resonanceRig.recipes`), so a station shows
+ * one output, its inputs and one run; the all-stations catalog is the Wiki, one link
+ * away, never a second copy here.
  *
  * It is the place's activity, so it renders below the Enby's own card (the
  * Location surface composes residents first, `docs/npc-conversations.md`) and
@@ -32,14 +26,7 @@ const MODE_TITLES: Record<RigMode, string> = {
 export function ResonanceRig() {
   const { state } = usePlay();
   const rig = state.resonanceRig;
-  const [mode, setMode] = useState<RigMode>("attune");
   const beat = useRigResultBeat(state.characterId, rig.run);
-
-  // Whatever is actually on the Rig is what the Rig shows.
-  const onRig = rig.cycle !== undefined;
-  useEffect(() => {
-    if (onRig) setMode("attune");
-  }, [onRig]);
 
   if (!rig.unlocked) return null;
 
@@ -57,26 +44,7 @@ export function ResonanceRig() {
   }));
 
   return (
-    <ActivityPanel
-      data-resonance-rig
-      data-rig-mode={mode}
-      eyebrow="Resonance Rig"
-      title={MODE_TITLES[mode]}
-    >
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Resonance Rig mode">
-        {(["attune", "recipes"] as const).map((candidate) => (
-          <ActionButton
-            aria-pressed={mode === candidate}
-            data-rig-mode-select={candidate}
-            intent={mode === candidate ? "primary" : "secondary"}
-            key={candidate}
-            onClick={() => setMode(candidate)}
-          >
-            {MODE_TITLES[candidate]}
-          </ActionButton>
-        ))}
-      </div>
-
+    <ActivityPanel data-resonance-rig eyebrow="Resonance Rig" title="Attune">
       {beat ? (
         <div
           className="border-l-2 bg-[color:var(--rs-surface-panel)] px-3 py-2"
@@ -95,7 +63,20 @@ export function ResonanceRig() {
         </div>
       ) : null}
 
-      {mode === "recipes" ? <RuneworkingRecipesCatalog /> : <AttuneMode />}
+      <AttuneMode />
+      {/* The Wiki is the one catalog of every Runeworking recipe and where each is made
+          (#441): the station shows only its own. */}
+      <p className="text-xs">
+        <Link
+          className="rs-focus text-[color:var(--rs-accent-primary)] underline underline-offset-2"
+          data-rig-wiki-link
+          href={RUNEWORKING_WIKI_PATH}
+          rel="noopener"
+          target="_blank"
+        >
+          View all Runeworking recipes
+        </Link>
+      </p>
 
       <SkillProgressRow
         level={state.runeworking.level}

@@ -104,6 +104,39 @@ export function runeworkingRunSummary(
   return `${plural(selection, "attunement", "attunements")} · ${inputs} → ${recipe.outputQuantity * selection} ${recipe.outputName} · ${seconds(recipe.durationTicks * selection, GAME_TICK_MS)} · ${recipe.baseXp * selection} Runeworking XP`;
 }
 
+/**
+ * The binding-cycle rule, said for the selected recipe's own inputs (#441): a Rune
+ * Fragment at Hilltop, a Cut Quartz and a Runestone at a personal Rig. Never names
+ * an ingredient of a different recipe.
+ */
+export function runeworkingCommitmentNote(recipe: RuneworkingRecipeProjection): string {
+  const names = recipe.inputs.map((input) => input.name);
+  const reserved =
+    names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "");
+  return `A started attunement is committed: its ${reserved} stay${names.length > 1 ? "" : "s"} reserved in your Inventory until it finishes, and you cannot leave the Rig while it is running. Finished pieces go straight to your Inventory.`;
+}
+
+/**
+ * Whether Start can actually run this recipe right now (#441). One rule for the
+ * button's enabled state AND its Mission halo, so a control that cannot run is never
+ * lit as the next step: level, materials for one cycle, no other activity, no command
+ * in flight.
+ */
+export function runeworkingCanStart(
+  recipe: Pick<RuneworkingRecipeProjection, "unlocked" | "affordableCycles">,
+  context: { activityRunning: boolean; foregroundBusy: boolean },
+): boolean {
+  return (
+    recipe.unlocked &&
+    recipe.affordableCycles >= 1 &&
+    !context.activityRunning &&
+    !context.foregroundBusy
+  );
+}
+
+/** The Wiki article that lists every Runeworking recipe and where each is made. */
+export const RUNEWORKING_WIKI_PATH = "/wiki/runeworking";
+
 /** A recipe as one line, e.g. "1 Rune Fragment → 1 Beginner Echo Seeker". */
 export function runeworkingRecipeLine(recipe: RuneworkingRecipeProjection): string {
   return `${recipe.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ")} → ${recipe.outputQuantity} ${recipe.outputName}`;

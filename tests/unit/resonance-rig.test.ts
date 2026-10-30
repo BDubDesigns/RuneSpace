@@ -33,7 +33,6 @@ import {
 import { getNpc, getResidentNpcs, resolveNpcPlacement } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import {
-  PERSONAL_RESONANCE_RIG,
   RUNEWORKING_STATIONS,
   getRuneworkingStation,
 } from "@/game/content/resonance-rig";
@@ -52,6 +51,15 @@ import {
   type ItemSource,
   type ItemSourceFacts,
 } from "@/game/domain/item-sources";
+import {
+  RUNEWORKING_WIKI_PATH,
+  runeworkingCanStart,
+  runeworkingCommitmentNote,
+  runeworkingRecipeLine,
+  runeworkingUnmetRequirements,
+} from "@/features/runeworking/rig-copy";
+import { getWikiArticle } from "@/features/public-site/public-wiki";
+import type { RuneworkingRecipeProjection } from "@/server/play";
 import { readImageHeader } from "./image-header";
 
 /**
@@ -695,5 +703,105 @@ describe("the Enby's Mission 1 conversations follow the live objective", () => {
     expect(projection.state).not.toBe("ready_for_completion");
     expect(projection.stage?.requirementsSatisfied).toBe(true);
     expect(projection.stage?.turnInAvailable).toBe(false);
+  });
+});
+
+describe("the shared station panel presents one local recipe honestly (#441)", () => {
+  const recipe = (
+    actionId: string,
+    carried: Record<string, number>,
+    over: Partial<RuneworkingRecipeProjection> = {},
+  ): RuneworkingRecipeProjection => {
+    const source = runeworkingRecipes(balance).find((entry) => entry.actionId === actionId)!;
+    const inputs = source.inputs.map((input) => ({
+      itemId: input.itemId,
+      name:
+        input.itemId === ITEM_IDS.runeFragment
+          ? "Rune Fragment"
+          : input.itemId === ITEM_IDS.cutQuartz
+            ? "Cut Quartz"
+            : "Runestone",
+      quantity: input.quantity,
+      carried: carried[input.itemId] ?? 0,
+    }));
+    return {
+      actionId,
+      outputItemId: source.outputItemId,
+      outputName:
+        actionId === ACTION_IDS.skatbollTpRuneRuneworking
+          ? "Skatboll TP Rune"
+          : "Beginner Echo Seeker",
+      outputQuantity: 1,
+      outputStackLimit: 5,
+      minimumLevel: source.minimumLevel,
+      unlocked: true,
+      durationTicks: source.durationTicks,
+      baseXp: source.baseXp,
+      inputs,
+      inputsAvailable: inputs.every((input) => input.carried >= input.quantity),
+      affordableCycles: Math.min(
+        ...inputs.map((input) => Math.floor(input.carried / input.quantity)),
+      ),
+      ...over,
+    };
+  };
+  const idle = { activityRunning: false, foregroundBusy: false };
+
+  it("never lights Start for a recipe it cannot run: missing a Runestone, level, activity or command", () => {
+    const quartzOnly = recipe(ACTION_IDS.skatbollTpRuneRuneworking, { [ITEM_IDS.cutQuartz]: 2 });
+    expect(quartzOnly.affordableCycles).toBe(0);
+    expect(runeworkingCanStart(quartzOnly, idle)).toBe(false);
+    expect(runeworkingUnmetRequirements(quartzOnly, 5)).toEqual(["Need 1 more Runestone"]);
+
+    const both = recipe(ACTION_IDS.skatbollTpRuneRuneworking, {
+      [ITEM_IDS.cutQuartz]: 2,
+      [ITEM_IDS.runestone]: 1,
+    });
+    expect(runeworkingCanStart(both, idle)).toBe(true);
+    expect(runeworkingUnmetRequirements(both, 5)).toEqual([]);
+    expect(runeworkingCanStart(both, { ...idle, activityRunning: true })).toBe(false);
+    expect(runeworkingCanStart(both, { ...idle, foregroundBusy: true })).toBe(false);
+    expect(runeworkingCanStart({ ...both, unlocked: false }, idle)).toBe(false);
+  });
+
+  it("explains reserved inputs from the selected recipe, never another station's", () => {
+    const tp = runeworkingCommitmentNote(
+      recipe(ACTION_IDS.skatbollTpRuneRuneworking, {
+        [ITEM_IDS.cutQuartz]: 1,
+        [ITEM_IDS.runestone]: 1,
+      }),
+    );
+    expect(tp).toContain("its Cut Quartz and Runestone stay reserved");
+    expect(tp).not.toContain("Rune Fragment");
+    const seeker = runeworkingCommitmentNote(
+      recipe(ACTION_IDS.beginnerEchoSeekerRuneworking, { [ITEM_IDS.runeFragment]: 1 }),
+    );
+    expect(seeker).toContain("its Rune Fragment stays reserved");
+    expect(seeker).not.toContain("Cut Quartz");
+    // The real rule is kept: committed, and no walking away.
+    for (const note of [tp, seeker]) {
+      expect(note).toMatch(/committed/);
+      expect(note).toMatch(/cannot leave the Rig/);
+    }
+    expect(runeworkingRecipeLine(recipe(ACTION_IDS.skatbollTpRuneRuneworking, {}))).toBe(
+      "1 Cut Quartz + 1 Runestone → 1 Skatboll TP Rune",
+    );
+  });
+
+  it("links to a real Runeworking Wiki article that lists every implemented recipe and where it is made", () => {
+    expect(RUNEWORKING_WIKI_PATH).toBe("/wiki/runeworking");
+    const article = getWikiArticle("runeworking")!;
+    expect(article).toBeDefined();
+    const text = JSON.stringify(article);
+    // Every shipped recipe, its level, its minimum and where it is made: derived, not restated.
+    expect(text).toContain("Beginner Echo Seeker");
+    expect(text).toContain("Hilltop Workshop");
+    expect(text).toContain("Skatboll TP Rune");
+    expect(text).toContain("Resonance Site");
+    for (const shipped of runeworkingRecipes(balance)) {
+      expect(text, shipped.actionId).toContain(`Runeworking ${shipped.minimumLevel}`);
+    }
+    // The tabs are gone from the station, and from the prose that described them.
+    expect(text).not.toMatch(/two modes|Recipes mode|Attune and Recipes|Rune Fragment stays/);
   });
 });

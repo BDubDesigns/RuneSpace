@@ -1211,15 +1211,15 @@ const authoredWikiArticles = [
           [
             "Beginner Echo Seeker — 1 ",
             { text: "Rune Fragment", articleSlug: "mining-and-refining" },
-            ". 20.4 seconds, 25 Runeworking XP, Runeworking 1. It always succeeds. It weighs 200g, the same as the Fragment it was made from, and stacks five to a slot.",
+            ", at the Wise Old Enby's Resonance Rig at Hilltop Workshop on Stillreach. 20.4 seconds, 25 Runeworking XP, Runeworking 1. It always succeeds. It weighs 200g, the same as the Fragment it was made from, and stacks five to a slot.",
           ],
           [
-            "Skatboll TP Rune — 1 Cut Quartz and 1 intact Runestone, at your own Resonance Rig (below). 28.8 seconds, 125 Runeworking XP, Runeworking 5. It always succeeds. It is the ordinary Skatboll TP Rune: 1,100g, five to a slot, and it can be traded or stored like any other.",
+            "Skatboll TP Rune — 1 Cut Quartz and 1 intact Runestone, at your own Resonance Rig at your Resonance Site on Skatboll (below). 28.8 seconds, 125 Runeworking XP, Runeworking 5. It always succeeds. It is the ordinary Skatboll TP Rune: 1,100g, five to a slot, and it can be traded or stored like any other.",
           ],
         ],
         paragraphs: [
           "A Beginner Echo Seeker is attuned to detect hidden disturbances in RuneSpace. Use one from your Inventory to hunt for a Resonance Echo (below).",
-          "The Rig has two modes: Attune, where you start and watch a run, and Recipes, a list of every Runeworking recipe you know. A recipe stays listed in both even when you are not carrying what it needs, and in Attune, Sources beside its ingredient shows where to get more.",
+          "Each Rig makes the one recipe listed for it above, so there is nothing to choose between: its panel shows what it makes, what it needs and what you are carrying, and Sources beside an ingredient shows where to get more. That list is the whole of Runeworking, and the Rig's panel links back here.",
         ],
       },
       {
@@ -1230,15 +1230,15 @@ const authoredWikiArticles = [
             { text: "A Place to Call Home", articleSlug: "mission-a-place-to-call-home" },
             ": it is yours alone, other players cannot use it, and it never travels with your ship. From then on that place is your Resonance Site. Skatboll TP Runes are attuned only there, and a rune made there remembers Skatboll whoever eventually uses it.",
           ],
-          "It runs exactly like the Wise Old Enby's: the same Attune and Recipes modes, and the same runs, below.",
+          "It runs exactly like the Wise Old Enby's: the same panel and the same runs, below.",
         ],
       },
       {
         heading: "Runs",
         paragraphs: [
-          "Choose how many to make with − and +, or Max to keep going until the next one cannot start. Each one is checked when it starts: that you still have the Rune Fragment, and that the finished Seeker will fit once the Fragment is gone — a part-full Seeker stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
-          "A started attunement is committed. Its Rune Fragment stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the Fragments for later ones are still yours until each one starts.",
-          "When an attunement finishes, the Fragment is used up and the Seeker lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
+          "Choose how many to make with − and +, or Max to keep going until the next one cannot start. The size controls appear once your materials cover at least one. Each one is checked when it starts: that you still have what it needs, and that the finished piece will fit once those are gone — a part-full stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
+          "A started attunement is committed. What it uses (a Rune Fragment at the Wise Old Enby's Rig, a Cut Quartz and an intact Runestone at yours) stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the materials for later ones are still yours until each one starts.",
+          "When an attunement finishes, its materials are used up and the piece lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
         ],
       },
       {
