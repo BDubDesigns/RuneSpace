@@ -161,6 +161,17 @@ const itemPresentations = {
     textFallback: "WA",
     artworkSrc: "/item-art/wheel-assembly.webp",
   },
+  // The Fabrication 12 Resonance Core (#436): an ordinary manufactured component.
+  [ITEM_IDS.resonanceCore]: {
+    displayName: "Resonance Core",
+    pluralName: "Resonance Cores",
+    accessibleDescription:
+      "Rugged open Galvaferrite containment cradle with visible bolts and blue conductive winding, holding one intact purple-blue luminous Runestone suspended in the centre with clear air gaps around it",
+    textFallback: "RC",
+    artworkSrc: "/item-art/resonance-core.webp",
+    description:
+      "A Runestone suspended in a wired Galvaferrite containment frame. Built as the heart of a larger resonance system.",
+  },
   // The Propulsion System's mounting interface (#330).
   [ITEM_IDS.driveMount]: {
     displayName: "Drive Mount",

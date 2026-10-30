@@ -114,6 +114,7 @@ describe("Wiki item catalog", () => {
         "Geological Sample Case",
         "Mounting Bracket",
         "Power Cell",
+        "Resonance Core",
         "Resonance Sampler",
         "Sealed Research Packet",
         "Wheel Assembly",

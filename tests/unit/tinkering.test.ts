@@ -79,6 +79,8 @@ describe("the Tier-1 Tinkering set and its exact values", () => {
       // Fabrication 8: the Drive Mount (#330), then the Freight Harness.
       ACTION_IDS.driveMountTinkering,
       ACTION_IDS.freightHarnessTinkering,
+      // Fabrication 12: the Resonance Core (#436), ordinary derived Tinkering.
+      ACTION_IDS.resonanceCoreTinkering,
     ]);
     const dismantled = tinkeringActionIds(balance).map((id) => target(id).recipe.actionId);
     expect(dismantled).not.toContain(ACTION_IDS.scrapMetalFabrication);

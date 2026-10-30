@@ -784,6 +784,25 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
         ]),
       }),
+      /**
+       * The Resonance Core (#436): a Fabrication 12 component for a future
+       * personal Resonance Rig. Its 3,900 g is exactly the 1,000 g Runestone, the
+       * two 950 g Galvaferrite and the 1,000 g Wire Spool it is made of. An
+       * ordinary recipe: no failure roll, extra gate or Core-specific behaviour.
+       */
+      resonanceCore: z.object({
+        actionId: z.literal(ACTION_IDS.resonanceCoreFabrication),
+        outputItemId: z.literal(ITEM_IDS.resonanceCore),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(12),
+        durationTicks: z.literal(80),
+        baseXp: z.literal(400),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), quantity: z.literal(1) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+        ]),
+      }),
     }),
     /**
      * Manual Override (#232): the optional per-workpiece push-your-luck layer.
@@ -858,6 +877,11 @@ const balanceSchema = z.object({
       freightHarness: z.object({
         actionId: z.literal(ACTION_IDS.freightHarnessTinkering),
         recipeActionId: z.literal(ACTION_IDS.freightHarnessFabrication),
+      }),
+      // Ordinary derived Tinkering (#436); the Resonance Core has no exception.
+      resonanceCore: z.object({
+        actionId: z.literal(ACTION_IDS.resonanceCoreTinkering),
+        recipeActionId: z.literal(ACTION_IDS.resonanceCoreFabrication),
       }),
     }),
   }),
@@ -1192,6 +1216,15 @@ const balanceSchema = z.object({
       itemId: z.literal(ITEM_IDS.freightHarness),
       massGrams: z.literal(9_000),
       equipment: z.object({ kind: z.literal("container"), slotCapacity: z.literal(6) }),
+    }),
+    /**
+     * The Resonance Core (#436): 3,900 g, conserved through its authored inputs,
+     * and two to a stack. Ordinary carried, stashed, Cargo and tradable stack.
+     */
+    resonanceCore: z.object({
+      itemId: z.literal(ITEM_IDS.resonanceCore),
+      massGrams: z.literal(3_900),
+      stackLimit: z.literal(2),
     }),
     /**
      * Mining Secondary Finds (#308): rough gemstones. Each owns the one bonus
@@ -1921,6 +1954,19 @@ const defaults = balanceSchema.parse({
         baseXp: 75,
         inputs: [{ itemId: ITEM_IDS.galvanicStock, quantity: 1 }],
       },
+      resonanceCore: {
+        actionId: ACTION_IDS.resonanceCoreFabrication,
+        outputItemId: ITEM_IDS.resonanceCore,
+        outputQuantity: 1,
+        minimumLevel: 12,
+        durationTicks: 80,
+        baseXp: 400,
+        inputs: [
+          { itemId: ITEM_IDS.runestone, quantity: 1 },
+          { itemId: ITEM_IDS.galvaferrite, quantity: 2 },
+          { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+        ],
+      },
     },
     manualOverride: {
       loadMinimum: 1,
@@ -1974,6 +2020,10 @@ const defaults = balanceSchema.parse({
       freightHarness: {
         actionId: ACTION_IDS.freightHarnessTinkering,
         recipeActionId: ACTION_IDS.freightHarnessFabrication,
+      },
+      resonanceCore: {
+        actionId: ACTION_IDS.resonanceCoreTinkering,
+        recipeActionId: ACTION_IDS.resonanceCoreFabrication,
       },
     },
   },
@@ -2135,6 +2185,7 @@ const defaults = balanceSchema.parse({
       massGrams: 9_000,
       equipment: { kind: "container", slotCapacity: 6 },
     },
+    resonanceCore: { itemId: ITEM_IDS.resonanceCore, massGrams: 3_900, stackLimit: 2 },
     cutQuartz: { itemId: ITEM_IDS.cutQuartz, massGrams: 100, stackLimit: 2 },
     cutTopaz: { itemId: ITEM_IDS.cutTopaz, massGrams: 100, stackLimit: 2 },
     cutSapphire: { itemId: ITEM_IDS.cutSapphire, massGrams: 100, stackLimit: 2 },

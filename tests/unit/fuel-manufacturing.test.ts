@@ -455,7 +455,7 @@ describe("Recipe A — Fabrication 8: 1 Galvanic Stock → 1 Empty Small Fuel Ca
     const others = fabricationRecipes(balance).filter(
       (recipe: FabricationRecipeBalance) => recipe.actionId !== fabricate.actionId,
     );
-    expect(others).toHaveLength(11);
+    expect(others).toHaveLength(12);
     const harness = fabricationRecipeForActionId(ACTION_IDS.freightHarnessFabrication, balance)!;
     expect(harness).toMatchObject({ minimumLevel: 8, durationTicks: 60, baseXp: 270 });
     const cells = fabricationRecipeForActionId(ACTION_IDS.powerCellFabrication, balance)!;
