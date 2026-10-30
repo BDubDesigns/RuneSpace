@@ -13,7 +13,7 @@ import {
 import { CONVERSATION_BACKGROUND_IDS, EXPRESSION_IDS, NPC_IDS } from "@/game/config/foundations";
 import { PERSONAL_RESONANCE_RIG } from "@/game/content/resonance-rig";
 import { RESONANCE_ARRIVAL_CUES } from "@/game/content/scene-cues";
-import { SCENE_CUE_REST, sceneCueInitialState } from "@/game/domain/scene-cues";
+import { sceneCueInitialState } from "@/game/domain/scene-cues";
 import { acknowledgeResonanceArrivalAction } from "@/server/actions";
 import { RESONANCE_ARRIVAL_COPY } from "./resonance-site-copy";
 
@@ -124,7 +124,7 @@ export function ResonanceArrival() {
           isComplete
           sceneCues={{
             frameRef,
-            state: cues.state ?? sceneCueInitialState(RESONANCE_ARRIVAL_CUES) ?? SCENE_CUE_REST,
+            state: cues.state ?? sceneCueInitialState(RESONANCE_ARRIVAL_CUES),
           }}
           visibleText={finished || reducedMotion ? caption : ""}
           controls={

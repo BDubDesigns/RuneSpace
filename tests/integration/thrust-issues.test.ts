@@ -786,6 +786,11 @@ suite("issue #330 Thrust Issues (real PostgreSQL)", () => {
         ACTION_IDS.cargoHoldWelding,
         ACTION_IDS.landingGearWelding,
         ACTION_IDS.propulsionWelding,
+        // The personal Resonance Rig (#441): its weld and its Skatboll TP Rune recipe are
+        // hosted here for everyone, exactly as Hilltop hosts the Seeker; whether a
+        // character has their own Rig is that station's unlock, not this list.
+        ACTION_IDS.resonanceRigWelding,
+        ACTION_IDS.skatbollTpRuneRuneworking,
       ]);
     });
   });
