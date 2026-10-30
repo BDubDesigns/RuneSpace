@@ -156,12 +156,14 @@ export async function teleportWithRune(
 }
 
 /**
- * Dismiss the arrival receipt. Presentation only and idempotent: it moves
- * nothing, consumes nothing and cannot replay a teleport.
+ * Dismiss only the arrival receipt the player actually saw. Presentation
+ * only and idempotent: a stale tab cannot dismiss a newer arrival, and
+ * acknowledgment moves nothing, consumes nothing and replays no teleport.
  */
 export function acknowledgeRuneTeleportArrival(
   userId: string,
   characterId: string,
+  intentId: string,
   now = new Date(),
 ): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
@@ -176,6 +178,7 @@ export function acknowledgeRuneTeleportArrival(
         .where(
           and(
             eq(characterRuneTeleports.characterId, character.id),
+            eq(characterRuneTeleports.intentId, intentId),
             isNull(characterRuneTeleports.arrivalAcknowledgedAt),
           ),
         );
