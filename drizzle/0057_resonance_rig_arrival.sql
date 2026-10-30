@@ -1,0 +1,1 @@
+ALTER TABLE "character_repair_targets" ADD COLUMN "arrival_acknowledged_at" timestamp with time zone;

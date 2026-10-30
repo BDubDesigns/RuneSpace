@@ -474,7 +474,7 @@ describe("the new materials and who buys them", () => {
     }
   });
 
-  it("gives Galvaferrite exactly two repair consumers: the Deep Jag stash mount and the Propulsion System", () => {
+  it("gives Galvaferrite exactly three repair consumers: the Deep Jag stash mount, the Propulsion System and the personal Resonance Rig", () => {
     // It is sellable and stockpilable; no Refining recipe takes it as an input.
     // The repairs that ask for it directly are the Deep Jag site stash mount
     // (#284) and the ship's Propulsion System (#330).
@@ -489,6 +489,7 @@ describe("the new materials and who buys them", () => {
     expect(consumers).toEqual([
       REPAIR_TARGET_IDS.siteStashDeepJag,
       REPAIR_TARGET_IDS.propulsionSystem,
+      REPAIR_TARGET_IDS.resonanceRig,
     ]);
   });
 });

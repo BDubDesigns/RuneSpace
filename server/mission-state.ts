@@ -35,7 +35,7 @@ import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import { LOCATIONS } from "@/game/content/locations";
 import { validateLocationStateVariants } from "@/game/domain/location-state";
 import {
-  missionSkillPrerequisiteLevel,
+  missionRequiredSkillLevel,
   projectMission,
   validateMissionDefinitions,
   type MissionObservation,
@@ -83,7 +83,7 @@ validateRepairTargets(
   new Set(MISSIONS.map((mission) => mission.id)),
   (missionId) => {
     const mission = MISSIONS.find((candidate) => candidate.id === missionId);
-    return mission && missionSkillPrerequisiteLevel(mission, SKILL_IDS.welding);
+    return mission && missionRequiredSkillLevel(mission, SKILL_IDS.welding);
   },
 );
 
@@ -386,15 +386,21 @@ function buildObservation(
   };
 }
 
-/** Every skill any authored mission prerequisite names, deduplicated. */
+/**
+ * Every skill any authored mission prerequisite or live `skill_level` objective
+ * names (#441), deduplicated.
+ */
 export function missionPrerequisiteSkills(
   definitions: readonly MissionDefinition[] = MISSIONS,
 ): readonly string[] {
   return [
     ...new Set(
-      definitions.flatMap((definition) =>
-        (definition.prerequisiteSkillLevels ?? []).map((prerequisite) => prerequisite.skillId),
-      ),
+      definitions.flatMap((definition) => [
+        ...(definition.prerequisiteSkillLevels ?? []).map((prerequisite) => prerequisite.skillId),
+        ...definition.requirements.flatMap((requirement) =>
+          requirement.kind === "skill_level" ? [requirement.skillId] : [],
+        ),
+      ]),
     ),
   ];
 }

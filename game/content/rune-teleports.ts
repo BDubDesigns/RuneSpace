@@ -1,6 +1,7 @@
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation, getLocationPlanetId } from "@/game/content/locations";
 import { getPlanetPresentation } from "@/game/content/planets";
+import { resolveLocationStateById, type LocationStateFacts } from "@/game/domain/location-state";
 
 /**
  * Teleport runes (#438): the carried items whose Use moves the character to one
@@ -18,11 +19,15 @@ export function getTeleportRune(itemId: string): { destinationLocationId: string
 
 /**
  * The destination as a character should read it. This is the one place the label
- * is chosen: today the location's own name ("Crash Site"); once a character builds
- * a personal Resonance Rig there, the character-specific "Resonance Site" name
- * is resolved here and every surface (confirmation, arrival modal) follows.
+ * is chosen: the location's own name ("Crash Site") until this character's personal
+ * Resonance Rig is finished there (#441), then their own "Resonance Site", from the
+ * same location-state resolution the Map and the scene header use, so every surface
+ * (confirmation, arrival modal) follows. The destination itself never changes.
  */
-export function teleportDestinationPresentation(destinationLocationId: string): {
+export function teleportDestinationPresentation(
+  destinationLocationId: string,
+  facts?: LocationStateFacts,
+): {
   locationId: string;
   name: string;
   planetName?: string;
@@ -30,7 +35,10 @@ export function teleportDestinationPresentation(destinationLocationId: string): 
   const planetId = getLocationPlanetId(destinationLocationId);
   return {
     locationId: destinationLocationId,
-    name: getLocation(destinationLocationId)?.displayName ?? destinationLocationId,
+    name:
+      (facts ? resolveLocationStateById(destinationLocationId, facts)?.displayName : undefined) ??
+      getLocation(destinationLocationId)?.displayName ??
+      destinationLocationId,
     ...(planetId ? { planetName: getPlanetPresentation(planetId).displayName } : {}),
   };
 }

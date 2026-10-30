@@ -107,6 +107,13 @@ export const LocationStateVariantSchema = z
           requires.shipBerth != null,
         { message: "A location state variant must require at least one authoritative fact" },
       ),
+    /**
+     * The name this state is known by (#441): the Crash Site is the character's
+     * own "Resonance Site" once their Rig stands there. Presentation only: the
+     * stable location ID, hex, adjacency and teleport destination are unchanged,
+     * and another character's location is unaffected.
+     */
+    displayName: z.string().min(1).optional(),
     description: z.string().optional(),
     travelable: z.boolean().optional(),
     mapStatus: z.string().min(1).optional(),

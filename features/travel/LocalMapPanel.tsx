@@ -735,12 +735,17 @@ export function LocalMapPanel({
               const location = getLocation(layout.locationId);
               if (!location) return null;
               const isCurrent = location.id === currentLocationId;
+              // This character's own name for the place (#441): the Crash Site is their
+              // Resonance Site once their Rig stands there. Only a renamed place
+              // replaces its short hex label.
+              const resolvedName = state.locationStates[location.id]?.displayName;
+              const renamed = resolvedName !== undefined && resolvedName !== location.displayName;
               return (
                 <HexButton
                   key={location.id}
                   locationId={location.id}
-                  name={location.presentation.localMap.label}
-                  accessibleName={location.displayName}
+                  name={renamed ? resolvedName : location.presentation.localMap.label}
+                  accessibleName={resolvedName ?? location.displayName}
                   statusLabel={tileStatusLabel(location.id)}
                   description={location.description}
                   selected={selected === location.id}
@@ -792,7 +797,7 @@ export function LocalMapPanel({
           id="map-destination-panel"
           locationId={selectedLocation.id}
           mapStatus={selectedState?.mapStatus}
-          name={selectedLocation.displayName}
+          name={selectedState?.displayName ?? selectedLocation.displayName}
           onToggleDetails={() => setDetailsFor(detailsOpen ? undefined : selectedLocation.id)}
           onWalk={() => travelTo(selectedLocation.id)}
           status={selectedStatus}

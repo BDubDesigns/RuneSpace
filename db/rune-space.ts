@@ -922,6 +922,16 @@ export const characterRepairTargets = pgTable(
      */
     cleanPass: jsonb("clean_pass"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /**
+     * When the player dismissed the one-time presentation a finished repair owes
+     * (#441): the Wise Old Enby's arrival at a finished personal Resonance Rig. The
+     * work's completion above is gameplay truth; this is only that the player has
+     * been told, so an arrival missed while offline, in another tab or after a
+     * reload is still owed and one already acknowledged is never repeated. Null
+     * means "not yet"; a repair that owes no presentation never reads it, so it is
+     * ignored on every other row and needs no backfill.
+     */
+    arrivalAcknowledgedAt: timestamp("arrival_acknowledged_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

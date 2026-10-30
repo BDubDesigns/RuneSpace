@@ -65,7 +65,8 @@ describe("dialogue quotes the live merchant prices", () => {
       .map((beat) => (beat.kind === "npc" ? beat.text : ""))
       .join("\n");
     expect(allText).not.toMatch(/\beight Credits\b/i);
-    expect(allText).not.toMatch(/\btwenty-four\b/i);
+    // A price, not a count: the Rig's "twenty-four welds" (#441) is not a Credits quote.
+    expect(allText).not.toMatch(/\btwenty-four Credits\b/i);
     expect(allText).not.toMatch(/\btwo credits\b/i);
     expect(allText).not.toMatch(/buy them for three\b/i);
     expect(allText).not.toMatch(/give you three Credits/i);

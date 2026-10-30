@@ -88,6 +88,7 @@ export function LocationSurface({
   const presentedLocation = locationState
     ? {
         ...location,
+        displayName: locationState.displayName,
         description: locationState.description,
         presentation: { scene: locationState.scene },
       }

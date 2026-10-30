@@ -402,8 +402,9 @@ describe("the Crash Site scene follows the Propulsion repair, per character", ()
   });
 
   it("ships one empty background and two alpha ship overlays, with every master retained", () => {
-    // The repaired ship and, once the Rivet has flown, the bare background (#358).
-    expect(crashSite.stateVariants).toHaveLength(2);
+    // The repaired ship, the bare background once the Rivet has flown (#358), and the
+    // character's finished Resonance Rig (#441).
+    expect(crashSite.stateVariants).toHaveLength(3);
     const background = crashSite.presentation.scene;
     expect(`public${background.asset}`).toBe("public/location-scenes/crash-site-empty.webp");
     expect(readImageHeader(`public${background.asset}`)).toMatchObject({

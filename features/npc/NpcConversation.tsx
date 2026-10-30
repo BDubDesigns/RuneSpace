@@ -21,6 +21,7 @@ import { composePresentedDialogue } from "@/game/domain/skill-level-dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import {
   getMissionCapacityRefusalDialogue,
   resolveMissionSuccessView,
@@ -113,6 +114,7 @@ export function NpcConversation({
   const venueBackgroundId = resolveNpcVenueBackgroundId(
     npc,
     deriveCompletedMissionIds(state.missions),
+    deriveCompletedRepairTargetIds(Object.values(state.repairs)),
   );
   // Finished repairs, for backgrounds that show a room as the player left it
   // (#292). Keyed by a string so the set only changes when a repair does.

@@ -25,9 +25,20 @@ export type CraftingCommandError =
   | "insufficient_inputs"
   | "no_room"
   | "quantity_unavailable";
+/**
+ * Where a recipe may be started. A fixed location is the activity's one station
+ * (Lapidary's workbench). A function answers per recipe from the character's
+ * location (#441): the Resonance Rig has a station at Hilltop Workshop and a
+ * personal one at the Crash Site, and a recipe belongs to the location that
+ * authors its action.
+ */
+export type CraftingHost =
+  | string
+  | ((currentLocationId: string, recipeActionId: string) => boolean);
+
 export function createCraftingCommands(
   activity: ReturnType<typeof createCraftingActivity>,
-  locationId: string,
+  host: CraftingHost,
   prefix: "runeworking" | "lapidary",
 ) {
   function stateWith(
@@ -56,13 +67,21 @@ export function createCraftingCommands(
     );
   }
 
-  async function standingAtStation(transaction: DatabaseTransaction, characterId: string) {
+  /** The location the character stands at when it hosts this recipe, else undefined. */
+  async function stationLocation(
+    transaction: DatabaseTransaction,
+    characterId: string,
+    recipeActionId: string,
+  ): Promise<string | undefined> {
     const rows = await transaction
       .select({ currentLocationId: characters.currentLocationId })
       .from(characters)
       .where(eq(characters.id, characterId))
       .limit(1);
-    return rows[0]?.currentLocationId === locationId;
+    const current = rows[0]?.currentLocationId;
+    if (current === undefined) return undefined;
+    const hosted = typeof host === "string" ? current === host : host(current, recipeActionId);
+    return hosted ? current : undefined;
   }
 
   function runCraftingCommand(
@@ -117,10 +136,11 @@ export function createCraftingCommands(
         // nothing. Anything else running is a different activity.
         if (action?.actionId === recipe.actionId) return stateWith(transaction, id, now);
         if (action) return stateWith(transaction, id, now, "another_action_active");
-        if (!(await standingAtStation(transaction, id))) {
+        const stationAt = await stationLocation(transaction, id, recipe.actionId);
+        if (stationAt === undefined) {
           return stateWith(transaction, id, now, "unavailable_here");
         }
-        const access = await activity.config.loadAccess(transaction, id);
+        const access = await activity.config.loadAccess(transaction, id, stationAt);
         if (
           access.kind === "locked" ||
           (access.kind === "supervised" && access.actionId !== recipe.actionId)

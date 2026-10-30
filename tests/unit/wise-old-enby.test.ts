@@ -10,6 +10,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import {
   getConversationBackground,
@@ -103,7 +104,16 @@ describe("the person at Hilltop Workshop", () => {
     expect(npc.displayName).toBe("The Wise Old Enby");
     expect(npc.homeLocationId).toBe(hilltop);
     expect(npc.localPlaceId).toBeUndefined();
-    expect(npc.relocations).toBeUndefined();
+    // The one authored move (#441): the visit to this character's personal Rig, from
+    // its completion until A Rune of Your Own is turned in. Still the one NPC.
+    expect(npc.relocations).toEqual([
+      {
+        afterCompletedRepairTargetId: REPAIR_TARGET_IDS.resonanceRig,
+        untilCompletedMissionId: MISSION_IDS.aRuneOfYourOwn,
+        locationId: LOCATION_IDS.crashSite,
+        conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite,
+      },
+    ]);
     expect(getLocalPlacesForLocation(hilltop)).toEqual([]);
   });
 

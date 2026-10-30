@@ -226,8 +226,10 @@ describe("the Landing Gear repair target", () => {
     const crashSite = getLocation(LOCATION_IDS.crashSite)!;
     // The repaired ship needs the Propulsion System's completion, so neither the
     // Cargo Hold nor the Landing Gear moves it. The only other variant is the
-    // departed ship (#358), which reads the ship's berth and no repair at all.
+    // departed ship (#358), which reads the ship's berth and no repair at all, and
+    // the character's own finished Resonance Rig (#441), which wins over both.
     expect(crashSite.stateVariants.map((variant) => variant.requires)).toEqual([
+      { completedRepairTargetId: REPAIR_TARGET_IDS.resonanceRig },
       { shipBerth: "elsewhere" },
       { completedRepairTargetId: REPAIR_TARGET_IDS.propulsionSystem },
     ]);

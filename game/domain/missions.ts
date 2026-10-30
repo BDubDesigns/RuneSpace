@@ -465,6 +465,15 @@ function renderRequirementObjective(
   if (requirement.kind === "repair_target_complete") {
     return renderRepairObjective(requirement, observation);
   }
+  if (requirement.kind === "skill_level") {
+    const current = Math.min(
+      observation?.skillLevels?.get(requirement.skillId) ?? 1,
+      requirement.level,
+    );
+    return requirement.objective
+      .replace("{current}", String(current))
+      .replace("{target}", String(requirement.level));
+  }
   if (requirement.kind === "npc_conversation") {
     // Once a lead has been followed the required contact is the only thing left
     // to do, and the objective says so (#369).
@@ -575,6 +584,8 @@ function requirementSatisfied(
       );
     case "repair_target_complete":
       return observation?.repairTargets?.get(requirement.targetId)?.complete === true;
+    case "skill_level":
+      return (observation?.skillLevels?.get(requirement.skillId) ?? 0) >= requirement.level;
     case "npc_conversation":
       // The durable mission-progress row for this authored key is the only
       // evidence; the conversation itself is never replayed as proof.
@@ -1061,6 +1072,27 @@ export function missionSkillPrerequisiteLevel(
 }
 
 /**
+ * The level one skill must reach for a Mission's work (#441): the offer
+ * prerequisite when it authors one, otherwise its live `skill_level` objective.
+ * A repair that "requires its Mission's level" reads this, so a level has exactly
+ * one home whichever way the Mission asks for it.
+ */
+export function missionRequiredSkillLevel(
+  definition: Pick<MissionDefinition, "prerequisiteSkillLevels" | "requirements">,
+  skillId: string,
+): number | undefined {
+  const prerequisite = definition.prerequisiteSkillLevels?.find(
+    (entry) => entry.skillId === skillId,
+  )?.level;
+  if (prerequisite !== undefined) return prerequisite;
+  for (const requirement of definition.requirements) {
+    if (requirement.kind === "skill_level" && requirement.skillId === skillId)
+      return requirement.level;
+  }
+  return undefined;
+}
+
+/**
  * Whether every authored skill-level prerequisite currently holds (#207, #209).
  *
  * Exported because projection and the authoritative acceptance command must
@@ -1235,6 +1267,20 @@ function projectRequirement(
       objective: renderRequirementObjective(requirement, observation),
       satisfied,
       itemId: requirement.itemId,
+    };
+  }
+  if (requirement.kind === "skill_level") {
+    return {
+      kind: requirement.kind,
+      objective: renderRequirementObjective(requirement, observation),
+      satisfied,
+      progress: {
+        current: Math.min(
+          observation?.skillLevels?.get(requirement.skillId) ?? 1,
+          requirement.level,
+        ),
+        target: requirement.level,
+      },
     };
   }
   if (requirement.kind === "repair_target_complete") {
@@ -1956,6 +2002,27 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
+      if (requirement.kind === "skill_level") {
+        const maximumLevel = skillLevelThresholds(requirement.skillId)?.at(-1)?.level;
+        if (maximumLevel === undefined) {
+          throw new Error(
+            `${where} skill-level requirement names skill "${requirement.skillId}", which has no approved progression curve.`,
+          );
+        }
+        if (
+          !Number.isInteger(requirement.level) ||
+          requirement.level < 1 ||
+          requirement.level > maximumLevel
+        ) {
+          throw new Error(
+            `${where} skill-level requirement level ${requirement.level} is not a level on that skill's curve.`,
+          );
+        }
+        if (requirement.objective.trim().length === 0) {
+          throw new Error(`${where} skill-level requirement must author its objective copy.`);
+        }
+        continue;
+      }
       const itemDefinition = getItemDefinition(requirement.itemId);
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
@@ -2064,6 +2131,8 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         dialogue.trackedActivityReminderDialogueId,
         "tracked activity reminder",
       );
+    if (dialogue.skillLevelReminderDialogueId)
+      assertDialogue(definition.id, dialogue.skillLevelReminderDialogueId, "skill level reminder");
     if (dialogue.repairReminderDialogueId)
       assertDialogue(definition.id, dialogue.repairReminderDialogueId, "repair reminder");
     if (dialogue.conversationReminderDialogueId) {
@@ -2157,6 +2226,7 @@ const LIFECYCLE_DIALOGUE_SLOTS = {
   equipment_reminder: "equipmentReminderDialogueId",
   carried_reminder: "carriedReminderDialogueId",
   tracked_activity_reminder: "trackedActivityReminderDialogueId",
+  skill_level_reminder: "skillLevelReminderDialogueId",
   repair_reminder: "repairReminderDialogueId",
   conversation_reminder: "conversationReminderDialogueId",
   busy: "busyDialogueId",
@@ -2178,6 +2248,7 @@ const REQUIREMENT_REMINDER_MOMENTS: Record<
   carried_stack: "carried_reminder",
   carried_unique_item: "carried_reminder",
   tracked_activity: "tracked_activity_reminder",
+  skill_level: "skill_level_reminder",
   repair_target_complete: "repair_reminder",
   npc_conversation: "conversation_reminder",
   // The turn-in NPC never meets a Mission this requirement belongs to (#358).

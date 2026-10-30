@@ -296,6 +296,25 @@ export type MissionRequirement =
     }
   | {
       /**
+       * The character's personal level in one skill has reached `level` (#441).
+       *
+       * A live objective, not an offer gate: unlike `prerequisiteSkillLevels`, which
+       * keeps a Mission from being offered at all, this one is accepted first and
+       * is simply the first thing the Mission asks. A character already at the
+       * level satisfies it at once. It observes the same authoritative level the
+       * skill row shows, grants nothing and records nothing. A Mission-authorized
+       * repair may read this very level as the one it requires
+       * (`requiresMissionWeldingLevel`), so the level has exactly one home.
+       */
+      kind: "skill_level";
+      skillId: SkillId;
+      /** Positive integer level on that skill's approved progression curve. */
+      level: number;
+      /** Player-facing copy; `{current}` and `{target}` are substituted. */
+      objective: string;
+    }
+  | {
+      /**
        * A physical Rivet flight on one authored route (#358): the first
        * requirement that only a gameplay outcome can satisfy.
        *
@@ -550,6 +569,7 @@ export type MissionLifecycleMoment =
   | "equipment_reminder"
   | "carried_reminder"
   | "tracked_activity_reminder"
+  | "skill_level_reminder"
   | "repair_reminder"
   | "conversation_reminder"
   | "busy"
@@ -582,6 +602,8 @@ export type MissionDialogue = {
   carriedReminderDialogueId?: DialogueId;
   /** First unmet requirement is a tracked activity. */
   trackedActivityReminderDialogueId?: DialogueId;
+  /** First unmet requirement is a skill level (#441). */
+  skillLevelReminderDialogueId?: DialogueId;
   /** First unmet requirement is an unfinished repair target. */
   repairReminderDialogueId?: DialogueId;
   /** First unmet requirement is a mandatory authored NPC conversation. */
@@ -2112,6 +2134,159 @@ export const FIRST_RESONANCE_ECHO: MissionDefinition = {
   },
 };
 
+/** The Skatboll TP Runes the Wise Old Enby hands over with A Place to Call Home (#441). */
+export const A_PLACE_TO_CALL_HOME_REWARD_RUNES = 2;
+
+/** The Welding level A Place to Call Home asks for before the Rig may be built (#441). */
+export const A_PLACE_TO_CALL_HOME_WELDING_LEVEL = 12;
+
+/** The Runeworking level the Enby will only discuss a Rig with (#441). */
+export const A_PLACE_TO_CALL_HOME_RUNEWORKING_LEVEL = 5;
+
+/** The Runeworking XP A Rune of Your Own pays, once, at its turn-in (#441). */
+export const A_RUNE_OF_YOUR_OWN_REWARD_XP = 500;
+
+/**
+ * A Place to Call Home — build a personal Resonance Rig at the Crash Site (#441).
+ *
+ * Offered by hand by the Wise Old Enby at Hilltop Workshop once First Runeworking
+ * Lesson is complete and Runeworking is 5. The first Echo hunt is not a
+ * prerequisite and neither is Welding: Welding 12 is the first live objective,
+ * satisfied at once for a character who already has it. The Rig is the Crash
+ * Site's authored repair (`REPAIR_TARGET_IDS.resonanceRig`): five finished
+ * components installed once, then twenty-four ordinary Welding sections that pay
+ * the 1,200 base Welding XP themselves. The Mission adds no Welding XP of its own.
+ *
+ * The twenty-fourth weld completes the character's own Rig and, derived from that
+ * completion, moves the one real Enby to the Crash Site (their Resonance Site). The
+ * explicit turn-in there hands over two Skatboll TP Runes through the ordinary
+ * all-or-nothing stack bundle, and continues, in the same transaction, into
+ * A Rune of Your Own, which has no offer of its own.
+ */
+export const A_PLACE_TO_CALL_HOME: MissionDefinition = {
+  id: MISSION_IDS.aPlaceToCallHome,
+  title: "A Place to Call Home",
+  summary:
+    "The Wise Old Enby wants you to build a personal Resonance Rig on the resonance point beneath your Crash Site: a Resonance Core, a good deal of metalwork, and Welding level twelve.",
+  prerequisiteMissionId: MISSION_IDS.firstRuneworkingLesson,
+  prerequisiteSkillLevels: [
+    { skillId: SKILL_IDS.runeworking, level: A_PLACE_TO_CALL_HOME_RUNEWORKING_LEVEL },
+  ],
+  continuationMissionId: MISSION_IDS.aRuneOfYourOwn,
+  offers: [
+    {
+      npcId: NPC_IDS.wiseOldEnby,
+      locationId: LOCATION_IDS.hilltopWorkshop,
+      dialogueId: DIALOGUE_IDS.wiseOldEnbyHomeOffer,
+      actionLabel: "Accept Mission",
+      declineLabel: "Not Now",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wiseOldEnbyHomeAccepted },
+    },
+  ],
+  requirements: [
+    {
+      kind: "skill_level",
+      skillId: SKILL_IDS.welding,
+      level: A_PLACE_TO_CALL_HOME_WELDING_LEVEL,
+      objective: "Reach Welding level {target} — currently {current}",
+    },
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.resonanceRig,
+      objective: "Build your Resonance Rig at the Crash Site",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wiseOldEnby,
+    locationId: LOCATION_IDS.crashSite,
+    requiresStationary: true,
+    objective: "Speak to the Wise Old Enby at your Resonance Site",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyHomeTurnIn,
+    actionLabel: "Complete A Place to Call Home",
+  },
+  reward: {
+    kind: "stack_bundle",
+    items: [{ itemId: ITEM_IDS.skatbollTpRune, quantity: A_PLACE_TO_CALL_HOME_REWARD_RUNES }],
+  },
+  dialogue: {
+    skillLevelReminderDialogueId: DIALOGUE_IDS.wiseOldEnbyHomeSkillReminder,
+    repairReminderDialogueId: DIALOGUE_IDS.wiseOldEnbyHomeRepairReminder,
+    completionPresentationDialogueId: DIALOGUE_IDS.wiseOldEnbyHomeCompletion,
+    capacitySlotsDialogueId: DIALOGUE_IDS.wiseOldEnbyHomeCapacity,
+    capacityMassDialogueId: DIALOGUE_IDS.wiseOldEnbyHomeCapacity,
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "The approved script authors no busy beat (#441): a character still attuning a rune at their Rig hears the Enby's turn-in, whose completion the server refuses until the run has stopped.",
+      },
+    ],
+  },
+};
+
+/**
+ * A Rune of Your Own — attune one Skatboll TP Rune at your own Rig (#441).
+ *
+ * Never offered: A Place to Call Home accepts it in its own completion
+ * transaction, so there is no second accept control and no offer dialogue. The
+ * character is already Runeworking 5 and already owns a finished Rig; the one new
+ * demand is to source a Cut Quartz and an intact Runestone and genuinely craft.
+ *
+ * The objective counts one server-confirmed completion of the Rig's Skatboll TP
+ * Rune recipe while this Mission is accepted, by the ordinary tracked-activity
+ * path in the craft's own transaction. A rune carried, traded, gifted, granted,
+ * used or crafted earlier counts for nothing, including the two just given. The
+ * turn-in asks for no rune and takes none: the crafted rune is the player's, and
+ * the Enby evaluates the recorded craft. It pays 500 Runeworking XP once; the
+ * craft already paid its own 125. The Enby returns to Hilltop Workshop when the
+ * turn-in commits (`game/content/npcs.ts`).
+ */
+export const A_RUNE_OF_YOUR_OWN: MissionDefinition = {
+  id: MISSION_IDS.aRuneOfYourOwn,
+  title: "A Rune of Your Own",
+  summary:
+    "The Wise Old Enby wants you to find a Cut Quartz and an Intact Runestone and attune a Skatboll TP Rune at your own Resonance Rig.",
+  prerequisiteMissionId: MISSION_IDS.aPlaceToCallHome,
+  offers: [],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "tp-runes-attuned",
+      activity: "runeworking",
+      metric: "completions",
+      actionId: ACTION_IDS.skatbollTpRuneRuneworking,
+      target: 1,
+      objective: "Craft 1 Skatboll TP Rune at your personal Resonance Rig — {current}/{target}",
+      recommendedActionId: ACTION_IDS.skatbollTpRuneRuneworking,
+      presentsOutputSources: true,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wiseOldEnby,
+    locationId: LOCATION_IDS.crashSite,
+    requiresStationary: true,
+    objective: "Speak to the Wise Old Enby at your Resonance Site",
+    dialogueId: DIALOGUE_IDS.wiseOldEnbyRuneTurnIn,
+    actionLabel: "Complete A Rune of Your Own",
+  },
+  reward: {
+    kind: "skill_xp",
+    skillId: SKILL_IDS.runeworking,
+    amount: A_RUNE_OF_YOUR_OWN_REWARD_XP,
+  },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wiseOldEnbyRuneReminder,
+    completionPresentationDialogueId: DIALOGUE_IDS.wiseOldEnbyRuneCompletion,
+    omitted: [
+      {
+        moment: "busy",
+        reason:
+          "The approved script authors no busy beat (#441): a character still attuning a rune hears the Enby's turn-in, whose completion the server refuses until the run has stopped.",
+      },
+    ],
+  },
+};
+
 /** Stable phase IDs are also the supervised activity-access policy identities. */
 export const MINERALS_MARIE_STAGE_IDS = {
   shape: "prove-yourself",
@@ -2256,6 +2431,10 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Its continuation, with the Enby's two-Seeker gift, and the same offer in
   // person for those who finished the lesson earlier or had no room (#393).
   FIRST_RESONANCE_ECHO,
+  // The Wise Old Enby's personal Resonance Rig chapter (#441): after First
+  // Runeworking Lesson at Runeworking 5, then its offerless continuation.
+  A_PLACE_TO_CALL_HOME,
+  A_RUNE_OF_YOUR_OWN,
   THEYRE_MINERALS_MARIE,
 ];
 

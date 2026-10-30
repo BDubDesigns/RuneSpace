@@ -186,6 +186,11 @@ export const AcknowledgeRuneTeleportArrivalRequestSchema = z.object({
   intentId: z.string().uuid(),
 });
 
+/** Dismissing the Wise Old Enby's arrival at a finished personal Rig (#441). */
+export const AcknowledgeResonanceArrivalRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /**
  * The confirmed, exact useful quantities for one irreversible repair commit,
  * plus which repair target is being worked on. The target's recipe, its

@@ -79,7 +79,7 @@ import {
   type RepairTargetState,
 } from "@/game/domain/welding-repair";
 import { resolveLocationState, type LocationStateFacts } from "@/game/domain/location-state";
-import { LOCATIONS } from "@/game/content/locations";
+import { LOCATIONS, isActionAvailableAtLocation } from "@/game/content/locations";
 import { getSiteStash } from "@/game/content/site-stashes";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { loadLocationStateFacts } from "@/server/location-state";
@@ -272,6 +272,7 @@ import {
 import type { ResearchProjection } from "@/game/domain/research-jobs";
 import type { RuneTeleportProjection } from "@/game/domain/rune-teleport";
 import { loadRuneTeleportProjection } from "@/server/rune-teleport-state";
+import { loadResonanceArrival, type ResonanceArrivalProjection } from "@/server/resonance-site";
 import {
   createEchoReadingResolver,
   echoRandomFrom,
@@ -833,6 +834,7 @@ export type TinkeringProjection = {
 export type LocationStateProjection = {
   locationId: string;
   variantId?: string;
+  displayName: string;
   description: string;
   travelable: boolean;
   mapStatus?: string;
@@ -1043,6 +1045,11 @@ export type PlayGameplayState = {
    * arrival receipt still owed, so the modal survives refresh and other devices.
    */
   runeTeleport: RuneTeleportProjection;
+  /**
+   * The Wise Old Enby's arrival at this character's finished Resonance Rig, while
+   * the player has not yet been shown it (#441). Absent once acknowledged.
+   */
+  resonanceArrival?: ResonanceArrivalProjection;
   /** One current Seeker reading refusal, for its Item Details (#393). */
   echoReadingError?: EchoReadingCommandError;
   /**
@@ -2089,6 +2096,8 @@ async function projectResonanceRig(
     stacks: readonly (typeof inventoryStacks.$inferSelect)[];
     carriedByItemId: Readonly<Record<string, number>>;
     balance: EffectiveGameBalance;
+    /** Which Rig station the character is standing at, if any (#441). */
+    currentLocationId: string;
   },
 ): Promise<ResonanceRigProjection> {
   const { balance } = input;
@@ -2098,37 +2107,45 @@ async function projectResonanceRig(
       ? runeworkingRecipeForActionId(input.action.actionId, balance)
       : undefined;
   return {
-    unlocked: await loadResonanceRigUnlocked(transaction, input.characterId),
-    recipes: runeworkingRecipes(balance).map((recipe) => {
-      const output = getItemDefinition(recipe.outputItemId, balance);
-      if (output?.kind !== "stack") {
-        throw new Error(`Runeworking output "${recipe.outputItemId}" must stack`);
-      }
-      return {
-        actionId: recipe.actionId,
-        outputItemId: recipe.outputItemId,
-        outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
-        outputQuantity: recipe.outputQuantity,
-        outputStackLimit: output.stackLimit,
-        minimumLevel: recipe.minimumLevel,
-        unlocked: runeworkingRecipeUnlocked(input.level, recipe),
-        durationTicks: recipe.durationTicks,
-        baseXp: recipe.baseXp,
-        inputs: recipe.inputs.map((each) => ({
-          itemId: each.itemId,
-          name: resolveItemPresentation(each.itemId, each.itemId).displayName,
-          quantity: each.quantity,
-          carried: input.carriedByItemId[each.itemId] ?? 0,
-        })),
-        inputsAvailable: recipe.inputs.every(
-          (each) => (input.carriedByItemId[each.itemId] ?? 0) >= each.quantity,
-        ),
-        affordableCycles: runeworkingAffordableCycles(
-          { runeworkingLevel: input.level, stacks: input.stacks },
-          recipe,
-        ),
-      };
-    }),
+    unlocked: await loadResonanceRigUnlocked(
+      transaction,
+      input.characterId,
+      input.currentLocationId,
+    ),
+    // Only the recipes the station the character stands at authors (#441): the
+    // Hilltop Rig attunes Seekers, a personal Rig at the Crash Site attunes TP Runes.
+    recipes: runeworkingRecipes(balance)
+      .filter((recipe) => isActionAvailableAtLocation(input.currentLocationId, recipe.actionId))
+      .map((recipe) => {
+        const output = getItemDefinition(recipe.outputItemId, balance);
+        if (output?.kind !== "stack") {
+          throw new Error(`Runeworking output "${recipe.outputItemId}" must stack`);
+        }
+        return {
+          actionId: recipe.actionId,
+          outputItemId: recipe.outputItemId,
+          outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
+          outputQuantity: recipe.outputQuantity,
+          outputStackLimit: output.stackLimit,
+          minimumLevel: recipe.minimumLevel,
+          unlocked: runeworkingRecipeUnlocked(input.level, recipe),
+          durationTicks: recipe.durationTicks,
+          baseXp: recipe.baseXp,
+          inputs: recipe.inputs.map((each) => ({
+            itemId: each.itemId,
+            name: resolveItemPresentation(each.itemId, each.itemId).displayName,
+            quantity: each.quantity,
+            carried: input.carriedByItemId[each.itemId] ?? 0,
+          })),
+          inputsAvailable: recipe.inputs.every(
+            (each) => (input.carriedByItemId[each.itemId] ?? 0) >= each.quantity,
+          ),
+          affordableCycles: runeworkingAffordableCycles(
+            { runeworkingLevel: input.level, stacks: input.stacks },
+            recipe,
+          ),
+        };
+      }),
     ...(activeRecipe && input.action
       ? {
           cycle: {
@@ -2490,14 +2507,6 @@ export async function stateFromTransaction(
     slotsAvailable: snapshot.slotsAvailable,
     massAvailableGrams: snapshot.massAvailableGrams,
   });
-  const resonanceRig = await projectResonanceRig(transaction, {
-    characterId,
-    action,
-    level: runeworkingProgress.level,
-    stacks: snapshot.stacks,
-    carriedByItemId,
-    balance,
-  });
   const cargoRepairProjection = repairs[REPAIR_TARGET_IDS.cargoHold]!;
   const cargoUniqueItems = cargoItemRows
     .map((row) => snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId))
@@ -2510,6 +2519,15 @@ export async function stateFromTransaction(
       currentCharge: chargeOf(instance, balance),
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  const resonanceRig = await projectResonanceRig(transaction, {
+    characterId,
+    action,
+    level: runeworkingProgress.level,
+    stacks: snapshot.stacks,
+    carriedByItemId,
+    balance,
+    currentLocationId,
+  });
   const siteStash = await projectSiteStash(transaction, {
     characterId,
     currentLocationId,
@@ -2700,6 +2718,7 @@ export async function stateFromTransaction(
     locationStates[location.id] = {
       locationId: resolved.locationId,
       ...(resolved.variantId ? { variantId: resolved.variantId } : {}),
+      displayName: resolved.displayName,
       description: resolved.description,
       travelable: resolved.travelable,
       ...(resolved.mapStatus ? { mapStatus: resolved.mapStatus } : {}),
@@ -2724,6 +2743,7 @@ export async function stateFromTransaction(
     completedMissionIds: deriveCompletedMissionIds(missions),
   });
   const runeTeleport = await loadRuneTeleportProjection(transaction, characterId);
+  const resonanceArrival = await loadResonanceArrival(transaction, characterId);
   return {
     characterId,
     serverNow: now.toISOString(),
@@ -2732,6 +2752,7 @@ export async function stateFromTransaction(
     fedhex,
     research,
     runeTeleport,
+    ...(resonanceArrival ? { resonanceArrival } : {}),
     location: { currentLocationId },
     credits,
     scavengeSuppressed: character[0]?.scavengeSuppressed ?? false,

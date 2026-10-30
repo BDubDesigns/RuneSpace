@@ -107,6 +107,9 @@ describe("issue #324 reachable lifecycle moments", () => {
       "first_runeworking_lesson:busy",
       // #393: the approved script authors no busy beat for the Echo debrief either.
       "first_resonance_echo:busy",
+      // #441: the approved scripts author no busy beat for either Rig Mission.
+      "a_place_to_call_home:busy",
+      "a_rune_of_your_own:busy",
     ]);
   });
 });

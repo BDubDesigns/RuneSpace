@@ -180,6 +180,11 @@ const missionIds = {
   // The Wise Old Enby's second lesson (#393): find one Resonance Echo with a
   // Beginner Echo Seeker. First Runeworking Lesson continues into it.
   firstResonanceEcho: asContentId("first_resonance_echo"),
+  // The Wise Old Enby's personal Resonance Rig chapter (#441): build the Rig at the
+  // Crash Site (offered at Hilltop Workshop), then craft a Skatboll TP Rune at it.
+  // A Place to Call Home continues into A Rune of Your Own, which has no offer.
+  aPlaceToCallHome: asContentId("a_place_to_call_home"),
+  aRuneOfYourOwn: asContentId("a_rune_of_your_own"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -432,6 +437,21 @@ const dialogueIds = {
   wiseOldEnbyFirstEchoCompletion: asContentId("wise_old_enby_first_echo_completion"),
   wiseOldEnbyHowToListenTopic: asContentId("wise_old_enby_topic_how_to_listen"),
   wiseOldEnbyAboutResonanceEchoesTopic: asContentId("wise_old_enby_topic_about_resonance_echoes"),
+  // A Place to Call Home (#441): the offer and its accepted instructions at Hilltop
+  // Workshop, the two contextual reminders, the visit's turn-in opening at the
+  // Resonance Site, and the completion scene (two TP Runes, then the lesson).
+  wiseOldEnbyHomeOffer: asContentId("wise_old_enby_home_offer"),
+  wiseOldEnbyHomeAccepted: asContentId("wise_old_enby_home_accepted"),
+  wiseOldEnbyHomeSkillReminder: asContentId("wise_old_enby_home_skill_reminder"),
+  wiseOldEnbyHomeRepairReminder: asContentId("wise_old_enby_home_repair_reminder"),
+  wiseOldEnbyHomeTurnIn: asContentId("wise_old_enby_home_turn_in"),
+  wiseOldEnbyHomeCompletion: asContentId("wise_old_enby_home_completion"),
+  wiseOldEnbyHomeCapacity: asContentId("wise_old_enby_home_capacity"),
+  // A Rune of Your Own (#441): the reminder while the craft is unfinished, the
+  // turn-in opening, and the completion scene (+500 XP, then the farewell).
+  wiseOldEnbyRuneReminder: asContentId("wise_old_enby_rune_reminder"),
+  wiseOldEnbyRuneTurnIn: asContentId("wise_old_enby_rune_turn_in"),
+  wiseOldEnbyRuneCompletion: asContentId("wise_old_enby_rune_completion"),
   // Werner's three replayable topics at Werner's Lab (#429).
   wernerAboutTheLabTopic: asContentId("werner_topic_about_the_lab"),
   wernerTheQuarryTopic: asContentId("werner_topic_the_quarry"),
@@ -564,6 +584,9 @@ const conversationBackgroundIds = {
   hilltopWorkshopInterior: asContentId("hilltop_workshop_interior"),
   // Werner's laboratory interior at Werner's Lab (#429).
   wernersLabInterior: asContentId("werners_lab_interior"),
+  // The Crash Site as this character's finished personal Resonance Site (#441):
+  // the empty ship-departed panorama with the Rig overlay, never the Rivet.
+  crashSiteResonanceSite: asContentId("crash_site_resonance_site"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -628,6 +651,8 @@ export const ACTION_IDS = {
   landingGearWelding: asContentId("landing_gear_welding"),
   // Welding the ship's Propulsion System at the Crash Site (#330).
   propulsionWelding: asContentId("propulsion_welding"),
+  // Welding the character's personal Resonance Rig at the Crash Site (#441).
+  resonanceRigWelding: asContentId("resonance_rig_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -661,6 +686,8 @@ export const ACTION_IDS = {
   // durable-identity reason Fabrication recipes have one: the active action IS
   // the recipe of the cycle on the Resonance Rig.
   beginnerEchoSeekerRuneworking: asContentId("beginner_echo_seeker_runeworking"),
+  // Attuning a Skatboll TP Rune at a personal Resonance Rig (#441).
+  skatbollTpRuneRuneworking: asContentId("skatboll_tp_rune_runeworking"),
   // Reading a Beginner Echo Seeker from Inventory (#393): one stationary,
   // timed reading. Which planet it searches is where the character stands, so
   // `active_actions` keeps its narrow no-payload shape.
@@ -863,6 +890,10 @@ export const REPAIR_TARGET_IDS = {
   // authoritative physical fact that the ship is restored: the Crash Site scene
   // and status read it, and there is no second `flight_ready` flag anywhere.
   propulsionSystem: asContentId("propulsion_system"),
+  // The character's personal Resonance Rig at the Crash Site (#441). Its
+  // completion is the one fact that the site is theirs: the Resonance Site name,
+  // scene, Enby's visit and the Skatboll TP Rune recipe all read it.
+  resonanceRig: asContentId("resonance_rig"),
 } as const satisfies Record<string, ContentId>;
 
 /**

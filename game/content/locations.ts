@@ -65,6 +65,16 @@ export const CRASH_SITE_SHIP_RESTORED_VARIANT_ID = "crash_site_ship_restored";
  */
 export const CRASH_SITE_SHIP_DEPARTED_VARIANT_ID = "crash_site_ship_departed";
 
+/**
+ * The Crash Site once this character's personal Resonance Rig is built (#441): the
+ * same stable location, hex and teleport destination, known to them as their
+ * "Resonance Site". It is authored first and requires only the Rig's own repair
+ * completion, because the Rivet has necessarily left to reach the Wise Old Enby
+ * before the Rig's Missions can start: the scene is the already-supported empty
+ * background plus the Rig, never the Rivet and never a ship+Rig composite.
+ */
+export const CRASH_SITE_RESONANCE_SITE_VARIANT_ID = "crash_site_resonance_site";
+
 /** Holo Hollow Landing once the character's own Rivet is berthed on the pad (#358). */
 export const HOLO_HOLLOW_LANDING_SHIP_BERTHED_VARIANT_ID = "holo_hollow_landing_ship_berthed";
 
@@ -147,6 +157,28 @@ const STILLREACH_LANDING_STATION_SCENE = {
   focal: { x: 45, y: 50 } as const,
 };
 
+/**
+ * The finished personal Resonance Rig (#441), a transparent overlay on the shared
+ * 1536x384 Crash Site stage. The owner approved the placement in the four-viewport
+ * QA against the full 3:2 master canvas (1152x768 delivered, never trimmed), as
+ * percent of this stage: it holds in the 4:1 header and the 15:8 dialogue frame
+ * alike, because both compose the same stage. The Wise Old Enby may stand in front
+ * of and partly cover its Core in dialogue; the Rig is deliberately not moved aside.
+ */
+export const RESONANCE_RIG_OVERLAY = {
+  asset: "/location-scenes/resonance-rig.webp" as const,
+  width: 1152,
+  height: 768,
+  placement: { left: 36.5, top: 20, width: 29 },
+};
+
+/** The empty Crash Site with the character's finished Rig on it (#441). */
+export const CRASH_SITE_RESONANCE_SITE_SCENE = {
+  ...CRASH_SITE_BACKGROUND,
+  alt: "The empty Crash Site, churned mud and scrap, with a welded industrial Resonance Rig standing in the clearing: braced galvaferrite supports, bundled blue and orange cables, glowing power cells and a purple Runestone suspended in its open frame, a mesa and a spired outpost behind it",
+  overlay: RESONANCE_RIG_OVERLAY,
+};
+
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
@@ -170,6 +202,14 @@ const locationDefinitions = [
       ACTION_IDS.cargoHoldWelding,
       ACTION_IDS.landingGearWelding,
       ACTION_IDS.propulsionWelding,
+      // The personal Rig (#441) is welded here too, though never beside the Rivet in
+      // legitimate progression: the Rig's Mission needs the character on Stillreach.
+      ACTION_IDS.resonanceRigWelding,
+      // The Skatboll TP Rune recipe is hosted here exactly as the Hilltop Rig hosts its
+      // Seeker (#441); whether THIS character's Rig stands is the station's own
+      // unlock (`game/content/resonance-rig.ts`), so a character without one sees
+      // and starts nothing.
+      ACTION_IDS.skatbollTpRuneRuneworking,
     ],
     // The ship is physically restored the moment the Propulsion System repair
     // completes (#330), per character and from the repair's own durable
@@ -178,7 +218,17 @@ const locationDefinitions = [
     // restoration change no scene: the ship is one wreck until its drive is fixed.
     stateVariants: [
       {
-        // First, so it wins over the restored ship: once the Rivet has flown the
+        // First of all (#441): a character whose own Rig stands here no longer has a
+        // ship here to show, whatever the berth, and the Rig is theirs alone.
+        id: CRASH_SITE_RESONANCE_SITE_VARIANT_ID,
+        requires: { completedRepairTargetId: REPAIR_TARGET_IDS.resonanceRig },
+        displayName: "Resonance Site",
+        description:
+          "Your Resonance Rig stands where the wreck once lay, its Core steady in the dusk. A rune attuned here will remember Skatboll.",
+        scene: CRASH_SITE_RESONANCE_SITE_SCENE,
+      },
+      {
+        // So it wins over the restored ship: once the Rivet has flown the
         // ground it stood on is all that is left, whatever was repaired.
         id: CRASH_SITE_SHIP_DEPARTED_VARIANT_ID,
         requires: { shipBerth: "elsewhere" },

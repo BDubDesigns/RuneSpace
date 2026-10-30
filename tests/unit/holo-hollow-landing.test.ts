@@ -193,7 +193,12 @@ describe("dialogue backdrop place labels", () => {
         ? getLocalPlaceInLocation(background.locationId, background.localPlaceId)
         : undefined;
       if (background.localPlaceId) expect(place).toBeDefined();
-      const expected = place?.displayName ?? getLocation(background.locationId)?.displayName;
+      // A background may name its place for the character (#441): the Crash Site as
+      // their Resonance Site.
+      const expected =
+        background.placeName ??
+        place?.displayName ??
+        getLocation(background.locationId)?.displayName;
       expect(getConversationBackgroundPlaceName(background.id)).toBe(expected);
     }
     expect(getConversationBackgroundPlaceName("last_leg_trading_interior")).toBe(
@@ -201,6 +206,7 @@ describe("dialogue backdrop place labels", () => {
     );
     expect(getConversationBackgroundPlaceName("curly_room_after")).toBe("HH B&B");
     expect(getConversationBackgroundPlaceName("crash_site_exterior")).toBe("Crash Site");
+    expect(getConversationBackgroundPlaceName("crash_site_resonance_site")).toBe("Resonance Site");
   });
 });
 

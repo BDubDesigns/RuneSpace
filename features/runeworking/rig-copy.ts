@@ -24,9 +24,9 @@ export function runeworkingErrorMessage(
 ): string {
   switch (error) {
     case "runeworking_unavailable_here":
-      return "The Resonance Rig is at Hilltop Workshop.";
+      return "That recipe is attuned at a Resonance Rig: the Wise Old Enby's at Hilltop Workshop, or your own at the Crash Site.";
     case "runeworking_locked":
-      return "The Wise Old Enby has not shown you the Resonance Rig yet.";
+      return "That Resonance Rig is not open to you yet.";
     case "runeworking_unknown_recipe":
       return "The Rig does not know that recipe.";
     case "runeworking_recipe_locked":

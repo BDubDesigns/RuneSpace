@@ -41,9 +41,15 @@ export type CraftingActivityConfig = {
   skillId: SkillId;
   activity: TrackedMissionActivity;
   recipes: () => readonly DeterministicRecipe[];
+  /**
+   * The character's access. `locationId` names the station being started at
+   * (#441); omitted, it asks about the activity as a whole, which is all a cycle
+   * resolved away from the keyboard needs.
+   */
   loadAccess: (
     transaction: DatabaseTransaction,
     characterId: string,
+    locationId?: string,
   ) => Promise<CraftingAuthorization>;
 };
 type CraftingRow = CraftingRunTable["$inferSelect"];

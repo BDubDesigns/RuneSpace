@@ -575,6 +575,28 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(16),
     }),
+    /**
+     * The character's personal Resonance Rig at the Crash Site (#441): the
+     * Galvaferrite-and-Core tier step after the ship's repairs. Every material is
+     * a finished component taken by item ID with no provenance, installed once
+     * through the ordinary repair contribution. The Core is tradable, so the
+     * installer needs no Fabrication. The Galvaferrite and Wire Spool are
+     * additional to what the Core's own recipe embedded, and the 24 sections pay
+     * 1,200 base Welding XP at the global 50 per section: there is no separate
+     * Mission award for the build.
+     */
+    resonanceRig: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.resonanceRig),
+      actionId: z.literal(ACTION_IDS.resonanceRigWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.resonanceCore), quantity: z.literal(1) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(3) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(4) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+        z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(2) }),
+      ]),
+      repairIncrements: z.literal(24),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -957,6 +979,23 @@ const balanceSchema = z.object({
         baseXp: z.literal(25),
         inputs: z.tuple([
           z.object({ itemId: z.literal(ITEM_IDS.runeFragment), quantity: z.literal(1) }),
+        ]),
+      }),
+      /**
+       * The Skatboll TP Rune, attuned at a personal Resonance Rig (#441). Every
+       * cycle succeeds and no new failure roll exists. The ingredients are
+       * self-sourced: a Cut Quartz (Lapidary's output) and an intact Runestone.
+       */
+      skatbollTpRune: z.object({
+        actionId: z.literal(ACTION_IDS.skatbollTpRuneRuneworking),
+        outputItemId: z.literal(ITEM_IDS.skatbollTpRune),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(48),
+        baseXp: z.literal(125),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.cutQuartz), quantity: z.literal(1) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), quantity: z.literal(1) }),
         ]),
       }),
     }),
@@ -1827,6 +1866,18 @@ const defaults = balanceSchema.parse({
       ],
       repairIncrements: 16,
     },
+    resonanceRig: {
+      targetId: REPAIR_TARGET_IDS.resonanceRig,
+      actionId: ACTION_IDS.resonanceRigWelding,
+      materials: [
+        { itemId: ITEM_IDS.resonanceCore, quantity: 1 },
+        { itemId: ITEM_IDS.galvaferrite, quantity: 3 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 4 },
+        { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+        { itemId: ITEM_IDS.powerCell, quantity: 2 },
+      ],
+      repairIncrements: 24,
+    },
   },
   cargoHold: {
     capacitySlots: 32,
@@ -2090,6 +2141,18 @@ const defaults = balanceSchema.parse({
         durationTicks: 34,
         baseXp: 25,
         inputs: [{ itemId: ITEM_IDS.runeFragment, quantity: 1 }],
+      },
+      skatbollTpRune: {
+        actionId: ACTION_IDS.skatbollTpRuneRuneworking,
+        outputItemId: ITEM_IDS.skatbollTpRune,
+        outputQuantity: 1,
+        minimumLevel: 5,
+        durationTicks: 48,
+        baseXp: 125,
+        inputs: [
+          { itemId: ITEM_IDS.cutQuartz, quantity: 1 },
+          { itemId: ITEM_IDS.runestone, quantity: 1 },
+        ],
       },
     },
   },

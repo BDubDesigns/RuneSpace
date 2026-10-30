@@ -5,17 +5,31 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
   type ConversationBackgroundId,
   type ExpressionId,
   type LocalPlaceId,
   type LocationId,
   type MissionId,
   type NpcId,
+  type RepairTargetId,
 } from "@/game/config/foundations";
 
-/** One authored, Mission-derived move (#190, #231). */
+/**
+ * One authored, derived move (#190, #231, #441).
+ *
+ * It starts when a durable fact holds: a completed Mission, or — for the Wise Old
+ * Enby's visit to a character's personal Resonance Rig — a completed repair target.
+ * `untilCompletedMissionId` ends it again, so a visit is the interval between two
+ * facts the game already records and never a stored position. Exactly one start is
+ * authored (validated at load).
+ */
 export type NpcRelocation = {
-  afterCompletedMissionId: MissionId;
+  afterCompletedMissionId?: MissionId;
+  /** Starts the move once this repair target is complete, per character (#441). */
+  afterCompletedRepairTargetId?: RepairTargetId;
+  /** Ends the move once this Mission is complete, returning the NPC home (#441). */
+  untilCompletedMissionId?: MissionId;
   locationId: LocationId;
   /** Present only when the NPC moves into a Local Place of `locationId`. */
   localPlaceId?: LocalPlaceId;
@@ -205,6 +219,20 @@ export const NPCS: readonly NpcDefinition[] = [
     displayName: "The Wise Old Enby",
     role: "Researcher at Hilltop Workshop",
     homeLocationId: LOCATION_IDS.hilltopWorkshop,
+    // The one NPC, never a copy (#441): from the moment this character's personal
+    // Resonance Rig is finished until A Rune of Your Own is turned in, the Enby
+    // stands at the Crash Site — their Resonance Site — and nowhere else. Both
+    // ends are facts the game already records, so there is no stored position and
+    // nothing for the client to decide. The Hilltop research jobs are unavailable
+    // while they are away (`docs/missions.md` §15).
+    relocations: [
+      {
+        afterCompletedRepairTargetId: REPAIR_TARGET_IDS.resonanceRig,
+        untilCompletedMissionId: MISSION_IDS.aRuneOfYourOwn,
+        locationId: LOCATION_IDS.crashSite,
+        conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite,
+      },
+    ],
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior,
     expressionAssets: {
       [EXPRESSION_IDS.neutral]: "/npc-art/wise-old-enby-neutral.png",
@@ -249,11 +277,19 @@ export function getNpc(npcId: string): NpcDefinition | undefined {
 function activeRelocation(
   npc: NpcDefinition,
   completedMissionIds: ReadonlySet<string>,
+  completedRepairTargetIds: ReadonlySet<string> = new Set(),
 ): NpcRelocation | undefined {
   const relocations = npc.relocations ?? [];
   for (let index = relocations.length - 1; index >= 0; index -= 1) {
     const relocation = relocations[index]!;
-    if (completedMissionIds.has(relocation.afterCompletedMissionId)) return relocation;
+    const started = relocation.afterCompletedMissionId
+      ? completedMissionIds.has(relocation.afterCompletedMissionId)
+      : relocation.afterCompletedRepairTargetId !== undefined &&
+        completedRepairTargetIds.has(relocation.afterCompletedRepairTargetId);
+    const ended =
+      relocation.untilCompletedMissionId !== undefined &&
+      completedMissionIds.has(relocation.untilCompletedMissionId);
+    if (started && !ended) return relocation;
   }
   return undefined;
 }
@@ -262,8 +298,9 @@ function activeRelocation(
 export function resolveNpcPlacement(
   npc: NpcDefinition,
   completedMissionIds: ReadonlySet<string> = new Set(),
+  completedRepairTargetIds: ReadonlySet<string> = new Set(),
 ): { locationId: LocationId; localPlaceId?: LocalPlaceId } {
-  const relocation = activeRelocation(npc, completedMissionIds);
+  const relocation = activeRelocation(npc, completedMissionIds, completedRepairTargetIds);
   if (relocation) {
     return {
       locationId: relocation.locationId,
@@ -314,10 +351,11 @@ export function npcCanStandAt(
 export function resolveNpcVenueBackgroundId(
   npc: NpcDefinition,
   completedMissionIds: ReadonlySet<string> = new Set(),
+  completedRepairTargetIds: ReadonlySet<string> = new Set(),
 ): ConversationBackgroundId | undefined {
   return (
-    activeRelocation(npc, completedMissionIds)?.conversationBackgroundId ??
-    npc.conversationBackgroundId
+    activeRelocation(npc, completedMissionIds, completedRepairTargetIds)
+      ?.conversationBackgroundId ?? npc.conversationBackgroundId
   );
 }
 
@@ -351,10 +389,15 @@ export function getResidentNpcs(input: {
   locationId: string;
   localPlaceId?: string;
   completedMissionIds?: ReadonlySet<string>;
+  completedRepairTargetIds?: ReadonlySet<string>;
   roster?: readonly NpcDefinition[];
 }): readonly NpcDefinition[] {
   return (input.roster ?? NPCS).filter((npc) => {
-    const placement = resolveNpcPlacement(npc, input.completedMissionIds);
+    const placement = resolveNpcPlacement(
+      npc,
+      input.completedMissionIds,
+      input.completedRepairTargetIds,
+    );
     return (
       placement.locationId === input.locationId && placement.localPlaceId === input.localPlaceId
     );

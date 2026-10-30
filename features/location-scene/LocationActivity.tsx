@@ -13,6 +13,7 @@ import { ResearchFieldAction } from "@/features/research/ResearchFieldAction";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { LapidaryWorkbench } from "@/features/lapidary/LapidaryWorkbench";
 import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
+import { PERSONAL_RESONANCE_RIG } from "@/game/content/resonance-rig";
 import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { ShipPanel } from "@/features/ship/ShipPanel";
 import { MilkyWaymoKiosk } from "@/features/passenger/MilkyWaymoKiosk";
@@ -171,6 +172,20 @@ function primaryActivity(
       // The Wise Old Enby's Resonance Rig (#391), once Not From Around Here is
       // complete. Talking to the Enby stays in their own card above it.
       return <ResonanceRig />;
+    case PERSONAL_RESONANCE_RIG.locationId:
+      // The character's own Rig (#441): a Welding job until the twenty-fourth weld,
+      // then their Resonance Rig. Both read the same repair's own completion.
+      return state.repairs[PERSONAL_RESONANCE_RIG.repairTargetId]?.complete ? (
+        <ResonanceRig />
+      ) : (
+        <RepairWorkPanel
+          eyebrow="Resonance point"
+          materialsPrompt="The Wise Old Enby's list is clear: the Core, the Galvaferrite, the brackets, the wire and the cells all go into the frame before anything is welded. Hand over what you are carrying and bring the rest when you come back."
+          targetId={PERSONAL_RESONANCE_RIG.repairTargetId}
+          title="Resonance Rig"
+          weldingPrompt="The frame is stocked and the Core is seated. What is left is twenty-four careful welds to secure it to the resonance point."
+        />
+      );
     default:
       return null;
   }

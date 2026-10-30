@@ -12,6 +12,7 @@ import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content
 import { getNpc, getResidentNpcs, type NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcConversation, type NpcConversationEntry } from "@/game/domain/conversation";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import {
   deriveAcceptedMissionIds,
   deriveCompletedMissionIds,
@@ -111,6 +112,8 @@ export function NpcInteractionPanel({
     locationId,
     localPlaceId: activePlace?.id,
     completedMissionIds,
+    // The Wise Old Enby's visit starts from a finished personal Rig (#441).
+    completedRepairTargetIds: deriveCompletedRepairTargetIds(Object.values(state.repairs)),
   });
   // Two venues, one rule: the merchant the open Local Place owns, or — when the
   // player is standing in the World Location itself — the one that location
