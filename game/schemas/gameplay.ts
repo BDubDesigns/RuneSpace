@@ -183,6 +183,7 @@ export const TeleportWithRuneRequestSchema = z.object({
 
 export const AcknowledgeRuneTeleportArrivalRequestSchema = z.object({
   characterId: z.string().uuid(),
+  intentId: z.string().uuid(),
 });
 
 /**
