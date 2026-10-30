@@ -384,16 +384,18 @@ suite("issue #438 Skatboll TP Rune (real PostgreSQL)", () => {
       await use(who, stackId, 2);
       const reread = await play.getPlayGameplayState(who.userId, who.character.id, start, quiet());
       expect(reread.runeTeleport.arrival).toMatchObject({ name: "Crash Site" });
+      const intentId = reread.runeTeleport.arrival!.intentId;
 
       const before = await untouched(who);
       const acknowledged = await commands.acknowledgeRuneTeleportArrival(
         who.userId,
         who.character.id,
+        intentId,
         start,
       );
       expect(acknowledged.runeTeleport.arrival).toBeUndefined();
       // Idempotent: a repeat or a second device changes nothing.
-      await commands.acknowledgeRuneTeleportArrival(who.userId, who.character.id, start);
+      await commands.acknowledgeRuneTeleportArrival(who.userId, who.character.id, intentId, start);
       expect(await untouched(who)).toEqual(before);
       expect(await held(who)).toBe(1);
       expect(await locationOf(who)).toBe(CRASH_SITE);
@@ -403,18 +405,66 @@ suite("issue #438 Skatboll TP Rune (real PostgreSQL)", () => {
     it("a later teleport issues a fresh arrival", async () => {
       const who = await player(STILLREACH);
       const stackId = await give(who, 2);
-      await use(who, stackId, 2);
-      await commands.acknowledgeRuneTeleportArrival(who.userId, who.character.id, start);
+      const first = await use(who, stackId, 2);
+      await commands.acknowledgeRuneTeleportArrival(
+        who.userId,
+        who.character.id,
+        first.state.runeTeleport.arrival!.intentId,
+        start,
+      );
       await move(who.character.id, STILLREACH);
       const second = await use(who, stackId, 1);
       expect(second.state.runeTeleport.arrival?.arrivedAt).toBeTruthy();
+    });
+
+    it("a stale tab cannot acknowledge a newer teleport arrival", async () => {
+      const who = await player(STILLREACH);
+      const stackId = await give(who, 2);
+      const first = await use(who, stackId, 2);
+      const staleIntentId = first.state.runeTeleport.arrival!.intentId;
+
+      // Another tab dismissed Arrival 1 and made a fresh teleport.
+      await commands.acknowledgeRuneTeleportArrival(
+        who.userId,
+        who.character.id,
+        staleIntentId,
+        start,
+      );
+      await move(who.character.id, STILLREACH);
+      const second = await use(who, stackId, 1);
+      const currentIntentId = second.state.runeTeleport.arrival!.intentId;
+      expect(currentIntentId).not.toBe(staleIntentId);
+      const before = await untouched(who);
+
+      // This old tab still shows Arrival 1, not the newer arrival.
+      const staleDismissal = await commands.acknowledgeRuneTeleportArrival(
+        who.userId,
+        who.character.id,
+        staleIntentId,
+        start,
+      );
+      expect(staleDismissal.runeTeleport.arrival?.intentId).toBe(currentIntentId);
+      const rows = await receipts(who);
+      expect(rows.find((row) => row.intentId === currentIntentId)?.arrivalAcknowledgedAt).toBeNull();
+      expect(await untouched(who)).toEqual(before);
+      expect(await held(who)).toBe(0);
+      expect(await locationOf(who)).toBe(CRASH_SITE);
+
+      // Only dismissing the current receipt clears the current arrival.
+      const dismissed = await commands.acknowledgeRuneTeleportArrival(
+        who.userId,
+        who.character.id,
+        currentIntentId,
+        start,
+      );
+      expect(dismissed.runeTeleport.arrival).toBeUndefined();
     });
 
     it("is still acknowledgeable while trade-engaged or in flight", async () => {
       const who = await player(STILLREACH);
       const other = await player(STILLREACH);
       const stackId = await give(who, 1);
-      await use(who, stackId, 1);
+      const teleported = await use(who, stackId, 1);
       await trades.createTradeRequest(
         who.userId,
         who.character.id,
@@ -424,6 +474,7 @@ suite("issue #438 Skatboll TP Rune (real PostgreSQL)", () => {
       const state = await commands.acknowledgeRuneTeleportArrival(
         who.userId,
         who.character.id,
+        teleported.state.runeTeleport.arrival!.intentId,
         start,
       );
       expect(state.runeTeleport.arrival).toBeUndefined();
