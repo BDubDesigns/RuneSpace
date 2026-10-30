@@ -42,6 +42,7 @@ export function RuneTeleportArrivalModal() {
         try {
           const result = await acknowledgeRuneTeleportArrivalAction({
             characterId: state.characterId,
+            intentId: arrival.intentId,
           });
           if (result.error || !result.state) {
             setMessage(result.error ?? "Comms interruption. The notice is still here; try again.");
@@ -65,7 +66,7 @@ export function RuneTeleportArrivalModal() {
       closeHandleRef={closeHandle}
       describedById={descriptionId}
       eyebrow="Skatboll TP Rune"
-      key={attempt}
+      key={`${arrival.intentId}:${attempt}`}
       label="Teleport arrival"
       onClose={acknowledge}
       title="Arrival"
