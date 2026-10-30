@@ -554,8 +554,10 @@ for (const viewport of [
     await startSampler(page);
     await useRune(page, details);
     const black = page.locator("[data-teleport-black]");
-    await expect(black).toHaveCSS("opacity", "1", { timeout: 10_000 });
-    // Full-bleed: it covers the whole viewport, bars and Drawers included.
+    // Full-bleed from the first frame (its opacity is the sampler's business: the
+    // fully opaque hold is short by design, and polling for it from outside races).
+    await expect(black).toBeAttached({ timeout: 10_000 });
+    // It covers the whole viewport, bars and Drawers included.
     const box = await black.boundingBox();
     expect(box).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
     for (const [x, y] of [

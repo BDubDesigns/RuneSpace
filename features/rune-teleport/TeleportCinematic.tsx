@@ -60,6 +60,9 @@ export function useOptionalTeleportCinematic(): TeleportCinematicValue | undefin
   return useContext(TeleportCinematicContext);
 }
 
+/** The least time the screen stays fully black once the destination has been committed behind it. */
+const FULL_BLACK_HOLD_MS = 120;
+
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -269,8 +272,10 @@ export function TeleportCinematicProvider({
         } else {
           setNotice({ tone: "danger", message: outcome.message });
         }
+        // Hold the fully black screen long enough for the world behind it to paint,
+        // and for the beat to read as a deliberate one rather than a flicker.
         await settleFrames();
-        await sleep(60);
+        await sleep(FULL_BLACK_HOLD_MS);
         setPhase("reveal");
         await fadeBlack(blackRef.current, 0, durations.reveal);
       } finally {
