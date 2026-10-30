@@ -662,6 +662,36 @@ export const characterResearchJobs = pgTable(
   ],
 );
 
+/**
+ * One confirmed teleport-rune Use (#438), keyed by the intent id the browser minted
+ * when the player pressed TELEPORT. The row is written in the same transaction
+ * that consumes the rune and moves the character, so it is both the exactly-once
+ * settlement of that intent (a duplicate, retry or second tab finds it and
+ * changes nothing) and the durable arrival receipt. `arrival_acknowledged_at` is
+ * presentation only: the arrival modal is owed while it is null, which survives
+ * refresh and other devices, and clearing it never moves, consumes or grants.
+ */
+export const characterRuneTeleports = pgTable(
+  "character_rune_teleports",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    intentId: text("intent_id").notNull(),
+    itemId: text("item_id").notNull(),
+    originLocationId: text("origin_location_id").notNull(),
+    destinationLocationId: text("destination_location_id").notNull(),
+    teleportedAt: timestamp("teleported_at", { withTimezone: true }).notNull(),
+    arrivalAcknowledgedAt: timestamp("arrival_acknowledged_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.intentId],
+      name: "character_rune_teleports_character_intent_pk",
+    }),
+  ],
+);
+
 /** Durable idempotency marker for the one-time Issue #18 starter loadout. */
 export const characterStarterProvisioning = pgTable("character_starter_provisioning", {
   characterId: text("character_id")
@@ -2772,3 +2802,4 @@ export type PlayerTradeOfferItem = typeof playerTradeOfferItems.$inferSelect;
 export type PlayerTradeAudit = typeof playerTradeAudits.$inferSelect;
 export type CharacterResearchAssignment = typeof characterResearchAssignments.$inferSelect;
 export type CharacterResearchJob = typeof characterResearchJobs.$inferSelect;
+export type CharacterRuneTeleport = typeof characterRuneTeleports.$inferSelect;

@@ -459,6 +459,23 @@ duration). If a future overlay needs motion beyond a fade, keep it off any
 element that contains absolutely-positioned item tiles, or restructure those
 tiles first.
 
+## Teleport cinematic (Issue #438)
+
+The Skatboll TP Rune's teleport is the one place the whole Play screen is allowed
+to move: `html[data-rs-teleport]` (`destabilize` → `collapse` → `reveal`) poses
+each marked region (`data-rs-region`, the rail and docked workspace hooks, and the
+portaled Drawer frame) from a fixed per-region set of custom properties, so a
+region's breakup and reassembly are one motion in two directions. It animates
+**transform and opacity only** (no particles, no random motion, no filters on
+large surfaces, nothing that flashes), under `prefers-reduced-motion: no-preference`
+alone. A top-layer scrim (`.rs-tp-scrim`) catches pointer input and carries
+fully opaque black plus four hairline cyan/violet seams. The black's fade is driven
+by the Web Animations API, not CSS, so reduced motion still gets a short fade
+despite the global zero-duration override. The Overlay motion rule above
+(no transforms on a Drawer panel's tile-bearing content) is respected by posing
+the Drawer's *frame*, and only while the cinematic runs. A new region joins the
+breakup by getting `data-rs-region` and a pose block, not a second timeline.
+
 ## Scroll hints (Issue #345)
 
 A bounded panel that scrolls on its own says so with the local map's amber arrow

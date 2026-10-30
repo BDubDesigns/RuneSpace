@@ -2617,3 +2617,304 @@ body {
     padding: 1.375rem 1.5rem 1.5rem;
   }
 }
+
+/* Teleport cinematic (#438).
+   A hand-authored breakup of the visible Play UI for the Skatboll TP Rune, keyed
+   on one attribute the cinematic provider sets on <html>:
+     data-rs-teleport="destabilize"  A: regions drift apart from fixed, authored poses
+     data-rs-teleport="collapse"     B: regions hold their pose behind opaque black
+     data-rs-teleport="reveal"       C: regions reassemble as the black lifts
+   Every pose is one set of custom properties per region (x/y offset, rotation,
+   skew, scale, final opacity, stagger), so a region's breakup and reassembly are
+   the same motion in two directions. Deterministic and compositor-friendly:
+   transform and opacity only, no filters on large surfaces, no particles, no
+   randomness and nothing that flashes. The region markers live on the shared
+   shell (header, rail, footer, launcher), Play's own groups and the portaled
+   Drawer frame, so panels, bars and Drawers all come apart together. Reduced
+   motion never reaches these rules: it gets the scrim's short fade alone. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-rs-teleport] {
+    --tp-ease: cubic-bezier(0.55, 0.05, 0.35, 1);
+  }
+
+  html[data-rs-teleport] [data-rs-region="header"] {
+    --tp-x: 0px;
+    --tp-y: -54px;
+    --tp-r: 0deg;
+    --tp-k: 0deg;
+    --tp-s: 1.03;
+    --tp-o: 0;
+    --tp-delay: 0ms;
+  }
+  html[data-rs-teleport] [data-rs-region="guidance"],
+  html[data-rs-teleport] [data-objectives-region] {
+    --tp-x: -72px;
+    --tp-y: -14px;
+    --tp-r: -2.5deg;
+    --tp-k: 0deg;
+    --tp-s: 0.94;
+    --tp-o: 0;
+    --tp-delay: 60ms;
+  }
+  html[data-rs-teleport] [data-rs-region="scene"] {
+    --tp-x: 0px;
+    --tp-y: -10px;
+    --tp-r: 0deg;
+    --tp-k: 0deg;
+    --tp-s: 1.08;
+    --tp-o: 0;
+    --tp-delay: 120ms;
+    transform-origin: 50% 30%;
+  }
+  html[data-rs-teleport] [data-rs-region="activity"] {
+    --tp-x: 14px;
+    --tp-y: 46px;
+    --tp-r: -1.6deg;
+    --tp-k: -4deg;
+    --tp-s: 0.9;
+    --tp-o: 0;
+    --tp-delay: 180ms;
+    transform-origin: 50% 0%;
+  }
+  html[data-rs-teleport] [data-play-rail] {
+    --tp-x: 70px;
+    --tp-y: -14px;
+    --tp-r: 1.8deg;
+    --tp-k: 0deg;
+    --tp-s: 0.97;
+    --tp-o: 0;
+    --tp-delay: 90ms;
+    transform-origin: 100% 0%;
+  }
+  html[data-rs-teleport] [data-utility-workspace] {
+    --tp-x: -48px;
+    --tp-y: 64px;
+    --tp-r: -3.5deg;
+    --tp-k: 0deg;
+    --tp-s: 0.66;
+    --tp-o: 0;
+    --tp-delay: 150ms;
+    transform-origin: 100% 100%;
+  }
+  html[data-rs-teleport] [data-rs-region="footer"] {
+    --tp-x: 0px;
+    --tp-y: 96px;
+    --tp-r: 0deg;
+    --tp-k: 0deg;
+    --tp-s: 0.98;
+    --tp-o: 0;
+    --tp-delay: 220ms;
+  }
+  html[data-rs-teleport] [data-rs-region="launcher"] {
+    --tp-x: 92px;
+    --tp-y: -24px;
+    --tp-r: 6deg;
+    --tp-k: 0deg;
+    --tp-s: 0.55;
+    --tp-o: 0;
+    --tp-delay: 200ms;
+  }
+  html[data-rs-teleport] [data-rs-region="drawer"] {
+    --tp-x: 0px;
+    --tp-y: 26px;
+    --tp-r: -2.2deg;
+    --tp-k: 0deg;
+    --tp-s: 0.84;
+    --tp-o: 0;
+    --tp-delay: 40ms;
+  }
+
+  html[data-rs-teleport="destabilize"] [data-rs-region="header"],
+  html[data-rs-teleport="destabilize"] [data-rs-region="guidance"],
+  html[data-rs-teleport="destabilize"] [data-objectives-region],
+  html[data-rs-teleport="destabilize"] [data-rs-region="scene"],
+  html[data-rs-teleport="destabilize"] [data-rs-region="activity"],
+  html[data-rs-teleport="destabilize"] [data-play-rail],
+  html[data-rs-teleport="destabilize"] [data-utility-workspace],
+  html[data-rs-teleport="destabilize"] [data-rs-region="footer"],
+  html[data-rs-teleport="destabilize"] [data-rs-region="launcher"],
+  html[data-rs-teleport="destabilize"] [data-rs-region="drawer"] {
+    animation: rs-tp-destabilize 1.15s var(--tp-ease) var(--tp-delay) both;
+  }
+
+  html[data-rs-teleport="collapse"] [data-rs-region="header"],
+  html[data-rs-teleport="collapse"] [data-rs-region="guidance"],
+  html[data-rs-teleport="collapse"] [data-objectives-region],
+  html[data-rs-teleport="collapse"] [data-rs-region="scene"],
+  html[data-rs-teleport="collapse"] [data-rs-region="activity"],
+  html[data-rs-teleport="collapse"] [data-play-rail],
+  html[data-rs-teleport="collapse"] [data-utility-workspace],
+  html[data-rs-teleport="collapse"] [data-rs-region="footer"],
+  html[data-rs-teleport="collapse"] [data-rs-region="launcher"],
+  html[data-rs-teleport="collapse"] [data-rs-region="drawer"] {
+    transform: translate3d(var(--tp-x), var(--tp-y), 0) rotate(var(--tp-r)) skewX(var(--tp-k))
+      scale(var(--tp-s));
+    opacity: var(--tp-o);
+  }
+
+  html[data-rs-teleport="reveal"] [data-rs-region="header"],
+  html[data-rs-teleport="reveal"] [data-rs-region="guidance"],
+  html[data-rs-teleport="reveal"] [data-objectives-region],
+  html[data-rs-teleport="reveal"] [data-rs-region="scene"],
+  html[data-rs-teleport="reveal"] [data-rs-region="activity"],
+  html[data-rs-teleport="reveal"] [data-play-rail],
+  html[data-rs-teleport="reveal"] [data-utility-workspace],
+  html[data-rs-teleport="reveal"] [data-rs-region="footer"],
+  html[data-rs-teleport="reveal"] [data-rs-region="launcher"],
+  html[data-rs-teleport="reveal"] [data-rs-region="drawer"] {
+    animation: rs-tp-reassemble 0.6s var(--tp-ease) calc(var(--tp-delay) / 3) both;
+  }
+}
+
+@keyframes rs-tp-destabilize {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  /* A small shudder against the direction of travel, so the pieces read as
+     straining before they let go. */
+  22% {
+    transform: translate3d(calc(var(--tp-x) * -0.08), calc(var(--tp-y) * -0.08), 0)
+      rotate(calc(var(--tp-r) * -0.3)) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--tp-x), var(--tp-y), 0) rotate(var(--tp-r)) skewX(var(--tp-k))
+      scale(var(--tp-s));
+    opacity: var(--tp-o);
+  }
+}
+
+@keyframes rs-tp-reassemble {
+  0% {
+    transform: translate3d(var(--tp-x), var(--tp-y), 0) rotate(var(--tp-r)) skewX(var(--tp-k))
+      scale(var(--tp-s));
+    opacity: var(--tp-o);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The cinematic's top layer: above every Drawer, bar and rail, and catching all
+   pointer input from the first frame to the last. The black layer's opacity is
+   driven from script (Web Animations), so the fade is still a fade, not a cut,
+   under reduced motion. It paints fully opaque black, never a tint. */
+.rs-tp-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: auto;
+  outline: none;
+}
+
+.rs-tp-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+
+.rs-tp-seams {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Restrained seams where the interface tears: four hairlines, cyan to violet. */
+.rs-tp-seam {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(75 216 245 / 0.75) 35%,
+    rgb(196 140 255 / 0.75) 65%,
+    transparent
+  );
+}
+
+.rs-tp-seam--h1,
+.rs-tp-seam--h2 {
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform-origin: 0 50%;
+}
+
+.rs-tp-seam--v1,
+.rs-tp-seam--v2 {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgb(196 140 255 / 0.75) 35%,
+    rgb(75 216 245 / 0.75) 65%,
+    transparent
+  );
+  transform-origin: 50% 0;
+}
+
+.rs-tp-seam--h1 {
+  top: 31%;
+}
+.rs-tp-seam--h2 {
+  top: 68%;
+}
+.rs-tp-seam--v1 {
+  left: 27%;
+}
+.rs-tp-seam--v2 {
+  left: 73%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rs-tp-seam--h1 {
+    animation: rs-tp-seam-x 1.05s ease-in-out 0.1s both;
+  }
+  .rs-tp-seam--h2 {
+    animation: rs-tp-seam-x 1.05s ease-in-out 0.3s both;
+  }
+  .rs-tp-seam--v1 {
+    animation: rs-tp-seam-y 1.05s ease-in-out 0.2s both;
+  }
+  .rs-tp-seam--v2 {
+    animation: rs-tp-seam-y 1.05s ease-in-out 0.4s both;
+  }
+}
+
+@keyframes rs-tp-seam-x {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.05);
+  }
+  45% {
+    opacity: 0.8;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1) translateY(6px);
+  }
+}
+
+@keyframes rs-tp-seam-y {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.05);
+  }
+  45% {
+    opacity: 0.8;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(1) translateX(-6px);
+  }
+}

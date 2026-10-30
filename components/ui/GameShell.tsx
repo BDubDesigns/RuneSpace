@@ -10,7 +10,10 @@ export function TopBar({
   trailing?: ReactNode;
 }) {
   return (
-    <header className="rs-bevel border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 py-3 shadow-[var(--rs-glow-primary)]">
+    <header
+      data-rs-region="header"
+      className="rs-bevel border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 py-3 shadow-[var(--rs-glow-primary)]"
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 font-display text-lg font-bold text-[color:var(--rs-text-primary)]">
           {title}
@@ -33,6 +36,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Primary"
+      data-rs-region="footer"
       className={`${hiddenAtDesktop ? "xl:hidden" : ""} fixed inset-x-0 bottom-0 z-10 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-navigation)] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm`}
     >
       {children}
@@ -82,6 +86,7 @@ function FloatingEdgeAnchor({
           : "left-[env(safe-area-inset-left)]"
       }`}
       data-floating-action-side={position.side}
+      data-rs-region="launcher"
     >
       <div className="relative h-full">
         <div

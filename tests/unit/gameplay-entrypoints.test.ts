@@ -106,7 +106,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 104 production player actions", () => {
+  it("enumerates exactly the 106 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -128,13 +128,14 @@ describe("player server actions (server/actions.ts)", () => {
     // disembarking its arrival notice. #406 adds seven research-job commands:
     // accept, start a field action, deliver the packet, collect payment, confirm
     // the passage, abandon, and dismiss the arrival receipt. #408 adds destroying
-    // a bound Mission loan from Inventory.
-    expect(bodies.size).toBe(104);
+    // a bound Mission loan from Inventory. #438 adds the Skatboll TP Rune's
+    // teleport and the dismissal of its arrival receipt.
+    expect(bodies.size).toBe(106);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(100);
+    expect(gameplay).toHaveLength(102);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }

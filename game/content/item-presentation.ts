@@ -172,6 +172,17 @@ const itemPresentations = {
     description:
       "A Runestone suspended in a wired Galvaferrite containment frame. Built as the heart of a larger resonance system.",
   },
+  // The Skatboll TP Rune (#438): the owner-approved art and an ordinary Use.
+  [ITEM_IDS.skatbollTpRune]: {
+    displayName: "Skatboll TP Rune",
+    pluralName: "Skatboll TP Runes",
+    accessibleDescription:
+      "A thick, rugged, chipped dark Runestone tablet with a faceted Cut Quartz inset glowing in the centre, surrounded by crisp cyan and violet illuminated geometric glyphs",
+    textFallback: "TP",
+    artworkSrc: "/item-art/skatboll-tp-rune.webp",
+    description:
+      "A manufactured teleport rune (TP). Use it from Inventory to teleport your character, with everything you carry, to the Crash Site on Skatboll. Your ship, its fuel and its Cargo Hold stay where they are parked. One rune is used up.",
+  },
   // The Propulsion System's mounting interface (#330).
   [ITEM_IDS.driveMount]: {
     displayName: "Drive Mount",

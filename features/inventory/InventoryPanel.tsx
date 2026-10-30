@@ -37,6 +37,10 @@ import {
 import { InlineConfirmation } from "./InlineConfirmation";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { EchoSeekerDetails } from "@/features/echo-hunts/EchoSeekerDetails";
+import {
+  RuneTeleportDetails,
+  RuneTeleportNotice,
+} from "@/features/rune-teleport/RuneTeleportDetails";
 import { loanBadge } from "@/features/research/loan-badge";
 import { ResearchLoanDestroy } from "@/features/research/ResearchLoanDestroy";
 import { ResearchLoanDetails } from "@/features/research/ResearchLoanDetails";
@@ -445,6 +449,7 @@ export function InventoryPanel({
           <Feedback tone={message.tone}>{message.message}</Feedback>
         </div>
       ) : null}
+      <RuneTeleportNotice />
       <RowDetailsGrid
         ariaLabel={`${totalSlots} inventory slots`}
         className="mt-4"
@@ -527,6 +532,11 @@ export function InventoryPanel({
               resolvedSelection.entry.itemId === state.echoHunt.seekerItemId ? (
                 // A Seeker's Use and its current-planet reading (#393).
                 <EchoSeekerDetails />
+              ) : null}
+              {resolvedSelection.kind === "stack" &&
+              state.runeTeleport.runes[resolvedSelection.entry.itemId] ? (
+                // A teleport rune's Use and its confirmation (#438).
+                <RuneTeleportDetails entry={resolvedSelection.entry} />
               ) : null}
               {selectedIsPowerCell ? (
                 <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">

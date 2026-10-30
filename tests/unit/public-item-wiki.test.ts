@@ -117,6 +117,7 @@ describe("Wiki item catalog", () => {
         "Resonance Core",
         "Resonance Sampler",
         "Sealed Research Packet",
+        "Skatboll TP Rune",
         "Wheel Assembly",
       ],
       [

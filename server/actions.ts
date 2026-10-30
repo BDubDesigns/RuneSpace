@@ -59,6 +59,11 @@ import {
   teleportResearchJob,
   type ResearchCommandResult,
 } from "@/server/research-job-commands";
+import {
+  acknowledgeRuneTeleportArrival,
+  teleportWithRune,
+  type TeleportRuneResult,
+} from "@/server/rune-teleport-commands";
 import { claimFedhexParcel, type FedhexClaimResult } from "@/server/fedhex-commands";
 import {
   finishCurrentTinkering,
@@ -218,6 +223,8 @@ import {
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
   BreakApartRunestoneRequestSchema,
+  TeleportWithRuneRequestSchema,
+  AcknowledgeRuneTeleportArrivalRequestSchema,
   RepairMaterialContributionRequestSchema,
   StartRefiningRequestSchema,
   StartFabricationRequestSchema,
@@ -1122,6 +1129,42 @@ export async function breakApartRunestoneAction(
       return { error: error.message };
     throw error;
   }
+}
+
+export type TeleportWithRuneActionResult = TeleportRuneResult | { error: string };
+
+/**
+ * Use a Skatboll TP Rune (#438). The server revalidates the selected carried stack,
+ * the position, idleness and the trade and flight gates inside the character lock;
+ * the intent id makes a retry or duplicate settle to the one teleport.
+ */
+export async function teleportWithRuneAction(
+  input: unknown,
+): Promise<TeleportWithRuneActionResult> {
+  const request = TeleportWithRuneRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid teleport command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await teleportWithRune(user.id, request.data.characterId, {
+      intentId: request.data.intentId,
+      stackId: request.data.stackId,
+      expectedQuantity: request.data.expectedQuantity,
+    });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function acknowledgeRuneTeleportArrivalAction(
+  input: unknown,
+): Promise<PlayActionResult> {
+  const request = AcknowledgeRuneTeleportArrivalRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid arrival acknowledgment." };
+  return runPlayAction(request.data.characterId, (userId, id) =>
+    acknowledgeRuneTeleportArrival(userId, id),
+  );
 }
 
 export async function beginTravelAction(input: unknown): Promise<PlayActionResult> {

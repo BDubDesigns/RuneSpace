@@ -6,6 +6,7 @@ import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { PassengerArrivalModal } from "@/features/passenger/PassengerArrivalModal";
 import { ResearchArrivalModal } from "@/features/research/ResearchArrivalModal";
+import { RuneTeleportArrivalModal } from "@/features/rune-teleport/RuneTeleportArrivalModal";
 import { PassengerJourneyPanel } from "@/features/passenger/PassengerJourneyPanel";
 import { FlightPanel } from "@/features/ship/FlightPanel";
 import { ShipArrivalNotice } from "@/features/ship/ShipArrivalNotice";
@@ -139,10 +140,12 @@ export function PlayConsole({
           is only ever one interactive copy. Until the browser has answered the
           phone placement renders, hidden by CSS at desktop width. */}
       {desktop !== true ? (
-        <MissionGuidanceStrips
-          className={desktop === undefined ? "xl:hidden" : undefined}
-          state={state}
-        />
+        <div className="space-y-3 empty:hidden" data-rs-region="guidance">
+          <MissionGuidanceStrips
+            className={desktop === undefined ? "xl:hidden" : undefined}
+            state={state}
+          />
+        </div>
       ) : null}
       <ScavengeSuppressedNotice />
       {/* The durable landing receipt leads every surface until it is dismissed (#358). */}
@@ -151,18 +154,28 @@ export function PlayConsole({
           the whole game, so it presents wherever the player is. */}
       <PassengerArrivalModal />
       <ResearchArrivalModal />
+      {/* A teleport rune's durable arrival, once the cinematic has finished (#438). */}
+      <RuneTeleportArrivalModal />
       {/* A Seeker reading's durable result, wherever the player is (#393). */}
       <EchoReadingNotice spotlight={noticeId !== undefined && spotlightNoticeId === noticeId} />
       {surface === "map" ? (
         // The return control is the desktop main-column header's while docked
         // (#286), so the panel does not carry a second one beside it.
-        <LocalMapPanel onBack={desktop ? undefined : onMapExit} onTravelStarted={onMapExit} />
+        <div className="space-y-3" data-rs-region="scene">
+          <LocalMapPanel onBack={desktop ? undefined : onMapExit} onTravelStarted={onMapExit} />
+        </div>
       ) : inTransit ? (
-        <JourneyPanel />
+        <div className="space-y-3" data-rs-region="scene">
+          <JourneyPanel />
+        </div>
       ) : inFlight ? (
-        <FlightPanel />
+        <div className="space-y-3" data-rs-region="scene">
+          <FlightPanel />
+        </div>
       ) : onShuttle ? (
-        <PassengerJourneyPanel />
+        <div className="space-y-3" data-rs-region="scene">
+          <PassengerJourneyPanel />
+        </div>
       ) : (
         <>
           {/* The grammar, in order (#193): the place, then the one thing you
@@ -170,10 +183,14 @@ export function PlayConsole({
               Each activity owns its own controls, context and run summary, so
               this shell composes surfaces rather than assembling any one
               activity's parts from a location branch. */}
-          <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
+          <div className="space-y-3 empty:hidden" data-rs-region="scene">
+            <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
+          </div>
           {/* Rusk Recovery's Work Orders terminal now lives in its Welding
               Workshop work area (#232), composed by the activity. */}
-          <LocationActivity characterName={characterName} localPlaceId={localPlaceId} />
+          <div className="space-y-3 empty:hidden" data-rs-region="activity">
+            <LocationActivity characterName={characterName} localPlaceId={localPlaceId} />
+          </div>
         </>
       )}
 

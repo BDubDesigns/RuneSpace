@@ -1227,6 +1227,15 @@ const balanceSchema = z.object({
       stackLimit: z.literal(2),
     }),
     /**
+     * The Skatboll TP Rune (#438): 1,100 g, five to a stack. An ordinary carried,
+     * stashed, Cargo and tradable stack; no merchant sells or buys it back.
+     */
+    skatbollTpRune: z.object({
+      itemId: z.literal(ITEM_IDS.skatbollTpRune),
+      massGrams: z.literal(1_100),
+      stackLimit: z.literal(5),
+    }),
+    /**
      * Mining Secondary Finds (#308): rough gemstones. Each owns the one bonus
      * Mining XP it is worth wherever a source's table awards it, so the same
      * Topaz is worth the same at The Jag and at Deep Jag and no source restates
@@ -2186,6 +2195,7 @@ const defaults = balanceSchema.parse({
       equipment: { kind: "container", slotCapacity: 6 },
     },
     resonanceCore: { itemId: ITEM_IDS.resonanceCore, massGrams: 3_900, stackLimit: 2 },
+    skatbollTpRune: { itemId: ITEM_IDS.skatbollTpRune, massGrams: 1_100, stackLimit: 5 },
     cutQuartz: { itemId: ITEM_IDS.cutQuartz, massGrams: 100, stackLimit: 2 },
     cutTopaz: { itemId: ITEM_IDS.cutTopaz, massGrams: 100, stackLimit: 2 },
     cutSapphire: { itemId: ITEM_IDS.cutSapphire, massGrams: 100, stackLimit: 2 },
