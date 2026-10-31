@@ -622,6 +622,7 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Curly's Stash Mount: HH B&B (#292) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
 | Landing Gear (Crash Site, #322) | 2 Wheel Assemblies + 2 Mounting Brackets + 1 Galvanic Wire Spool | 12 | 600 |
 | Propulsion System (Crash Site, #330) | 2 Drive Mounts + 1 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Wire Spool | 16 | 800 |
+| Resonance Rig (Crash Site, #441) | 1 Resonance Core + 3 Galvaferrite + 4 Mounting Brackets + 1 Galvanic Wire Spool + 2 Power Cells | 24 | 1,200 |
 
 Curly's mount is The Jag's Tier-1 job, authored as its own entry, done for an
 NPC: it is authorized by accepting **Curly Must-Stash**, lives inside HH B&B,
@@ -680,6 +681,17 @@ restored. Ship flight-ready."), through `completedRepairStatus`
 Restoring the ship opens **no** flight control by itself. The first flight
 (#358, "The Rivet Utility Shuttle and its first flight" below) consumes the
 repair completion and the Mission turn-in as facts; it adds no flag to either.
+
+The personal Resonance Rig (#441) is the Crash Site's fourth repair and the first
+whose job is not part of the ship. It is authorized by accepting **A Place to Call
+Home** and needs the Welding 12 that Mission itself asks for, now as a live
+`skill_level` objective rather than an acceptance prerequisite
+(`requiresMissionWeldingLevel` reads `missionRequiredSkillLevel`, so the level still
+has exactly one home). Its five finished components are installed once through the
+ordinary contribution, then **24 ordinary sections** pay 1,200 base Welding XP at
+the global 50 per section: no Mission XP, Clean Pass and interruption behave as for
+every other repair. Its completion is the one fact the site is theirs; see
+"The personal Resonance Rig at the Crash Site (issue #441)" below.
 
 ### Ship systems: one presentation, now inside the Ship panel (issue #322)
 
@@ -1815,6 +1827,73 @@ resolution), `server/runeworking.ts` (snapshot, resolver, persistence),
 after acceptance, then the Enby's turn-in for 150 RW XP (`docs/missions.md`).
 Later attunements are always allowed and pay their ordinary XP.
 
+### The personal Resonance Rig at the Crash Site (issue #441)
+
+Runeworking has two stations. The Wise Old Enby's prebuilt Rig at Hilltop Workshop
+(opened by *Not From Around Here*) attunes the Seeker; **a character's own Rig at the
+Crash Site** (opened by that character's finished Rig repair) attunes the
+**Skatboll TP Rune**. The stations are `RUNEWORKING_STATIONS` in
+`game/content/resonance-rig.ts`; a recipe belongs to the station whose location
+authors its action in `availableActionIds`, and a station's unlock is a record the
+game already keeps (a Mission completion stamp, a repair completion). There is no
+second "Rig unlocked" flag.
+
+| Recipe | Station | Level | Input | Output | Time | XP |
+| --- | --- | ---: | --- | --- | --- | ---: |
+| Beginner Echo Seeker | Hilltop Workshop | RW 1 | 1 Rune Fragment | 1 Seeker | 34 ticks | 25 |
+| Skatboll TP Rune | your Rig, Crash Site | RW 5 | 1 Cut Quartz + 1 intact Runestone | 1 Skatboll TP Rune | **48 ticks (28.8 s)** | **125** |
+
+The TP Rune is the existing item (1,100 g, stack 5, ordinary trade and storage),
+every cycle succeeds, and nothing new is invented: no failure roll, no free
+ingredients, no Mission-only production lock. `server/crafting-commands.ts` takes a
+per-recipe `CraftingHost` (a fixed location for Lapidary, a function for Runeworking),
+so the same Start / Finish Current / bounded-run / capacity / reconnect behaviour
+applies. Starting is refused with `unavailable_here` away from a hosting station and
+`locked` at one the character has not opened.
+
+**Place and presence.** Completing the Rig changes nothing global. The same stable
+location, hex and teleport destination is, for that character, the **Resonance
+Site**: `stateVariants` gain an optional `displayName`, and the Crash Site's first
+variant (`crash_site_resonance_site`, requiring only the Rig repair) renames it, shows
+the empty ship-departed panorama plus the Rig overlay (placement `{ left: 36.5, top:
+20, width: 29 }` of the shared 1536x384 stage), and is read by the Map hex, the scene
+header, the dialogue place plate and the Skatboll TP Rune's confirmation and arrival
+(`teleportDestinationPresentation`). The Rivet and the Rig cannot both be there in
+legitimate progression, so there is no ship+Rig composite. From the final weld until
+*A Rune of Your Own* is turned in, the **one** Wise Old Enby stands at the Crash Site:
+an `NpcRelocation` that starts on a completed repair target and ends on a completed
+Mission (`afterCompletedRepairTargetId` / `untilCompletedMissionId`), derived like
+every other placement. While they are away their Hilltop Research Jobs cannot be
+offered, handed in or confirmed (`giverAtWorkshop` in
+`server/research-job-commands.ts`) and the Research Jobs button is not shown; a held
+assignment is untouched.
+
+**The arrival.** The Rig's completion is gameplay; *being shown* the Enby's arrival is
+a receipt, `character_repair_targets.arrival_acknowledged_at` (migration
+`0057_resonance_rig_arrival`, one nullable column, ignored by every other row).
+`state.resonanceArrival` is present while it is owed, so a weld that finished offline,
+in another tab or before a reload is still presented, and an acknowledged one never is.
+`acknowledgeResonanceArrival` is presentation only and idempotent. The scene
+(`features/resonance-site/ResonanceArrival.tsx`) plays through the shared
+`DialogueScene` and the scene-cue layer below, waits (still owed) while the player is
+elsewhere or a teleport is revealing, and never starts a conversation.
+
+**Scene cues.** `game/domain/scene-cues.ts` is a small deterministic vocabulary:
+three layers (`core`, `rift`, `portrait`) and five effects (`fade`, `slide`, `open`,
+`close`, `pulse`) at absolute millisecond offsets, with no vertical motion at all
+because the approved Enby portraits are cropped at the feet. `game/content/scene-cues.ts`
+authors the arrival (core pulse, rift opens, portrait fades in, rift closes, then one
+caption, about 1.9 s) and the departure (rift opens, portrait slides sideways into it
+while fading, rift closes). `features/scene-cues/` plays a sequence with the Web
+Animations API (reduced motion goes straight to the final state, Skip finishes at
+once, an interruption cancels without completing, and a fallback timer completes a
+throttled tab). The stage-relative layers are children of the shared
+`SceneComposition`; the portrait gets a frame-sized clipping wrapper only when a
+sequence is cued, so every other dialogue renders exactly what it always did. A
+`DialogueSequence` may author `exitCueSequenceId`: when the player finishes it, the
+sequence plays over its last beat and the conversation then closes. Presentation
+only: placement, rewards and Mission state are settled by the server first.
+
 ## Lapidary at Werner's Lab (#431)
 
 Lapidary is the sixth skill and uses the standard level curve. Its sky-blue
@@ -2103,11 +2182,13 @@ buys, not a Rivet flight with the ship hidden.
 The first teleport rune is an ordinary carried, stashable, Cargo-Hold-storable and
 **tradable** stack: 1,100 g, stack limit 5, category Components & Supplies, with the
 owner-approved art (`assets/item-art/skatboll-tp-rune.png`, byte-identical,
-SHA-256 `aeff8beb…3644`). No merchant sells or buys it back, and it has no
-repeatable source yet: today it arrives only from the existing Admin Console
-ADD ITEM (or a trade). Manufacture (Runeworking 5, at a personal Resonance Rig,
-1 Cut Quartz + 1 Intact Runestone), the personal Rig, the Crash Site's later
-"Resonance Site" name and the Enby's missions are **not** part of this slice.
+SHA-256 `aeff8beb…3644`). No merchant sells or buys it back. It is made at a
+character's own Resonance Rig (Runeworking 5, 1 Cut Quartz + 1 Intact Runestone,
+28.8 s, 125 XP; "The personal Resonance Rig at the Crash Site (issue #441)",
+below) and is otherwise only given by the Wise Old Enby (two with *A Place to Call
+Home*), by the Admin Console ADD ITEM, or by trade. The personal Rig, the Crash
+Site's "Resonance Site" name for that character and the Enby's two Missions arrived
+with #441; none of them gates **Use**, which stays "the carrying alone".
 
 **Use** is from ordinary Inventory Item Details: **USE RUNE** → a RuneSpace
 confirmation (**Teleport to Skatboll?**, naming the destination, that one rune is
@@ -2120,7 +2201,9 @@ Cancel, Escape and an outside tap send no command and cost nothing.
   Rig, Mission or prior visit. A received, traded or admin-granted rune works the
   same. The destination is the existing `LOCATION_IDS.crashSite`, resolved through
   `game/content/rune-teleports.ts`, the one place its player-facing label is
-  chosen, so a character-specific name can arrive later without a second location.
+  chosen: the location's own name, or the character's "Resonance Site" once their
+  Rig stands there (#441), resolved from the same location-state boundary as the
+  Map. It is the same single destination either way.
 - **The command** (`teleportWithRune` in `server/rune-teleport-commands.ts`,
   rules in `game/domain/rune-teleport.ts`) runs inside the shared owned-character
   lock after due work has reconciled. The shared boundary already refuses

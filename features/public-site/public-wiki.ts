@@ -1211,20 +1211,34 @@ const authoredWikiArticles = [
           [
             "Beginner Echo Seeker — 1 ",
             { text: "Rune Fragment", articleSlug: "mining-and-refining" },
-            ". 20.4 seconds, 25 Runeworking XP, Runeworking 1. It always succeeds. It weighs 200g, the same as the Fragment it was made from, and stacks five to a slot.",
+            ", at the Wise Old Enby's Resonance Rig at Hilltop Workshop on Stillreach. 20.4 seconds, 25 Runeworking XP, Runeworking 1. It always succeeds. It weighs 200g, the same as the Fragment it was made from, and stacks five to a slot.",
+          ],
+          [
+            "Skatboll TP Rune — 1 Cut Quartz and 1 intact Runestone, at your own Resonance Rig at your Resonance Site on Skatboll (below). 28.8 seconds, 125 Runeworking XP, Runeworking 5. It always succeeds. It is the ordinary Skatboll TP Rune: 1,100g, five to a slot, and it can be traded or stored like any other.",
           ],
         ],
         paragraphs: [
           "A Beginner Echo Seeker is attuned to detect hidden disturbances in RuneSpace. Use one from your Inventory to hunt for a Resonance Echo (below).",
-          "The Rig has two modes: Attune, where you start and watch a run, and Recipes, a list of every Runeworking recipe you know. A recipe stays listed in both even when you are not carrying what it needs, and in Attune, Sources beside its ingredient shows where to get more.",
+          "Each Rig makes the one recipe listed for it above, so there is nothing to choose between: its panel shows what it makes, what it needs and what you are carrying, and Sources beside an ingredient shows where to get more. That list is the whole of Runeworking, and the Rig's panel links back here.",
+        ],
+      },
+      {
+        heading: "Your own Resonance Rig",
+        paragraphs: [
+          [
+            "The Wise Old Enby's Rig stays at Hilltop Workshop, and Beginner Echo Seekers are made only there. Your own Rig stands on your Crash Site on Skatboll once you build it in ",
+            { text: "A Place to Call Home", articleSlug: "mission-a-place-to-call-home" },
+            ": it is yours alone, other players cannot use it, and it never travels with your ship. From then on that place is your Resonance Site. Skatboll TP Runes are attuned only there, and a rune made there remembers Skatboll whoever eventually uses it.",
+          ],
+          "It runs exactly like the Wise Old Enby's: the same panel and the same runs, below.",
         ],
       },
       {
         heading: "Runs",
         paragraphs: [
-          "Choose how many to make with − and +, or Max to keep going until the next one cannot start. Each one is checked when it starts: that you still have the Rune Fragment, and that the finished Seeker will fit once the Fragment is gone — a part-full Seeker stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
-          "A started attunement is committed. Its Rune Fragment stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the Fragments for later ones are still yours until each one starts.",
-          "When an attunement finishes, the Fragment is used up and the Seeker lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
+          "Choose how many to make with − and +, or Max to keep going until the next one cannot start. The size controls appear once your materials cover at least one. Each one is checked when it starts: that you still have what it needs, and that the finished piece will fit once those are gone — a part-full stack is topped up first. Max stops as soon as one of those runs out, however many that turns out to be.",
+          "A started attunement is committed. What it uses (a Rune Fragment at the Wise Old Enby's Rig, a Cut Quartz and an intact Runestone at yours) stays in your Inventory until it finishes, set aside for it, and you cannot walk away from the Rig until it is done. Only the attunement on the Rig sets anything aside; the materials for later ones are still yours until each one starts.",
+          "When an attunement finishes, its materials are used up and the piece lands in your Inventory at the same moment, with its XP. There is no cancel: Stop After This Attunement lets the one on the Rig finish and ends the run there. Closing the game or losing your connection changes nothing; the Rig keeps going, and when you come back it is exactly where it would have been.",
         ],
       },
       {
@@ -1371,6 +1385,19 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "A Rig of Your Own",
+        list: [
+          [
+            { text: "A Place to Call Home", articleSlug: "mission-a-place-to-call-home" },
+            " — offered by hand by the Wise Old Enby at Hilltop Workshop once Seeker? I Hardly Know Her! is done and you are at Runeworking 5. Build a Resonance Rig at your Crash Site (Welding 12 and 24 welds) and return to them there for two Skatboll TP Runes.",
+          ],
+          [
+            { text: "A Rune of Your Own", articleSlug: "mission-a-rune-of-your-own" },
+            " — starts by itself when you complete A Place to Call Home. Craft one Skatboll TP Rune at your Rig and speak to the Wise Old Enby for 500 Runeworking XP. You keep the rune.",
+          ],
+        ],
+      },
+      {
         heading: "Werner’s supervised lessons",
         list: [
           [
@@ -1387,6 +1414,7 @@ const authoredWikiArticles = [
           "10,000 Hours leads in two independent directions. One is Tansy's Fabrication chapter — Return the Favor, then Break It Down, then Brace Yourself and what it opens. The other is 10,001 Hours and the Work Orders board. Neither needs the other.",
           "Brace Yourself opens three Missions: Wheel Be Right Back, which leads on to Thrust Issues, plus A Cut Above and Cutting Costs.",
           "Not From Around Here stands apart from all of them: it needs no earlier Mission, and the Rune Fragment you carry offers it. Finishing it hands you Seeker? I Hardly Know Her!, and finishing that hands you First Resonance Echo.",
+          "Once Seeker? I Hardly Know Her! is done and you are at Runeworking 5, the Wise Old Enby offers A Place to Call Home by hand; it does not wait for First Resonance Echo. Finishing it hands you A Rune of Your Own.",
         ],
       },
       {
@@ -1989,9 +2017,21 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "A Rig of your own",
+        paragraphs: [
+          [
+            "Once you have finished Seeker? I Hardly Know Her! and reached Runeworking 5, they will offer ",
+            { text: "A Place to Call Home", articleSlug: "mission-a-place-to-call-home" },
+            ": a Resonance Rig of your own, built on the resonance point beneath your Crash Site. When it is finished they come to see it, and while they are visiting your Resonance Site they are not at Hilltop Workshop. They return once you have finished ",
+            { text: "A Rune of Your Own", articleSlug: "mission-a-rune-of-your-own" },
+            ".",
+          ],
+        ],
+      },
+      {
         heading: "Research Jobs",
         paragraphs: [
-          "Talk to them and choose Research Jobs for repeatable work. They keep one research job going at a time per character; story missions are separate and never blocked. Each job lends you one item that takes a normal Inventory slot and its real weight, so you need room for it. You cannot sell, trade, store, stash or drop a loaned item, and none of these jobs pays any XP. To give a job up, choose Abandon Assignment in its Mission Log entry, from anywhere, or choose Destroy on the loaned item in your Inventory and confirm: either way you lose its progress and the loaned item, and nothing is paid. Once the Courier packet has been handed to FedHex there is nothing left to destroy, so use Abandon Assignment.",
+          "Talk to them and choose Research Jobs for repeatable work. While they are visiting your own Resonance Rig they are away from the workshop: no job can be offered or handed in until they are home, and a job you hold waits for them. They keep one research job going at a time per character; story missions are separate and never blocked. Each job lends you one item that takes a normal Inventory slot and its real weight, so you need room for it. You cannot sell, trade, store, stash or drop a loaned item, and none of these jobs pays any XP. To give a job up, choose Abandon Assignment in its Mission Log entry, from anywhere, or choose Destroy on the loaned item in your Inventory and confirm: either way you lose its progress and the loaned item, and nothing is paid. Once the Courier packet has been handed to FedHex there is nothing left to destroy, so use Abandon Assignment.",
           [
             "Research Courier lends a 2 kg Sealed Research Packet. Carry it to the FedHex terminal at Stillreach Landing Station (see ",
             { text: "Credits & Trading", articleSlug: "credits-and-trading" },

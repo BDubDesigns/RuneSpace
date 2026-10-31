@@ -21,6 +21,7 @@ import { composePresentedDialogue } from "@/game/domain/skill-level-dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import {
   getMissionCapacityRefusalDialogue,
   resolveMissionSuccessView,
@@ -113,6 +114,7 @@ export function NpcConversation({
   const venueBackgroundId = resolveNpcVenueBackgroundId(
     npc,
     deriveCompletedMissionIds(state.missions),
+    deriveCompletedRepairTargetIds(Object.values(state.repairs)),
   );
   // Finished repairs, for backgrounds that show a room as the player left it
   // (#292). Keyed by a string so the set only changes when a repair does.
@@ -272,6 +274,9 @@ export function NpcConversation({
             onAction={open?.action ? runConversationAction : undefined}
             onBack={returnToHub}
             onFinish={returnToHub}
+            // A speaker who has just left (#441) ends the conversation: there is no
+            // hub left to return to once their exit has played.
+            onDepart={onClose}
             sequence={sequence}
             {...(open?.creditsReceipt ? { receipt: open.creditsReceipt } : {})}
             {...(venueBackgroundId ? { venueBackgroundId } : {})}
@@ -325,6 +330,9 @@ export function NpcConversation({
               <GroupedHubButtons
                 hasTopics={topicEntries.length > 0}
                 onSelect={setSection}
+                // The jobs belong to the workshop (#441): while the Enby is visiting a
+                // personal Resonance Site there is no Research Jobs button to press.
+                researchAvailable={state.location.currentLocationId === RESEARCH_GIVER.locationId}
                 researchGuidance={state.research.assignment?.stage === "ready"}
               />
             ) : topicEntries.length > 0 ? (
@@ -357,10 +365,12 @@ export function NpcConversation({
 function GroupedHubButtons({
   hasTopics,
   onSelect,
+  researchAvailable,
   researchGuidance,
 }: {
   hasTopics: boolean;
   onSelect: (section: "topics" | "research") => void;
+  researchAvailable: boolean;
   researchGuidance: boolean;
 }) {
   return (
@@ -377,22 +387,24 @@ function GroupedHubButtons({
           </span>
         </button>
       ) : null}
-      <button
-        className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center justify-between gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-3 text-left ${researchGuidance ? "rs-mission-available" : ""}`}
-        data-conversation-group="research"
-        data-mission-guidance={researchGuidance ? "turn_in" : undefined}
-        onClick={() => onSelect("research")}
-        type="button"
-      >
-        <span className="font-display text-sm font-bold uppercase tracking-wide">
-          Research Jobs
-        </span>
-        {researchGuidance ? (
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]">
-            Turn in
+      {researchAvailable ? (
+        <button
+          className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center justify-between gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-3 text-left ${researchGuidance ? "rs-mission-available" : ""}`}
+          data-conversation-group="research"
+          data-mission-guidance={researchGuidance ? "turn_in" : undefined}
+          onClick={() => onSelect("research")}
+          type="button"
+        >
+          <span className="font-display text-sm font-bold uppercase tracking-wide">
+            Research Jobs
           </span>
-        ) : null}
-      </button>
+          {researchGuidance ? (
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]">
+              Turn in
+            </span>
+          ) : null}
+        </button>
+      ) : null}
     </div>
   );
 }

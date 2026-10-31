@@ -14,6 +14,8 @@ import { RuneworkingRunPanel } from "@/features/runeworking/RuneworkingRunPanel"
 import {
   ATTUNEMENT_UNIT,
   runeworkingErrorMessage,
+  runeworkingCanStart,
+  runeworkingCommitmentNote,
   runeworkingRecipeLine,
   runeworkingRunSummary,
   runeworkingStopIsExpected,
@@ -22,7 +24,6 @@ import {
 } from "@/features/runeworking/rig-copy";
 import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
 import { seconds } from "@/features/shared/duration-copy";
-import { RecipeTile } from "@/features/shared/RecipeTile";
 import { useStationCommand } from "@/features/shared/use-station-command";
 import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import {
@@ -60,7 +61,6 @@ function describe(
 export function AttuneMode() {
   const { foregroundBusy, state } = usePlay();
   const rig = state.resonanceRig;
-  const [selectedActionId, setSelectedActionId] = useState<string>();
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const active = rig.cycle;
   const isActive = Boolean(active);
@@ -75,11 +75,8 @@ export function AttuneMode() {
     (recipe) => recipe.unlocked || guidance.actionIds.has(recipe.actionId),
   );
   const guidedRecipe = visible.find((candidate) => guidance.actionIds.has(candidate.actionId));
-  const recipe =
-    activeRecipe ??
-    visible.find((candidate) => candidate.actionId === selectedActionId) ??
-    guidedRecipe ??
-    visible[0];
+  // A station makes one recipe (#441), so there is nothing to select between.
+  const recipe = activeRecipe ?? guidedRecipe ?? visible[0];
   const command = useStationCommand((next) => describe(next, recipe?.actionId));
   const characterId = state.characterId;
 
@@ -107,44 +104,48 @@ export function AttuneMode() {
   }
 
   const stopReason = rig.lastStopReason;
+  // The one Start rule, used for the button and for its guidance alike: a control that
+  // cannot run now is never lit as the next step (#441). Mission pin guidance elsewhere
+  // (the log, the Map, Sources) is untouched.
+  const executable =
+    recipe !== undefined &&
+    runeworkingCanStart(recipe, {
+      activityRunning: Boolean(state.activeAction),
+      foregroundBusy,
+    });
+  const unmet = recipe ? runeworkingUnmetRequirements(recipe, state.runeworking.level) : [];
   return (
     <div className="space-y-3" data-attune-mode>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-attune-recipes>
-        {visible.map((candidate) => (
-          <RecipeTile
-            data-attune-recipe={candidate.actionId}
-            data-attune-recipe-ready={String(candidate.unlocked && candidate.inputsAvailable)}
-            guided={guidance.actionIds.has(candidate.actionId)}
-            itemId={candidate.outputItemId}
-            key={candidate.actionId}
-            name={candidate.outputName}
-            onSelect={() => {
-              if (candidate.actionId !== recipe?.actionId)
-                setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
-              setSelectedActionId(candidate.actionId);
-            }}
-            quantity={candidate.outputQuantity}
-            recipe={`${runeworkingRecipeLine(candidate)} · ${seconds(candidate.durationTicks, GAME_TICK_MS)}`}
-            requirements={runeworkingUnmetRequirements(candidate, state.runeworking.level)}
-            selected={candidate.actionId === recipe?.actionId}
-            stackLimit={candidate.outputStackLimit}
-            tileLabel={`${candidate.outputName}: ${runeworkingRecipeLine(candidate)}`}
-          />
-        ))}
-      </div>
-
       {recipe ? (
         <div className="space-y-3" data-attune-selected={recipe.actionId}>
-          <p className="font-display text-sm uppercase tracking-wide">
-            {recipe.outputName} &middot; {seconds(recipe.durationTicks, GAME_TICK_MS)} &middot;{" "}
-            <XpAmount
-              amount={recipe.baseXp}
-              prefix="+"
-              skillId={SKILL_IDS.runeworking}
-              skillName="Runeworking"
-            />{" "}
-            &middot; Always succeeds
-          </p>
+          <div className="flex items-start gap-3">
+            <div className="w-24 shrink-0 sm:w-28">
+              <StackItemVisual
+                itemId={recipe.outputItemId}
+                name={recipe.outputName}
+                quantity={recipe.outputQuantity}
+                stackLimit={recipe.outputStackLimit}
+              />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="font-display text-sm font-bold uppercase tracking-wide">
+                {recipe.outputName}
+              </p>
+              <p className="text-xs text-[color:var(--rs-text-secondary)]" data-attune-recipe-line>
+                {runeworkingRecipeLine(recipe)}
+              </p>
+              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+                {seconds(recipe.durationTicks, GAME_TICK_MS)} &middot;{" "}
+                <XpAmount
+                  amount={recipe.baseXp}
+                  prefix="+"
+                  skillId={SKILL_IDS.runeworking}
+                  skillName="Runeworking"
+                />{" "}
+                &middot; Always succeeds
+              </p>
+            </div>
+          </div>
           <ul className="space-y-1 text-sm" data-attune-inputs>
             {recipe.inputs.map((input) => (
               <li
@@ -159,7 +160,9 @@ export function AttuneMode() {
               </li>
             ))}
           </ul>
-          {recipe.unlocked ? (
+          {/* Run size only when a run can be made: with nothing to make, the missing
+              materials below are the whole story. */}
+          {recipe.unlocked && recipe.affordableCycles >= 1 ? (
             <BoundedRunSelector
               affordable={recipe.affordableCycles}
               disabled={foregroundBusy || Boolean(state.activeAction)}
@@ -169,15 +172,15 @@ export function AttuneMode() {
               unit={ATTUNEMENT_UNIT}
             />
           ) : null}
+          {unmet.length > 0 ? (
+            <p className="text-sm text-[color:var(--rs-text-muted)]" data-attune-unmet>
+              {unmet.join(" · ")}
+            </p>
+          ) : null}
           <MissionActionButton
             data-attune-start
-            disabled={
-              !recipe.unlocked ||
-              recipe.affordableCycles < 1 ||
-              Boolean(state.activeAction) ||
-              foregroundBusy
-            }
-            guidance={guidance.actionIds.has(recipe.actionId) ? "active" : undefined}
+            disabled={!executable}
+            guidance={executable && guidance.actionIds.has(recipe.actionId) ? "active" : undefined}
             loading={command.pending === "start"}
             onClick={() =>
               command.run("start", () =>
@@ -192,9 +195,7 @@ export function AttuneMode() {
             Attune {recipe.outputName}
           </MissionActionButton>
           <p className="text-xs text-[color:var(--rs-text-muted)]">
-            A started attunement is committed: its Rune Fragment stays reserved in your Inventory
-            until it finishes, and you cannot leave the Rig while it is running. Finished pieces go
-            straight to your Inventory.
+            {runeworkingCommitmentNote(recipe)}
           </p>
         </div>
       ) : null}

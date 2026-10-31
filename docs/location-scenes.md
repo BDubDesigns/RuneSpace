@@ -196,6 +196,25 @@ remove a ship that is still parked there.
 canvas). No bespoke duplicate art, and no mobile/desktop split. The overlay stays
 inside its canvas (`tests/unit/ship.test.ts`).
 
+### The personal Resonance Site (issue #441)
+
+A finished personal Resonance Rig is the Crash Site's **first** state variant
+(`crash_site_resonance_site`), requiring only that character's completed Rig repair.
+It is the already-supported empty background plus **one** new transparent overlay,
+`resonance-rig.webp` (1152x768, the owner-approved 1536x1024 RGBA master kept
+unaltered in `assets/location-scenes/resonance-rig-master.png`, SHA-256
+`2d873b23…4d30`, derived by `scripts/prepare-resonance-rig-art.mjs`). The overlay is
+**not trimmed**: the owner approved `{ left: 36.5, top: 20, width: 29 }` against the
+full 3:2 canvas, so trimming would move the art off its mark. There is no ship+Rig
+state: the Rivet has to leave before the Rig's Missions can start, so the early-game
+crashed, repaired and departed variants are unchanged and still follow the ship.
+Variants gained an optional `displayName`, so the same location is the character's
+"Resonance Site" in the header plate, on the Map and in dialogue. The 15:8 Enby
+conversation composes the same stage (`CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite`
+reads the variant's own scene), so the two can never disagree, and the Enby may stand
+in front of the Core. The authored cue layers (`core`, `rift`) are positioned from this
+placement (`RESONANCE_RIG_CUE_ANCHORS`).
+
 ### Placement is scene-relative metadata
 
 `overlay.placement` is `{ left, top, width }` in **percent of the background's own

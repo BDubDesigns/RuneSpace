@@ -111,14 +111,15 @@ describe("the Mission as authored", () => {
   it("follows Not From Around Here, by continuation and by prerequisite", () => {
     expect(NOT_FROM_AROUND_HERE.continuationMissionId).toBe(MISSION_IDS.firstRuneworkingLesson);
     expect(FIRST_RUNEWORKING_LESSON.prerequisiteMissionId).toBe(MISSION_IDS.notFromAroundHere);
-    // It hands on to exactly one next chapter (#393), by continuation and by
-    // that chapter's own prerequisite-gated offer.
+    // It hands on to First Resonance Echo (#393), by continuation and by that
+    // chapter's own prerequisite-gated offer, and to A Place to Call Home (#441),
+    // which is a separate, manually offered chapter that does not wait for the Echo.
     expect(FIRST_RUNEWORKING_LESSON.continuationMissionId).toBe(MISSION_IDS.firstResonanceEcho);
     expect(
       MISSIONS.filter(
         (mission) => mission.prerequisiteMissionId === MISSION_IDS.firstRuneworkingLesson,
       ).map((mission) => mission.id),
-    ).toEqual([MISSION_IDS.firstResonanceEcho]);
+    ).toEqual([MISSION_IDS.firstResonanceEcho, MISSION_IDS.aPlaceToCallHome]);
   });
 
   it("offers itself in person at the Enby with Begin Lesson / Not Now, flowing into the lesson", () => {

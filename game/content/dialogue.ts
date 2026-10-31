@@ -20,6 +20,8 @@ import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { getItemPresentation } from "./item-presentation";
 import { merchantBuybackPrice, merchantRetailPrice } from "./merchants";
 import {
+  A_PLACE_TO_CALL_HOME_REWARD_RUNES,
+  A_RUNE_OF_YOUR_OWN_REWARD_XP,
   FIRST_RESONANCE_ECHO_GIFT_SEEKERS,
   FIRST_RESONANCE_ECHO_REWARD_XP,
   KEEP_THE_CHANGE_BUDGET_CREDITS,
@@ -113,6 +115,14 @@ export type DialogueSequence = {
    * is the level-dependent advice — authors no beats of its own.
    */
   skillLevelDialogueId?: SkillLevelDialogueId;
+  /**
+   * A scene-cue sequence (`game/content/scene-cues.ts`) played over this scene once
+   * its last beat is finished, before the conversation ends (#441): the Wise Old
+   * Enby leaving through their own rift. Presentation only — whoever is leaving has
+   * already been placed elsewhere by the server, and skipping or interrupting the
+   * cues changes nothing. Absent for every other sequence.
+   */
+  exitCueSequenceId?: string;
   beats: readonly DialogueBeat[];
 };
 
@@ -164,6 +174,9 @@ const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
 const lastLegShop = CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior;
 const hilltopWorkshop = CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior;
 const wernersLab = CONVERSATION_BACKGROUND_IDS.wernersLabInterior;
+// The Wise Old Enby's visit to this character's personal Resonance Rig (#441): the
+// empty ship-departed Crash Site and the Rig, never the repaired Rivet.
+const resonanceSite = CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite;
 // Curly's room before and after his mount is installed (#292). The unfinished
 // room resolves to the finished one from the mount's own completion, so a beat
 // authored against it always shows the room as it currently is.
@@ -249,6 +262,18 @@ function enbyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.wiseOldEnby,
     expressionId,
     backgroundId: hilltopWorkshop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+/** The Enby at the character's Resonance Site (#441), standing before the Rig. */
+function enbyAtSite(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.wiseOldEnby,
+    expressionId,
+    backgroundId: resonanceSite,
     presentationMode: "local",
     text,
   };
@@ -4126,6 +4151,233 @@ const dialogue = {
       enbyLocal(
         EXPRESSION_IDS.friendly,
         "Whenever you're ready, then. Safe travels! And do come back sometime. The universe is much more interesting with company.",
+      ),
+    ],
+  },
+  // A Place to Call Home (#441): the manual offer at Hilltop Workshop. The approved
+  // script verbatim; accepting is the generic Mission command, never this prose.
+  [DIALOGUE_IDS.wiseOldEnbyHomeOffer]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeOffer,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Ah, there you are! I've been going over some old readings from Skatboll. Your Crash Site, specifically.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "There's a natural resonance point beneath that wreckage. Quite a stable one, considering the way you introduced yourself to the planet.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "A Rig built on that point could attune teleport runes. Carry one elsewhere, and it would know exactly where to bring you back.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.neutral,
+        "Not because of who made it, mind you. The rune remembers the place, not the person.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You've learned to listen to RuneSpace. Now I'd like you to build something that can work with it. A Resonance Core, a good deal of metalwork, and Welding level twelve.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.amused,
+        "I can give you the measurements. I would offer to do the welding myself, but we have both seen enough questionable engineering for one lifetime.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Fancy turning that Crash Site into something worth coming home to?",
+      ),
+    ],
+  },
+  // Shown right after accepting, at Hilltop Workshop.
+  [DIALOGUE_IDS.wiseOldEnbyHomeAccepted]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeAccepted,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Wonderful! If you're not quite at Welding twelve, Wade at Rusk Recovery has a workbench worth practicing on. Any proper Welding work will do.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You'll need one Resonance Core, three Galvaferrite, four Mounting Brackets, a Galvanic Wire Spool, and two Power Cells. I've made a list. Best not to trust either of us to remember all of it.",
+      ),
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "Bring the materials to the Crash Site, install them, and secure the Rig with twenty-four welds. You can work on it in stages. I'll be watching the readings from here.",
+      ),
+    ],
+  },
+  // While Welding is still below twelve. Contextual: no travel to the Enby is required.
+  [DIALOGUE_IDS.wiseOldEnbyHomeSkillReminder]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeSkillReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.friendly,
+        "How's the Welding coming along? No hurry. The resonance point's been there longer than either of us, and I doubt it's about to move.",
+      ),
+    ],
+  },
+  // Welding twelve reached, the Rig not finished.
+  [DIALOGUE_IDS.wiseOldEnbyHomeRepairReminder]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeRepairReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyLocal(
+        EXPRESSION_IDS.thoughtful,
+        "You're ready to build. Materials at the Crash Site, then twenty-four careful welds. Best to let the Core do the clever part.",
+      ),
+    ],
+  },
+  // The Enby at the finished Resonance Site, before the explicit turn-in.
+  [DIALOGUE_IDS.wiseOldEnbyHomeTurnIn]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Ah! There you are. And look at that! Nothing's exploded. An excellent start.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "The Core is steady. The resonance is clean. You've made a proper anchor point out of a place that once was rather more of a problem.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "The Rig is yours. It won't travel with you, but it'll be here whenever you return.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "I came over on one of my own Skatboll runes to see it for myself.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "And I brought two more for you. Consider them a practical demonstration.",
+      ),
+    ],
+  },
+  // After the confirmed grant, in the same conversation: the two runes the server
+  // actually handed over, then the lesson that A Rune of Your Own continues from.
+  // Presentation only; the item beat is shown from the receipt of a committed
+  // completion and never from this prose.
+  [DIALOGUE_IDS.wiseOldEnbyHomeCompletion]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      {
+        kind: "item",
+        itemId: ITEM_IDS.skatbollTpRune,
+        quantity: A_PLACE_TO_CALL_HOME_REWARD_RUNES,
+        backgroundId: resonanceSite,
+        text: "Enby hands you two Skatboll TP Runes.",
+        isRewardTotal: true,
+      },
+      enbyAtSite(
+        EXPRESSION_IDS.amused,
+        "Making the rune itself is quite straightforward once you've learned how. It's finding the materials that keeps me from popping about every time I forget something.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "Your Rig is anchored to this place. A rune made here will remember Skatboll, regardless of who eventually uses it.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "One Cut Quartz and one Intact Runestone. Bring them to your Rig, attune a rune of your own, and let it finish properly.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Come and tell me when you've done it. I think I'll stay a little while.",
+      ),
+    ],
+  },
+  // Both runes would not fit (slots or mass alike): nothing was given, the Mission
+  // was not completed and A Rune of Your Own was not accepted. Make room and retry.
+  // NOT in the approved script: authored so the framework's required capacity
+  // refusal exists; flagged for owner review in the PR.
+  [DIALOGUE_IDS.wiseOldEnbyHomeCapacity]: {
+    id: DIALOGUE_IDS.wiseOldEnbyHomeCapacity,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyAtSite(
+        EXPRESSION_IDS.amused,
+        "Ah. I do have two runes for you, but your pockets appear to have no room for them.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Make a little space and come back. The Rig isn't going anywhere, and neither am I.",
+      ),
+    ],
+  },
+  // A Rune of Your Own: while the craft is still to do. One scene of three lines.
+  [DIALOGUE_IDS.wiseOldEnbyRuneReminder]: {
+    id: DIALOGUE_IDS.wiseOldEnbyRuneReminder,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Have you found your Quartz and Runestone? Getting hold of suitable materials is rather more trouble than the attunement itself.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "Cut Quartz, mind you, not rough. One of each at your Rig, and give the attunement time to settle.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.amused,
+        "If you've already got a rune in your pocket, splendid. But I want to see what you can make, not what you can acquire.",
+      ),
+    ],
+  },
+  // The genuine craft is done: the opening whose explicit control completes the
+  // Mission. No rune is asked for, shown or taken.
+  [DIALOGUE_IDS.wiseOldEnbyRuneTurnIn]: {
+    id: DIALOGUE_IDS.wiseOldEnbyRuneTurnIn,
+    npcId: NPC_IDS.wiseOldEnby,
+    beats: [
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Ah, there it is. I checked the Rig's attunement record. One clean Skatboll rune, made by your own hand.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "You've done more than make a stone glow. You've taught it precisely where in the universe it belongs.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.amused,
+        "My first attempt was less precise. It knew where to go, certainly. Unfortunately the answer was a cupboard.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Keep your rune. You've earned it. I came to teach, not to collect souvenirs.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.thoughtful,
+        "You've built the Rig, and now you know how to make your way back to it. That was what I hoped you'd learn.",
+      ),
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Well, I should be getting back to Stillreach. My rune will take me to The Low Hum. Still a bit of a walk from there to the workshop, I'm afraid.",
+      ),
+    ],
+  },
+  // After the confirmed turn-in: the +500 XP the server already paid, then the
+  // farewell, with the Enby's own departure played over its last line.
+  [DIALOGUE_IDS.wiseOldEnbyRuneCompletion]: {
+    id: DIALOGUE_IDS.wiseOldEnbyRuneCompletion,
+    npcId: NPC_IDS.wiseOldEnby,
+    exitCueSequenceId: "resonance_rig_departure",
+    beats: [
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.runeworking,
+        amount: A_RUNE_OF_YOUR_OWN_REWARD_XP,
+        backgroundId: resonanceSite,
+        text: "",
+      },
+      enbyAtSite(
+        EXPRESSION_IDS.friendly,
+        "Do come visit, won't you? I suspect you've barely scratched the surface of what RuneSpace can do.",
       ),
     ],
   },

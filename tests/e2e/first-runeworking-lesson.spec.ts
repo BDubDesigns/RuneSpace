@@ -209,11 +209,15 @@ test("completing the mystery flows straight into the lesson, and the Rig opens",
   const card = await page.locator("[data-npc-interaction]").first().boundingBox();
   const rigBox = await rig.boundingBox();
   expect(card!.y).toBeLessThan(rigBox!.y);
-  // Recipes stays readable without a single Fragment.
-  await rig.locator('[data-rig-mode-select="recipes"]').click();
-  await expect(
-    rig.locator(`[data-rig-recipes-entry="${ACTION_IDS.beginnerEchoSeekerRuneworking}"]`),
-  ).toContainText("Beginner Echo Seeker");
+  // The station's one recipe stays readable without a single Fragment, there is no
+  // mode switch, and the Wiki holds the full catalog (#441).
+  await expect(rig.locator("[data-rig-mode-select]")).toHaveCount(0);
+  await expect(rig.locator("[data-attune-recipe-line]")).toHaveText(
+    "1 Rune Fragment → 1 Beginner Echo Seeker",
+  );
+  await expect(rig.locator("[data-attune-unmet]")).toContainText("Need 1 more Rune Fragment");
+  await expect(rig.locator("[data-attune-start]")).toBeDisabled();
+  await expect(rig.locator("[data-rig-wiki-link]")).toHaveAttribute("href", "/wiki/runeworking");
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
   ).toBeLessThanOrEqual(0);

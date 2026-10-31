@@ -64,6 +64,7 @@ import {
   teleportWithRune,
   type TeleportRuneResult,
 } from "@/server/rune-teleport-commands";
+import { acknowledgeResonanceArrival } from "@/server/resonance-site-commands";
 import { claimFedhexParcel, type FedhexClaimResult } from "@/server/fedhex-commands";
 import {
   finishCurrentTinkering,
@@ -224,6 +225,7 @@ import {
   DiscardInventoryStackRequestSchema,
   BreakApartRunestoneRequestSchema,
   TeleportWithRuneRequestSchema,
+  AcknowledgeResonanceArrivalRequestSchema,
   AcknowledgeRuneTeleportArrivalRequestSchema,
   RepairMaterialContributionRequestSchema,
   StartRefiningRequestSchema,
@@ -1164,6 +1166,15 @@ export async function acknowledgeRuneTeleportArrivalAction(
   if (!request.success) return { error: "Invalid arrival acknowledgment." };
   return runPlayAction(request.data.characterId, (userId, id) =>
     acknowledgeRuneTeleportArrival(userId, id, request.data.intentId),
+  );
+}
+
+/** Dismiss the Wise Old Enby's arrival at the character's finished Rig (#441). */
+export async function acknowledgeResonanceArrivalAction(input: unknown): Promise<PlayActionResult> {
+  const request = AcknowledgeResonanceArrivalRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid arrival acknowledgment." };
+  return runPlayAction(request.data.characterId, (userId, id) =>
+    acknowledgeResonanceArrival(userId, id),
   );
 }
 

@@ -129,6 +129,29 @@ export async function loadRepairTargetRow(
   return rows[0];
 }
 
+/**
+ * Whether one repair target has reached its authoritative completion for this
+ * character (#441). The one read a station unlock, a location variant or an NPC's
+ * placement may ask, so none of them keeps a flag of its own.
+ */
+export async function isRepairTargetComplete(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  targetId: RepairTargetId,
+): Promise<boolean> {
+  const rows = await transaction
+    .select({ completedAt: characterRepairTargets.completedAt })
+    .from(characterRepairTargets)
+    .where(
+      and(
+        eq(characterRepairTargets.characterId, characterId),
+        eq(characterRepairTargets.targetId, targetId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.completedAt != null;
+}
+
 /** Every repair-target row this character owns, for the play-state projection. */
 export async function loadRepairTargetStates(
   transaction: DatabaseTransaction,

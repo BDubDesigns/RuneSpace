@@ -202,6 +202,15 @@ function rigRequirement(missionId: string): WikiItemLine {
   ];
 }
 
+/** The character's own Rig (#441): built in a Mission, not opened by one. */
+function personalRigRequirement(missionId: string): WikiItemLine {
+  return [
+    "Needs your own Resonance Rig at your Crash Site, which you build in ",
+    missionLink(missionId),
+    ". This is separate from the skill level; you need both.",
+  ];
+}
+
 function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
   const facts: WikiItemLine[] = [
     [`Requires ${skillRequirement(recipe.skillId, recipe.minimumLevel)}`],
@@ -215,7 +224,11 @@ function recipeFacts(recipe: ItemReferenceRecipe): WikiItemLine[] {
       "; unrestricted runs after graduation.",
     ]);
   if (recipe.kind === "runework") {
-    facts.push(rigRequirement(recipe.stationOpensAfterCompletedMissionId));
+    facts.push(
+      recipe.personalRig
+        ? personalRigRequirement(recipe.stationOpensAfterCompletedMissionId)
+        : rigRequirement(recipe.stationOpensAfterCompletedMissionId),
+    );
   }
   facts.push(["Where: ", ...locationPhrase(recipe.locations)]);
   // Runeworking has no failure: every attunement makes its piece (#391).
@@ -301,11 +314,13 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
       return [
         source.kind === "lapidary" ? "Cut it from " : "Attune it from ",
         ...joinLinks(recipe.inputs.map((input) => itemLink(input.itemId, input.quantity))),
-        ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) at ${source.kind === "lapidary" ? "the Lapidary Workbench" : "the Resonance Rig"} — `,
+        ` (${skillRequirement(recipe.skillId, recipe.minimumLevel)}) at ${source.kind === "lapidary" ? "the Lapidary Workbench" : source.recipe.kind === "runework" && source.recipe.personalRig ? "your own Resonance Rig" : "the Resonance Rig"} — `,
         ...locationPhrase(recipe.locations),
         source.kind === "lapidary"
           ? ". Always succeeds. Supervised lessons are available during "
-          : ". Always succeeds. The Rig opens once you have completed ",
+          : source.recipe.kind === "runework" && source.recipe.personalRig
+            ? ". Always succeeds. You build the Rig in "
+            : ". Always succeeds. The Rig opens once you have completed ",
         missionLink(recipe.stationOpensAfterCompletedMissionId),
         source.kind === "lapidary" ? "; graduation permanently unlocks normal runs." : ".",
       ];

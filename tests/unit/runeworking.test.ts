@@ -90,8 +90,12 @@ describe("the approved skill, item and recipe", () => {
     });
   });
 
-  it("ships exactly one recipe: 1 Rune Fragment into 1 Seeker, 34 ticks, 25 XP, Level 1", () => {
-    expect(runeworkingActionIds(balance)).toEqual([ACTION_IDS.beginnerEchoSeekerRuneworking]);
+  it("ships the Seeker recipe: 1 Rune Fragment into 1 Seeker, 34 ticks, 25 XP, Level 1", () => {
+    // The personal Rig's Skatboll TP Rune (#441) is the second recipe, at its own station.
+    expect(runeworkingActionIds(balance)).toEqual([
+      ACTION_IDS.beginnerEchoSeekerRuneworking,
+      ACTION_IDS.skatbollTpRuneRuneworking,
+    ]);
     expect(seeker).toEqual({
       actionId: ACTION_IDS.beginnerEchoSeekerRuneworking,
       outputItemId: SEEKER,

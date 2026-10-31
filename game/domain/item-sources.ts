@@ -180,6 +180,13 @@ export type ItemSourceFacts = {
    * never re-derived here.
    */
   resonanceRigUnlocked: boolean;
+  /**
+   * The locations of the Rig stations the character may use (#441). When present, a
+   * Runeworking recipe is a source only at an open station that hosts it: the
+   * Wise Old Enby's Rig hosts the Seeker, the character's own Rig the TP Rune.
+   * Absent, every hosting location counts (an old caller that only knew the one Rig).
+   */
+  resonanceStationLocationIds?: ReadonlySet<string>;
   lapidaryAccess?: MissionActivityAccess;
   /**
    * Each World Location's actions as THIS character's state resolves them
@@ -325,6 +332,10 @@ export function resolveItemSources(
         recipe.actionId,
         facts.locationStates,
         registries.locations,
+      ).filter(
+        (locationId) =>
+          facts.resonanceStationLocationIds === undefined ||
+          facts.resonanceStationLocationIds.has(locationId),
       );
       if (locationIds.length === 0) continue;
       sources.push({

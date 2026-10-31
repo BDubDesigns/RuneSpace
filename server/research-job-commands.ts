@@ -9,6 +9,9 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { getLocation } from "@/game/content/locations";
+import { getNpc, resolveNpcPlacement } from "@/game/content/npcs";
+import { repairComplete } from "@/game/domain/welding-repair";
+import { loadRepairTargetStates } from "@/server/welding";
 import { getMissionItemDestroyPolicy } from "@/game/content/mission-item-destroy";
 import { RESEARCH_GIVER, RESEARCH_JOBS, getResearchJob } from "@/game/content/research-jobs";
 import {
@@ -98,8 +101,38 @@ type Context = {
   currentLocationId: string;
   hasActiveAction: boolean;
   activeActionId: string | undefined;
+  /**
+   * The giver is standing in their workshop for this character (#441). While they
+   * are visiting this character's personal Resonance Rig they are not, and their
+   * assignments can be neither offered nor handed in; held ones stay intact.
+   */
+  giverAtWorkshop: boolean;
   now: Date;
 };
+
+/**
+ * Whether the Wise Old Enby is at Hilltop Workshop for this character, from the
+ * same derived placement the world uses (`resolveNpcPlacement`): never a flag of
+ * the research system's own, so it can never disagree with where they stand.
+ */
+async function giverAtWorkshop(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<boolean> {
+  const giver = getNpc(RESEARCH_GIVER.npcId);
+  if (!giver) return false;
+  const [completedMissionIds, repairStates] = await Promise.all([
+    loadCompletedMissionIds(transaction, characterId),
+    loadRepairTargetStates(transaction, characterId),
+  ]);
+  const completedRepairTargetIds = new Set(
+    [...repairStates].filter(([, repair]) => repairComplete(repair)).map(([targetId]) => targetId),
+  );
+  return (
+    resolveNpcPlacement(giver, completedMissionIds, completedRepairTargetIds).locationId ===
+    RESEARCH_GIVER.locationId
+  );
+}
 
 function stateAfter(
   transaction: DatabaseTransaction,
@@ -144,6 +177,7 @@ function runResearchCommand(
         currentLocationId: row?.currentLocationId ?? character.currentLocationId,
         hasActiveAction: action !== undefined,
         activeActionId: action?.actionId,
+        giverAtWorkshop: await giverAtWorkshop(transaction, character.id),
         now,
       });
       return { state: await stateAfter(transaction, character.id, now), research };
@@ -193,7 +227,14 @@ async function loadRun(
 }
 
 function atEnby(context: Context): boolean {
-  return context.currentLocationId === RESEARCH_GIVER.locationId;
+  return context.currentLocationId === RESEARCH_GIVER.locationId && context.giverAtWorkshop;
+}
+
+/** The refusal copy for a giver who cannot be reached here: away, or simply elsewhere. */
+function giverUnreachable(context: Context, elsewhere: string): string {
+  return context.currentLocationId === RESEARCH_GIVER.locationId && !context.giverAtWorkshop
+    ? "The Wise Old Enby is away visiting your Resonance Site. Your assignments will wait for them to come home."
+    : elsewhere;
 }
 
 /** Accept one job at Hilltop Workshop and lend its item (all or nothing). */
@@ -207,7 +248,10 @@ export function acceptResearchJob(
     const job = getResearchJob(request.jobId);
     if (!job) return refuse("unknown_job", "That is not one of The Wise Old Enby's assignments.");
     if (!atEnby(context)) {
-      return refuse("wrong_place", "Take assignments from The Wise Old Enby at Hilltop Workshop.");
+      return refuse(
+        "wrong_place",
+        giverUnreachable(context, "Take assignments from The Wise Old Enby at Hilltop Workshop."),
+      );
     }
     const { transaction } = context;
     const existing = await loadResearchAssignment(transaction, context.characterId, { lock: true });
@@ -393,7 +437,10 @@ export function completeResearchJob(
       );
     }
     if (!atEnby(context)) {
-      return refuse("wrong_place", "Return to The Wise Old Enby at Hilltop Workshop.");
+      return refuse(
+        "wrong_place",
+        giverUnreachable(context, "Return to The Wise Old Enby at Hilltop Workshop."),
+      );
     }
     if (context.hasActiveAction) {
       return refuse("not_stationary", "Finish what you are doing first.");
@@ -439,7 +486,10 @@ export function teleportResearchJob(
       return refuse("wrong_job", "This assignment does not open a passage.");
     }
     if (!atEnby(context)) {
-      return refuse("wrong_place", "The passage opens from The Wise Old Enby's workshop.");
+      return refuse(
+        "wrong_place",
+        giverUnreachable(context, "The passage opens from The Wise Old Enby's workshop."),
+      );
     }
     if (context.hasActiveAction) {
       return refuse("not_stationary", "Finish what you are doing first.");

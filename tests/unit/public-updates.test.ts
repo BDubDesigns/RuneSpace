@@ -134,9 +134,9 @@ describe("public Updates content boundary", () => {
   });
 
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
-    // Newest by instant, so the account news boundary surfaces it (#156).
+    // The newest Update is the Resonance Rig's (#441), published after Werner's.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("lapidary-topaz-sapphire");
+    expect(getLatestPublishedUpdate().slug).toBe("a-resonance-rig-of-your-own");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );

@@ -400,6 +400,13 @@
       "when": 1793339442185,
       "tag": "0056_rune_teleports",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793382935488,
+      "tag": "0057_resonance_rig_arrival",
+      "breakpoints": true
     }
   ]
 }

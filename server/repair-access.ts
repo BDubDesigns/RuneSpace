@@ -4,7 +4,7 @@ import { skillLevelThresholds } from "@/game/config/balance";
 import { SKILL_IDS, type RepairTargetId } from "@/game/config/foundations";
 import { getMission } from "@/game/content/missions";
 import { getRepairTarget } from "@/game/content/repair-targets";
-import { missionSkillPrerequisiteLevel } from "@/game/domain/missions";
+import { missionRequiredSkillLevel } from "@/game/domain/missions";
 import { repairComplete, type RepairTargetState } from "@/game/domain/welding-repair";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { characterSkillLevel } from "@/server/skill-levels";
@@ -34,7 +34,7 @@ export function deriveRepairAccess(
 
 function missionWeldingRequirement(missionId: string): number {
   const mission = getMission(missionId);
-  const level = mission && missionSkillPrerequisiteLevel(mission, SKILL_IDS.welding);
+  const level = mission && missionRequiredSkillLevel(mission, SKILL_IDS.welding);
   if (level === undefined) throw new Error(`Mission "${missionId}" requires no Welding level.`);
   return level;
 }

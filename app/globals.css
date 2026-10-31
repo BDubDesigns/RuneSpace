@@ -2926,3 +2926,21 @@ body {
     transform: scaleY(1) translateX(-6px);
   }
 }
+
+/* Scene cues (#441): the Rig Core's glow, painted with the arcane and cyan accents.
+   Its opacity is the only thing the cue player animates; a reduced-motion visitor
+   gets the settled state with no animation at all. */
+.rs-scene-cue-core {
+  background: radial-gradient(
+    circle,
+    var(--rs-accent-arcane) 0%,
+    var(--rs-accent-arcane-hover) 38%,
+    transparent 70%
+  );
+  filter: blur(3px);
+  mix-blend-mode: screen;
+}
+.rs-scene-cue-rift {
+  filter: drop-shadow(0 0 5px var(--rs-accent-arcane))
+    drop-shadow(0 0 10px var(--rs-accent-primary));
+}

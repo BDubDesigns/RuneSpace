@@ -9,7 +9,11 @@ import {
   type RepairTargetId,
 } from "@/game/config/foundations";
 import type { LocationDefinition } from "@/game/schemas/locations";
-import { CRASH_SITE_SHIP_RESTORED_VARIANT_ID, getLocation } from "./locations";
+import {
+  CRASH_SITE_RESONANCE_SITE_VARIANT_ID,
+  CRASH_SITE_SHIP_RESTORED_VARIANT_ID,
+  getLocation,
+} from "./locations";
 import { getLocalPlaceInLocation } from "./local-places";
 
 export type ConversationBackgroundDefinition = {
@@ -19,6 +23,11 @@ export type ConversationBackgroundDefinition = {
   localPlaceId?: LocalPlaceId;
   asset: string;
   alt: string;
+  /**
+   * The name of the place this backdrop shows when it differs from its World
+   * Location's own (#441): the Crash Site as this character's Resonance Site.
+   */
+  placeName?: string;
   /**
    * A layered scene this background is composed from (#351). When present the
    * conversation renders the same stage the Location header does, so a ship stays
@@ -61,11 +70,24 @@ if (
     "The Crash Site restored-ship variant must require exactly one completed repair target.",
   );
 }
+// The finished personal Rig (#441) is the Crash Site's own first state variant, so
+// the 15:8 conversation and the 4:1 header compose the one stage and cannot
+// disagree about the Rig or about the ship being gone.
+const crashSiteResonanceSite = crashSiteLocation?.stateVariants.find(
+  (variant) => variant.id === CRASH_SITE_RESONANCE_SITE_VARIANT_ID,
+);
+const crashSiteResonanceScene = crashSiteResonanceSite?.scene;
 const theJagScene = getLocation(LOCATION_IDS.theJag)?.presentation.scene;
 
-if (!crashSiteScene || !crashSiteRepairedScene || !theJagScene) {
+if (
+  !crashSiteScene ||
+  !crashSiteRepairedScene ||
+  !crashSiteResonanceScene ||
+  !crashSiteResonanceSite?.displayName ||
+  !theJagScene
+) {
   throw new Error(
-    "Conversation backgrounds require the Crash Site (crashed and repaired) and The Jag scenes",
+    "Conversation backgrounds require the Crash Site (crashed, repaired and Resonance Site) and The Jag scenes",
   );
 }
 
@@ -90,6 +112,17 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: crashSiteRepairedScene.asset,
     alt: crashSiteRepairedScene.alt,
     composition: crashSiteRepairedScene,
+  },
+  {
+    // The Wise Old Enby's visit (#441): the empty ship-departed panorama and this
+    // character's own Rig, never the repaired Rivet. A beat is authored against it
+    // directly, so the background does not depend on a repair-resolved swap.
+    id: CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite,
+    locationId: LOCATION_IDS.crashSite,
+    asset: crashSiteResonanceScene.asset,
+    alt: crashSiteResonanceScene.alt,
+    placeName: crashSiteResonanceSite.displayName,
+    composition: crashSiteResonanceScene,
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.theJagExterior,
@@ -210,6 +243,7 @@ export function resolveConversationBackgroundId(
 export function getConversationBackgroundPlaceName(backgroundId: string): string | undefined {
   const background = getConversationBackground(backgroundId);
   if (!background) return undefined;
+  if (background.placeName) return background.placeName;
   if (background.localPlaceId) {
     const place = getLocalPlaceInLocation(background.locationId, background.localPlaceId);
     if (!place) {

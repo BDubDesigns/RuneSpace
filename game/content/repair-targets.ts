@@ -169,6 +169,30 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     completedStatus: "Propulsion restored. Report to Wade.",
     reportedStatus: "Propulsion restored. Ship flight-ready.",
   },
+  {
+    // The character's personal Resonance Rig at the Crash Site (#441). A Mission
+    // authorizes the work and Welding 12 is that Mission's own first objective,
+    // read from it by the one repair-access predicate. Its completion is the one
+    // fact that the site is theirs: the Resonance Site name and scene, the Wise
+    // Old Enby's visit and the Skatboll TP Rune recipe all read it, and nothing
+    // else records it. The Rig is never shared and never travels with the ship.
+    id: REPAIR_TARGET_IDS.resonanceRig,
+    displayName: "Resonance Rig",
+    locationId: LOCATION_IDS.crashSite,
+    authorization: {
+      kind: "mission",
+      missionId: MISSION_IDS.aPlaceToCallHome,
+      requiresMissionWeldingLevel: true,
+    },
+    materialNotes: {
+      [ITEM_IDS.resonanceCore]: "the heart of the Rig, seated in its frame",
+      [ITEM_IDS.galvaferrite]: "the frame and supports",
+      [ITEM_IDS.mountingBracket]: "frame-to-base mounting hardware",
+      [ITEM_IDS.galvanicWireSpool]: "the Core's signal wiring",
+      [ITEM_IDS.powerCell]: "charge to bring the Core up",
+    },
+    completedStatus: "Resonance Rig online.",
+  },
   // Site stash mounts (#284): permanent, per-character, one per authored site.
   // Same tier, same Welding gate, same recipe wherever it is built.
   {

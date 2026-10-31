@@ -21,7 +21,7 @@ import {
 } from "@/game/config/foundations";
 import { getMission } from "@/game/content/missions";
 import { REPAIR_TARGETS } from "@/game/content/repair-targets";
-import { missionSkillPrerequisiteLevel } from "@/game/domain/missions";
+import { missionRequiredSkillLevel } from "@/game/domain/missions";
 import { getWorkOrder, WORK_ORDERS } from "@/game/content/work-orders";
 import {
   cleanPassFromPersisted,
@@ -1008,7 +1008,7 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
           // A Mission-authorized repair may also need the personal Welding its
           // Mission requires (#330).
           if (target.authorization.requiresMissionWeldingLevel) {
-            const required = missionSkillPrerequisiteLevel(
+            const required = missionRequiredSkillLevel(
               getMission(target.authorization.missionId)!,
               SKILL_IDS.welding,
             );

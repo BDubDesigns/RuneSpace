@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
-import { type RepairTargetId } from "@/game/config/foundations";
+import { SKILL_IDS, type RepairTargetId } from "@/game/config/foundations";
 import { MISSIONS, type MissionDefinition, type MissionRequirement } from "@/game/content/missions";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -81,6 +81,9 @@ function observe(
       ),
     ),
     repairTargets: repairObservation({ [targetId]: progress }),
+    // A Mission may put a skill level ahead of its repair (#441): these tests speak
+    // about the repair, so the level objective is already met.
+    skillLevels: new Map(Object.values(SKILL_IDS).map((skillId) => [skillId, 99])),
   };
 }
 
@@ -111,7 +114,9 @@ describe.each(repairMissions)(
     const [primary, secondary] = entry.recipe.materials;
     if (!primary) throw new Error(`${entry.displayName} authors no repair materials`);
     const multiMaterial = secondary !== undefined;
-    const somePrimary = Math.max(1, primary.quantity - 5);
+    // Strictly short of the full quantity, so a one-unit first material (the
+    // personal Rig's Resonance Core) is still outstanding rather than installed.
+    const somePrimary = Math.min(Math.max(1, primary.quantity - 5), primary.quantity - 1);
     // Always short of the full quantity, so a one-unit second material (the
     // Propulsion System's Galvaferrite) is still outstanding rather than covered.
     const someSecondary = secondary

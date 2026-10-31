@@ -42,6 +42,8 @@ export type ResolvedLocationState = {
   locationId: string;
   /** The winning variant's ID, or undefined when the base state applies. */
   variantId?: string;
+  /** The character's name for the place: a variant may rename it (#441). */
+  displayName: string;
   description: string;
   /** Whether an authored walking edge into this location may currently be used. */
   travelable: boolean;
@@ -85,6 +87,7 @@ export function resolveLocationState(
   return {
     locationId: location.id,
     ...(variant ? { variantId: variant.id } : {}),
+    displayName: variant?.displayName ?? location.displayName,
     description: variant?.description ?? location.description,
     travelable: variant?.travelable ?? location.travelable,
     ...((variant?.mapStatus ?? location.mapStatus)

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import {
   getConversationBackground,
   getConversationBackgroundPlaceName,
@@ -11,6 +11,8 @@ import {
   resolveDialogueSpeaker,
 } from "@/game/content/dialogue";
 import { SceneComposition } from "@/features/location-scene/SceneComposition";
+import { SceneCueStageLayers } from "@/features/scene-cues/SceneCueStageLayers";
+import { sceneCueLayerStyle, type SceneCueState } from "@/game/domain/scene-cues";
 import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { VisualTile } from "@/components/items/VisualTile";
 import { CREDITS_CHIP_SRC, CreditsAmount } from "@/components/ui/CreditsAmount";
@@ -42,6 +44,7 @@ export function DialogueScene({
   beatIndex = 0,
   actionMessage,
   controls,
+  sceneCues,
 }: {
   beat: PresentedDialogueBeat;
   visibleText?: string;
@@ -59,6 +62,14 @@ export function DialogueScene({
   beatIndex?: number;
   actionMessage?: string;
   controls?: ReactNode;
+  /**
+   * Scene cues (#441): a sequence of authored layer cues is playing, or has just
+   * played, over this scene. The frame ref is what the player finds its layers
+   * through, and `state` is where the layers rest between and after cues. Absent
+   * for every ordinary dialogue, which then renders exactly the elements it always
+   * did: the portrait gets no wrapper and the stage no extra layers.
+   */
+  sceneCues?: { frameRef: RefObject<HTMLDivElement | null>; state: SceneCueState };
 }) {
   const authoredBeat: DialogueBeat | undefined = beat.kind === "credits_receipt" ? undefined : beat;
   const resolvedSpeaker = authoredBeat ? resolveDialogueSpeaker(authoredBeat) : undefined;
@@ -76,6 +87,7 @@ export function DialogueScene({
   return (
     <div className="overflow-hidden border border-[color:var(--rs-border-structural)] bg-black">
       <div
+        ref={sceneCues?.frameRef}
         className="rs-dialogue-scene relative aspect-[15/8] min-h-56 w-full overflow-hidden sm:min-h-72"
         data-dialogue-presentation={presentationMode}
         data-presentation-mode={presentationMode}
@@ -92,7 +104,10 @@ export function DialogueScene({
             // at most ~1912px wide.
             stageWidthHint={1912}
             priority
-          />
+          >
+            {/* Stage-relative cue layers (#441), cropped and placed with the world art. */}
+            {sceneCues ? <SceneCueStageLayers state={sceneCues.state} /> : null}
+          </SceneComposition>
         ) : (
           <Image
             src={background.asset}
@@ -125,21 +140,23 @@ export function DialogueScene({
           </>
         ) : null}
         {resolvedSpeaker && beat.kind === "npc" ? (
-          <Image
-            key={`${beat.speakerNpcId}:${portraitGeneration}`}
-            src={resolvedSpeaker.expressionAsset}
-            alt={`${resolvedSpeaker.npc.displayName}, ${beat.expressionId} expression`}
-            width={400}
-            height={500}
-            sizes="min(60vw, 24rem)"
-            className="rs-dialogue-scene__npc absolute inset-x-1/2 bottom-0 z-20 h-[92%] w-auto -translate-x-1/2 object-contain"
-            data-portrait-transition="fade-in"
-            // Issue #117: the speaking NPC is the subject of the frame, but it
-            // was the only lazy image in a scene whose background already had
-            // priority — measured starting ~470 ms after that background on the
-            // deployed site at 390 px DPR 3. One portrait renders per beat.
-            priority
-          />
+          <PortraitCueFrame sceneCues={sceneCues}>
+            <Image
+              key={`${beat.speakerNpcId}:${portraitGeneration}`}
+              src={resolvedSpeaker.expressionAsset}
+              alt={`${resolvedSpeaker.npc.displayName}, ${beat.expressionId} expression`}
+              width={400}
+              height={500}
+              sizes="min(60vw, 24rem)"
+              className="rs-dialogue-scene__npc absolute inset-x-1/2 bottom-0 z-20 h-[92%] w-auto -translate-x-1/2 object-contain"
+              data-portrait-transition="fade-in"
+              // Issue #117: the speaking NPC is the subject of the frame, but it
+              // was the only lazy image in a scene whose background already had
+              // priority — measured starting ~470 ms after that background on the
+              // deployed site at 390 px DPR 3. One portrait renders per beat.
+              priority
+            />
+          </PortraitCueFrame>
         ) : null}
         {resolvedItem && beat.kind === "item" ? (
           <span
@@ -271,6 +288,32 @@ export function DialogueScene({
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">{controls}</div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The frame-relative layer a portrait cue animates (#441). It fills the frame, so a
+ * sideways slide is a percent of the frame's width and the portrait's bottom edge
+ * stays on the frame's: the approved portraits are cropped at the feet, and the
+ * frame's own `overflow-hidden` keeps clipping them whatever the cue does. With no
+ * cues it is not rendered at all and the portrait is exactly as it always was.
+ */
+function PortraitCueFrame({
+  sceneCues,
+  children,
+}: {
+  sceneCues: { frameRef: RefObject<HTMLDivElement | null>; state: SceneCueState } | undefined;
+  children: ReactNode;
+}) {
+  if (!sceneCues) return <>{children}</>;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
+      data-scene-cue-target="portrait"
+      style={sceneCueLayerStyle("portrait", sceneCues.state)}
+    >
+      {children}
     </div>
   );
 }

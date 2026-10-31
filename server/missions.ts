@@ -55,7 +55,7 @@ import {
 } from "@/game/domain/missions";
 import { orderInstancesForConsumption } from "@/game/domain/tinkering";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
-import { characterSkillLevel } from "@/server/skill-levels";
+import { characterSkillLevel, characterSkillLevels } from "@/server/skill-levels";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
@@ -71,7 +71,11 @@ import {
   loadOwnedItemInstances,
 } from "@/server/carried-inventory";
 import { ensureMissionProgressRows, recordMissionConversation } from "@/server/mission-progress";
-import { repairMaterialItemIds, repairTargetObservations } from "@/server/mission-state";
+import {
+  missionPrerequisiteSkills,
+  repairMaterialItemIds,
+  repairTargetObservations,
+} from "@/server/mission-state";
 import { loadRepairTargetStates } from "@/server/welding";
 
 export type MissionAcceptance =
@@ -150,6 +154,7 @@ export type MissionCompletion =
         | "equipment"
         | "tracked_activity"
         | "repair_target_complete"
+        | "skill_level"
         | "npc_conversation"
         | "insufficient_items"
         | "capacity";
@@ -895,30 +900,41 @@ async function completeMissionForDefinition(input: {
   }
 
   const balance = getEffectiveGameBalance();
-  const [itemState, assignments, stacks, progressRows, repairStates] = await Promise.all([
-    loadOwnedItemInstances(transaction, context.character.id),
-    transaction
-      .select()
-      .from(equippedItems)
-      .where(eq(equippedItems.characterId, context.character.id))
-      .for("update"),
-    transaction
-      .select()
-      .from(inventoryStacks)
-      .where(eq(inventoryStacks.characterId, context.character.id))
-      .for("update"),
-    transaction
-      .select()
-      .from(characterMissionProgress)
-      .where(
-        and(
-          eq(characterMissionProgress.characterId, context.character.id),
-          eq(characterMissionProgress.missionId, definition.id),
-        ),
-      )
-      .for("update"),
-    loadRepairTargetStates(transaction, context.character.id),
-  ]);
+  const [itemState, assignments, stacks, progressRows, repairStates, skillLevels] =
+    await Promise.all([
+      loadOwnedItemInstances(transaction, context.character.id),
+      transaction
+        .select()
+        .from(equippedItems)
+        .where(eq(equippedItems.characterId, context.character.id))
+        .for("update"),
+      transaction
+        .select()
+        .from(inventoryStacks)
+        .where(eq(inventoryStacks.characterId, context.character.id))
+        .for("update"),
+      transaction
+        .select()
+        .from(characterMissionProgress)
+        .where(
+          and(
+            eq(characterMissionProgress.characterId, context.character.id),
+            eq(characterMissionProgress.missionId, definition.id),
+          ),
+        )
+        .for("update"),
+      loadRepairTargetStates(transaction, context.character.id),
+      // The levels a `skill_level` objective reads (#441), from the same authority
+      // as the projection.
+      characterSkillLevels(
+        transaction,
+        context.character.id,
+        missionPrerequisiteSkills().map((skillId) => ({
+          skillId,
+          thresholds: standardSkillLevelThresholds(),
+        })),
+      ),
+    ]);
   const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
   const equippedInstanceIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
   // Carried and unequipped: the only instances a unique-item turn-in may take.
@@ -931,6 +947,7 @@ async function completeMissionForDefinition(input: {
     stageProgress(stage, new Map(progressRows.map((row) => [row.progressKey, row.progress])))!,
     repairStates,
     handableInstances,
+    skillLevels,
   );
 
   // Re-evaluate every authored requirement against live authoritative
@@ -962,6 +979,16 @@ async function completeMissionForDefinition(input: {
         return stateFor({
           status: "refused",
           reason: "tracked_activity",
+          message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+        });
+      }
+      continue;
+    }
+    if (requirement.kind === "skill_level") {
+      if ((observation.skillLevels?.get(requirement.skillId) ?? 0) < requirement.level) {
+        return stateFor({
+          status: "refused",
+          reason: "skill_level",
           message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
         });
       }
@@ -1356,6 +1383,15 @@ function renderRequirementCopy(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "repair_target_complete") return requirement.objective;
+  if (requirement.kind === "skill_level") {
+    const current = Math.min(
+      observation.skillLevels?.get(requirement.skillId) ?? 1,
+      requirement.level,
+    );
+    return requirement.objective
+      .replace("{current}", String(current))
+      .replace("{target}", String(requirement.level));
+  }
   if (
     requirement.kind === "npc_conversation" ||
     requirement.kind === "ship_flight" ||
@@ -1428,6 +1464,7 @@ function buildCompletionObservation(
   trackedProgress: ReadonlyMap<string, number> = new Map(),
   repairStates: ReadonlyMap<string, RepairTargetState>,
   handableInstances: readonly { itemId: string }[] = [],
+  skillLevels?: ReadonlyMap<string, number>,
 ): MissionObservation {
   const carriedUniqueItems = new Map<string, number>();
   for (const instance of handableInstances) {
@@ -1473,6 +1510,7 @@ function buildCompletionObservation(
     itemNames,
     trackedProgress,
     repairTargets,
+    ...(skillLevels ? { skillLevels } : {}),
   };
 }
 
