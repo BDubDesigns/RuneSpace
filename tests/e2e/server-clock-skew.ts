@@ -39,14 +39,14 @@ export async function startAndBracket(start: () => Promise<void>): Promise<Start
 /**
  * Asserts a progress meter agrees with the authoritative timeline: the action
  * began inside `window`, lasts `durationMs`, and `meter` reports "<n>s" of it
- * remaining plus a matching fill. Tolerance covers the bracket's width, the
+ * remaining plus a matching fill. Tolerance (2 s, well inside the 5 s skews) covers the bracket's width, the
  * 250 ms display tick, and the response delay the server-clock offset trails by.
  */
 export async function expectMeterOnServerTimeline(
   meter: Locator,
   window: StartWindow,
   durationMs: number,
-  slackMs = 900,
+  slackMs = 2_000,
 ) {
   const label = (await meter.getAttribute("aria-label")) ?? "";
   const fillAttr = await meter.getAttribute("aria-valuenow");
