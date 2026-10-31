@@ -9,7 +9,12 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import {
+  expectMeterOnServerTimeline,
+  skewBrowserClock,
+  startAndBracket,
+} from "./server-clock-skew";
 import {
   openEquipmentTab,
   equipmentSlotTile,
@@ -444,51 +449,30 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
 });
 
 /**
- * A browser clock running 5 s behind the server must not stretch the Mining
- * countdown or hold its meter at empty (#446). Only the page's `Date` is
- * skewed; the server keeps true time.
+ * A browser clock running 5 s off the server must not stretch the Mining
+ * countdown or hold its meter at empty (#446). The 10-tick (6 s) attempt is
+ * judged against the true start window, not against figures derived from the
+ * meter itself, so a fast clock fails on the old code as well as a slow one.
  */
 for (const skewMs of [-5_000, 5_000]) {
   test(`Mining progress follows the server clock when the browser clock is ${skewMs / 1_000}s off (#446)`, async ({
     page,
   }) => {
-    await page.addInitScript((skew) => {
-      const RealDate = Date;
-      class SkewedDate extends RealDate {
-        constructor(...args: unknown[]) {
-          if (args.length === 0) super(RealDate.now() + skew);
-          else super(...(args as [number]));
-        }
-        static override now() {
-          return RealDate.now() + skew;
-        }
-      }
-      window.Date = SkewedDate as DateConstructor;
-    }, skewMs);
+    await skewBrowserClock(page, skewMs);
     await page.reload();
-    await page.getByRole("button", { name: "Start Mining" }).click();
+    const window = await startAndBracket(() =>
+      page.getByRole("button", { name: "Start Mining" }).click(),
+    );
     const meter = page.getByRole("progressbar", { name: /to next attempt/ });
     await expect(meter).toBeVisible();
-    const read = async () => {
-      const label = (await meter.getAttribute("aria-label")) ?? "";
-      return {
-        remaining: Number.parseFloat(/([\d.]+)s to next attempt/.exec(label)?.[1] ?? "NaN"),
-        fraction: Number.parseFloat((await meter.getAttribute("aria-valuenow")) ?? "NaN"),
-      };
-    };
-    // 10 ticks is the authored attempt; the tick length is the game's.
-    const first = await read();
-    const total = first.remaining / (1 - first.fraction / 100);
-    // Elapsed and remaining must describe the same attempt: they sum to its
-    // length, rather than disagreeing by the skew.
-    expect(first.remaining).toBeLessThanOrEqual(total + 0.5);
-    expect(first.remaining).toBeGreaterThan(0);
+    const durationMs = 10 * GAME_TICK_MS;
+    await expectMeterOnServerTimeline(meter, window, durationMs);
     await page.waitForTimeout(1_500);
-    const later = await read();
-    expect(later.fraction).toBeGreaterThan(first.fraction);
-    expect(later.remaining).toBeLessThan(first.remaining);
-    // Before the fix, a slow clock showed ~5 s extra (about 11 s for this 6 s attempt) and an empty meter.
-    expect(first.remaining).toBeLessThan(7);
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    // Rehydration: a reload mid-attempt lands on the same server timeline.
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectMeterOnServerTimeline(meter, window, durationMs);
   });
 }
 
