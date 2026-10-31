@@ -355,3 +355,44 @@ required by this slice. Roll back application code only with awareness that
 new Mission progress remains stored. Older code cannot resolve Lapidary actions;
 finish active Lapidary runs before an application rollback and leave the additive
 schema intact. Never drop player records to roll back.
+
+## Scapelikes aggregate presence (issue #444)
+
+This opt-in integration reports the same two-minute account count as
+`GET /api/player-presence`. It only runs when an operator invokes the task; it
+is not triggered by gameplay, page views, or application startup. Keep the two
+server-only values and the schedule **only in the production application's
+runtime environment**, never in the preview environment, CI, client variables,
+commands, or repository. Neither the private site ID nor the cron secret should
+be logged or shared. An unset or weak cron secret rejects requests; an absent
+site ID makes an authorized request fail without reading the count. Nothing is
+sent by default.
+
+Owner-operated activation after reviewing and deploying the PR:
+
+1. In production Coolify, set runtime-only `SCAPELIKES_SITE_ID` to the private
+   Scapelikes dashboard site ID and `SCAPELIKES_PRESENCE_CRON_SECRET` to a
+   separately generated strong random secret of at least 32 characters. For
+   example, generate one privately with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+   Do not put either value in preview variables or the task command.
+2. Deploy and open the production **application** terminal. Verify `node --version`
+   is Node 22 and `test -f server/scapelikes-presence-task.mjs` succeeds in the
+   actual Nixpacks runtime container. Confirm `PORT` is the application's local
+   listening port; the task defaults to 3000 if it is unset.
+3. Run `node server/scapelikes-presence-task.mjs --dry-run`. Confirm the safe
+   success message and check task/application logs for errors. This validates
+   with Scapelikes without recording live presence. Stop on any failure.
+4. Create a production application Scheduled Task with cron `* * * * *` and
+   command `node server/scapelikes-presence-task.mjs`. Execute Now and inspect
+   Recent executions for success. Avoid invoking live writes within 20 seconds
+   of each other, including the next scheduled run.
+5. After one or two cycles, compare the RuneSpace Scapelikes listing with
+   `GET /api/player-presence` and the homepage, allowing for reporting lag and
+   changes in active players. Verify the PR preview has neither production
+   variable nor a reporting task, and does not change the production listing.
+
+Failures return a nonzero task exit and safe status-only diagnostics in app logs
+and Coolify execution history; there is no automatic retry. Reports expire at
+Scapelikes after five minutes. To roll back, disable or remove the scheduled task;
+remove the production variables as well if retiring the integration. Do not
+rerun live reports more frequently than the provider's 20-second limit.

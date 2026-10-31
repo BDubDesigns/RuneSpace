@@ -47,6 +47,9 @@ const envSchema = z.object({
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0),
     ),
+  // Optional, server-only Scapelikes reporting credentials.
+  SCAPELIKES_SITE_ID: optionalNonEmpty(),
+  SCAPELIKES_PRESENCE_CRON_SECRET: optionalNonEmpty(),
   /**
    * Cloudflare Turnstile protecting sign-up and verification resend (issue
    * #221). The site key is public and rendered into the registration page; the
