@@ -210,6 +210,7 @@ export function RefiningConsole({ localPlaceId }: { localPlaceId?: string } = {}
     releaseCommand,
     setRefreshCallback,
     acceptState,
+    serverNowMs,
     state,
   } = usePlay();
   const refining = state.refining;
@@ -223,7 +224,7 @@ export function RefiningConsole({ localPlaceId }: { localPlaceId?: string } = {}
   // The run's selection (#229): always starts at one, and resets to one
   // whenever the recipe changes, because a count means batches OF a recipe.
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
   const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh" | "slag">();
@@ -339,9 +340,9 @@ export function RefiningConsole({ localPlaceId }: { localPlaceId?: string } = {}
 
   useEffect(() => {
     if (!active) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, [Boolean(active)]);
+  }, [Boolean(active), serverNowMs]);
 
   const latestAttempt = latestRefiningAttempt(refiningRun.recentAttempts);
   const recentBatchCount =

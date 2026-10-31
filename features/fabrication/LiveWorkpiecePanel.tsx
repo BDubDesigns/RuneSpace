@@ -1,5 +1,6 @@
 "use client";
 
+import { usePlay } from "@/features/play/PlayContext";
 import { useEffect, useId, useState } from "react";
 import { StackItemVisual } from "@/components/items/StackItemVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
@@ -48,11 +49,12 @@ export function LiveWorkpiecePanel({
   station: FabricationProjection;
 }) {
   const workpiece = station.workpiece!;
-  const [now, setNow] = useState(Date.now());
+  const { serverNowMs } = usePlay();
+  const [now, setNow] = useState(serverNowMs);
   useEffect(() => {
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, []);
+  }, [serverNowMs]);
   const startsAt = new Date(workpiece.startedAt).getTime();
   const endsAt = new Date(workpiece.endsAt).getTime();
   const remainingMs = Math.max(0, endsAt - now);

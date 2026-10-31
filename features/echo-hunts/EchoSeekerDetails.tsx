@@ -122,11 +122,12 @@ function ReadingProgress({
   endsAt: string;
   planetName?: string;
 }) {
-  const [now, setNow] = useState(Date.now());
+  const { serverNowMs } = usePlay();
+  const [now, setNow] = useState(serverNowMs);
   useEffect(() => {
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, []);
+  }, [serverNowMs]);
   const start = new Date(startsAt).getTime();
   const end = new Date(endsAt).getTime();
   const remainingMs = Math.max(0, end - now);

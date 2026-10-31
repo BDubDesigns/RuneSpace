@@ -251,6 +251,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     enqueueForeground,
     foregroundBusy,
     releaseCommand,
+    serverNowMs,
     setRefreshCallback,
     state,
   } = usePlay();
@@ -259,7 +260,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
       ? miningStopMessage(state.stop.reason as MiningStopReason)
       : undefined,
   );
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
   const [pendingCommand, setPendingCommand] = useState<
@@ -369,11 +370,11 @@ export function MiningActivity({ characterName }: { characterName: string }) {
 
   useEffect(() => {
     if (!active && !state.travelState) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => {
       window.clearInterval(clock);
     };
-  }, [Boolean(active), Boolean(state.travelState)]);
+  }, [Boolean(active), Boolean(state.travelState), serverNowMs]);
 
   // A run survives travel by design, so the persisted one can belong to a
   // source the player has since walked away from (#211 review). Its totals and
