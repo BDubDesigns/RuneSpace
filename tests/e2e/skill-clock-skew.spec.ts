@@ -274,3 +274,57 @@ for (const skewMs of SKEWS) {
     await expectMeterOnServerTimeline(meter, window, durationMs);
   });
 }
+
+// The cursor is placed briefly in the future solely to keep this seeded,
+// already-projected opportunity stable while CI loads and reloads the page.
+// Both the server and this test process retain their real clocks.
+for (const skewMs of [0, -5_000, 5_000]) {
+  for (const label of ["Clean Pass window", "Current weld"]) {
+    test(`${label} uses server time with browser skew ${skewMs}ms (#470)`, async ({
+      page,
+      testCharacter,
+    }) => {
+      const characterId = testCharacter.id;
+      const target = getRepairTargetBalance(REPAIR_TARGET_IDS.deepJagCaveIn, balance);
+      const now = new Date();
+      await db.insert(characterMissions).values({
+        characterId,
+        missionId: MISSION_IDS.braceYourself,
+        acceptedAt: now,
+      });
+      await stand(characterId, LOCATION_IDS.deepJag);
+      await db.insert(characterRepairTargets).values({
+        characterId,
+        targetId: REPAIR_TARGET_IDS.deepJagCaveIn,
+        materials: Object.fromEntries(target.materials.map((item) => [item.itemId, item.quantity])),
+        weldingProgress: 1,
+        cleanPass: [{ section: 2, outcome: null }],
+      });
+      await openTestCharacter(page, characterId);
+      await skewBrowserClock(page, skewMs);
+      const startsAt = new Date(Date.now() + 15_000);
+      await db.insert(activeActions).values({
+        characterId,
+        actionId: target.actionId,
+        startedAt: startsAt,
+        resolvedThroughAt: startsAt,
+      });
+      await page.reload();
+      const panel = page.locator(`[data-repair-work-panel="${REPAIR_TARGET_IDS.deepJagCaveIn}"]`);
+      const cleanPass = panel.locator('[data-clean-pass-state="open"]');
+      const endMs = startsAt.getTime() + balance.welding.attemptDurationTicks * GAME_TICK_MS;
+      await expect(cleanPass).toBeVisible();
+      const meter = panel.getByRole("progressbar", { name: label });
+      await expect(meter).toBeVisible();
+      const text = await meter.getAttribute("aria-label");
+      const readAt = Date.now();
+      const match = /([\d.]+)s/.exec(text ?? "");
+      expect(match, `missing countdown in ${text}`).not.toBeNull();
+      const shownMs = Number(match![1]) * 1_000;
+      expect(Math.abs(shownMs - (endMs - readAt)), `${label} at skew ${skewMs}`).toBeLessThan(
+        2_000,
+      );
+      await expect(cleanPass.locator("[data-clean-pass-claim]")).toBeEnabled();
+    });
+  }
+}
