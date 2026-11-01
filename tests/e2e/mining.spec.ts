@@ -9,7 +9,12 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import {
+  expectMeterOnServerTimeline,
+  skewBrowserClock,
+  startAndBracket,
+} from "./server-clock-skew";
 import {
   openEquipmentTab,
   equipmentSlotTile,
@@ -442,6 +447,34 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
     .where(eq(characterMiningState.characterId, characterId));
   expect(persisted[0]?.runAttempts).toBe(1);
 });
+
+/**
+ * A browser clock running 5 s off the server must not stretch the Mining
+ * countdown or hold its meter at empty (#446). The 10-tick (6 s) attempt is
+ * judged against the true start window, not against figures derived from the
+ * meter itself, so a fast clock fails on the old code as well as a slow one.
+ */
+for (const skewMs of [-5_000, 5_000]) {
+  test(`Mining progress follows the server clock when the browser clock is ${skewMs / 1_000}s off (#446)`, async ({
+    page,
+  }) => {
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    const window = await startAndBracket(() =>
+      page.getByRole("button", { name: "Start Mining" }).click(),
+    );
+    const meter = page.getByRole("progressbar", { name: /to next attempt/ });
+    await expect(meter).toBeVisible();
+    const durationMs = 10 * GAME_TICK_MS;
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    await page.waitForTimeout(1_500);
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    // Rehydration: a reload mid-attempt lands on the same server timeline.
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+  });
+}
 
 test("footer Character destination uses the full icon-plus-label destination", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

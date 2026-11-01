@@ -233,11 +233,12 @@ function RigCyclePanel({
   rig: ResonanceRigProjection;
 }) {
   const cycle = rig.cycle!;
-  const [now, setNow] = useState(Date.now());
+  const { serverNowMs } = usePlay();
+  const [now, setNow] = useState(serverNowMs);
   useEffect(() => {
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, []);
+  }, [serverNowMs]);
   const startsAt = new Date(cycle.startedAt).getTime();
   const endsAt = new Date(cycle.endsAt).getTime();
   const remainingMs = Math.max(0, endsAt - now);

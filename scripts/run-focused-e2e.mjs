@@ -90,6 +90,7 @@ export const FOCUSED_PHASES = [
   "first-runeworking-lesson",
   "first-resonance-echo",
   "resonance-rig",
+  "skill-clock-skew",
   "ship-first-flight",
   "scroll-affordances",
   "stillreach",

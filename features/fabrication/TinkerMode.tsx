@@ -87,11 +87,11 @@ function describe(
  * Current completes it and stops.
  */
 export function TinkerMode() {
-  const { foregroundBusy, state } = usePlay();
+  const { foregroundBusy, serverNowMs, state } = usePlay();
   const tinkering = state.tinkering;
   const [selectedActionId, setSelectedActionId] = useState<string>();
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const cycle = tinkering.cycle;
   const cycleTarget = tinkering.targets.find((target) => target.actionId === cycle?.targetActionId);
   const visible = tinkerVisibleTargets(tinkering.targets);
@@ -106,9 +106,9 @@ export function TinkerMode() {
 
   useEffect(() => {
     if (!running) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, [running]);
+  }, [running, serverNowMs]);
   useEffect(() => {
     if (running) setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
   }, [running]);
