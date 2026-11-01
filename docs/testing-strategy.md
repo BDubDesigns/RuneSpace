@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 13368)
-Total output lines: 750
-
 # Testing Strategy
 
 RuneSpace uses a **risk-based** testing strategy. Tests focus on where bugs and
@@ -300,7 +297,90 @@ unit tests, `pnpm test:integration`, build, focused E2E, and the full
 `pnpm test:e2e:canonical` run, which runs on GitHub when working from the shared
 Hermes host.
 
-- Uploading an artifact is not proof t…1368 tokens truncated…me with a character who is
+- Uploading an artifact is not proof that promised evidence exists. Verify each
+  expected evidence file before upload, and inspect artifact contents whenever
+  evidence is part of the definition of done.
+
+### Issue #245 realtime/social coverage
+
+- `tests/unit/realtime.test.ts` owns the wire format and incremental parser,
+  audience matching and in-process fanout, the publisher's independence from
+  chat/trading models, the browser connection lifecycle (reconcile on connect
+  and reconnect, immediate reconnect after a deliberate close, backoff,
+  watchdog, refusal stops), duplicate-safe shell state, and the launcher's
+  accessible attention state.
+- `tests/integration/realtime.test.ts` proves stream authorization against
+  PostgreSQL: unauthenticated, foreign-character, and gameplay-access refusals
+  (including revocation between streams), the server-derived scope, delivery
+  only to matching streams across several tabs, heartbeat, and the bounded
+  lifetime.
+- `tests/e2e/social-shell.spec.ts` proves, at phone and desktop widths, the
+  launcher's edge placement (flush right, centred in the usable viewport,
+  through a rotation, no reserved page space — measured at the end of a page
+  the spec stretches to overflow, because the natural page height depends on
+  the host's fonts — clear of the Map's selected
+  destination panel), the Drawer over the current
+  surface, the accessible attention state and a pinned card driven through the
+  real `SocialContext` seam, reconnect after the deliberate close, one stream
+  per tab across several tabs, and recovery of a suspended, offline tab. It
+  ends streams through the local-E2E-only `POST /api/e2e/realtime` hook instead
+  of waiting out the 5-minute lifetime, and reaches the seam from the page's
+  React fiber because no production feature raises attention yet.
+
+### Issue #246 public chat coverage
+
+- `tests/unit/chat.test.ts` owns the content contract (trim, empty, 280 code
+  points, matching the database CHECK), the shared budget (General 5 / Trade 3
+  on one count), the composer bands, the ad cooldown, the severe-term
+  guardrail's whole-token matching against a stand-in term, and the browser
+  feed's merge, ordering, gap restart, and dual-feed ad projection.
+- `tests/integration/chat.test.ts` proves against PostgreSQL: server-derived
+  immutable identity, foreign-character / gated / anonymous refusals, the
+  budget across characters and concurrent requests, the promoted ad's atomic
+  charge, one record in both feeds, its one shared send and account-wide
+  cooldown (including a concurrent race), refused ads spending nothing,
+  guardrail refusals persisting and delivering nothing, publish-after-commit,
+  stable seq pagination across identical timestamps, and bounded 90-day
+  retention (#352): a prune never deletes more than its limit, oldest first,
+  skipping rows another transaction holds and taking disjoint batches from
+  concurrent callers, each proved under the default plan and one forced to
+  re-scan a semi-joined subquery (`set_config('enable_hashagg', 'off', true)`
+  and friends, local to the test's transaction), with a control that the
+  pre-#352 statement really takes that shape.
+- `tests/e2e/public-chat.spec.ts` proves at phone and desktop widths: switching
+  channels in place, own/long messages without horizontal overflow, the
+  promoted ad's treatment and its one record in both feeds, the 280-character
+  and rate states counting down with no request (Trade stepping from full to
+  high uses seeded sends with expiries seconds apart: back-to-back sends
+  expire within one tick of the one-second local clock, so their intermediate
+  band may never render, #293), another tab's sends
+  correcting the indicator through the server's refusal, load-older, live
+  delivery, and a reconnect catching a missed message without duplicates. Each
+  journey signs in a fresh account (its own budget) and looks only for its own
+  tagged messages, because the feeds are game-wide. Canonical runs the
+  chromium project only, so the journeys set the phone (393px) and desktop
+  widths themselves; the multi-width ones skip the mobile project so the
+  shared feed is never seeded twice at once.
+
+### Issue #247 Whispers, Block, and Report coverage
+
+- `tests/unit/chat.test.ts`, `tests/unit/social-safety.test.ts`, and
+  `tests/unit/realtime.test.ts` own the pure rules: Whispers on General's limit
+  of the shared count, the pair key, Whisper feed merging, the six report
+  reasons, the optional note, and the publish audience that skips blockers.
+- `tests/integration/social-safety.test.ts` proves against PostgreSQL: only an
+  owned playable character sends; identity survives renames; offline
+  recipients read durable history; latest 50 and pagination; unread durable
+  per recipient character, cleared everywhere and never moved backwards; the
+  shared budget across General, Whispers, and Trade; the guardrail on Whispers;
+  Block across every character of both accounts, public suppression for the
+  blocker only, Whispers refused both ways without disclosure, history kept,
+  unblock, and the block/unblock signals; message and player reports, the
+  10-before/10-after window from the right feed, no unrelated Whisper leakage,
+  same-account dedupe, Report + Block, and evidence surviving retention.
+- `tests/e2e/whispers-safety.spec.ts` proves with two real accounts at phone
+  and desktop widths: starting a Whisper from a chat sender (its name), from
+  the same-location profile, and by exact name with a character who is
   elsewhere, offline, and silent in public, without leaving Play, live arrival with unread on the
   launcher and the Whispers tab, reading on one tab clearing the other, the
   Block / Report / Report + Block flows, blocked public messages disappearing
