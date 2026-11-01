@@ -134,9 +134,15 @@ function NewsControl({ unread }: { unread: boolean }) {
   const router = useRouter();
   // Opening Updates in a new tab (#448) leaves the live game tab untouched. The link
   // is an ordinary anchor, so it still works without JavaScript, middle-click and
-  // the context menu; the acknowledgement is fire-and-forget on primary/aux click.
+  // the context menu. Acknowledgement is fire-and-forget on a real visit: primary
+  // click (including keyboard activation) and middle-click. `auxclick` also fires
+  // for the right button (context menu), which is not a visit, so it is filtered
+  // by `button`. A failed acknowledgement is swallowed: it must never block
+  // navigation, and the unread dot simply stays until the next successful visit.
   function acknowledge() {
-    void acknowledgeNewsAction().then(() => router.refresh());
+    acknowledgeNewsAction()
+      .then(() => router.refresh())
+      .catch(() => undefined);
   }
   return (
     <span
@@ -148,7 +154,9 @@ function NewsControl({ unread }: { unread: boolean }) {
         className="relative px-2.5"
         href="/updates"
         intent="secondary"
-        onAuxClick={acknowledge}
+        onAuxClick={(event) => {
+          if (event.button === 1) acknowledge();
+        }}
         onClick={acknowledge}
         rel="noopener"
         target="_blank"
