@@ -355,34 +355,28 @@ for (const skewMs of [0, -5_000, 5_000]) {
           .insert(itemInstances)
           .values({ characterId, itemId: ITEM_IDS.geologicalSampleCase })
           .returning();
-        await db
-          .insert(characterResearchAssignments)
-          .values({
-            characterId,
-            jobId: RESEARCH_JOB_IDS.geologicalFieldSurvey,
-            itemInstanceId: loan!.id,
-            startedAt: now,
-          });
+        await db.insert(characterResearchAssignments).values({
+          characterId,
+          jobId: RESEARCH_JOB_IDS.geologicalFieldSurvey,
+          itemInstanceId: loan!.id,
+          startedAt: now,
+        });
       } else {
-        await db
-          .insert(characterMissions)
-          .values({
-            characterId,
-            missionId: MISSION_IDS.tenThousandHours,
-            acceptedAt: now,
-            ...(surface === "work-order" ? { completedAt: now } : {}),
-          });
+        await db.insert(characterMissions).values({
+          characterId,
+          missionId: MISSION_IDS.tenThousandHours,
+          acceptedAt: now,
+          ...(surface === "work-order" ? { completedAt: now } : {}),
+        });
         if (surface === "practice") {
           await db.insert(characterPracticeWelds).values({ characterId, cycleActive: true });
         } else {
-          await db
-            .insert(characterWorkOrderPostings)
-            .values({
-              characterId,
-              slotIndex: 0,
-              workOrderId: WORK_ORDER_IDS.rennCarryFrame,
-              acceptedAt: now,
-            });
+          await db.insert(characterWorkOrderPostings).values({
+            characterId,
+            slotIndex: 0,
+            workOrderId: WORK_ORDER_IDS.rennCarryFrame,
+            acceptedAt: now,
+          });
         }
       }
       await openTestCharacter(page, characterId);
@@ -392,18 +386,16 @@ for (const skewMs of [0, -5_000, 5_000]) {
         (research
           ? balance.researchJobs.surfaceSampleDurationTicks
           : balance.welding.attemptDurationTicks) * GAME_TICK_MS;
-      await db
-        .insert(activeActions)
-        .values({
-          characterId,
-          actionId: research
-            ? ACTION_IDS.researchSurfaceSample
-            : surface === "practice"
-              ? ACTION_IDS.practiceWelding
-              : ACTION_IDS.workOrderWelding,
-          startedAt: startsAt,
-          resolvedThroughAt: startsAt,
-        });
+      await db.insert(activeActions).values({
+        characterId,
+        actionId: research
+          ? ACTION_IDS.researchSurfaceSample
+          : surface === "practice"
+            ? ACTION_IDS.practiceWelding
+            : ACTION_IDS.workOrderWelding,
+        startedAt: startsAt,
+        resolvedThroughAt: startsAt,
+      });
       await page.reload();
       const panel = page.locator(
         research
@@ -415,16 +407,21 @@ for (const skewMs of [0, -5_000, 5_000]) {
       const meter = panel.getByRole("progressbar", {
         name: research ? /Working/ : /Current section/,
       });
-      await expect(meter).toBeVisible();
-      const label = await meter.getAttribute("aria-label");
-      const readAt = Date.now();
-      const shown = /([\d.]+)s/.exec(label ?? "");
-      expect(shown, `missing countdown: ${label}`).not.toBeNull();
-      const expectedRemaining = startsAt.getTime() + durationMs - readAt;
-      expect(Math.abs(Number(shown![1]) * 1_000 - expectedRemaining)).toBeLessThan(2_000);
-      const fill = Number(await meter.getAttribute("aria-valuenow"));
-      const expectedFill = Math.min(100, (1 - expectedRemaining / durationMs) * 100);
-      expect((Math.abs(fill - expectedFill) * durationMs) / 100).toBeLessThan(2_000);
+      const expectTimeline = async () => {
+        await expect(meter).toBeVisible();
+        const label = await meter.getAttribute("aria-label");
+        const readAt = Date.now();
+        const shown = /([\d.]+)s/.exec(label ?? "");
+        expect(shown, `missing countdown: ${label}`).not.toBeNull();
+        const expectedRemaining = startsAt.getTime() + durationMs - readAt;
+        expect(Math.abs(Number(shown![1]) * 1_000 - expectedRemaining)).toBeLessThan(2_000);
+        const fill = Number(await meter.getAttribute("aria-valuenow"));
+        const expectedFill = Math.min(100, (1 - expectedRemaining / durationMs) * 100);
+        expect((Math.abs(fill - expectedFill) * durationMs) / 100).toBeLessThan(2_000);
+      };
+      await expectTimeline();
+      await page.reload();
+      await expectTimeline();
     });
   }
 }
