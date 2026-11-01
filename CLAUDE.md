@@ -62,10 +62,9 @@ until grep -q "All canonical E2E checks passed\|FAIL" run.log; do sleep 15; done
 ```
 
 Approximate timings in an isolated cloud container, so nothing looks hung:
-`pnpm test` ~12s and `pnpm test:integration` ~25s. `pnpm test:e2e:canonical`
-was once measured at ~3 min (44s production build, then 88 specs), but a
-recent run reached only 310 of 394 specs in ~13 min before it was killed, so do
-not rely on that figure. On the shared one-vCPU Hermes host, the production
+`pnpm test` ~12s and `pnpm test:integration` ~25s. A full canonical run is
+not a cloud-session step (see below); one attempt reached only 310 of 394 specs
+in ~13 min before it was killed. On the shared one-vCPU Hermes host, the production
 build alone takes ~2.3 min and an uncontended canonical run ~12 min.
 
 ## Local validation in an isolated cloud container
@@ -87,19 +86,31 @@ export DATABASE_URL="postgres://postgres@127.0.0.1:5432/postgres"
 pnpm test:integration
 ```
 
-**Do not run `pnpm test:e2e:canonical` here as routine.** `AGENTS.md` step 5
-says the PR's CI runs the full canonical suite, and GitHub does it faster and
-without risking a half-finished local run. Push, open the PR, and read the
-checks. Run it locally only to reproduce a CI failure or for a genuinely
-high-risk boundary change, and then start it detached (`setsid nohup … &`) and
-wait on its log's terminal line, never inside a foreground tool call that can
-hit the tool timeout.
+**Claude Code cloud sessions must not run the full canonical E2E suite
+(`pnpm test:e2e:canonical`) unless the owner explicitly authorizes it for that
+task.** GitHub Actions owns full canonical validation: every PR push runs it,
+and `Merge gate` reports it. Push, open the PR, and read the checks.
 
-If Playwright reports `Executable doesn't exist … chromium_headless_shell-<n>`,
-the pinned Playwright expects a different browser build than the one
-pre-installed under `/opt/pw-browsers`. Point `PLAYWRIGHT_BROWSERS_PATH` at a
-scratch directory containing a symlink with the expected name rather than
-editing the repo's Playwright config.
+Validate proportionally instead: unit tests, `pnpm test:integration` (or the
+specific integration files), and, where a browser is needed, a focused run of
+the one relevant spec (`pnpm test:e2e:focused <phase>`). When a GitHub CI test
+fails, read the failing job's log, then diagnose and reproduce only that spec or
+subsystem locally — never the whole canonical suite — fix it, and push so CI
+re-verifies. A new E2E spec must also be registered in `canonicalSpecPattern`
+(`playwright.config.ts`) and `FOCUSED_PHASES` (`scripts/run-focused-e2e.mjs`),
+or CI will silently never run it.
+
+Focused Playwright execution in a cloud container may fail with
+`Executable doesn't exist … chromium_headless_shell-<n>`: the repository's
+pinned Playwright can expect a different browser build than the one
+pre-installed under `/opt/pw-browsers`. Recurring workaround, kept outside the
+repository: create a scratch directory (not in the worktree) containing a
+`chromium_headless_shell-<n>/chrome-linux/headless_shell` symlink to the
+installed headless-shell binary and an `INSTALLATION_COMPLETE` file, then set
+`PLAYWRIGHT_BROWSERS_PATH` to that directory for the focused run. This is a
+best-effort local aid, not a guarantee of version compatibility; do not edit
+the Playwright configuration or commit the symlink, and treat GitHub CI as the
+authority if behavior differs.
 
 `pnpm build` needs `DATABASE_URL` and a throwaway `BETTER_AUTH_SECRET` of at
 least 16 characters. The Coolify production database is never a target, on any
