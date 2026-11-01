@@ -438,6 +438,63 @@ test.describe("Chat/Social polish on the public site", () => {
     ).toBe(true);
   });
 
+  test("News is acknowledged by left and middle click, not by the context menu (#448)", async ({
+    browser,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "runs once");
+    const tag = randomUUID().slice(0, 6);
+    const { userId, context } = await establishAuthenticatedSession(
+      browser,
+      `News ${tag}`,
+      `polish-news-aux-${tag}-${randomUUID().slice(0, 8)}@example.com`,
+    );
+    users.push(userId);
+    try {
+      const created = await createCharacterForUser(
+        db,
+        rune,
+        ownership,
+        characters,
+        userId,
+        `Auxy ${tag}`,
+        PORTRAIT_IDS.evaSalvageWelder,
+        { seedLegacyStarterCutter: false },
+      );
+      // A fresh account has never acknowledged news, so the control starts unread.
+      const page = await context.newPage();
+      await openTestCharacter(page, created.id);
+      const banner = page.getByRole("banner");
+      const unread = banner.getByRole("link", {
+        name: "News, unread update available",
+        exact: true,
+      });
+      await expect(unread).toBeVisible();
+
+      // Opening the browser context menu (auxclick, button 2) is not a visit to Updates.
+      await unread.click({ button: "right" });
+      await page.keyboard.press("Escape");
+      await page.reload();
+      await expect(unread).toBeVisible();
+
+      // Middle-click opens a background tab and does acknowledge.
+      const [background] = await Promise.all([
+        context.waitForEvent("page"),
+        unread.click({ button: "middle" }),
+      ]);
+      // A background tab opened (its URL may stay blank until focused); the game tab is
+      // untouched.
+      await background.close();
+      await expect
+        .poll(async () => {
+          await page.reload();
+          return banner.getByRole("link", { name: /unread/i }).count();
+        })
+        .toBe(0);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("News points a returning player at Heads Up", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "runs once");
     // A newer Update has shipped since (#286): this journey is about Heads Up.
@@ -471,18 +528,23 @@ test.describe("Chat/Social polish on the public site", () => {
       const page = await context.newPage();
       await openTestCharacter(page, created.id);
       const banner = page.getByRole("banner");
-      await banner
-        .getByRole("button", { name: "News, unread update available", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/updates$/);
+      const gameUrl = page.url();
+      const [updates] = await Promise.all([
+        page.waitForEvent("popup"),
+        banner.getByRole("link", { name: "News, unread update available", exact: true }).click(),
+      ]);
+      // News opens in a new tab (#448); the game tab is untouched.
+      expect(page.url()).toBe(gameUrl);
+      await expect(updates).toHaveURL(/\/updates$/);
       await expect(
-        page
+        updates
           .getByRole("list", { name: "Published Updates" })
           .getByRole("link", { name: "Heads Up", exact: true }),
       ).toBeVisible();
-      await openTestCharacter(page, created.id);
-      await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-      await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
+      await updates.close();
+      await page.reload();
+      await expect(banner.getByRole("link", { name: "News", exact: true })).toBeVisible();
+      await expect(banner.getByRole("link", { name: /unread/i })).toHaveCount(0);
     } finally {
       await context.close();
     }

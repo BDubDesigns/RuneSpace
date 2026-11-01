@@ -154,7 +154,7 @@ for (const viewport of [DESKTOP, WIDE]) {
 
     // Global branding, News and account controls stay in the global header.
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "News" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "News" })).toBeVisible();
 
     // Map is a peer navigation button in Play's top bar, left of News and Sign
     // out — not in the rail, and with no row of its own above the location art.
@@ -163,7 +163,7 @@ for (const viewport of [DESKTOP, WIDE]) {
     await expect(map).toBeVisible();
     await expect(map).toHaveAccessibleName("Map");
     const mapBox = (await map.boundingBox())!;
-    const newsBox = (await banner.getByRole("button", { name: "News" }).boundingBox())!;
+    const newsBox = (await banner.getByRole("link", { name: "News" }).boundingBox())!;
     const signOutBox = (await banner.getByRole("button", { name: "Sign out" }).boundingBox())!;
     const logoBox = (await banner.getByRole("img", { name: "RuneSpace" }).boundingBox())!;
     const railBox = (await rail(page).boundingBox())!;

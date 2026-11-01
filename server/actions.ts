@@ -342,17 +342,14 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
 /**
  * Acknowledge account-level news (issue #156). The authenticated account's
  * news read-through boundary advances to the newest published Update's
- * instant as resolved server-side, then the browser navigates to the Updates
- * index — an ordinary form submission, so this works as normal navigation
- * even without client JavaScript. Errors intentionally fall through to the
- * thrown redirect/error rather than a client-visible result: this control has
- * no other in-place error affordance, and a failed acknowledgement should
- * surface the same way any other broken navigation would.
+ * instant as resolved server-side. The News control opens the Updates index in a
+ * new tab itself (issue #448), so this no longer redirects and the live game tab
+ * is never navigated. Errors fall through as a thrown error rather than a
+ * client-visible result: this control has no other in-place error affordance.
  */
 export async function acknowledgeNewsAction(): Promise<void> {
   const user = await requireCurrentUser(await headers());
   await acknowledgeNews(user.id);
-  redirect("/updates");
 }
 
 /**

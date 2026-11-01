@@ -25,7 +25,30 @@ test("public navigation, rankings, and shareable profiles work on mobile and des
   for (const name of ["Home", "Updates", "Wiki", "High Scores"])
     await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
   await expect(page.getByText(/\d+ players? online/)).toBeVisible();
-  await page.getByRole("link", { name: "View High Scores" }).click();
+  // Entry links open Wiki, High Scores and Updates in a new tab (#448); Home stays in-tab.
+  for (const name of ["Updates", "Wiki", "High Scores"]) {
+    const link = nav.getByRole("link", { name, exact: true });
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+  }
+  await expect(nav.getByRole("link", { name: "Home", exact: true })).not.toHaveAttribute(
+    "target",
+    "_blank",
+  );
+  const landingUrl = page.url();
+  const [scores] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.getByRole("link", { name: "View High Scores" }).click(),
+  ]);
+  expect(page.url()).toBe(landingUrl);
+  await expect(scores.getByRole("heading", { name: "High Scores" })).toBeVisible();
+  // Normal navigation inside the opened tab does not spawn more tabs.
+  const profile = scores.locator('a[href^="/high-scores/characters/"]').first();
+  if (await profile.count()) {
+    await expect(profile).not.toHaveAttribute("target", "_blank");
+  }
+  await scores.close();
+  await page.goto("/high-scores");
   await expect(page.getByRole("heading", { name: "High Scores" })).toBeVisible();
   const ranking = page.getByLabel("Ranking");
   for (const label of [
@@ -75,6 +98,9 @@ test("public navigation, rankings, and shareable profiles work on mobile and des
   await page.keyboard.press("Enter");
   await expect(menu).toHaveAttribute("aria-expanded", "true");
   await expect(nav.getByRole("link", { name: "High Scores", exact: true })).toBeVisible();
+  for (const name of ["Updates", "Wiki", "High Scores"]) {
+    await expect(nav.getByRole("link", { name, exact: true })).toHaveAttribute("target", "_blank");
+  }
   await page.keyboard.press("Escape");
   await expect(menu).toBeFocused();
   await expect(menu).toHaveAttribute("aria-expanded", "false");
@@ -115,11 +141,17 @@ test("players can reach High Scores from Character", async ({
     .getByRole("navigation", { name: "Primary" })
     .getByRole("button", { name: "Character", exact: true })
     .click();
-  await page
-    .getByRole("dialog", { name: "Character" })
-    .getByRole("link", { name: "View High Scores" })
-    .click();
-  await expect(page).toHaveURL(/\/high-scores/, { timeout: 20_000 });
+  const gameUrl = page.url();
+  const [scores] = await Promise.all([
+    page.waitForEvent("popup"),
+    page
+      .getByRole("dialog", { name: "Character" })
+      .getByRole("link", { name: "View High Scores" })
+      .click(),
+  ]);
+  // Opens in a new tab (#448); the live game tab is not navigated away.
+  await expect(scores).toHaveURL(/\/high-scores/, { timeout: 20_000 });
+  expect(page.url()).toBe(gameUrl);
 });
 
 test("share uses the native sheet and reports copy failures", async ({

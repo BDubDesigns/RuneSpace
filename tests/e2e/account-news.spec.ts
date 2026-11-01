@@ -68,31 +68,36 @@ test("News indicator starts unread, clears through a real navigation, and stays 
     // has published Updates, so the control starts unread regardless of which
     // character just entered Play.
     const banner = page.getByRole("banner");
-    const unreadNewsButton = banner.getByRole("button", {
+    const unreadNewsButton = banner.getByRole("link", {
       name: "News, unread update available",
       exact: true,
     });
     await expect(unreadNewsButton).toBeVisible();
 
-    // Activating it is a real navigation to the Updates index (not a modal or
+    // Activating it opens the Updates index in a new tab (not a modal or
     // client-only state change), and acknowledges through whatever was newest
     // at that moment.
-    await unreadNewsButton.click();
-    await expect(page).toHaveURL(/\/updates$/);
-    await expect(page.getByRole("heading", { name: "Updates", level: 1 })).toBeVisible();
+    await expect(unreadNewsButton).toHaveAttribute("target", "_blank");
+    await expect(unreadNewsButton).toHaveAttribute("rel", /noopener/);
+    const [updates] = await Promise.all([page.waitForEvent("popup"), unreadNewsButton.click()]);
+    // The Updates index opens in a new tab (#448); the game tab stays put.
+    await expect(page).toHaveURL(firstCharacterUrl);
+    await expect(updates).toHaveURL(/\/updates$/);
+    await expect(updates.getByRole("heading", { name: "Updates", level: 1 })).toBeVisible();
+    await updates.close();
 
     // Returning to the same character's Play page reflects the cleared state.
     await page.goto(firstCharacterUrl);
-    await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-    await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
+    await expect(banner.getByRole("link", { name: "News", exact: true })).toBeVisible();
+    await expect(banner.getByRole("link", { name: /unread/i })).toHaveCount(0);
 
     // The boundary is account-level: a second character under the same
     // account sees the already-cleared state without acknowledging again.
     await openUtility(page, "character");
     await utilitySurface(page, "Character").getByRole("link", { name: "Switch Character" }).click();
     await createCharacter(page, uniqueCharacterName("News Two"));
-    await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-    await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
+    await expect(banner.getByRole("link", { name: "News", exact: true })).toBeVisible();
+    await expect(banner.getByRole("link", { name: /unread/i })).toHaveCount(0);
   } finally {
     await context.close();
     await cleanupTestUser(db, authSchema, rune, userId);

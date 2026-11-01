@@ -3,7 +3,6 @@
 import { Backpack, Mail, Map as MapIcon, ScrollText, User } from "lucide-react";
 import type { ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
@@ -97,10 +96,10 @@ function PlayFooter() {
 }
 
 /**
- * Account-level unread-news control (issue #156). Submitting the form is an
- * ordinary navigation (works without client JavaScript): the server action
+ * Account-level unread-news control (issue #156). An anchor opening `/updates` in a
+ * new tab (issue #448); activating it also runs the server action that
  * advances the authenticated account's news read-through boundary to the
- * newest published Update's instant, then redirects to `/updates`. The
+ * newest published Update's instant, then refreshes the page state. The
  * unread dot is `aria-hidden`; the real state is folded into the button's
  * `aria-label`, matching the existing footer badge convention.
  *
@@ -116,10 +115,10 @@ function PlayFooter() {
  * restrained panel ambiance; kept separate from the mission
  * guidance/available tokens since those already carry gameplay meaning this
  * control doesn't share. Two things keep it from silently doing nothing:
- * - `ActionButton` always carries `rs-bevel`, whose clip-path clips any
+ * - `ActionLink` always carries `rs-bevel`, whose clip-path clips any
  *   shadow drawn outside the element's own box (see `.rs-bevel` and the
  *   `.rs-bevel.rs-mission-guidance` note in `app/globals.css`), so the glow
- *   is applied to the unclipped `<form>` wrapper around the button rather
+ *   is applied to the unclipped `<span>` wrapper around the link rather
  *   than the beveled button itself; `rs-bevel` stays untouched.
  * - Tailwind's `shadow-[var(...)]` arbitrary-value syntax only sets the
  *   `--tw-shadow-color`/`--tw-shadow` custom properties, not the `box-shadow`
@@ -132,17 +131,35 @@ function PlayFooter() {
  * `box-shadow`, so it never interferes with the focus ring.
  */
 function NewsControl({ unread }: { unread: boolean }) {
+  const router = useRouter();
+  // Opening Updates in a new tab (#448) leaves the live game tab untouched. The link
+  // is an ordinary anchor, so it still works without JavaScript, middle-click and
+  // the context menu. Acknowledgement is fire-and-forget on a real visit: primary
+  // click (including keyboard activation) and middle-click. `auxclick` also fires
+  // for the right button (context menu), which is not a visit, so it is filtered
+  // by `button`. A failed acknowledgement is swallowed: it must never block
+  // navigation, and the unread dot simply stays until the next successful visit.
+  function acknowledge() {
+    acknowledgeNewsAction()
+      .then(() => router.refresh())
+      .catch(() => undefined);
+  }
   return (
-    <form
-      action={acknowledgeNewsAction}
+    <span
       className="inline-flex"
       style={unread ? { boxShadow: "var(--rs-glow-news-unread)" } : undefined}
     >
-      <ActionButton
+      <ActionLink
         aria-label={unread ? "News, unread update available" : "News"}
         className="relative px-2.5"
+        href="/updates"
         intent="secondary"
-        type="submit"
+        onAuxClick={(event) => {
+          if (event.button === 1) acknowledge();
+        }}
+        onClick={acknowledge}
+        rel="noopener"
+        target="_blank"
       >
         <Mail aria-hidden="true" className="h-4 w-4" />
         <span className="sr-only">News</span>
@@ -152,8 +169,8 @@ function NewsControl({ unread }: { unread: boolean }) {
             className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-[color:var(--rs-surface-control)] bg-[color:var(--rs-accent-primary)]"
           />
         ) : null}
-      </ActionButton>
-    </form>
+      </ActionLink>
+    </span>
   );
 }
 

@@ -133,6 +133,8 @@ export function PublicLandingPage({
               <a
                 className="rs-focus font-semibold text-[color:var(--rs-accent-primary)] underline"
                 href="/high-scores"
+                rel="noopener"
+                target="_blank"
               >
                 View High Scores
               </a>

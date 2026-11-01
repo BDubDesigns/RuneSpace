@@ -99,7 +99,13 @@ export function CharacterPanel({
           ) : null}
         </div>
       </div>
-      <ActionLink className="mt-4" href="/high-scores" intent="secondary">
+      <ActionLink
+        className="mt-4"
+        href="/high-scores"
+        intent="secondary"
+        rel="noopener"
+        target="_blank"
+      >
         View High Scores
       </ActionLink>
       <h3 className="mt-5 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">
