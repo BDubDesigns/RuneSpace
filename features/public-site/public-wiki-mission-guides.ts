@@ -1068,7 +1068,7 @@ export const missionGuideArticles = [
           "250 Welding XP more when you tell Renn.",
           [
             "Once the repair is done, the shelter stays fixed for good. The crews use it every workday and know who fixed it, so they let you ride the shift hauler out to The Jag for ",
-            link("5 Credits a trip", "travel-and-scavenging"),
+            link("10 Credits a trip", "travel-and-scavenging"),
             ". Only on the way out — the hauler comes back loaded with shale, so you walk home.",
           ],
         ],

@@ -1023,7 +1023,7 @@ test("keeps the repaired shelter and the ride apart until Renn is told", async (
   expect(gap).toBeLessThanOrEqual(24);
 });
 
-test("presents the repaired Crew Stop and its one-way 5-Credit ride out to The Jag", async ({
+test("presents the repaired Crew Stop and its one-way 10-Credit ride out to The Jag", async ({
   page,
   testCharacter,
 }) => {
@@ -1044,7 +1044,7 @@ test("presents the repaired Crew Stop and its one-way 5-Credit ride out to The J
     weldingProgress: 10,
     completedAt: now,
   });
-  await arriveInHoloHollow(characterId, { credits: 5 });
+  await arriveInHoloHollow(characterId, { credits: 10 });
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
 
@@ -1071,18 +1071,18 @@ test("presents the repaired Crew Stop and its one-way 5-Credit ride out to The J
   // The ride states where it goes and what it costs, and is keyboard reachable.
   const ride = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.theJag}"]`);
   await expect(ride).toContainText("Ride to The Jag");
-  await expect(ride).toContainText("5 Credits");
+  await expect(ride).toContainText("10 Credits");
   await expect(ride).toBeEnabled();
   await ride.focus();
   await expect(ride).toBeFocused();
 
   // Insufficient funds is stated, not merely implied by a dimmed control.
-  await db.update(characters).set({ credits: 4 }).where(eq(characters.id, characterId));
+  await db.update(characters).set({ credits: 9 }).where(eq(characters.id, characterId));
   await page.reload();
   const unaffordable = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.theJag}"]`);
   await expect(unaffordable).toBeDisabled();
   await expect(page.locator("[data-crew-hauler-rides]")).toContainText(
-    "The fare is 5 Credits. You have 4.",
+    "The fare is 10 Credits. You have 9.",
   );
 
   // The ride is outbound only: the hauler goes back loaded with shale, and the

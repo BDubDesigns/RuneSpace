@@ -173,7 +173,7 @@ const authoredWikiArticles = [
             { text: "Out of the Weather", articleSlug: "mission-out-of-the-weather" },
             ", the mining crews will let you ride their shift hauler out from Holo Hollow to The Jag.",
           ],
-          "It costs 5 Credits every ride — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
+          "It costs 10 Credits every ride — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
           "It runs one way: out to The Jag only. There is room for you heading out, but the hauler comes back loaded with shale, so you walk home through The Long Scramble like everybody else. You board it at the repaired Crew Stop in town. It's a real journey, not a teleport: you arrive when it gets there. There's nothing to scavenge on the back of a hauler, so walking is still the only way to find something along the route.",
         ],
       },
@@ -223,7 +223,7 @@ const authoredWikiArticles = [
         paragraphs: [
           "Changed your mind? Turn Back on the Journey ends the trip on the spot and leaves you idle where you set out. You don't end up partway along the route, and there's no trip home to wait for. If you arrive first, you've arrived: you stay at the destination.",
           "Turning back from a walk isn't a free reroll of Scavenge. After you turn back from a walk, walks stop offering Scavenge — through reloading, reconnecting and logging out and in — until you complete a walk by arriving. Another Turn Back doesn't clear it, and neither does a Crew Hauler ride. The Journey tells you when Scavenge is unavailable. Anything you had already scavenged stays yours, and an opportunity you hadn't claimed is gone with the trip.",
-          "You can turn back from the Crew Hauler too, and it never gets you the 5 Credits back. Turning back from a ride doesn't affect Scavenge either way.",
+          "You can turn back from the Crew Hauler too, and it never gets you the 10 Credits back. Turning back from a ride doesn't affect Scavenge either way.",
         ],
       },
     ],

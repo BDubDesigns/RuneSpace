@@ -356,7 +356,7 @@ suite("issue #312 Turn Back (real PostgreSQL)", () => {
   });
 
   describe("Crew Hauler", () => {
-    async function rider(credits = 10) {
+    async function rider(credits = 20) {
       const { userId, character } = await makeCharacter();
       await db.insert(rune.characterMissions).values(
         [
@@ -388,7 +388,7 @@ suite("issue #312 Turn Back (real PostgreSQL)", () => {
     }
 
     it("cancels immediately at the origin, keeps the fare spent, and creates no suppression", async () => {
-      const { userId, character } = await rider(10);
+      const { userId, character } = await rider(20);
       const boarded = await play.beginTransportTravel(
         userId,
         character.id,
@@ -396,7 +396,7 @@ suite("issue #312 Turn Back (real PostgreSQL)", () => {
         startedAt,
       );
       expect(boarded.travelState?.mode).toBe("crew_hauler");
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(await creditsOf(character.id)).toBe(10);
 
       const state = await travelCommands.turnBackTravel(userId, character.id, at(3));
 
@@ -404,18 +404,18 @@ suite("issue #312 Turn Back (real PostgreSQL)", () => {
       expect(state.location.currentLocationId).toBe(LOCATION_IDS.holoHollow);
       expect(state.scavengeSuppressed).toBe(false);
       expect(await suppressionOf(character.id)).toBe(false);
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(await creditsOf(character.id)).toBe(10);
       expect(await journeyRows(character.id)).toEqual({ actions: [], travel: [] });
     });
 
     it("lets arrival win a ride too", async () => {
-      const { userId, character } = await rider(10);
+      const { userId, character } = await rider(20);
       await play.beginTransportTravel(userId, character.id, LOCATION_IDS.theJag, startedAt);
 
       const state = await travelCommands.turnBackTravel(userId, character.id, at(RIDE_TICKS));
 
       expect(state.location.currentLocationId).toBe(LOCATION_IDS.theJag);
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(await creditsOf(character.id)).toBe(10);
     });
 
     it("neither cancelling nor completing a ride clears an existing walking suppression", async () => {
