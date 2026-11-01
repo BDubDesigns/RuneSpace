@@ -73,10 +73,11 @@ function resultError(result: PlayActionResult | RepairMaterialContributionAction
  * material recipe and increment count are never a second copy of balance.
  */
 export function CrewStopPanel() {
-  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
+  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, serverNowMs, state } =
+    usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
 
   const balance = getEffectiveGameBalance();
@@ -98,9 +99,16 @@ export function CrewStopPanel() {
 
   useEffect(() => {
     if (!activeWelding) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [activeWelding]);
+  }, [
+    activeWelding,
+    state.activeAction?.progressStartedAt,
+    state.activeAction?.nextAttemptAt,
+    state.serverNow,
+    serverNowMs,
+  ]);
 
   useEffect(() => {
     const wasComplete = previousCompletion.current;

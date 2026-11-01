@@ -66,10 +66,11 @@ export function RepairWorkPanel({
   /** Copy shown under the Start Welding control once the material is in. */
   weldingPrompt: string;
 }) {
-  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
+  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, serverNowMs, state } =
+    usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<"materials" | "start" | "stop">();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
   const balance = getEffectiveGameBalance();
   const target = getRepairTargetBalance(targetId, balance);
@@ -80,9 +81,16 @@ export function RepairWorkPanel({
 
   useEffect(() => {
     if (!activeWelding) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [activeWelding]);
+  }, [
+    activeWelding,
+    state.activeAction?.progressStartedAt,
+    state.activeAction?.nextAttemptAt,
+    state.serverNow,
+    serverNowMs,
+  ]);
 
   useEffect(() => {
     const wasComplete = previousCompletion.current;
