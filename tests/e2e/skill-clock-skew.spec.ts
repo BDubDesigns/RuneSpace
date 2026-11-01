@@ -422,6 +422,16 @@ for (const skewMs of [0, -5_000, 5_000]) {
       await expectTimeline();
       await page.reload();
       await expectTimeline();
+      // Let the real test-process clock enter the section, then check actual
+      // in-progress countdown and fill rather than only the future cursor.
+      await expect
+        .poll(() => Date.now(), { timeout: 20_000, intervals: [100, 250] })
+        .toBeGreaterThan(startsAt.getTime() + durationMs * 0.2);
+      await expectMeterOnServerTimeline(
+        meter,
+        { before: startsAt.getTime(), after: startsAt.getTime() },
+        durationMs,
+      );
     });
   }
 }
