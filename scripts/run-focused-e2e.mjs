@@ -102,6 +102,7 @@ export const FOCUSED_PHASES = [
   "high-scores",
   "lapidary-gems",
   "mission-item-destroy",
+  "unique-item-destroy",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

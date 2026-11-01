@@ -31,7 +31,7 @@ const suite = DATABASE_URL ? describe : describe.skip;
  * twenty Refined Ferrite are consumed exactly once across several visits and
  * under concurrency, that ten genuine Welding increments pay exactly 500 XP and
  * cannot be duplicated by interruption or retry, that Renn's turn-in adds
- * exactly 250 more, that the 5-Credit fare commits atomically with the Journey
+ * exactly 250 more, that the 10-Credit fare commits atomically with the Journey
  * and never twice, and that a paid ride persists no Scavenge window for anybody
  * to claim.
  */
@@ -737,7 +737,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
   });
 
   describe("the Crew Hauler fare and Journey", () => {
-    async function riderAt(locationId: string, credits = 10) {
+    async function riderAt(locationId: string, credits = 20) {
       const { userId, character } = await makeCharacter();
       await completeChainThroughHoldItTogether(character.id);
       await db.insert(rune.characterMissions).values({
@@ -769,7 +769,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       expect(await creditsOf(character.id)).toBe(10);
     });
 
-    it("charges exactly 5 Credits and starts a real Journey out to The Jag", async () => {
+    it("boards on exactly the 10-Credit fare, leaving nothing", async () => {
       const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 10);
       const started = await play.beginTransportTravel(
         userId,
@@ -778,7 +778,21 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
         now,
         deterministicRandom(),
       );
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(started.travelError).toBeUndefined();
+      expect(started.travelState).toMatchObject({ mode: "crew_hauler" });
+      expect(await creditsOf(character.id)).toBe(0);
+    });
+
+    it("charges exactly 10 Credits and starts a real Journey out to The Jag", async () => {
+      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 20);
+      const started = await play.beginTransportTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.theJag,
+        now,
+        deterministicRandom(),
+      );
+      expect(await creditsOf(character.id)).toBe(10);
       expect(started.travelState).toMatchObject({
         originLocationId: LOCATION_IDS.holoHollow,
         destinationLocationId: LOCATION_IDS.theJag,
@@ -872,7 +886,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
     });
 
     it("refuses an unaffordable fare without charging or starting anything", async () => {
-      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 4);
+      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 9);
       const refused = await play.beginTransportTravel(
         userId,
         character.id,
@@ -881,7 +895,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
         deterministicRandom(),
       );
       expect(refused.travelError).toBe("insufficient_credits");
-      expect(await creditsOf(character.id)).toBe(4);
+      expect(await creditsOf(character.id)).toBe(9);
       expect(
         await db
           .select()
@@ -891,7 +905,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
     });
 
     it("never double-charges a retried or concurrent boarding", async () => {
-      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 10);
+      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 20);
       await Promise.all([
         play.beginTransportTravel(
           userId,
@@ -908,7 +922,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
           deterministicRandom(),
         ),
       ]);
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(await creditsOf(character.id)).toBe(10);
 
       // An idempotent retry of the ride already under way charges nothing more.
       await play.beginTransportTravel(
@@ -918,7 +932,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
         tick(now, 5),
         deterministicRandom(),
       );
-      expect(await creditsOf(character.id)).toBe(5);
+      expect(await creditsOf(character.id)).toBe(10);
     });
 
     it("refuses a forged origin/destination pair server-side", async () => {

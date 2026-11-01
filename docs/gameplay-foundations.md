@@ -2306,9 +2306,11 @@ Mining as no usable tool.
 - Stack details come from the authoritative projection and typed content:
   approved artwork, display name, quantity, per-item and total mass, and the
   approved stack limit. Carried unique items show their artwork, display name,
-  mass, and approved persistent state (such as Cutter charge) and carry no
-  Drop, Use, or Destroy action. Carried equippable gear (Mining tools and
-  containers alike) gets an Equip action, below.
+  mass, and approved persistent state (such as Cutter charge). A carried,
+  unequipped unique item offers **Destroy** (#456, below) and no stack Drop;
+  a held research loan keeps its own Destroy & Abandon (#408). Carried
+  equippable gear (Mining tools and containers alike) also gets an Equip
+  action, below.
 - `Drop 1` and `Drop stack` are available for stack rows only. Both require an
   inline confirmation stating the item, the exact quantity, and that dropped
   items are **permanently destroyed in the current development build**. The
@@ -2320,6 +2322,22 @@ Mining as no usable tool.
   future work; no world object is created by dropping. Selling to an approved
   NPC merchant is a separate authoritative command (see Credits below), not a
   drop or a transfer.
+- **Destroy a carried unique item (#456).** Inline confirmation (KEEP ITEM /
+  DESTROY ITEM) naming the exact item and current charge, stating permanent
+  destruction with no ground object or recovery. The server command
+  `discardUniqueItem` (distinct from the stack `discardInventoryStack`, same
+  character lock and due-work reconciliation) takes one `itemInstanceId` plus the
+  confirmed `expectedItemId` and decides with `planUniqueItemDisposal` over
+  `loadOwnedItemInstances`. It refuses: an unknown/foreign/changed instance;
+  equipped gear (so the final equipped container can only leave through
+  `changeEquipment`'s own at-least-one-container rule, which is unchanged);
+  Cargo, stash-stored and stash-installed instances; the instance a held research
+  run owns (only #408's Destroy & Abandon cancels it); and the last *usable*
+  Mining Cutter, counted with `usableMiningCutterCount` over every owned
+  instance (equipped, carried, Cargo, stashes) at the character's current Mining
+  level, so a level-locked Cutter is no substitute. No item type is banned and no
+  Station or location is required. Success deletes exactly one row and runs the
+  shared reservation check.
 - Inventory Equip (#68, extended by #363) is offered for every carried unique
   item that any authored equipment slot lists in its `eligibleItems`, with no
   item-ID branch. Inventory only allocates to an EMPTY compatible slot (the first

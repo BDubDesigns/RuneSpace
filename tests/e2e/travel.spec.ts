@@ -1906,7 +1906,7 @@ test("Turn Back from the Crew Hauler warns about the fare first and does not ref
   });
   await db
     .update(characters)
-    .set({ currentLocationId: LOCATION_IDS.holoHollow, credits: 5 })
+    .set({ currentLocationId: LOCATION_IDS.holoHollow, credits: 10 })
     .where(eq(characters.id, characterId));
 
   await page.goto(`/play/${characterId}`);
@@ -1920,7 +1920,7 @@ test("Turn Back from the Crew Hauler warns about the fare first and does not ref
   expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
   expect(await characterRow(characterId)).toMatchObject({
     currentLocationId: LOCATION_IDS.holoHollow,
-    credits: 5,
+    credits: 10,
     scavengeSuppressed: false,
   });
   // Cancelling a ride is not a walk's Scavenge reroll, so there is nothing to explain.

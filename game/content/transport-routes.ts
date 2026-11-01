@@ -70,7 +70,7 @@ export const TRANSPORT_ROUTES: readonly TransportRouteDefinition[] = [
     // and none on the way back with the hauler full of shale.
     originLocationId: LOCATION_IDS.holoHollow,
     destinationLocationId: LOCATION_IDS.theJag,
-    fareCredits: 5,
+    fareCredits: 10,
     unlockMissionId: MISSION_IDS.outOfTheWeather,
     displayName: "Crew Hauler",
     boardingLocalPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,

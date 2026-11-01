@@ -349,7 +349,7 @@ timetable, no ticketing, and no named driver.
 
 The player can repair it through Renn's optional side Mission **Out of the
 Weather** using the Welding they learned from Wade, after which the crews let
-them ride out to the mine for 5 Credits. See "Out of the Weather" below.
+them ride out to the mine for 10 Credits. See "Out of the Weather" below.
 
 ### Future contract board
 
@@ -533,7 +533,7 @@ blocks nothing — **Keep the Change is not a prerequisite and is not affected**
 The point of the Mission is that the world stays changed. The repaired shelter
 keeps its repaired artwork and copy permanently, and because the crews use it
 every workday and know who fixed it, they will squeeze the player onto the shift
-hauler out to The Jag for **5 Credits a ride**. The ride is boarded at the
+hauler out to The Jag for **10 Credits a ride**. The ride is boarded at the
 shelter itself — it belongs to the people who wait there, not to the town — and
 it runs **one way only**: there is room for a passenger heading out, and none
 coming back with the hauler loaded with shale, so the player walks home through

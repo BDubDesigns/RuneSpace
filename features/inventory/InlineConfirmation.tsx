@@ -27,6 +27,7 @@ export function InlineConfirmation({
   "data-drop-confirmation"?: boolean;
   "data-mission-item-destroy-confirmation"?: boolean;
   "data-research-abandon-confirmation"?: boolean;
+  "data-unique-destroy-confirmation"?: boolean;
 }) {
   return (
     <div

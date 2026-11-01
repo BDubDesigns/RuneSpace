@@ -54,7 +54,7 @@ import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
  * presentation, the Crew Hauler's route/duration/Scavenge semantics, and the
  * guarantee that adding a paid route never created a walkable one. Server
  * authority — exactly-once material consumption, Welding XP, the 250 XP
- * completion reward, and the atomic 5-Credit fare — is proven against real
+ * completion reward, and the atomic 10-Credit fare — is proven against real
  * PostgreSQL in tests/integration/out-of-the-weather.test.ts.
  */
 
@@ -500,7 +500,7 @@ describe("the Crew Hauler runs one way, and is boarded at the shelter", () => {
     });
     expect(shelter).toHaveLength(1);
     expect(shelter[0]?.destinationLocationId).toBe(LOCATION_IDS.theJag);
-    expect(shelter[0]?.fareCredits).toBe(5);
+    expect(shelter[0]?.fareCredits).toBe(10);
   });
 
   it("offers nothing at all at The Jag: there is no ride home to hide", () => {
@@ -573,12 +573,12 @@ describe("the Crew Hauler is a paid route, not map adjacency", () => {
     ).toEqual({ ok: false, reason: "not_adjacent" });
   });
 
-  it("costs exactly 5 Credits for the one ride it authors", () => {
+  it("costs exactly 10 Credits for the one ride it authors", () => {
     expect(TRANSPORT_ROUTES).toHaveLength(1);
-    expect(TRANSPORT_ROUTES[0]).toMatchObject({ fareCredits: 5, mode: "crew_hauler" });
+    expect(TRANSPORT_ROUTES[0]).toMatchObject({ fareCredits: 10, mode: "crew_hauler" });
     const [ride, ...others] = getTransportRoutesFrom(LOCATION_IDS.holoHollow);
     expect(others).toEqual([]);
-    expect(ride?.fareCredits).toBe(5);
+    expect(ride?.fareCredits).toBe(10);
     expect(getTransportRoutesFrom(LOCATION_IDS.theJag)).toEqual([]);
   });
 
@@ -662,7 +662,7 @@ describe("boarding is server-decided", () => {
       destinationLocationId: LOCATION_IDS.theJag,
       alreadyTraveling: false,
       completedMissionIds: new Set([MISSION_IDS.outOfTheWeather]),
-      credits: 5,
+      credits: 10,
       ...overrides,
     });
 
@@ -705,14 +705,16 @@ describe("boarding is server-decided", () => {
   });
 
   it("refuses an unaffordable fare and a ride already under way", () => {
-    expect(board({ credits: 4 })).toEqual({ ok: false, reason: "insufficient_credits" });
+    expect(board({ credits: 9 })).toEqual({ ok: false, reason: "insufficient_credits" });
+    // The fare is exactly 10: a balance of exactly 10 can board.
+    expect(board({ credits: 10 })).toMatchObject({ ok: true, fareCredits: 10 });
     expect(board({ alreadyTraveling: true })).toEqual({ ok: false, reason: "already_traveling" });
   });
 
   it("resolves fare, duration and mode from content, not from the request", () => {
     expect(board({ credits: 1_000 })).toMatchObject({
       ok: true,
-      fareCredits: 5,
+      fareCredits: 10,
       durationTicks: 20,
       mode: "crew_hauler",
     });

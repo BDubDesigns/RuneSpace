@@ -1119,14 +1119,16 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   const cutterDescId = await cutterTile.getAttribute("aria-describedby");
   expect(cutterDescId).toBeTruthy();
   await expect(inventory.locator(`#${cutterDescId}`)).toContainText("3 of 10 charges remaining");
-  // Selecting the carried unique item reveals its details and NO destructive or
-  // use actions; unique items are never treated as droppable stacks.
+  // Selecting the carried unique item reveals its details and a single-instance
+  // Destroy (#456), never the stack Drop or a Power Cell load; unique items are
+  // never treated as droppable stacks.
   await cutterTile.click();
   await expect(cutterTile).toHaveAttribute("aria-pressed", "true");
   const cutterDetails = inventory.getByRole("region", { name: "Salvage Cutter details" });
   await expect(cutterDetails.locator('[data-stat="mass"] dd')).toHaveText("5 kg");
   await expect(cutterDetails.getByText("3 of 10 charges remaining", { exact: true })).toBeVisible();
-  await expect(cutterDetails.getByText("Unique item — cannot be dropped.")).toBeVisible();
+  await expect(cutterDetails.getByText("Unique item — cannot be dropped.")).toHaveCount(0);
+  await expect(cutterDetails.getByRole("button", { name: "Destroy" })).toBeVisible();
   await expect(cutterDetails.getByRole("button", { name: /Drop|Load/ })).toHaveCount(0);
   // Unique items never receive the stack-fill treatment.
   await expect(cutterDetails.locator("[data-stack-track]")).toHaveCount(0);
