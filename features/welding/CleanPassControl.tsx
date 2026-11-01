@@ -27,8 +27,9 @@ const SUCCESS_FLASH_MS = 2_400;
  * work itself.
  */
 export function CleanPassControl({ cleanPass }: { cleanPass?: CleanPassProjection }) {
-  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
-  const [now, setNow] = useState(Date.now());
+  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, serverNowMs, state } =
+    usePlay();
+  const [now, setNow] = useState(serverNowMs);
   const [claiming, setClaiming] = useState(false);
   const [message, setMessage] = useState<string>();
   const [flash, setFlash] = useState(false);
@@ -41,22 +42,30 @@ export function CleanPassControl({ cleanPass }: { cleanPass?: CleanPassProjectio
     (opportunity) =>
       opportunity.outcome === null && opportunity.section === cleanPass.sectionsCompleted + 1,
   );
+  const openSectionNumber = openSection?.section;
 
   useEffect(() => {
-    if (!openSection) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 100);
+    if (openSectionNumber === undefined) return;
+    setNow(serverNowMs());
+    const clock = window.setInterval(() => setNow(serverNowMs()), 100);
     return () => window.clearInterval(clock);
-  }, [openSection?.section]);
+  }, [
+    openSectionNumber,
+    action?.progressStartedAt,
+    action?.nextAttemptAt,
+    state.serverNow,
+    serverNowMs,
+  ]);
 
   useEffect(() => {
-    if (!openSection) {
+    if (openSectionNumber === undefined) {
       announcedSection.current = undefined;
       return;
     }
-    if (announcedSection.current === openSection.section) return;
-    announcedSection.current = openSection.section;
+    if (announcedSection.current === openSectionNumber) return;
+    announcedSection.current = openSectionNumber;
     setAnnouncement("Clean Pass available now.");
-  }, [openSection?.section]);
+  }, [openSectionNumber]);
 
   useEffect(() => {
     if (!flash) return;
