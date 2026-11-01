@@ -3,6 +3,9 @@ import { db } from "@/db";
 import {
   activeActions,
   characterMissions,
+  characterPracticeWelds,
+  characterWorkOrderPostings,
+  characterResearchAssignments,
   characterRepairTargets,
   characterSkillXp,
   characters,
@@ -22,6 +25,8 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   REPAIR_TARGET_IDS,
+  RESEARCH_JOB_IDS,
+  WORK_ORDER_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
 import { THEYRE_MINERALS_MARIE } from "@/game/content/missions";
@@ -325,6 +330,108 @@ for (const skewMs of [0, -5_000, 5_000]) {
         2_000,
       );
       await expect(cleanPass.locator("[data-clean-pass-claim]")).toBeEnabled();
+    });
+  }
+}
+
+// Seed a future cursor, as in the Clean Pass test above, so these short
+// sections remain projected during CI navigation. The expected countdown and
+// fill use the unskewed test-process clock and the seeded server timestamps.
+for (const skewMs of [0, -5_000, 5_000]) {
+  for (const surface of ["practice", "work-order", "research"] as const) {
+    test(`${surface} progress follows server time at ${skewMs}ms (#473 #474)`, async ({
+      page,
+      testCharacter,
+    }) => {
+      const characterId = testCharacter.id;
+      const now = new Date();
+      const research = surface === "research";
+      await stand(
+        characterId,
+        research ? LOCATION_IDS.prospectingQuarry : LOCATION_IDS.ruskRecovery,
+      );
+      if (research) {
+        const [loan] = await db
+          .insert(itemInstances)
+          .values({ characterId, itemId: ITEM_IDS.geologicalSampleCase })
+          .returning();
+        await db.insert(characterResearchAssignments).values({
+          characterId,
+          jobId: RESEARCH_JOB_IDS.geologicalFieldSurvey,
+          itemInstanceId: loan!.id,
+          startedAt: now,
+        });
+      } else {
+        await db.insert(characterMissions).values({
+          characterId,
+          missionId: MISSION_IDS.tenThousandHours,
+          acceptedAt: now,
+          ...(surface === "work-order" ? { completedAt: now } : {}),
+        });
+        if (surface === "practice") {
+          await db.insert(characterPracticeWelds).values({ characterId, cycleActive: true });
+        } else {
+          await db.insert(characterWorkOrderPostings).values({
+            characterId,
+            slotIndex: 0,
+            workOrderId: WORK_ORDER_IDS.rennCarryFrame,
+            acceptedAt: now,
+          });
+        }
+      }
+      await openTestCharacter(page, characterId);
+      await skewBrowserClock(page, skewMs);
+      const startsAt = new Date(Date.now() + 15_000);
+      const durationMs =
+        (research
+          ? balance.researchJobs.surfaceSampleDurationTicks
+          : balance.welding.attemptDurationTicks) * GAME_TICK_MS;
+      await db.insert(activeActions).values({
+        characterId,
+        actionId: research
+          ? ACTION_IDS.researchSurfaceSample
+          : surface === "practice"
+            ? ACTION_IDS.practiceWelding
+            : ACTION_IDS.workOrderWelding,
+        startedAt: startsAt,
+        resolvedThroughAt: startsAt,
+      });
+      await page.reload();
+      const panel = page.locator(
+        research
+          ? "[data-research-field-action]"
+          : surface === "practice"
+            ? "[data-practice-panel]"
+            : "[data-work-order-bench]",
+      );
+      const meter = panel.getByRole("progressbar", {
+        name: research ? /Working/ : /Current section/,
+      });
+      const expectTimeline = async () => {
+        await expect(meter).toBeVisible();
+        const label = await meter.getAttribute("aria-label");
+        const readAt = Date.now();
+        const shown = /([\d.]+)s/.exec(label ?? "");
+        expect(shown, `missing countdown: ${label}`).not.toBeNull();
+        const expectedRemaining = startsAt.getTime() + durationMs - readAt;
+        expect(Math.abs(Number(shown![1]) * 1_000 - expectedRemaining)).toBeLessThan(2_000);
+        const fill = Number(await meter.getAttribute("aria-valuenow"));
+        const expectedFill = Math.min(100, (1 - expectedRemaining / durationMs) * 100);
+        expect((Math.abs(fill - expectedFill) * durationMs) / 100).toBeLessThan(2_000);
+      };
+      await expectTimeline();
+      await page.reload();
+      await expectTimeline();
+      // Let the real test-process clock enter the section, then check actual
+      // in-progress countdown and fill rather than only the future cursor.
+      await expect
+        .poll(() => Date.now(), { timeout: 20_000, intervals: [100, 250] })
+        .toBeGreaterThan(startsAt.getTime() + durationMs * 0.2);
+      await expectMeterOnServerTimeline(
+        meter,
+        { before: startsAt.getTime(), after: startsAt.getTime() },
+        durationMs,
+      );
     });
   }
 }

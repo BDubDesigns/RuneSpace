@@ -91,12 +91,13 @@ function practiceMessage(state: PlayGameplayState): string | undefined {
  * its own sibling panel, so the bench stays the controls the player is using.
  */
 export function PracticeWeldingPanel() {
-  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
+  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, serverNowMs, state } =
+    usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   // The run's selection (#229): complete welds starting at one, or Max.
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
 
   const balance = getEffectiveGameBalance();
@@ -105,9 +106,16 @@ export function PracticeWeldingPanel() {
 
   useEffect(() => {
     if (!active) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, [active]);
+  }, [
+    active,
+    state.activeAction?.progressStartedAt,
+    state.activeAction?.nextAttemptAt,
+    state.serverNow,
+    serverNowMs,
+  ]);
 
   // Every new selection starts at one (#229): once a run is under way the
   // selector is hidden, and when it next appears it is for a fresh run.

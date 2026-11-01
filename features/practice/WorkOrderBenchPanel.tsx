@@ -31,19 +31,27 @@ import { XpAmount } from "@/components/ui/XpAmount";
  * ready.
  */
 export function WorkOrderBenchPanel({ active }: { active: ActiveWorkOrderProjection }) {
-  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
+  const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, serverNowMs, state } =
+    usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
 
   const welding = active.active;
 
   useEffect(() => {
     if (!welding) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, [welding]);
+  }, [
+    welding,
+    state.activeAction?.progressStartedAt,
+    state.activeAction?.nextAttemptAt,
+    state.serverNow,
+    serverNowMs,
+  ]);
 
   const guided = derivePinnedGuidanceTargets(state).actionIds.has(ACTION_IDS.workOrderWelding);
   const started = active.sectionsCompleted > 0;

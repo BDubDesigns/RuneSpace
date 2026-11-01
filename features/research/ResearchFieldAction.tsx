@@ -135,11 +135,13 @@ export function ResearchFieldAction() {
 }
 
 function ActionProgress({ startsAt, endsAt }: { startsAt: string; endsAt: string }) {
-  const [now, setNow] = useState(Date.now());
+  const { serverNowMs, state } = usePlay();
+  const [now, setNow] = useState(serverNowMs);
   useEffect(() => {
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(clock);
-  }, []);
+  }, [startsAt, endsAt, state.serverNow, serverNowMs]);
   const start = new Date(startsAt).getTime();
   const end = new Date(endsAt).getTime();
   const remainingMs = Math.max(0, end - now);
