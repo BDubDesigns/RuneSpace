@@ -11,6 +11,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
 import { getItemPresentation, itemQuantityLabel } from "@/game/content/item-presentation";
 import { breakApartFacts, canBreakApart } from "@/game/domain/rune-materials";
+import { formatMassGrams } from "@/game/domain/mass";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { ItemOfferModal } from "@/features/missions/ItemOfferModal";
@@ -434,9 +435,18 @@ export function InventoryPanel({
   const content = (
     <div className="pb-2" data-inventory-surface onClick={onSurfaceClick}>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="text-sm text-[color:var(--rs-text-secondary)]">
-          {state.inventory.slotsUsed} occupied / {totalSlots} slots
-        </p>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-[color:var(--rs-text-secondary)]">
+          <p>
+            {state.inventory.slotsUsed} occupied / {totalSlots} slots
+          </p>
+          <p data-inventory-carried-mass>
+            Carried mass:{" "}
+            <strong className="text-[color:var(--rs-text-primary)]">
+              {formatMassGrams(state.inventory.massGrams)} /{" "}
+              {formatMassGrams(state.inventory.capacityGrams)}
+            </strong>
+          </p>
+        </div>
         <p
           className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-inventory-credits

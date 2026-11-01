@@ -1464,6 +1464,12 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   expect(statsBox!.height).toBeGreaterThan(previewBox!.height);
   await captureReviewScreenshot(page, "mining-mobile-inventory-selection.png");
 
+  // Inventory shows the same authoritative carried mass as Equipment (#449): 8 full
+  // stacks (8 kg) + 15 kg loadout, in the header row beside the slot count.
+  await expect(inventory.locator("[data-inventory-carried-mass]")).toHaveText(
+    "Carried mass: 23 kg / 50 kg",
+  );
+
   // Drop stack enters the inline permanent-destruction confirmation.
   await details.getByRole("button", { name: "Drop stack (10)" }).click();
   const confirmation = inventory.getByRole("alert");
@@ -1480,6 +1486,10 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
 
   // Remain in Inventory with the stack removed, slot freed, and a calm success.
   await expect(inventory.getByText("7 occupied / 8 slots")).toBeVisible();
+  // The Inventory readout reacts to the authoritative drop with no reload.
+  await expect(inventory.locator("[data-inventory-carried-mass]")).toHaveText(
+    "Carried mass: 22 kg / 50 kg",
+  );
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(1);
   await expect(inventory.getByRole("button", { name: "10 Ferrite Shale" })).toHaveCount(7);
   const success = inventory.getByText("Dropped 10 Ferrite Shale.", { exact: true });

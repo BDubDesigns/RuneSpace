@@ -7,6 +7,20 @@ import type { PublicSiteNavItem } from "./PublicSiteShell";
 const linkClass =
   "rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-sm font-semibold text-[color:var(--rs-text-secondary)] underline-offset-4 hover:text-[color:var(--rs-text-primary)] hover:underline";
 
+/**
+ * Wiki, High Scores and Updates are reference sections: their entry links open in a
+ * new tab (issue #448) so a player's live game tab is never replaced. Home stays in-tab.
+ */
+const NEW_TAB_PATHS: readonly string[] = ["/updates", "/wiki", "/high-scores"];
+
+export function opensInNewTab(href: string): boolean {
+  return NEW_TAB_PATHS.includes(href);
+}
+
+function newTabProps(href: string) {
+  return opensInNewTab(href) ? ({ target: "_blank", rel: "noopener" } as const) : {};
+}
+
 export function PublicNavigation({ items }: { items: readonly PublicSiteNavItem[] }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -34,7 +48,7 @@ export function PublicNavigation({ items }: { items: readonly PublicSiteNavItem[
       <ul className="hidden items-center gap-3 min-[360px]:flex sm:gap-5">
         {items.map((item) => (
           <li key={item.href}>
-            <Link className={linkClass} href={item.href}>
+            <Link className={linkClass} href={item.href} {...newTabProps(item.href)}>
               {item.label}
             </Link>
           </li>
@@ -58,7 +72,12 @@ export function PublicNavigation({ items }: { items: readonly PublicSiteNavItem[
           >
             {items.map((item) => (
               <li key={item.href}>
-                <Link className={linkClass} href={item.href} onClick={() => setOpen(false)}>
+                <Link
+                  className={linkClass}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  {...newTabProps(item.href)}
+                >
                   {item.label}
                 </Link>
               </li>

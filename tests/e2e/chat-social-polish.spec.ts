@@ -471,18 +471,23 @@ test.describe("Chat/Social polish on the public site", () => {
       const page = await context.newPage();
       await openTestCharacter(page, created.id);
       const banner = page.getByRole("banner");
-      await banner
-        .getByRole("button", { name: "News, unread update available", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/updates$/);
+      const gameUrl = page.url();
+      const [updates] = await Promise.all([
+        page.waitForEvent("popup"),
+        banner.getByRole("link", { name: "News, unread update available", exact: true }).click(),
+      ]);
+      // News opens in a new tab (#448); the game tab is untouched.
+      expect(page.url()).toBe(gameUrl);
+      await expect(updates).toHaveURL(/\/updates$/);
       await expect(
-        page
+        updates
           .getByRole("list", { name: "Published Updates" })
           .getByRole("link", { name: "Heads Up", exact: true }),
       ).toBeVisible();
-      await openTestCharacter(page, created.id);
-      await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-      await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
+      await updates.close();
+      await page.reload();
+      await expect(banner.getByRole("link", { name: "News", exact: true })).toBeVisible();
+      await expect(banner.getByRole("link", { name: /unread/i })).toHaveCount(0);
     } finally {
       await context.close();
     }
