@@ -9,6 +9,43 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #466 — consolidated soft-alpha fixes and improvements.
+    slug: "soft-alpha-fixes-and-improvements",
+    title: "Soft-Alpha Fixes & Improvements",
+    publishedAt: "2026-11-01T05:00:00-08:00",
+    summary:
+      "More reliable timers and scrolling, a clearer Inventory, and a few ways to make getting around RuneSpace easier.",
+    body: [
+      "We've been listening to your soft-alpha feedback and making the little things work better. This roundup brings together recent fixes, Inventory improvements and a small travel balance change.",
+      "Special thanks to Mycerale for the detailed reports about Scavenge, progress timing and intermittent scrolling, and for the thoughtful suggestions on navigation and Inventory. Feedback like this is helping make RuneSpace better for everyone.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Inventory now shows your current carried mass alongside your maximum capacity.",
+          "You can permanently destroy eligible carried unique items, such as a spare Cutter or Scrap Box, from Inventory. You'll be asked to confirm first. Equipped and mission-bound items are protected, and you can't destroy your last usable Cutter.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Wiki, High Scores and Updates entry links now open in a new tab, including the in-game News and High Scores links, so you can keep your game open.",
+          "The Crew Hauler from Holo Hollow to The Jag now costs 10 Credits instead of 5. The ride still takes 12 seconds.",
+        ],
+      },
+      {
+        heading: "Fixed",
+        items: [
+          "Scavenge opportunities now follow server time, so a difference in your device clock won't make an expired opportunity appear available.",
+          "Progress bars and countdowns for Mining, Refining, Fabrication, Tinkering, Echo Seeker listening and Attune now follow server time, too.",
+          "Fixed an issue where overlapping dialogs could leave the page unable to scroll after they closed.",
+          "Retry Connection now reloads the game, and open game tabs can refresh when a new build arrives. Refreshing waits for sensitive moments such as an active Trade or Scavenge opportunity.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #441 — the personal Resonance Rig chapter.
     slug: "a-resonance-rig-of-your-own",
     title: "A Resonance Rig of Your Own",

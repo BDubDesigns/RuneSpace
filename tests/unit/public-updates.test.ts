@@ -134,9 +134,9 @@ describe("public Updates content boundary", () => {
   });
 
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
-    // The newest Update is the Resonance Rig's (#441), published after Werner's.
+    // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("a-resonance-rig-of-your-own");
+    expect(getLatestPublishedUpdate().slug).toBe("soft-alpha-fixes-and-improvements");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );
