@@ -76,8 +76,10 @@ import { changeEquipment } from "@/server/equipment";
 import {
   breakApartRunestone,
   discardInventoryStack,
+  discardUniqueItem,
   type BreakApartRunestoneResult,
   type DiscardInventoryStackResult,
+  type DiscardUniqueItemResult,
 } from "@/server/inventory";
 import {
   depositCargoStack,
@@ -223,6 +225,7 @@ import {
   TradeRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
+  DiscardUniqueItemRequestSchema,
   BreakApartRunestoneRequestSchema,
   TeleportWithRuneRequestSchema,
   AcknowledgeResonanceArrivalRequestSchema,
@@ -1100,6 +1103,27 @@ export async function discardInventoryStackAction(
       stackId: request.data.stackId,
       mode: request.data.mode,
       expectedQuantity: request.data.expectedQuantity,
+    });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError || error instanceof FabricationReservationError)
+      return { error: error.message };
+    throw error;
+  }
+}
+
+export type DiscardUniqueItemActionResult = DiscardUniqueItemResult | { error: string };
+
+export async function discardUniqueItemAction(
+  input: unknown,
+): Promise<DiscardUniqueItemActionResult> {
+  const request = DiscardUniqueItemRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid inventory command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await discardUniqueItem(user.id, request.data.characterId, {
+      itemInstanceId: request.data.itemInstanceId,
+      expectedItemId: request.data.expectedItemId,
     });
   } catch (error) {
     redirectOnGameplayRefusal(error);

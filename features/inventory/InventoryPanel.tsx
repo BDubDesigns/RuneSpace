@@ -17,7 +17,11 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { ItemOfferModal } from "@/features/missions/ItemOfferModal";
 import { itemOfferForItem, type ItemOfferView } from "@/features/missions/item-offers";
 import { derivePinnedGuidanceTargets } from "@/features/missions/mission-pins";
-import { breakApartRunestoneAction, discardInventoryStackAction } from "@/server/actions";
+import {
+  breakApartRunestoneAction,
+  discardInventoryStackAction,
+  discardUniqueItemAction,
+} from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import {
   deriveInventoryEquipAvailability,
@@ -27,6 +31,7 @@ import {
   stackDropActions,
   type InventorySelection,
   type InventoryStackEntry,
+  type InventoryUniqueEntry,
   type ResolvedInventorySelection,
 } from "./inventory-selection";
 import { useSelectableDetails } from "@/features/shared/use-selectable-details";
@@ -45,7 +50,7 @@ import {
 import { loanBadge } from "@/features/research/loan-badge";
 import { ResearchLoanDestroy } from "@/features/research/ResearchLoanDestroy";
 import { ResearchLoanDetails } from "@/features/research/ResearchLoanDetails";
-import { isResearchLoanItem } from "@/game/domain/research-jobs";
+import { isResearchLoanItem, missionItemDestroyOffer } from "@/game/domain/research-jobs";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
@@ -65,7 +70,19 @@ type BreakApartConfirmation = {
   expectedQuantity: number;
 };
 
-type InventoryConfirmation = DropConfirmation | BreakApartConfirmation;
+/**
+ * The permanent-destruction confirmation for one carried unique instance
+ * (#456). It names the exact server-owned instance and the item the player saw.
+ */
+type UniqueDestroyConfirmation = {
+  kind: "destroy_unique";
+  itemInstanceId: string;
+  itemId: string;
+  itemName: string;
+  currentCharge: number | undefined;
+};
+
+type InventoryConfirmation = DropConfirmation | BreakApartConfirmation | UniqueDestroyConfirmation;
 
 export function InventoryPanel({
   state,
@@ -173,6 +190,19 @@ export function InventoryPanel({
   // or vanished since confirmation, clear it safely and explain why.
   useEffect(() => {
     if (!confirming) return;
+    if (confirming.kind === "destroy_unique") {
+      const item = state.inventory.uniqueItems.find(
+        (entry) => entry.id === confirming.itemInstanceId,
+      );
+      if (!item || item.currentCharge !== confirming.currentCharge) {
+        setConfirming(undefined);
+        setMessage({
+          tone: "danger",
+          message: "Inventory changed. Review the item and try again.",
+        });
+      }
+      return;
+    }
     const stack = state.inventory.stacks.find((entry) => entry.id === confirming.stackId);
     if (!stack || stack.quantity !== confirming.expectedQuantity) {
       setConfirming(undefined);
@@ -305,6 +335,62 @@ export function InventoryPanel({
         } finally {
           releaseCommand();
           setConfirming(undefined);
+        }
+      });
+    };
+    enqueueForeground(execute);
+  }
+
+  function openUniqueDestroyConfirmation(entry: InventoryUniqueEntry) {
+    originSelectorRef.current = "[data-unique-destroy-start]";
+    setConfirming({
+      kind: "destroy_unique",
+      itemInstanceId: entry.id,
+      itemId: entry.itemId,
+      itemName: entry.name,
+      currentCharge: entry.currentCharge,
+    });
+  }
+
+  function runDiscardUnique() {
+    if (confirming?.kind !== "destroy_unique") return;
+    const request = {
+      itemInstanceId: confirming.itemInstanceId,
+      expectedItemId: confirming.itemId,
+    };
+    const itemName = confirming.itemName;
+    const execute = () => {
+      startTransition(async () => {
+        try {
+          const result = await discardUniqueItemAction({
+            characterId: state.characterId,
+            ...request,
+          });
+          // Close the confirmation before accepting state, so the reconcile
+          // effect cannot mistake our own successful removal for a stale item.
+          setConfirming(undefined);
+          if ("error" in result) {
+            setMessage({ tone: "danger", message: result.error });
+          } else {
+            if (result.discard.status === "discarded") {
+              // The selected tile is gone: land on the grid, not on <body>.
+              armFocusReturn(() => gridRef.current);
+            }
+            acceptState(result.state);
+            setMessage(
+              result.discard.status === "discarded"
+                ? { tone: "success", message: `${itemName} destroyed permanently.` }
+                : { tone: "danger", message: result.discard.message },
+            );
+          }
+        } catch {
+          setConfirming(undefined);
+          setMessage({
+            tone: "danger",
+            message: "Comms interruption. Inventory could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
         }
       });
     };
@@ -592,11 +678,7 @@ export function InventoryPanel({
                     // A Wise Old Enby loan (#406): what it is for and how far along the
                     // job is, in place of the generic unique-item line.
                     <ResearchLoanDetails itemId={resolvedSelection.entry.itemId} />
-                  ) : (
-                    <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                      Unique item — cannot be dropped.
-                    </p>
-                  )}
+                  ) : null}
                   <ResearchLoanDestroy
                     item={resolvedSelection.entry}
                     key={resolvedSelection.entry.id}
@@ -606,6 +688,50 @@ export function InventoryPanel({
                       armFocusReturn(() => gridRef.current);
                     }}
                   />
+                  {missionItemDestroyOffer(
+                    state.research.assignment,
+                    resolvedSelection.entry,
+                  ) ? null : (
+                    // Any other carried, unequipped unique item (#456). A held Mission
+                    // loan is destroyed only through its own Destroy & Abandon above.
+                    <div
+                      className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3"
+                      data-unique-destroy
+                    >
+                      {confirming?.kind === "destroy_unique" ? (
+                        <InlineConfirmation
+                          busy={foregroundBusy}
+                          cancelLabel="KEEP ITEM"
+                          cancelRef={cancelButtonRef}
+                          confirmLabel="DESTROY ITEM"
+                          data-unique-destroy-confirmation
+                          onCancel={cancelConfirmation}
+                          onConfirm={runDiscardUnique}
+                        >
+                          <p className="font-bold text-[color:var(--rs-text-primary)]">
+                            Destroy {confirming.itemName}
+                            {confirming.currentCharge !== undefined
+                              ? ` (${confirming.currentCharge} of ${getItemMaximumCharge(confirming.itemId)} charges)`
+                              : ""}
+                            ?
+                          </p>
+                          <p className="mt-1">
+                            This permanently destroys this one item. It is not left on the ground
+                            and cannot be recovered. You can do this anywhere; no Station is needed.
+                          </p>
+                        </InlineConfirmation>
+                      ) : (
+                        <ActionButton
+                          data-unique-destroy-start
+                          disabled={foregroundBusy}
+                          intent="danger"
+                          onClick={() => openUniqueDestroyConfirmation(resolvedSelection.entry)}
+                        >
+                          Destroy
+                        </ActionButton>
+                      )}
+                    </div>
+                  )}
                   {equipAvailability ? (
                     <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
                       <ActionButton

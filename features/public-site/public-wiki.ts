@@ -467,6 +467,8 @@ const authoredWikiArticles = [
         heading: "Dropping items",
         paragraphs: [
           "Dropping a stack asks you to confirm the exact quantity first. In the current build, dropped items are permanently destroyed — there's no ground pickup yet, so only drop what you're sure you don't need.",
+          "A carried item you are not wearing or using, such as a spare Mining Cutter, a spare container or a piece of Legendary gear, shows Destroy in its Item details. It asks you to confirm that exact item, then destroys it permanently, anywhere, with no Station needed. Nothing is left on the ground to pick up. Equipped items, items in your Cargo Hold or a site stash, and a container installed at a stash have to be taken out and carried first, and destroying one never empties a container for you.",
+          "Two things always stay: you can never destroy your last usable Mining Cutter — counting every Cutter you own, equipped, carried, in your Cargo Hold or in a stash, and only those your Mining level lets you use — and you always keep one container equipped. An item lent for a Wise Old Enby assignment is destroyed with its own Destroy & Abandon, which also ends the assignment.",
           [
             "Materials set aside for a piece on the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },

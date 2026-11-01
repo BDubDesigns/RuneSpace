@@ -158,6 +158,17 @@ export const DiscardInventoryStackRequestSchema = z.object({
 });
 
 /**
+ * Unique-item discard (#456) names exactly one server-owned item instance and
+ * the item the player confirmed. Eligibility, ownership, location and every
+ * safeguard are server-resolved; nothing here is trusted.
+ */
+export const DiscardUniqueItemRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  itemInstanceId: z.string().uuid(),
+  expectedItemId: z.string().min(1).max(100),
+});
+
+/**
  * Break Apart (#367) identifies only the selected stack and the quantity the
  * player confirmed against. The consumed item, the output, the ratio and every
  * capacity decision are server-resolved; the action always converts exactly one.
