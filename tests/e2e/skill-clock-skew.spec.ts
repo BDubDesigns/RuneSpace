@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  activeActions,
   characterMissions,
   characterRepairTargets,
   characterSkillXp,
@@ -23,6 +24,7 @@ import {
   REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import { THEYRE_MINERALS_MARIE } from "@/game/content/missions";
 import { expect, openTestCharacter, test } from "./fixtures";
 import {
   expectMeterOnServerTimeline,
@@ -43,6 +45,86 @@ const rig = getRepairTargetBalance(REPAIR_TARGET_IDS.resonanceRig, balance);
 const thresholds = standardSkillLevelThresholds(balance);
 const levelXp = (level: number) => thresholds.find((entry) => entry.level === level)!.totalXp;
 const SKEWS = [-5_000, 5_000];
+
+for (const skewMs of [0, ...SKEWS]) {
+  test(`Lapidary follows server time with browser skew ${skewMs}ms (#468)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const characterId = testCharacter.id;
+    await stand(characterId, LOCATION_IDS.wernersLab);
+    await db
+      .insert(characterSkillXp)
+      .values({
+        characterId,
+        skillId: SKILL_IDS.lapidary,
+        totalXp: levelXp(5),
+      })
+      .onConflictDoUpdate({
+        target: [characterSkillXp.characterId, characterSkillXp.skillId],
+        set: { totalXp: levelXp(5) },
+      });
+    const completedAt = new Date();
+    await db.insert(characterMissions).values({
+      characterId,
+      missionId: MISSION_IDS.theyreMineralsMarie,
+      completedStageIds: THEYRE_MINERALS_MARIE.stages!.map((stage) => stage.id),
+      acceptedAt: completedAt,
+      completedAt,
+    });
+    await give(characterId, ITEM_IDS.uncutTopaz, 2);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openTestCharacter(page, characterId);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+
+    const bench = page.locator("[data-lapidary-workbench]");
+    await bench.getByRole("button", { name: "Techniques", exact: true }).click();
+    await expect(bench.locator("[data-lapidary-techniques-catalog]")).toBeVisible();
+    await bench.getByRole("button", { name: "Work", exact: true }).click();
+    await bench
+      .locator(`[data-lapidary-recipe="${ACTION_IDS.cutTopaz}"]`)
+      .getByRole("button")
+      .click();
+    await bench.locator("[data-bounded-run-max]").click();
+    const durationMs = balance.lapidary.recipes.cutTopaz.durationTicks * GAME_TICK_MS;
+    const window = await startAndBracket(() => bench.locator("[data-lapidary-start]").click());
+    const meter = bench.getByRole("progressbar", { name: /Cut Topaz/ });
+    await expect(meter).toBeVisible();
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    await expect
+      .poll(async () => Number(await meter.getAttribute("aria-valuenow")))
+      .toBeGreaterThan(8);
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectMeterOnServerTimeline(meter, window, durationMs);
+    await expect(bench.getByRole("button", { name: "Stop After This Piece" })).toBeVisible();
+    if (skewMs === 0) {
+      // Advance the display clock without advancing the server, so the live
+      // cycle stays projected while its display reaches the resolving state.
+      await page.evaluate((advanceMs) => {
+        const previousNow = Date.now;
+        Date.now = () => previousNow() + advanceMs;
+      }, durationMs);
+      await expect(meter).toHaveAttribute("aria-label", /Resolving/);
+      const ageCurrentPiece = async () => {
+        const ago = new Date(Date.now() - durationMs - 1_000);
+        await db
+          .update(activeActions)
+          .set({ startedAt: ago, resolvedThroughAt: ago })
+          .where(eq(activeActions.characterId, characterId));
+        await page.reload();
+      };
+      await ageCurrentPiece();
+      await expect(bench.locator("[data-bounded-run-progress]")).toContainText("1 piece");
+      await expect(meter).toBeVisible();
+      await ageCurrentPiece();
+      await expect(bench.locator("[data-lapidary-cycle]")).toHaveCount(0);
+      await expect(bench.locator("[data-lapidary-result]")).toContainText("+300 Lapidary XP");
+    }
+  });
+}
 
 async function stand(characterId: string, locationId: string) {
   await db
