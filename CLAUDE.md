@@ -62,10 +62,11 @@ until grep -q "All canonical E2E checks passed\|FAIL" run.log; do sleep 15; done
 ```
 
 Approximate timings in an isolated cloud container, so nothing looks hung:
-`pnpm test` ~12s, `pnpm test:integration` ~25s, `pnpm test:e2e:canonical` ~3 min
-end to end (44s production build, then 88 specs on a single worker). On the
-shared one-vCPU Hermes host, the production build alone takes ~2.3 min and an
-uncontended canonical run ~12 min.
+`pnpm test` ~12s and `pnpm test:integration` ~25s. `pnpm test:e2e:canonical`
+was once measured at ~3 min (44s production build, then 88 specs), but a
+recent run reached only 310 of 394 specs in ~13 min before it was killed, so do
+not rely on that figure. On the shared one-vCPU Hermes host, the production
+build alone takes ~2.3 min and an uncontended canonical run ~12 min.
 
 ## Local validation in an isolated cloud container
 
@@ -84,8 +85,21 @@ disposable-database wrapper, which creates and drops its own database:
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/pg-runespace -l /tmp/pg.log start"
 export DATABASE_URL="postgres://postgres@127.0.0.1:5432/postgres"
 pnpm test:integration
-pnpm test:e2e:canonical
 ```
+
+**Do not run `pnpm test:e2e:canonical` here as routine.** `AGENTS.md` step 5
+says the PR's CI runs the full canonical suite, and GitHub does it faster and
+without risking a half-finished local run. Push, open the PR, and read the
+checks. Run it locally only to reproduce a CI failure or for a genuinely
+high-risk boundary change, and then start it detached (`setsid nohup … &`) and
+wait on its log's terminal line, never inside a foreground tool call that can
+hit the tool timeout.
+
+If Playwright reports `Executable doesn't exist … chromium_headless_shell-<n>`,
+the pinned Playwright expects a different browser build than the one
+pre-installed under `/opt/pw-browsers`. Point `PLAYWRIGHT_BROWSERS_PATH` at a
+scratch directory containing a symlink with the expected name rather than
+editing the repo's Playwright config.
 
 `pnpm build` needs `DATABASE_URL` and a throwaway `BETTER_AUTH_SECRET` of at
 least 16 characters. The Coolify production database is never a target, on any
