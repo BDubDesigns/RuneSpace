@@ -47,6 +47,12 @@ small number of critical mobile player journeys.
   (issue #280); unordered row order follows the query plan and physical layout.
 
 ## 3. Browser tests (Playwright)
+- Server-timed gameplay displays must compare authoritative timestamps with
+  `usePlay().serverNowMs()`, not the device clock. Keep local-only animation
+  timing separate. For each new server-timed workpiece or claim window, add
+  focused browser-clock-skew coverage using `tests/e2e/server-clock-skew.ts`,
+  including active-state rehydration where applicable. The server remains the
+  authority for completion and claims.
 - Target: a **small number** of important mobile player journeys (the smoke
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
 - The landing page has a minimal app-loading smoke test

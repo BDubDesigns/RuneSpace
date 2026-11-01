@@ -32,12 +32,12 @@ const UNIT = { singular: "piece", plural: "pieces" };
 
 /** Server-projected permission, recipe, capacity, run and results; UI sends intent. */
 export function LapidaryWorkbench() {
-  const { state, foregroundBusy } = usePlay();
+  const { state, foregroundBusy, serverNowMs } = usePlay();
   const bench = state.lapidaryWorkbench;
   const [mode, setMode] = useState<"work" | "techniques">("work");
   const [selected, setSelected] = useState<string>();
   const [selection, setSelection] = useState<BoundedRunSelection>(1);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const targets = derivePinnedGuidanceTargets(state);
   const visible = workLapidaryTechniques(bench, targets.actionIds);
   const recipe =
@@ -65,9 +65,10 @@ export function LapidaryWorkbench() {
   }, [isActive]);
   useEffect(() => {
     if (!bench.cycle) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [bench.cycle]);
+  }, [bench.cycle, serverNowMs]);
   useEffect(() => {
     setSelection(1);
   }, [bench.access.kind, bench.cycle?.recipeActionId, recipe?.actionId]);
