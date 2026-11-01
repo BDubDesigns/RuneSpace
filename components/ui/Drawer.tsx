@@ -28,6 +28,67 @@ const FOCUSABLE_SELECTOR =
 const EXIT_FALLBACK_MS = 400;
 
 /**
+ * The document scroll lock is shared by every open Drawer and reference
+ * counted. Each Drawer used to snapshot whatever body styles it found at mount,
+ * so a Drawer that opened over another one captured the first Drawer's *locked*
+ * styles as its "originals"; if the first then closed before it (the order is
+ * not guaranteed: independent arrival modals, an NPC conversation, a result
+ * Drawer), the page was released while a modal was still open, and the later
+ * Drawer's close re-applied `overflow: hidden; position: fixed` for good, which
+ * only a full reload cleared (#447). The styles are captured once, by the first
+ * lock, and restored once, by the last release.
+ * Uses position:fixed + scrollY save/restore for iOS Safari compatibility.
+ */
+let documentScrollLocks = 0;
+let documentScrollSnapshot: {
+  scrollY: number;
+  overflow: string;
+  position: string;
+  top: string;
+  width: string;
+  paddingRight: string;
+} | null = null;
+
+function acquireDocumentScrollLock(): () => void {
+  if (documentScrollLocks === 0) {
+    const { style } = document.body;
+    const scrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    documentScrollSnapshot = {
+      scrollY,
+      overflow: style.overflow,
+      position: style.position,
+      top: style.top,
+      width: style.width,
+      paddingRight: style.paddingRight,
+    };
+    style.overflow = "hidden";
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.width = "100%";
+    if (scrollbarWidth > 0) style.paddingRight = `${scrollbarWidth}px`;
+  }
+  documentScrollLocks += 1;
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    documentScrollLocks -= 1;
+    if (documentScrollLocks > 0 || !documentScrollSnapshot) return;
+    const original = documentScrollSnapshot;
+    documentScrollSnapshot = null;
+    const { style } = document.body;
+    style.overflow = original.overflow;
+    style.position = original.position;
+    style.top = original.top;
+    style.width = original.width;
+    style.paddingRight = original.paddingRight;
+    window.scrollTo(0, original.scrollY);
+  };
+}
+
+/**
  * Open Drawers, oldest first. Only the newest owns the keyboard: a surface
  * that opens over another one (an accepted player trade over an NPC
  * conversation, #268) must not have the older Drawer's focus trap pull focus
@@ -247,36 +308,10 @@ export function Drawer({
     return () => document.removeEventListener("focusin", onFocusIn);
   }, [focusFirstAvailable]);
 
-  // Lock document scroll while open; restore on close/unmount.
-  // Uses position:fixed + scrollY save/restore for iOS Safari compatibility.
+  // Lock document scroll while open; restore once the last Drawer is gone.
   // Cleanup runs on unmount, so the page stays locked through the whole fade
   // (no background jump) and restores the instant the dialog is removed.
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const originalOverflow = document.body.style.overflow;
-    const originalPosition = document.body.style.position;
-    const originalTop = document.body.style.top;
-    const originalWidth = document.body.style.width;
-    const originalPaddingRight = document.body.style.paddingRight;
-
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-    }
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.position = originalPosition;
-      document.body.style.top = originalTop;
-      document.body.style.width = originalWidth;
-      document.body.style.paddingRight = originalPaddingRight;
-      window.scrollTo(0, scrollY);
-    };
-  }, []);
+  useEffect(() => acquireDocumentScrollLock(), []);
 
   // Deferred unmount: once the exit fade starts, unmount on the panel's exit
   // animationend, with a timeout safety net in case the event never fires.
