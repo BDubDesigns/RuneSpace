@@ -743,3 +743,60 @@ for (const skewMs of [0, -5_000, 5_000]) {
     expect((await characterRow(id)).credits).toBe(800);
   });
 }
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`cabin announcement follows the server's first transition with skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    // The projection is reloaded after moving the test-owned recorded journey;
+    // the unskewed test clock independently decides the expected announcement.
+    await ageJourney(id, 26_000);
+    const row = (await journeyRow(id))!;
+    await page.reload();
+    const cabin = page.locator(CABIN);
+    await expect(cabin).toBeVisible();
+    const elapsed = Date.now() - row.startedAt.getTime();
+    expect(elapsed, "reload must finish before the first announcement boundary").toBeLessThan(
+      30_000,
+    );
+    await expect(cabin).toHaveAttribute("data-cabin-phase", "departure");
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+  });
+}
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`shuttle cinematic follows the recorded journey near touchdown with skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    await ageJourney(id, 172_000);
+    const row = (await journeyRow(id))!;
+    await page.reload();
+    const cinematic = page.locator(CINEMATIC);
+    await expect(cinematic).toBeVisible();
+    await expect.poll(() => row.arrivesAt.getTime() - Date.now()).toBeLessThan(7_500);
+    const remaining = row.arrivesAt.getTime() - Date.now();
+    expect(remaining, "reload must finish before the touchdown phase").toBeGreaterThan(3_000);
+    await expect(cinematic).toHaveAttribute("data-flight-phase", "travel");
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+  });
+}

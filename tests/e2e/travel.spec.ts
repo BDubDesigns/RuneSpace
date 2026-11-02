@@ -1976,7 +1976,7 @@ for (const skewMs of [0, -5_000, 5_000]) {
       await expect(route).toBeVisible();
       await assertTimeline();
       expect((await characterRow(id)).currentLocationId).toBe(LOCATION_IDS.crashSite);
-      await page.getByRole("button", { name: "Back to Location" }).click();
+      await page.getByRole("button", { name: "Back to Journey" }).click();
       await page.getByRole("button", { name: "Turn Back" }).click();
       await expect(page.getByText("Journey progress")).toHaveCount(0);
       expect((await characterRow(id)).currentLocationId).toBe(LOCATION_IDS.crashSite);

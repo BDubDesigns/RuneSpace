@@ -744,3 +744,33 @@ for (const skewMs of [0, -5_000, 5_000]) {
     ).toBe(LOCATION_IDS.holoHollowLanding);
   });
 }
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`Rivet cinematic follows the recorded flight near touchdown with skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedPilot(id, { berth: LOCATION_IDS.holoHollowLanding, fuel: 200 });
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await page.locator(SHIP).locator(BOARD).click();
+    await page
+      .locator(
+        `[data-ship-route="${SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation}"] [data-ship-launch]`,
+      )
+      .click();
+    await expect(page.locator("[data-flight-surface]")).toBeVisible();
+    await ageFlight(id, 252_000);
+    const row = await shipRow(id);
+    await page.reload();
+    const cinematic = page.locator(CINEMATIC);
+    await expect(cinematic).toBeVisible();
+    await expect.poll(() => row.flightArrivesAt!.getTime() - Date.now()).toBeLessThan(7_500);
+    const remaining = row.flightArrivesAt!.getTime() - Date.now();
+    expect(remaining, "reload must finish before the touchdown phase").toBeGreaterThan(3_000);
+    await expect(cinematic).toHaveAttribute("data-flight-phase", "travel");
+    expect((await shipRow(id)).berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+  });
+}
