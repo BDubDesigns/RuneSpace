@@ -88,7 +88,13 @@ export function ScavengeControl({
       onRefusal(undefined);
       startTransition(async () => {
         try {
-          const result = await claimScavengeAction({ characterId: state.characterId });
+          // The leg this window belongs to (#450): on a route the next leg can
+          // begin the instant this one arrives, and a late claim must never be
+          // read against the wrong leg's window.
+          const result = await claimScavengeAction({
+            characterId: state.characterId,
+            travelStartedAt: travel?.startedAt,
+          });
           if ("error" in result) {
             onRefusal(result.error);
             return;

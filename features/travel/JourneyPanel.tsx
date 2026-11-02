@@ -5,12 +5,20 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getLocation } from "@/game/content/locations";
+import { GAME_TICK_MS } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
 import { Feedback } from "@/components/ui/Feedback";
 import { ScavengeControl } from "./ScavengeControl";
+import { StopAfterLegControl } from "./StopAfterLegControl";
 import { TurnBackControl } from "./TurnBackControl";
 import { deriveJourneyFeed, newestJourneyEventsFirst } from "./journey-feed";
 import { usePlay } from "@/features/play/PlayContext";
+
+const WALK_MS = getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS;
+
+/** Where each stop of a Route To (#450) stands relative to the leg under way. */
+type RouteStopStatus = "passed" | "here" | "next" | "ahead";
 
 function progressBetween(startedAt: string, arrivesAt: string, now: number): number {
   const start = new Date(startedAt).getTime();
@@ -44,6 +52,25 @@ export function JourneyPanel() {
       ? undefined
       : (TRANSPORT_ROUTES.find((route) => route.mode === travel.mode)?.displayName ?? "transport");
   const remainingSeconds = Math.max(0, (new Date(travel.arrivesAt).getTime() - now) / 1_000);
+  // This character's own name for a place (#441), as everywhere else.
+  const placeName = (locationId: string) =>
+    state.locationStates[locationId]?.displayName ??
+    getLocation(locationId)?.displayName ??
+    locationId;
+  const route = travel.route;
+  const routeLegIndex = route ? route.locationIds.indexOf(travel.originLocationId) : -1;
+  const routeLegCount = route ? route.locationIds.length - 1 : 0;
+  const routeRemainingSeconds = route
+    ? remainingSeconds + (route.remainingLocationIds.length * WALK_MS) / 1_000
+    : 0;
+  const routeStopStatus = (index: number): RouteStopStatus =>
+    index < routeLegIndex
+      ? "passed"
+      : index === routeLegIndex
+        ? "here"
+        : index === routeLegIndex + 1
+          ? "next"
+          : "ahead";
   const feed = newestJourneyEventsFirst(deriveJourneyFeed(travel, new Date(now)));
 
   return (
@@ -77,6 +104,86 @@ export function JourneyPanel() {
           : "The active work stopped before departure. No new activity can begin until you arrive."}
       </p>
 
+      {/* Route To (#450): the route as a whole, beside the ordinary leg above.
+          The committed location is the leg's origin until the leg arrives, so
+          that is where the player stands, and where Turn Back leaves them. */}
+      {route ? (
+        <section
+          aria-label="Route"
+          className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+          data-journey-route={route.finalDestinationLocationId}
+        >
+          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
+            Route to {placeName(route.finalDestinationLocationId)}
+          </p>
+          <p
+            className="mt-1 text-sm text-[color:var(--rs-text-primary)]"
+            data-journey-route-leg={`${routeLegIndex + 1}/${routeLegCount}`}
+          >
+            Leg {routeLegIndex + 1} of {routeLegCount} · about {Math.ceil(routeRemainingSeconds)}{" "}
+            sec of walking left
+          </p>
+          <ol
+            aria-label="Route stops"
+            className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs"
+            data-journey-route-path
+          >
+            {route.locationIds.map((locationId, index) => {
+              const stop = routeStopStatus(index);
+              return (
+                <li
+                  className={`flex items-center gap-1.5 ${
+                    stop === "here"
+                      ? "font-bold text-[color:var(--rs-text-primary)]"
+                      : stop === "next"
+                        ? "text-[color:var(--rs-accent-secondary)]"
+                        : stop === "passed"
+                          ? "text-[color:var(--rs-text-muted)] line-through"
+                          : "text-[color:var(--rs-text-secondary)]"
+                  }`}
+                  data-journey-route-stop={stop}
+                  key={locationId}
+                >
+                  <span>
+                    {placeName(locationId)}
+                    <span className="sr-only">
+                      {stop === "here"
+                        ? " (you are here)"
+                        : stop === "next"
+                          ? " (walking there now)"
+                          : stop === "passed"
+                            ? " (passed)"
+                            : ""}
+                    </span>
+                  </span>
+                  {index < route.locationIds.length - 1 ? (
+                    <span aria-hidden="true" className="text-[color:var(--rs-text-muted)]">
+                      →
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+          <p
+            className="mt-2 text-xs text-[color:var(--rs-text-secondary)]"
+            data-journey-route-location={travel.originLocationId}
+          >
+            You are at {origin}. Each leg is an ordinary walk with its own chance to Scavenge.
+          </p>
+          {route.remainingLocationIds.length > 0 ? (
+            <StopAfterLegControl legDestinationName={destination} />
+          ) : (
+            <p
+              className="mt-3 font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]"
+              data-journey-route-final-leg
+            >
+              Final leg — you&apos;ll stop at {destination}.
+            </p>
+          )}
+        </section>
+      ) : null}
+
       {/* Suppression is stated, never merely implied by a missing find (#312). */}
       {travel.scavengeSuppressed ? (
         <div data-journey-scavenge-suppressed>
@@ -97,7 +204,10 @@ export function JourneyPanel() {
       ) : null}
 
       {/* Reachable here, with the Journey itself, rather than through the Map. */}
-      <TurnBackControl rideFare={Boolean(rideName)} />
+      <TurnBackControl
+        rideFare={Boolean(rideName)}
+        routeNote={route ? `Turn Back ends the route and leaves you at ${origin}.` : undefined}
+      />
 
       {/* Newest first (#240): the latest beat leads, so a live Scavenge control
           is reachable without scrolling past older history, which stays below

@@ -16,6 +16,9 @@ export function travelErrorMessage(reason: NonNullable<PlayGameplayState["travel
     // distinct from `not_adjacent` so a collapsed Deep Jag never reads as
     // though The Jag does not connect to it.
     route_blocked: "That way is blocked.",
+    // Route To (#450): no ordinary walking path reaches it from here — another
+    // world, or a way through only over places that are shut.
+    no_walking_route: "There is no walking route there from here.",
     already_traveling: "You are already traveling. Arrival must complete first.",
     mining_unavailable_here: "Mining is not available at this location.",
     unknown_route: "No ride runs that way.",

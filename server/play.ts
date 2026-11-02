@@ -78,7 +78,11 @@ import {
   repairMaterialsComplete,
   type RepairTargetState,
 } from "@/game/domain/welding-repair";
-import { resolveLocationState, type LocationStateFacts } from "@/game/domain/location-state";
+import {
+  isLocationTravelable,
+  resolveLocationState,
+  type LocationStateFacts,
+} from "@/game/domain/location-state";
 import { LOCATIONS, isActionAvailableAtLocation } from "@/game/content/locations";
 import { getSiteStash } from "@/game/content/site-stashes";
 import { getRepairTarget } from "@/game/content/repair-targets";
@@ -132,6 +136,8 @@ import {
 import {
   planTransportTravel,
   planTravel,
+  planWalkingRoute,
+  remainingRouteLocationIds,
   travelDurationTicks,
   travelOffersScavenge,
 } from "@/game/domain/travel";
@@ -1225,6 +1231,20 @@ export type PlayGameplayState = {
       expiresAt: string;
       outcome?: ScavengeResolvedOutcome;
     };
+    /**
+     * Present while this walk is one leg of a Route To (#450). The leg itself is
+     * `originLocationId` -> `destinationLocationId`, an ordinary walk with its
+     * own Scavenge window; the character's committed location is still the
+     * leg's origin until it arrives.
+     */
+    route?: {
+      /** The whole planned route, where it set out from first and its end last. */
+      locationIds: readonly string[];
+      /** The hexes still to walk after this leg's destination, in order. */
+      remainingLocationIds: readonly string[];
+      /** Where the route ends: this leg's destination when nothing remains. */
+      finalDestinationLocationId: string;
+    };
   };
   /**
    * True while a Turn Back from a walk is still suppressing walking Scavenge
@@ -1248,6 +1268,8 @@ export type PlayGameplayState = {
   /** Set when a begin-travel command was refused by the authoritative rules. */
   travelError?:
     | "route_blocked"
+    /** Route To (#450): no ordinary walking path reaches the destination from here. */
+    | "no_walking_route"
     | "unknown_destination"
     | "same_location"
     | "not_adjacent"
@@ -1393,7 +1415,9 @@ export function createPlayResolver(
     })),
     {
       actionId: ACTION_IDS.travel,
-      resolver: createTravelResolver() as PlayResolver,
+      // Each chained Route To leg (#450) rolls its own Scavenge window from the
+      // same source an ordinary Walk's departure uses.
+      resolver: createTravelResolver(random) as PlayResolver,
     },
     {
       // A Milky Waymo passenger journey (#404): lazily landed from its own
@@ -2618,6 +2642,22 @@ export async function stateFromTransaction(
                   };
                 })()
               : undefined,
+          route: (() => {
+            if (!travel.routeLocationIds) return undefined;
+            const remainingLocationIds = remainingRouteLocationIds({
+              routeLocationIds: travel.routeLocationIds,
+              originLocationId: travel.originLocationId,
+              destinationLocationId: travel.destinationLocationId,
+            });
+            return remainingLocationIds
+              ? {
+                  locationIds: [...travel.routeLocationIds],
+                  remainingLocationIds: [...remainingLocationIds],
+                  finalDestinationLocationId:
+                    remainingLocationIds.at(-1) ?? travel.destinationLocationId,
+                }
+              : undefined;
+          })(),
         }
       : undefined;
   // Whichever authored Mining tool is equipped (#233); its own definition
@@ -3203,6 +3243,43 @@ export async function beginTravel(
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
 ): Promise<PlayGameplayState> {
+  return beginWalkingJourney(userId, characterId, destinationLocationId, "walk", now, random);
+}
+
+/**
+ * Route To (#450): begin an automatic multi-leg walk to a same-planet location.
+ *
+ * The browser supplies only the final destination. The path is planned here,
+ * from authored adjacency and this character's own location-state facts
+ * (`planWalkingRoute`), and stored on the travel row; the first leg begins
+ * exactly as an ordinary Walk would — the same gates, the same replacement of
+ * travel-replaceable work, the same Scavenge window roll or #312 suppression.
+ * Every later leg is chained by the Travel resolver at the previous leg's
+ * arrival instant. A destination one leg away is simply an ordinary Walk.
+ *
+ * A repeat while the same route is under way is idempotent; any other route or
+ * walk while traveling is refused with `already_traveling`, never a silent
+ * change of destination.
+ */
+export async function beginRouteTravel(
+  userId: string,
+  characterId: string,
+  destinationLocationId: string,
+  now = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<PlayGameplayState> {
+  return beginWalkingJourney(userId, characterId, destinationLocationId, "route", now, random);
+}
+
+/** The shared departure of a Walk and of a Route To's first leg. */
+async function beginWalkingJourney(
+  userId: string,
+  characterId: string,
+  destinationLocationId: string,
+  request: "walk" | "route",
+  now: Date,
+  random: MiningRandom,
+): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -3239,7 +3316,13 @@ export async function beginTravel(
       const travel = travelRows[0];
 
       if (alreadyTraveling) {
-        const sameDestination = travel?.destinationLocationId === destinationLocationId;
+        // A Walk repeats the leg under way; a Route To repeats the route's end,
+        // which a retry that lands after a leg boundary still recognises.
+        const sameDestination =
+          request === "route"
+            ? (travel?.routeLocationIds?.at(-1) ?? travel?.destinationLocationId) ===
+              destinationLocationId
+            : travel?.destinationLocationId === destinationLocationId;
         if (sameDestination) {
           // Idempotent retry: the journey is already underway to this destination.
           return stateFromTransaction(
@@ -3268,12 +3351,23 @@ export async function beginTravel(
       // The destination's current state is authoritative here, not merely in
       // the Map's presentation: a forged request for a collapsed Deep Jag is
       // refused server-side with `route_blocked` (#209).
-      const plan = planTravel({
-        currentLocationId,
-        destinationLocationId,
-        alreadyTraveling: false,
-        locationStateFacts: await loadLocationStateFacts(transaction, context.character.id),
-      });
+      const locationStateFacts = await loadLocationStateFacts(transaction, context.character.id);
+      const routePlan =
+        request === "route"
+          ? planWalkingRoute({
+              currentLocationId,
+              destinationLocationId,
+              isTravelable: (locationId) => isLocationTravelable(locationId, locationStateFacts),
+            })
+          : undefined;
+      const plan =
+        routePlan ??
+        planTravel({
+          currentLocationId,
+          destinationLocationId,
+          alreadyTraveling: false,
+          locationStateFacts,
+        });
       if (!plan.ok) {
         return stateFromTransaction(
           transaction,
@@ -3357,11 +3451,14 @@ export async function beginTravel(
         startedAt: now,
         resolvedThroughAt: now,
       });
+      // A route's first leg is its first step; a one-leg route is a plain Walk.
+      const route = routePlan?.ok && routePlan.legCount > 1 ? routePlan.path : undefined;
       await transaction.insert(characterTravelState).values({
         characterId: context.character.id,
         originLocationId: currentLocationId,
-        destinationLocationId,
+        destinationLocationId: route ? route[1]! : destinationLocationId,
         mode: "walk",
+        routeLocationIds: route ? [...route] : null,
         // While Scavenge is suppressed after a Turn Back (#312) the walk gets no
         // window at all, and no random roll is spent deciding where one would
         // have been. Only a completed walk lifts the suppression.
@@ -3514,12 +3611,20 @@ export async function beginTransportTravel(
   );
 }
 
-/** Claim the single optional Scavenge window attached to the active Travel row. */
+/**
+ * Claim the single optional Scavenge window attached to the active Travel row.
+ *
+ * `travelStartedAt` names the leg the player was looking at. On a Route To
+ * (#450) the next leg begins the instant the last one arrives, so a claim sent
+ * for one leg's window could otherwise be read against the next leg's; a claim
+ * naming any leg but the one under way is refused as missed and spends nothing.
+ */
 export async function claimScavenge(
   userId: string,
   characterId: string,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
+  travelStartedAt?: string,
 ): Promise<ScavengeClaimResult> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
@@ -3566,6 +3671,17 @@ export async function claimScavenge(
           status: "refused",
           reason: "no_travel",
           message: "Scavenge is only available during an active walk.",
+        });
+      }
+
+      if (
+        travelStartedAt !== undefined &&
+        new Date(travelStartedAt).getTime() !== context.action.startedAt.getTime()
+      ) {
+        return stateFor({
+          status: "refused",
+          reason: "missed",
+          message: "That Scavenge window belonged to an earlier leg of your walk.",
         });
       }
 

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { characters, characterTravelState } from "@/db/rune-space";
 import { ACTION_IDS, type TravelMode } from "@/game/config/foundations";
-import { travelOffersScavenge } from "@/game/domain/travel";
+import { remainingRouteLocationIds, travelOffersScavenge } from "@/game/domain/travel";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { createPlayResolver, ensurePlayProvisioning, stateFromTransaction } from "@/server/play";
 import type { PlayGameplayState } from "@/server/play";
@@ -59,6 +59,72 @@ export async function turnBackTravel(
             .update(characters)
             .set({ scavengeSuppressed: true })
             .where(eq(characters.id, context.character.id));
+        }
+      }
+
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        { successes: 0, failures: 0, awardedXp: 0 },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        now,
+      );
+    },
+    now,
+  );
+}
+
+/**
+ * Stop After This Leg (#450): finish the walking leg under way and do not
+ * begin the next one.
+ *
+ * It is not a Turn Back. Nothing is cancelled: the leg keeps its progress, its
+ * Scavenge window, and its arrival, which commits normally and lifts Scavenge
+ * suppression exactly as any completed walk does. The command only shortens
+ * the stored route so that it ends at this leg's destination.
+ *
+ * The same lock-first reconciliation as every Play command decides which leg
+ * that is. If the leg the player saw had already arrived when the command
+ * reconciles, arrival wins as it does for Turn Back: that arrival stands, the
+ * route has already moved on to its next leg, and it is that leg — now the one
+ * under way — that the route stops after. A command while not on a route (a
+ * plain walk, a ride, idle, or a route that already ended) changes nothing and
+ * returns authoritative state, so a retry or a late duplicate is harmless.
+ */
+export async function stopRouteAfterLeg(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+): Promise<PlayGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(),
+    async (transaction, context) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+
+      if (context.action?.actionId === ACTION_IDS.travel) {
+        const [travel] = await transaction
+          .select()
+          .from(characterTravelState)
+          .where(eq(characterTravelState.characterId, context.character.id))
+          .for("update");
+        const remaining = travel?.routeLocationIds
+          ? remainingRouteLocationIds({
+              routeLocationIds: travel.routeLocationIds,
+              originLocationId: travel.originLocationId,
+              destinationLocationId: travel.destinationLocationId,
+            })
+          : undefined;
+        if (travel?.routeLocationIds && remaining && remaining.length > 0) {
+          const legEnd = travel.routeLocationIds.indexOf(travel.destinationLocationId);
+          await transaction
+            .update(characterTravelState)
+            .set({ routeLocationIds: travel.routeLocationIds.slice(0, legEnd + 1) })
+            .where(eq(characterTravelState.characterId, context.character.id));
         }
       }
 

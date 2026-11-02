@@ -7,11 +7,16 @@ import {
 } from "@/db/rune-space";
 import { ACTION_IDS, type TravelMode } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
+import { scavengeOpportunityStartTick } from "@/game/domain/scavenge";
 import {
+  chainWalkingRouteLegs,
   isTravelRouteValid,
+  planTravel,
+  remainingRouteLocationIds,
   resolveTravel,
   travelDurationTicks,
   type TravelState,
+  type WalkingRouteLeg,
 } from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
@@ -47,7 +52,22 @@ export type TravelSnapshot = {
 
 export type TravelResolution = {
   arrived: boolean;
+  /**
+   * Route To (#450): the legs that follow the arrived one, already on the
+   * authoritative timeline. Every `arrivedLegs` entry arrived inside this same
+   * resolution window (an offline catch-up); `activeLeg` is the leg the
+   * character is now walking. Absent for an ordinary walk or ride, and when
+   * the arrived leg was a route's last.
+   */
+  routeContinuation?: {
+    routeLocationIds: readonly string[];
+    arrivedLegs: readonly WalkingRouteLeg[];
+    activeLeg?: WalkingRouteLeg;
+  };
 };
+
+/** The one random source a walking leg needs: its Scavenge window roll. */
+export type TravelRandom = { nextBasisPoints(): number };
 
 /**
  * End the active Journey without arriving: delete the Travel action and its
@@ -82,7 +102,9 @@ export async function clearActiveJourney(
  * rolls back the transaction and preserves the current character location
  * and the active Travel action.
  */
-export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelResolution> {
+export function createTravelResolver(
+  random: TravelRandom,
+): ActionResolver<TravelSnapshot, TravelResolution> {
   return {
     supports: (action): boolean => action.actionId === ACTION_IDS.travel,
     load: async (transaction, { character }) => {
@@ -127,11 +149,73 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
             ticksToMilliseconds(1),
         ),
       });
+      if (!result.arrived) {
+        return {
+          outcome: { arrived: false },
+          transition: { kind: "continue", consumedTicks: result.consumedTicks },
+        };
+      }
+
+      // Route To (#450): an arrived leg of a route chains straight into the
+      // next ordinary walk, starting at this leg's own arrival instant. Every
+      // further leg already due inside this window (an offline return) arrives
+      // in order here too, so no committed location is ever skipped and no leg
+      // is shorter or longer than a walk.
+      const remaining =
+        mode === "walk" && snapshot.travel.routeLocationIds
+          ? remainingRouteLocationIds({
+              routeLocationIds: snapshot.travel.routeLocationIds,
+              originLocationId: travel.originLocationId,
+              destinationLocationId: travel.destinationLocationId,
+            })
+          : undefined;
+      if (!remaining || remaining.length === 0) {
+        return {
+          outcome: { arrived: true },
+          transition: { kind: "stop", consumedTicks: result.consumedTicks },
+        };
+      }
+      const chain = chainWalkingRouteLegs({
+        arrivedAt: travel.arrivesAt,
+        fromLocationId: travel.destinationLocationId,
+        remainingLocationIds: remaining,
+        availableThroughAt: window.availableThroughAt,
+        // Each leg is held to exactly the rule an ordinary Walk is, with this
+        // character's own location-state facts.
+        canWalk: (originLocationId, destinationLocationId) =>
+          planTravel({
+            currentLocationId: originLocationId,
+            destinationLocationId,
+            alreadyTraveling: false,
+            locationStateFacts: snapshot.locationStateFacts as LocationStateFacts,
+          }).ok,
+      });
+      const outcome: TravelResolution = {
+        arrived: true,
+        routeContinuation: {
+          routeLocationIds: [...snapshot.travel.routeLocationIds!],
+          arrivedLegs: chain.arrivedLegs,
+          ...(chain.activeLeg ? { activeLeg: chain.activeLeg } : {}),
+        },
+      };
+      if (!chain.activeLeg) {
+        // The whole rest of the route arrived inside this window, or the next
+        // leg was refused: the Journey ends where the last arrival left it.
+        return {
+          outcome,
+          transition: { kind: "stop", consumedTicks: result.consumedTicks },
+        };
+      }
+      // The active leg is a fresh Travel action from its own start instant.
+      // The cursor consumes the whole window, which ends no earlier than that
+      // start: every leg before it arrived inside this window.
       return {
-        outcome: { arrived: result.arrived },
-        transition: result.arrived
-          ? { kind: "stop", consumedTicks: result.consumedTicks }
-          : { kind: "continue", consumedTicks: result.consumedTicks },
+        outcome,
+        transition: {
+          kind: "replace",
+          consumedTicks: window.elapsedTicks,
+          action: { actionId: ACTION_IDS.travel, startedAt: chain.activeLeg.startedAt },
+        },
       };
     },
     persist: async (transaction, outcome, context) => {
@@ -154,80 +238,122 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         );
       }
 
-      const {
-        originLocationId: storedOrigin,
-        destinationLocationId: storedDestination,
-        mode: storedMode,
-      } = travel;
+      await commitTravelArrival(transaction, context.character.id, travel);
 
-      // Validate all persisted state against the authoritative location
-      // registry before committing. Any inconsistency is an integrity failure:
-      // roll back the transaction, preserve the character location and action.
-      const originDef = getLocation(storedOrigin);
-      const destDef = getLocation(storedDestination);
-
-      if (!originDef) {
-        throw new TravelRuleError(
-          `Unknown persisted origin: ${storedOrigin}`,
-          "unknown_destination",
-        );
+      // Route To (#450): each following leg begins as an ordinary walk at the
+      // previous leg's arrival instant, with its own single Scavenge window
+      // roll. The walking arrival just committed lifted any Turn Back
+      // suppression, exactly as it does for a Walk, so every chained leg rolls.
+      // A leg that also arrived inside this window commits in order, so the
+      // character genuinely stands at each intermediate hex before leaving it;
+      // its window is long past and nothing is ever claimed on its behalf.
+      const continuation = outcome.routeContinuation;
+      if (!continuation) return;
+      const legs = [
+        ...continuation.arrivedLegs.map((leg) => ({ leg, arrived: true })),
+        ...(continuation.activeLeg ? [{ leg: continuation.activeLeg, arrived: false }] : []),
+      ];
+      for (const { leg, arrived } of legs) {
+        const [legRow] = await transaction
+          .insert(characterTravelState)
+          .values({
+            characterId: context.character.id,
+            originLocationId: leg.originLocationId,
+            destinationLocationId: leg.destinationLocationId,
+            mode: "walk",
+            scavengeOpportunityStartTick: scavengeOpportunityStartTick(random.nextBasisPoints()),
+            routeLocationIds: [...continuation.routeLocationIds],
+          })
+          .returning();
+        if (arrived && legRow) await commitTravelArrival(transaction, context.character.id, legRow);
       }
-      if (!destDef) {
-        throw new TravelRuleError(
-          `Unknown persisted destination: ${storedDestination}`,
-          "unknown_destination",
-        );
-      }
-      if (storedOrigin === storedDestination) {
-        throw new TravelRuleError(
-          "Persisted origin and destination are the same location",
-          "same_location",
-        );
-      }
-      // Walking is validated against map adjacency; an authored transport ride
-      // is validated against its own route, which is deliberately not an
-      // adjacency. Either way, an unrecognised route never commits an arrival.
-      if (
-        !isTravelRouteValid({
-          mode: storedMode as TravelMode,
-          originLocationId: storedOrigin,
-          destinationLocationId: storedDestination,
-          locationStateFacts: await loadLocationStateFacts(transaction, context.character.id),
-        })
-      ) {
-        throw new TravelRuleError(
-          `Persisted ${storedMode} route is not valid: ${storedOrigin} -> ${storedDestination}`,
-          storedMode === "walk" ? "not_adjacent" : "unknown_route",
-        );
-      }
-      // The character row was locked FOR UPDATE at the top of this transaction.
-      // Its currentLocationId is the authoritative location at resolution time.
-      // Re-read it inside the transaction to avoid depending on the frozen snapshot.
-      const [charRow] = await transaction
-        .select({ currentLocationId: characters.currentLocationId })
-        .from(characters)
-        .where(eq(characters.id, context.character.id))
-        .limit(1);
-      if (!charRow || charRow.currentLocationId !== storedOrigin) {
-        throw new TravelRuleError(
-          `Character location (${charRow?.currentLocationId}) does not match stored travel origin (${storedOrigin})`,
-          "not_adjacent",
-        );
-      }
-
-      // Completing a walking Journey is the only thing that lifts Scavenge
-      // suppression (#312); a ride arriving leaves it exactly as it was.
-      await transaction
-        .update(characters)
-        .set(
-          storedMode === "walk"
-            ? { currentLocationId: storedDestination, scavengeSuppressed: false }
-            : { currentLocationId: storedDestination },
-        )
-        .where(eq(characters.id, context.character.id));
-      await transaction
-        .delete(characterTravelState)
-        .where(eq(characterTravelState.characterId, context.character.id));
     },
   };
+}
+
+/**
+ * Commit one Journey's arrival exactly once: validate the persisted leg against
+ * the authoritative registry and the character's own location, move the
+ * character to its destination, and clear the travel row. Any inconsistency is
+ * an integrity failure that rolls the whole transaction back, preserving the
+ * character location and the active action. Shared by an ordinary arrival and
+ * every leg of a route (#450), so a route leg can never commit more loosely
+ * than a Walk.
+ */
+async function commitTravelArrival(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  travel: CharacterTravelState,
+): Promise<void> {
+  const {
+    originLocationId: storedOrigin,
+    destinationLocationId: storedDestination,
+    mode: storedMode,
+  } = travel;
+
+  // Validate all persisted state against the authoritative location
+  // registry before committing. Any inconsistency is an integrity failure:
+  // roll back the transaction, preserve the character location and action.
+  const originDef = getLocation(storedOrigin);
+  const destDef = getLocation(storedDestination);
+
+  if (!originDef) {
+    throw new TravelRuleError(`Unknown persisted origin: ${storedOrigin}`, "unknown_destination");
+  }
+  if (!destDef) {
+    throw new TravelRuleError(
+      `Unknown persisted destination: ${storedDestination}`,
+      "unknown_destination",
+    );
+  }
+  if (storedOrigin === storedDestination) {
+    throw new TravelRuleError(
+      "Persisted origin and destination are the same location",
+      "same_location",
+    );
+  }
+  // Walking is validated against map adjacency; an authored transport ride
+  // is validated against its own route, which is deliberately not an
+  // adjacency. Either way, an unrecognised route never commits an arrival.
+  if (
+    !isTravelRouteValid({
+      mode: storedMode as TravelMode,
+      originLocationId: storedOrigin,
+      destinationLocationId: storedDestination,
+      locationStateFacts: await loadLocationStateFacts(transaction, characterId),
+    })
+  ) {
+    throw new TravelRuleError(
+      `Persisted ${storedMode} route is not valid: ${storedOrigin} -> ${storedDestination}`,
+      storedMode === "walk" ? "not_adjacent" : "unknown_route",
+    );
+  }
+  // The character row was locked FOR UPDATE at the top of this transaction.
+  // Its currentLocationId is the authoritative location at resolution time.
+  // Re-read it inside the transaction to avoid depending on the frozen snapshot.
+  const [charRow] = await transaction
+    .select({ currentLocationId: characters.currentLocationId })
+    .from(characters)
+    .where(eq(characters.id, characterId))
+    .limit(1);
+  if (!charRow || charRow.currentLocationId !== storedOrigin) {
+    throw new TravelRuleError(
+      `Character location (${charRow?.currentLocationId}) does not match stored travel origin (${storedOrigin})`,
+      "not_adjacent",
+    );
+  }
+
+  // Completing a walking Journey is the only thing that lifts Scavenge
+  // suppression (#312); a ride arriving leaves it exactly as it was.
+  await transaction
+    .update(characters)
+    .set(
+      storedMode === "walk"
+        ? { currentLocationId: storedDestination, scavengeSuppressed: false }
+        : { currentLocationId: storedDestination },
+    )
+    .where(eq(characters.id, characterId));
+  await transaction
+    .delete(characterTravelState)
+    .where(eq(characterTravelState.characterId, characterId));
 }

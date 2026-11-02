@@ -367,9 +367,11 @@ document scroll, and no map pan or nudge when it opens.
   it is one bounded two-axis scroller, and scrolling it never clears a selection.
 - **State comes from the existing facts.** `mapDestinationStatus` (`features/travel/map-destination.ts`)
   reads registry adjacency plus the server-derived `locationStates[id].travelable`, the same facts
-  the travel gate enforces: `current` shows "You are here", `unreachable` shows "No route from
-  here", `blocked` keeps the named refusal (`data-map-route-blocked`), and only `reachable` offers
-  Walk. There is never a disabled Walk button.
+  the travel gate enforces: `current` shows "You are here", `blocked` keeps the named refusal
+  (`data-map-route-blocked`) for any shut destination however far away, only `reachable` offers
+  Walk, and only `routable` offers Route To (#450, below). `unreachable` ("No route from here")
+  remains for a hex no ordinary walking path reaches; no current map has one. There is never a
+  disabled Walk button.
 - **Compact by default.** Name, the location's resolved status plus walking time
   (`data-map-destination-meta`, e.g. `Refining · 24 sec walk`), then `Details` and Walk. The visible
   Walk label is `Walk — 24 sec`; its accessible name keeps the destination (`Walk to … — 24 sec`).
@@ -380,6 +382,56 @@ document scroll, and no map pan or nudge when it opens.
 - Verified at 390×844 and 1440×900: the panel sits wholly above the navigation, the Walk control
   is fully in view with Details on or off, and there is no horizontal overflow. On `sm` and wider
   the panel is capped at `max-w-xl` and centered under the map.
+
+## Route To: automatic multi-hex walking (issue #450)
+
+Route To removes the repeated Walk clicks on a route the player already chose. It is not a
+transport mode: every leg is an ordinary 40-tick / 24-second walk with its own Scavenge window,
+and the character genuinely arrives at each intermediate hex.
+
+- **Planning is one pure rule.** `planWalkingRoute` (`game/domain/travel.ts`) is a bounded
+  breadth-first search over one planet's authored adjacency, entering only hexes the character may
+  currently enter (`isLocationTravelable` on the server, `locationStates[id].travelable` in the
+  panel — the same facts). Of every shortest path, the lexicographically smallest sequence of
+  location IDs wins, so the tie-break never depends on authoring order. A shut destination is
+  `route_blocked`; another planet's location, or a way through only shut hexes, is
+  `no_walking_route`. Adjacency can never join planets, so no ride, ship, shuttle, or teleport is
+  ever part of a route. A Route To one leg away is simply an ordinary Walk.
+- **The route lives on the travel row.** `character_travel_state.route_location_ids` (migration
+  `0058_route_to`) stores the whole path, origin first, while the walk is one leg of a route; NULL is
+  an ordinary walk. The row's own origin and destination are always the active leg. Because the
+  route lives on the Journey's row, everything that ends a Journey — Turn Back, the operator
+  force-idle — ends the rest of the route with it, with no second cleanup path.
+- **Legs chain inside the Travel resolver.** When a leg's arrival is due, the resolver commits it
+  exactly as before (`commitTravelArrival`: registry validation, origin check, location commit,
+  suppression lift) and then `chainWalkingRouteLegs` begins the next leg *at the arrived leg's own
+  arrival instant*, never at the moment the server looked. Every further leg already due in the same
+  resolution window commits in order, so an offline return passes through every intermediate hex
+  and ends where a watching player would be. The surviving leg becomes the Travel action through the
+  resolver's existing `replace` transition. This runs under the owned-character lock like every
+  reconciliation, so concurrent reads, duplicate commands, and retries observe one committed
+  timeline. The chain is bounded by the route, itself a shortest path on one map.
+- **Each leg rolls one Scavenge window** when it begins, from the same random source as a Walk's
+  departure; a leg that also arrived offline keeps its spent roll and is never claimed for. A walking
+  arrival lifts #312 suppression, so only a route's first leg can be suppressed. A claim names its leg
+  (`travelStartedAt`); a claim naming any other leg is refused as `missed` and spends nothing.
+- **Stop After This Leg is not Turn Back.** `stopRouteAfterLeg` (`server/travel-commands.ts`)
+  shortens the stored route to end at the active leg's destination; nothing is cancelled, the leg
+  keeps its window, and its arrival lifts suppression like any walk. Turn Back is unchanged: it ends
+  the active leg and, with its row, the rest of the route, leaving the character at the leg's origin —
+  the last stop reached — and suppresses Scavenge. Both reconcile first, so **arrival wins**: if the
+  leg the player saw already arrived, the next leg is already under way and the command applies to
+  that leg.
+- **Presentation.** A `routable` destination's panel shows the path (`data-map-route-preview`), the
+  leg count and total walking time, and a `Route To — 48 sec` control (accessible name
+  `Route To The Jag, 2 legs — 48 sec`); the map draws the planned legs as dashed overlays on their own
+  authored edges (`data-map-route-plan`). In transit, the leg's ends keep `Origin` / `Destination`
+  and the hexes still ahead read `On route` / `Route end` (`data-map-transit-role`). The Journey adds a
+  route block (`data-journey-route`): leg *n* of *m*, every stop as passed / here / next / ahead, the
+  committed location, Stop After This Leg while legs remain, and a Turn Back note naming where it
+  leaves the player. The map stays read-only in transit, so a route is never silently replaced; a
+  different Route To or Walk while traveling is refused with `already_traveling`, and a repeat of the
+  same route is idempotent.
 
 ## Edge arrows: one geometry, Mission cues (issue #240)
 

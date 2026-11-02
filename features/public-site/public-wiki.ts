@@ -162,7 +162,16 @@ const authoredWikiArticles = [
         heading: "Selecting and confirming a walk",
         paragraphs: [
           "Select a location on the Map to look at it, then use the separate confirmation control to actually start walking there. Each leg between two connected locations takes about 24 seconds, and your progress is safe if you refresh or lose connection partway through.",
-          "Selecting a location opens a small panel just above the navigation bar with its name, what's there, the walking time, and the Walk button, so you never have to scroll away from the map to leave. Details shows the location's full description in the same panel; select Details again to put it away. Selecting where you're standing says You are here, and a location with no path from where you are says No route from here — neither offers a walk. Select another location to switch, or tap an empty part of the map (or press Escape) to close the panel.",
+          "Selecting a location opens a small panel just above the navigation bar with its name, what's there, the walking time, and the Walk button, so you never have to scroll away from the map to leave. Details shows the location's full description in the same panel; select Details again to put it away. Selecting where you're standing says You are here and offers nothing. A blocked place, like Deep Jag before its cave-in is shored up, says the way through is blocked. Select another location to switch, or tap an empty part of the map (or press Escape) to close the panel.",
+        ],
+      },
+      {
+        heading: "Route To: walking further than one hex",
+        paragraphs: [
+          "Select a place on your planet's map that isn't next to you and the panel offers Route To instead of Walk. It shows the way you'll go, every place along it, the number of legs and the total walking time, before anything starts. The route is the shortest ordinary walk there, and never goes through a place that is shut to you. It never uses a ride, a shuttle, a ship or a teleport, and it never crosses to another planet.",
+          "Route To only saves you the clicking. Each leg is an ordinary 24-second walk, and the next one starts the moment you arrive, so a two-leg route takes 48 seconds. You really arrive at each place on the way: your location changes at every stop, and the Map and the Journey both show the leg you're on, where you are now, and what's left.",
+          "Every leg has its own normal chance to Scavenge, with its usual three-second window. Nothing is claimed for you. If you're watching, you can claim it; if you're away or looking elsewhere, it passes like any other missed find. The route carries on if you refresh, lose connection or close the game: come back later and you'll be exactly where the walk has taken you, with nothing found on legs you weren't there for.",
+          "Stop After This Leg finishes the walk you're on and stops at the next place, with nothing cancelled. Turn Back works as it always does, on the leg you're on: it ends that leg and the rest of the route, leaving you at the last place you reached, and counts as turning back from a walk for Scavenge. While you're on a route the Map is read-only, so to go somewhere else, stop or turn back first, then choose again.",
         ],
       },
       {
