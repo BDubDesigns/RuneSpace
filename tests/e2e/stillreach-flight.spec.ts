@@ -739,6 +739,15 @@ for (const skewMs of [0, -5_000, 5_000]) {
     await expect(meter).toBeVisible();
     await expectFlightOnServerTimeline(meter, start, end);
     expect((await shipRow(id)).flightStartedAt).toEqual(start);
+    await ageFlight(id, 120_000);
+    const midFlight = await shipRow(id);
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(
+      meter,
+      midFlight.flightStartedAt!,
+      midFlight.flightArrivesAt!,
+    );
     expect(
       (await db.select().from(characters).where(eq(characters.id, id)))[0]!.currentLocationId,
     ).toBe(LOCATION_IDS.holoHollowLanding);

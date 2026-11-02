@@ -739,6 +739,11 @@ for (const skewMs of [0, -5_000, 5_000]) {
     await expect(meter).toBeVisible();
     await expectFlightOnServerTimeline(meter, row.startedAt, row.arrivesAt);
     expect((await journeyRow(id))!.startedAt).toEqual(row.startedAt);
+    await ageJourney(id, 90_000);
+    const midJourney = (await journeyRow(id))!;
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, midJourney.startedAt, midJourney.arrivesAt);
     expect((await characterRow(id)).currentLocationId).toBe(HOLO);
     expect((await characterRow(id)).credits).toBe(800);
   });
