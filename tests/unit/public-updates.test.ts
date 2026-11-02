@@ -136,7 +136,7 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("route-to-automatic-walking");
+    expect(getLatestPublishedUpdate().slug).toBe("legendary-miner-gear-upgrade");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );
@@ -161,12 +161,52 @@ describe("public Updates content boundary", () => {
     expect(text).not.toContain("Survey Line to");
   });
 
-  it("publishes the Route To Update newest-first and links its existing Travel Wiki article", () => {
+  it("publishes the Legendary Miner gear upgrade as the newest Update with both item figures (#484)", () => {
+    const update = getPublicUpdate("legendary-miner-gear-upgrade")!;
+    expect(update.title).toBe("Legendary Miner Gear: Worth the Hunt");
+    expect(update.publishedAt).toBe("2026-11-02T05:29:00-08:00");
+    expect(getLatestPublishedUpdate()).toEqual(update);
+    expect(getPublishedUpdates()[0]).toEqual(update);
+    expect(update.hero).toBeUndefined();
+
+    const figures = update.body.filter(
+      (block) => typeof block === "object" && !Array.isArray(block) && block.kind === "figure",
+    );
+    expect(figures).toEqual([
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.minersBoots }, side: "left" },
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.minersGloves }, side: "right" },
+    ]);
+
+    const article = JSON.stringify(update);
+    for (const detail of [
+      "exactly 1 in 150",
+      "1 in 500",
+      "Skatboll",
+      "Stillreach",
+      "+5% Mining XP",
+      "+10% Mining XP",
+      "rounded up once per attempt",
+      "success chance",
+      "not a guaranteed drop",
+    ]) {
+      expect(article).toContain(detail);
+    }
+    const links = update.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Runeworking", articleSlug: "runeworking" });
+    expect(links).toContainEqual({
+      text: "Inventory & Equipment",
+      articleSlug: "inventory-and-equipment",
+    });
+  });
+
+  it("keeps the Route To Update and links its existing Travel Wiki article", () => {
     const update = getPublicUpdate("route-to-automatic-walking")!;
     expect(update.title).toBe("Route To Is Here");
     expect(update.publishedAt).toBe("2026-11-01T22:37:00-08:00");
-    expect(getLatestPublishedUpdate()).toEqual(update);
-    expect(getPublishedUpdates()[0]).toEqual(update);
+    expect(getPublishedUpdates()).toContainEqual(update);
+    expect(getPublishedUpdates().indexOf(update)).toBe(1);
     expect(update.hero).toBeUndefined();
 
     const text = JSON.stringify(update);

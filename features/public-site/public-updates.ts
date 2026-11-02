@@ -9,6 +9,44 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #484 — announce the Legendary Miner gear improvements shipped in #465.
+    slug: "legendary-miner-gear-upgrade",
+    title: "Legendary Miner Gear: Worth the Hunt",
+    publishedAt: "2026-11-02T05:29:00-08:00",
+    summary:
+      "Legendary Miner's Boots and Gloves now have a 1-in-150 Beginner Echo chance, and each equipped piece adds 5% Mining XP.",
+    body: [
+      "The hunt just got better. Legendary Miner's Boots and Gloves are now more than three times as likely to appear from a completed Beginner Resonance Echo: exactly 1 in 150 on their respective planets, up from 1 in 500. Each Echo is still a fresh roll, not a guaranteed drop.",
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.minersBoots }, side: "left" },
+      "Hunt Beginner Echoes on Skatboll for Legendary Miner's Boots. Worn on your feet, they still grant +1 effective Mining level for success chance only, and now add +5% Mining XP to each extraction attempt that earns XP.",
+      { kind: "figure", art: { kind: "item", itemId: ITEM_IDS.minersGloves }, side: "right" },
+      "Hunt Beginner Echoes on Stillreach for Legendary Miner's Gloves. Worn on your hands, they carry the same +1 effective Mining level for success chance and new +5% Mining XP bonus.",
+      "Wear both and the XP bonuses add together for +10% Mining XP, rounded up once per attempt. The pair also keeps its existing +2 effective Mining levels for success chance. Neither item speeds up Mining, increases ore yields, unlocks higher-level sources or boosts other skills. That XP bonus stays useful even when your Mining success chance is already maxed out.",
+      [
+        "Ready to track them down? See ",
+        { text: "Runeworking", articleSlug: "runeworking" },
+        " for Beginner Echo Seekers and Echo hunts, and ",
+        { text: "Inventory & Equipment", articleSlug: "inventory-and-equipment" },
+        " for how the two equipped bonuses work.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Legendary Miner's Boots and Gloves each grant +5% Mining XP while equipped. Wearing both grants +10% additive Mining XP, rounded up once per extraction attempt.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Legendary Boots from Skatboll Beginner Echoes and Legendary Gloves from Stillreach Beginner Echoes now each have an exact 1-in-150 chance (previously 1 in 500).",
+          "Each piece keeps its +1 effective Mining level for success chance. Mining speed, ore yields, natural level requirements and other skills are unchanged.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #481 — announce Route To after #450 shipped.
     slug: "route-to-automatic-walking",
     title: "Route To Is Here",

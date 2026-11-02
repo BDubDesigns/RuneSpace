@@ -6,7 +6,40 @@ const updateSlug = "runespace-is-starting-to-feel-like-a-game";
 const updateTitle = "RuneSpace Is Starting to Feel Like a Game";
 
 test.describe("public Updates", () => {
-  test("publishes Route To on the index, article, homepage and RSS feed", async ({ page }) => {
+  test("announces Legendary Miner gear on Updates, homepage and RSS (#484)", async ({ page }) => {
+    const gearTitle = "Legendary Miner Gear: Worth the Hunt";
+    const gearSlug = "legendary-miner-gear-upgrade";
+
+    await page.goto("/updates");
+    const gearLink = page.getByRole("link", { name: gearTitle, exact: true });
+    await expect(gearLink).toHaveAttribute("href", `/updates/${gearSlug}`);
+    await gearLink.click();
+    await expect(page).toHaveURL(`/updates/${gearSlug}`);
+    await expect(page.getByRole("heading", { name: gearTitle, level: 1 })).toBeVisible();
+    await expect(page.getByText(/exactly 1 in 150 on their respective planets/)).toBeVisible();
+    await expect(page.getByText(/Wear both and the XP bonuses add together/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Runeworking" })).toHaveAttribute(
+      "href",
+      "/wiki/runeworking",
+    );
+    await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: gearTitle, level: 2 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
+      "href",
+      `/updates/${gearSlug}`,
+    );
+
+    const response = await page.request.get("/feed.xml");
+    expect(response.ok()).toBe(true);
+    const feed = await response.text();
+    expect(feed).toContain(`<title>${gearTitle}</title>`);
+    expect(feed).toContain(`/updates/${gearSlug}`);
+  });
+
+  test("publishes Route To on the index, article and RSS feed", async ({ page }) => {
     const routeTitle = "Route To Is Here";
     const routeSlug = "route-to-automatic-walking";
 
@@ -25,14 +58,6 @@ test.describe("public Updates", () => {
     );
     await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
-
-    await page.goto("/");
-    const latestUpdate = page.getByRole("heading", { name: routeTitle, level: 2 });
-    await expect(latestUpdate).toBeVisible();
-    await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
-      "href",
-      `/updates/${routeSlug}`,
-    );
 
     const response = await page.request.get("/feed.xml");
     expect(response.ok()).toBe(true);
