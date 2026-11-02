@@ -453,7 +453,7 @@ describe("resolving one reading", () => {
         mass: 0,
         target: LOCATION_IDS.theJag,
       }),
-      random: draws(1_433),
+      random: draws(1_448),
     });
     expect(mass).toMatchObject({ rewardItemId: ITEM_IDS.runestone, lostReason: "mass" });
   });
