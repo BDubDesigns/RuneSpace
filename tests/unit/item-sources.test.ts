@@ -166,26 +166,35 @@ describe("item sources — Fabrication, Refining, Mining", () => {
   });
 
   it("a Secondary Find resolves to every mine whose table can produce it", () => {
-    const miningFive = facts({ levels: { [SKILL_IDS.mining]: 5 } });
-    const topaz = of(resolveItemSources(ITEM_IDS.uncutTopaz, miningFive), "mine");
-    expect(topaz.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
-      balance.mining.sources.ferriteShale.actionId,
-      // Stillreach's Prospecting Quarry table (#379).
-      balance.mining.sources.stone.actionId,
-      // The Galvanite source has a Mining 5 gate, so it sorts after the two level-1 mines.
-      balance.mining.sources.galvanite.actionId,
-    ]);
+    // This is about which mines are listed, not how they are presented: a mine
+    // the character is under-level for is still listed (Locked), and presentation
+    // order (access rank, then authored order) is proved by the "sorts a locked
+    // mine after usable sources" test below. So compare the set of mines.
+    const mineIds = (sources: readonly ItemSource[]) =>
+      of(sources, "mine")
+        .map((source) => source.kind === "mine" && source.sourceActionId)
+        .sort();
+    const topaz = of(resolveItemSources(ITEM_IDS.uncutTopaz, facts()), "mine");
+    expect(mineIds(topaz)).toEqual(
+      [
+        balance.mining.sources.ferriteShale.actionId,
+        balance.mining.sources.galvanite.actionId,
+        // Stillreach's Prospecting Quarry table (#379).
+        balance.mining.sources.stone.actionId,
+      ].sort(),
+    );
     expect(topaz.every((source) => source.kind === "mine" && source.role === "secondary")).toBe(
       true,
     );
     // Deep Jag's Galvanite table, The South Cut's Oil Shale table (#342) and
     // Harmonic Workings' Rune Fragment table (#383) can all turn up a Sapphire.
-    const sapphire = of(resolveItemSources(ITEM_IDS.uncutSapphire, miningFive), "mine");
-    expect(sapphire.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
-      balance.mining.sources.galvanite.actionId,
-      balance.mining.sources.oilShale.actionId,
-      balance.mining.sources.harmonicMining.actionId,
-    ]);
+    expect(mineIds(resolveItemSources(ITEM_IDS.uncutSapphire, facts()))).toEqual(
+      [
+        balance.mining.sources.galvanite.actionId,
+        balance.mining.sources.oilShale.actionId,
+        balance.mining.sources.harmonicMining.actionId,
+      ].sort(),
+    );
   });
 
   it("reports no odds for a Secondary Find or Scavenge", () => {
@@ -528,7 +537,7 @@ describe("item sources — Mining skill gate (#387)", () => {
     }
   });
 
-  it("lists Galvanite as Mining 5 only after Deep Jag is open", () => {
+  it("lists Galvanite Locked at Mining 4 and Available at Mining 5", () => {
     const actionId = balance.mining.sources.galvanite.actionId;
     expect(mineAt(ITEM_IDS.galvanite, actionId, 4)?.access).toEqual({
       state: "locked",

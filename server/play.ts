@@ -607,7 +607,7 @@ export type MiningSourceProjection = {
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
-  /** The Mining level that opens this source (#342); 1 for every source before Oil Shale. */
+  /** The Mining level that opens this source (#342), authored per source in `balance.mining.sources`. */
   requiredMiningLevel: number;
   /** What a missed roll still earns, or null when it earns nothing (#342). */
   lowYield: { quantity: number; xp: number } | null;
