@@ -772,5 +772,22 @@ for (const skewMs of [0, -5_000, 5_000]) {
     expect(remaining, "reload must finish before the touchdown phase").toBeGreaterThan(3_000);
     await expect(cinematic).toHaveAttribute("data-flight-phase", "travel");
     expect((await shipRow(id)).berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+    if (skewMs === 0) {
+      // Hold reconciliation so the display can pass its deadline without a
+      // server read landing the flight. Restore it before checking arrival.
+      const hold = async (route: import("@playwright/test").Route) => {
+        if (route.request().method() === "POST") await route.abort();
+        else await route.continue();
+      };
+      await page.route("**/play/**", hold);
+      await expect(page.locator("[data-flight-progress]")).toContainText("Touchdown pending", {
+        timeout: 12_000,
+      });
+      expect((await shipRow(id)).berthLocationId).toBe(LOCATION_IDS.holoHollowLanding);
+      await page.unroute("**/play/**", hold);
+      await page.reload();
+      await expect(page.locator(NOTICE)).toBeVisible();
+      expect((await shipRow(id)).berthLocationId).toBe(LOCATION_IDS.stillreachLandingStation);
+    }
   });
 }

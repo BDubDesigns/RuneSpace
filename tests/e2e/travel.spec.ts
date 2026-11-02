@@ -1953,6 +1953,9 @@ for (const skewMs of [0, -5_000, 5_000]) {
         await db.select().from(activeActions).where(eq(activeActions.characterId, id))
       )[0]!;
       const start = action.startedAt.getTime();
+      const journeyMeter = page.getByRole("progressbar", { name: /Journey progress/ });
+      const journeyFill = Number(await journeyMeter.getAttribute("aria-valuenow"));
+      expect(Math.abs((journeyFill / 100) * 24_000 - (Date.now() - start))).toBeLessThan(2_000);
       await openMapSurface(page);
       const map = page.locator('[aria-label="Local map"]');
       const route = map.locator("line[data-route-progress]");
