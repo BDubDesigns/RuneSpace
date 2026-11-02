@@ -648,6 +648,17 @@ test("Deep Jag: the mine and its stash share the site without sharing meters", a
   });
   await standAt(characterId, LOCATION_IDS.deepJag);
   await setWelding(characterId, 8);
+  // This playtest exercises a working Deep Jag mine, now gated at Mining 5.
+  const miningFiveXp = standardSkillLevelThresholds(balance).find(
+    (threshold) => threshold.level === balance.mining.sources.galvanite.requiredMiningLevel,
+  )!.totalXp;
+  await db
+    .insert(characterSkillXp)
+    .values({ characterId, skillId: SKILL_IDS.mining, totalXp: miningFiveXp })
+    .onConflictDoUpdate({
+      target: [characterSkillXp.characterId, characterSkillXp.skillId],
+      set: { totalXp: miningFiveXp },
+    });
   await seedLegacyStarterCutter(characterId);
   await db.insert(inventoryStacks).values([
     { characterId, itemId: ITEM_IDS.galvaferrite, quantity: 2 },
