@@ -509,13 +509,14 @@ export function LocalMapPanel({
     releaseCommand,
     foregroundBusy: busy,
     requestAutoRefresh,
+    serverNowMs,
   } = usePlay();
   const [selectedLocationId, setSelected] = useState<string | undefined>();
   // Details belongs to one destination: selecting another hex starts compact.
   const [detailsFor, setDetailsFor] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const mapCanvasRef = useRef<HTMLDivElement | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [, startTransition] = useTransition();
   const [transitioning, setTransitioning] = useState(false);
 
@@ -559,12 +560,13 @@ export function LocalMapPanel({
   } = useLocalMapScrollAffordances(true, missionEdgeTargets);
 
   useEffect(() => {
-    if (!inTransit) return;
-    const clock = window.setInterval(() => setNow(Date.now()), 250);
+    if (!travel) return;
+    setNow(serverNowMs());
+    const clock = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => {
       window.clearInterval(clock);
     };
-  }, [inTransit]);
+  }, [serverNowMs, travel]);
 
   function travelTo(destinationId: string) {
     const execute = () => {

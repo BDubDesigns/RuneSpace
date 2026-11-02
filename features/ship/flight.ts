@@ -41,7 +41,7 @@ export function flightProgressPercent(
 }
 
 /**
- * The flight's remaining whole-second countdown and whether the local clock has
+ * The flight's remaining whole-second countdown and whether the supplied clock has
  * passed the scheduled arrival. Passing it never lands anything: the client only
  * shows "arrival pending" until the server's next read confirms touchdown.
  */
@@ -77,7 +77,7 @@ export type FlightCinematicFrame = {
   phaseDurationMs: number;
   /** Fraction of the chart leg flown, 0..1: 0 through takeoff, 1 from landing on. */
   travelProgress: number;
-  /** The local clock has passed the scheduled arrival; only the server lands the ship. */
+  /** The supplied clock has passed the scheduled arrival; only the server lands the ship. */
   arrivalPending: boolean;
 };
 

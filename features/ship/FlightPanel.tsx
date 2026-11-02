@@ -17,7 +17,7 @@ import { getPlanetPresentation } from "@/game/content/planets";
  * presentation layer over the same recorded flight and adds no time to it.
  *
  * Every figure comes from the server's recorded flight, so a reload resumes the
- * remaining time rather than restarting it. When the local clock passes the
+ * remaining time rather than restarting it. When the estimated server clock passes the
  * scheduled arrival the panel says touchdown is pending and unlocks nothing: only
  * the server's next read confirms the landing (`PlayContext` keeps asking), so a
  * fast or slow client clock can neither land the ship early nor strand it.
@@ -27,16 +27,17 @@ import { getPlanetPresentation } from "@/game/content/planets";
  * Equipment and Missions stay browseable in their own utilities throughout.
  */
 export function FlightPanel() {
-  const { state } = usePlay();
+  const { serverNowMs, state } = usePlay();
   const flight = state.ship.flight;
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(serverNowMs);
   const [minimized, setMinimized] = useState(false);
 
   useEffect(() => {
     if (!flight) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [flight]);
+  }, [flight, serverNowMs]);
 
   if (!flight) return null;
 

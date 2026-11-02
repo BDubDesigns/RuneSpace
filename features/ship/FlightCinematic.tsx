@@ -79,7 +79,7 @@ export function FlightCinematic({
   originName: string;
   destinationName: string;
 }) {
-  // The frame depends on the browser clock, so it is rendered only after mount:
+  // The frame depends on a client clock estimate, so it is rendered only after mount:
   // server markup and the first client render agree on an empty 15:8 frame.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);

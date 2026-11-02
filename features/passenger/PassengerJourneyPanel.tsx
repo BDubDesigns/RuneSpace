@@ -20,23 +20,24 @@ import { getPlanetPresentation } from "@/game/content/planets";
  * the way the Rivet's `FlightPanel` is: every figure, the cinematic's phase and
  * the cabin announcement are derived from the journey's own start and arrival
  * instants, so a reload resumes where the journey is. Passing the scheduled
- * arrival on the local clock lands nothing; it says arrival is pending and the
+ * arrival on the estimated server clock lands nothing; it says arrival is pending and the
  * server's next read confirms it (`PlayContext` keeps asking). There is no cancel
  * and no pilot control: the shuttle flies itself.
  */
 export function PassengerJourneyPanel() {
-  const { state } = usePlay();
+  const { serverNowMs, state } = usePlay();
   const journey = state.passenger.journey;
-  const [now, setNow] = useState(() => Date.now());
-  // The clock reads the browser, so the cabin line renders only after mount.
+  const [now, setNow] = useState(serverNowMs);
+  // The clock is estimated on the client, so the cabin line renders only after mount.
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     if (!journey) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    setNow(serverNowMs());
+    const timer = window.setInterval(() => setNow(serverNowMs()), 250);
     return () => window.clearInterval(timer);
-  }, [journey]);
+  }, [journey, serverNowMs]);
 
   if (!journey) return null;
 

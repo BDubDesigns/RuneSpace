@@ -24,6 +24,7 @@ import {
 } from "@/game/domain/cabin-announcements";
 import { expect, openTestCharacter, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
+import { expectFlightOnServerTimeline, skewBrowserClock } from "./server-clock-skew";
 
 /**
  * Issue #404 — Milky Waymo, played end to end: the two check-in Local Places,
@@ -714,3 +715,110 @@ test("shows the arrival sign-off whole under reduced motion and still dismisses"
   await expect(modal).toHaveCount(0);
   await expect.poll(async () => (await journeyRow(characterId))!.acknowledgedAt).not.toBeNull();
 });
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`Milky Waymo uses server time with browser skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await page.setViewportSize(PHONE);
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    const row = (await journeyRow(id))!;
+    const meter = page.getByRole("progressbar", { name: /Journey progress/ });
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, row.startedAt, row.arrivesAt);
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, row.startedAt, row.arrivesAt);
+    expect((await journeyRow(id))!.startedAt).toEqual(row.startedAt);
+    await ageJourney(id, 90_000);
+    const midJourney = (await journeyRow(id))!;
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, midJourney.startedAt, midJourney.arrivesAt);
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+    expect((await characterRow(id)).credits).toBe(800);
+  });
+}
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`cabin announcement follows the server's first transition with skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    // The projection is reloaded after moving the test-owned recorded journey;
+    // the unskewed test clock independently decides the expected announcement.
+    await ageJourney(id, 26_000);
+    const row = (await journeyRow(id))!;
+    await page.reload();
+    const cabin = page.locator(CABIN);
+    await expect(cabin).toBeVisible();
+    const elapsed = Date.now() - row.startedAt.getTime();
+    expect(elapsed, "reload must finish before the first announcement boundary").toBeLessThan(
+      30_000,
+    );
+    await expect(cabin).toHaveAttribute("data-cabin-phase", "departure");
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+  });
+}
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`shuttle cinematic follows the recorded journey near touchdown with skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    await ageJourney(id, 172_000);
+    const row = (await journeyRow(id))!;
+    await page.reload();
+    const cinematic = page.locator(CINEMATIC);
+    await expect(cinematic).toBeVisible();
+    await expect.poll(() => row.arrivesAt.getTime() - Date.now()).toBeLessThan(7_500);
+    const remaining = row.arrivesAt.getTime() - Date.now();
+    expect(remaining, "reload must finish before the touchdown phase").toBeGreaterThan(3_000);
+    await expect(cinematic).toHaveAttribute("data-flight-phase", "travel");
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+    if (skewMs === 0) {
+      const hold = async (route: import("@playwright/test").Route) => {
+        if (route.request().method() === "POST") await route.abort();
+        else await route.continue();
+      };
+      await page.route("**/play/**", hold);
+      await expect(page.locator("[data-passenger-progress]")).toContainText("Arrival pending", {
+        timeout: 12_000,
+      });
+      expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+      expect((await characterRow(id)).credits).toBe(800);
+      await page.unroute("**/play/**", hold);
+      await page.reload();
+      await expect(page.locator(NOTICE)).toBeVisible();
+      expect((await characterRow(id)).currentLocationId).toBe(STILLREACH);
+      expect((await characterRow(id)).credits).toBe(800);
+    }
+  });
+}

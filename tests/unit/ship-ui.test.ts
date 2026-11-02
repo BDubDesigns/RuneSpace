@@ -20,6 +20,7 @@ const play = vi.hoisted(() => ({ state: {} as unknown }));
 vi.mock("@/features/play/PlayContext", () => ({
   usePlay: () => ({
     state: play.state,
+    serverNowMs: () => Date.now(),
     foregroundBusy: false,
     enqueueForeground: () => undefined,
     releaseCommand: () => undefined,
