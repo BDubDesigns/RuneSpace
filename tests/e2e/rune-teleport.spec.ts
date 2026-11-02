@@ -96,20 +96,49 @@ async function finished(page: Page) {
 }
 
 type Sample = { phase: string; black: number; place: string; at: number };
+/** One fade of the black layer: where it is headed, and the document's phase when it began. */
+type Fade = { to: number; phase: string | null };
 
 /**
  * Records, on every animation frame while the cinematic runs, the phase, the
  * black layer's opacity and the place name the page currently shows, plus the
  * pose of every breakup region the first frame it is held behind the collapse.
+ *
+ * It also records each fade of the black layer at the instant the browser is
+ * asked to start it (Element.animate), with the document's phase at that same
+ * instant. A per-frame sample can only show that a fade had already begun by the
+ * time a frame was read; this shows whether it was allowed to begin.
  */
 async function startSampler(page: Page) {
   await page.evaluate(() => {
     const samples: Sample[] = [];
+    const fades: Fade[] = [];
     const poses: Record<string, { transform: string; opacity: number; width: number }> = {};
-    const w = window as unknown as { __tp: Sample[]; __tpPoses: typeof poses; __tpStop: boolean };
+    const w = window as unknown as {
+      __tp: Sample[];
+      __tpFades: Fade[];
+      __tpPoses: typeof poses;
+      __tpStop: boolean;
+      __tpRestore: () => void;
+    };
     w.__tp = samples;
+    w.__tpFades = fades;
     w.__tpPoses = poses;
     w.__tpStop = false;
+    const nativeAnimate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, keyframes, options) {
+      if (this.matches("[data-teleport-black]")) {
+        const last = (keyframes as Keyframe[] | null)?.at(-1);
+        fades.push({
+          to: Number(last?.opacity),
+          phase: document.documentElement.getAttribute("data-rs-teleport"),
+        });
+      }
+      return nativeAnimate.call(this, keyframes, options);
+    };
+    w.__tpRestore = () => {
+      Element.prototype.animate = nativeAnimate;
+    };
     const nameOf = (el: Element) =>
       el.getAttribute("data-rs-region") ??
       (el.matches("[data-play-rail]")
@@ -153,11 +182,14 @@ async function readSampler(page: Page) {
   return page.evaluate(() => {
     const w = window as unknown as {
       __tp: Sample[];
+      __tpFades: Fade[];
       __tpPoses: Record<string, { transform: string; opacity: number; width: number }>;
       __tpStop: boolean;
+      __tpRestore: () => void;
     };
     w.__tpStop = true;
-    return { samples: w.__tp, poses: w.__tpPoses };
+    w.__tpRestore();
+    return { samples: w.__tp, fades: w.__tpFades, poses: w.__tpPoses };
   });
 }
 
@@ -174,6 +206,7 @@ const phaseOrder = (samples: Sample[]) => [...new Set(samples.map((sample) => sa
  */
 function expectNothingRevealedEarly(
   samples: Sample[],
+  fades: Fade[],
   departureName: string,
   destinationName: string,
 ) {
@@ -196,6 +229,17 @@ function expectNothingRevealedEarly(
   const firstReveal = samples.find((sample) => sample.phase === "reveal");
   expect(firstReveal, "the cinematic reached its reveal").toBeDefined();
   expect(firstReveal!.black).toBeGreaterThan(0.95);
+  // That holds by construction, not by luck of frame timing, because the black
+  // is only allowed to start lifting once the document says "reveal": it fades in
+  // once before then and lifts once after. A lift that began first would leave the
+  // first reveal frame to find the black already thinning, and in the full
+  // cinematic would show the destination's still-scattered regions through it.
+  expect(
+    fades.map((fade) => fade.to),
+    "the black faded in once, then lifted once",
+  ).toEqual([1, 0]);
+  expect(fades[0]!.phase, "the fade to black begins before the reveal phase").not.toBe("reveal");
+  expect(fades[1]!.phase, "the black only starts to lift once the phase is reveal").toBe("reveal");
   // The collapse really did go fully black before the reveal began.
   expect(
     samples.some((sample) => sample.phase === "collapse" && sample.black === 1),
@@ -270,10 +314,10 @@ test.describe("phone", () => {
       ),
     ).toBe(true);
     await finished(page);
-    const { samples, poses } = await readSampler(page);
+    const { samples, fades, poses } = await readSampler(page);
 
     expect(phaseOrder(samples)).toEqual(["destabilize", "collapse", "reveal"]);
-    expectNothingRevealedEarly(samples, departure, "Crash Site");
+    expectNothingRevealedEarly(samples, fades, departure, "Crash Site");
     const span = samples.at(-1)!.at - samples[0]!.at;
     expect(span).toBeGreaterThan(1_800);
     expect(span).toBeLessThan(8_000);
@@ -332,9 +376,9 @@ test.describe("phone", () => {
     await startSampler(page);
     await useRune(page, details);
     await finished(page);
-    const { samples, poses } = await readSampler(page);
+    const { samples, fades, poses } = await readSampler(page);
 
-    expectNothingRevealedEarly(samples, departure, "Crash Site");
+    expectNothingRevealedEarly(samples, fades, departure, "Crash Site");
     // No region ever left its place or faded on its own.
     for (const pose of Object.values(poses)) {
       expect(pose.transform).toBe("none");
@@ -467,11 +511,11 @@ test.describe("phone", () => {
     await startSampler(page);
     await useRune(page, details);
     await finished(page);
-    const { samples } = await readSampler(page);
+    const { samples, fades } = await readSampler(page);
 
     // The browser never heard the answer, yet the re-read finds the receipt: the
     // world is the destination, once, and the arrival is owed.
-    expectNothingRevealedEarly(samples, departure, "Crash Site");
+    expectNothingRevealedEarly(samples, fades, departure, "Crash Site");
     await expect(arrival(page)).toBeVisible();
     expect(await runesHeld(testCharacter.id)).toBe(1);
     expect(await receipts(testCharacter.id)).toHaveLength(1);
@@ -576,9 +620,9 @@ for (const viewport of [
       ).toBe(true);
     }
     await finished(page);
-    const { samples, poses } = await readSampler(page);
+    const { samples, fades, poses } = await readSampler(page);
 
-    expectNothingRevealedEarly(samples, departure, "Crash Site");
+    expectNothingRevealedEarly(samples, fades, departure, "Crash Site");
     for (const name of viewport.regions) {
       expect(poses[name], `${name} is part of the ${viewport.name} breakup`).toBeDefined();
       expect(poses[name]!.transform).not.toBe("none");

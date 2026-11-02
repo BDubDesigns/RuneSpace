@@ -166,24 +166,35 @@ describe("item sources — Fabrication, Refining, Mining", () => {
   });
 
   it("a Secondary Find resolves to every mine whose table can produce it", () => {
+    // This is about which mines are listed, not how they are presented: a mine
+    // the character is under-level for is still listed (Locked), and presentation
+    // order (access rank, then authored order) is proved by the "sorts a locked
+    // mine after usable sources" test below. So compare the set of mines.
+    const mineIds = (sources: readonly ItemSource[]) =>
+      of(sources, "mine")
+        .map((source) => source.kind === "mine" && source.sourceActionId)
+        .sort();
     const topaz = of(resolveItemSources(ITEM_IDS.uncutTopaz, facts()), "mine");
-    expect(topaz.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
-      balance.mining.sources.ferriteShale.actionId,
-      balance.mining.sources.galvanite.actionId,
-      // Stillreach's Prospecting Quarry table (#379).
-      balance.mining.sources.stone.actionId,
-    ]);
+    expect(mineIds(topaz)).toEqual(
+      [
+        balance.mining.sources.ferriteShale.actionId,
+        balance.mining.sources.galvanite.actionId,
+        // Stillreach's Prospecting Quarry table (#379).
+        balance.mining.sources.stone.actionId,
+      ].sort(),
+    );
     expect(topaz.every((source) => source.kind === "mine" && source.role === "secondary")).toBe(
       true,
     );
     // Deep Jag's Galvanite table, The South Cut's Oil Shale table (#342) and
     // Harmonic Workings' Rune Fragment table (#383) can all turn up a Sapphire.
-    const sapphire = of(resolveItemSources(ITEM_IDS.uncutSapphire, facts()), "mine");
-    expect(sapphire.map((source) => source.kind === "mine" && source.sourceActionId)).toEqual([
-      balance.mining.sources.galvanite.actionId,
-      balance.mining.sources.oilShale.actionId,
-      balance.mining.sources.harmonicMining.actionId,
-    ]);
+    expect(mineIds(resolveItemSources(ITEM_IDS.uncutSapphire, facts()))).toEqual(
+      [
+        balance.mining.sources.galvanite.actionId,
+        balance.mining.sources.oilShale.actionId,
+        balance.mining.sources.harmonicMining.actionId,
+      ].sort(),
+    );
   });
 
   it("reports no odds for a Secondary Find or Scavenge", () => {
@@ -520,11 +531,21 @@ describe("item sources — Mining skill gate (#387)", () => {
   it("keeps a Level 1 mine Available at starting Mining wherever it is discovered", () => {
     for (const [itemId, actionId] of [
       [ITEM_IDS.ferriteShale, balance.mining.sources.ferriteShale.actionId],
-      [ITEM_IDS.galvanite, balance.mining.sources.galvanite.actionId],
       [ITEM_IDS.stone, balance.mining.sources.stone.actionId],
     ] as const) {
       expect(mineAt(itemId, actionId, 1)?.access).toEqual({ state: "available" });
     }
+  });
+
+  it("lists Galvanite Locked at Mining 4 and Available at Mining 5", () => {
+    const actionId = balance.mining.sources.galvanite.actionId;
+    expect(mineAt(ITEM_IDS.galvanite, actionId, 4)?.access).toEqual({
+      state: "locked",
+      gates: [{ kind: "skill_level", skillId: SKILL_IDS.mining, level: 5 }],
+    });
+    expect(mineAt(ITEM_IDS.galvanite, actionId, 5)?.access).toEqual({
+      state: "available",
+    });
   });
 
   it("never reveals an undiscovered mine by Mining level, not even as Locked", () => {

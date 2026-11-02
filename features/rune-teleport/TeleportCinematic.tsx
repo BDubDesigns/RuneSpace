@@ -11,7 +11,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { usePlay } from "@/features/play/PlayContext";
 import { refreshPlayAction, teleportWithRuneAction } from "@/server/actions";
 import {
@@ -276,7 +276,11 @@ export function TeleportCinematicProvider({
         // and for the beat to read as a deliberate one rather than a flicker.
         await settleFrames();
         await sleep(FULL_BLACK_HOLD_MS);
-        setPhase("reveal");
+        // The black lifts only once the document says "reveal". A plain setPhase is
+        // committed on a later task, but the fade starts on this one, so the black
+        // would thin for a frame or more while the CSS still held the regions in
+        // their collapse pose. flushSync commits the phase (and its attribute) first.
+        flushSync(() => setPhase("reveal"));
         await fadeBlack(blackRef.current, 0, durations.reveal);
       } finally {
         if (mountedRef.current) setPhase("idle");

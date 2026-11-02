@@ -86,7 +86,7 @@ const balanceSchema = z.object({
         successXp: z.literal(25),
         yieldMinimum: z.literal(1),
         yieldMaximum: z.literal(2),
-        requiredMiningLevel: z.literal(1),
+        requiredMiningLevel: z.literal(5),
         lowYield: z.null(),
         secondaryFinds: z.tuple([
           z.object({
@@ -1600,7 +1600,7 @@ const defaults = balanceSchema.parse({
         successXp: 25,
         yieldMinimum: 1,
         yieldMaximum: 2,
-        requiredMiningLevel: 1,
+        requiredMiningLevel: 5,
         lowYield: null,
         secondaryFinds: [
           { itemId: ITEM_IDS.uncutTopaz, oneIn: 35, announce: false },

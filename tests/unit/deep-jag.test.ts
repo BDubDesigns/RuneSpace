@@ -23,6 +23,7 @@ import { getMission } from "@/game/content/missions";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import {
   boostedMiningAttemptDurationTicks,
+  miningSourceUnlocked,
   miningSuccessChanceBps,
   resolveMining,
 } from "@/game/domain/mining";
@@ -259,6 +260,15 @@ describe("the cave-in repair recipe", () => {
 });
 
 describe("Galvanite Mining", () => {
+  it("requires Mining 5 just as Deep Jag access does, while Ferrite remains Mining 1", () => {
+    expect(galvanite.requiredMiningLevel).toBe(5);
+    expect(miningSourceUnlocked(4, galvanite)).toBe(false);
+    expect(miningSourceUnlocked(5, galvanite)).toBe(true);
+    expect(balance.mining.sources.ferriteShale.requiredMiningLevel).toBe(1);
+    expect(miningSourceUnlocked(1, balance.mining.sources.ferriteShale)).toBe(true);
+    expect(balance.refining.recipes.galvanicStock.minimumLevel).toBe(5);
+  });
+
   it("uses the exact approved 15-tick / 35%-to-40 / 1-2 / 25-XP rules", () => {
     expect(galvanite.itemId).toBe(ITEM_IDS.galvanite);
     expect(galvanite.attemptDurationTicks).toBe(15);

@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  getRepairTargetBalance,
+  standardSkillLevelThresholds,
+} from "@/game/config/balance";
 import {
   GAME_TICK_MS,
   ITEM_IDS,
@@ -52,6 +56,9 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
   // are read and cleaned up by these names only (see `systemAnnouncementsBy`).
   const finders: string[] = [];
   const balance = getEffectiveGameBalance();
+  const deepJagStartingXp = standardSkillLevelThresholds(balance).find(
+    (threshold) => threshold.level === balance.mining.sources.galvanite.requiredMiningLevel,
+  )!.totalXp;
   const now = new Date("2026-10-01T00:00:00.000Z");
   const tick = (from: Date, ticks: number) => new Date(from.getTime() + ticks * GAME_TICK_MS);
 
@@ -108,6 +115,18 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     finders.push(character.displayName);
     await play.getPlayGameplayState(userId, character.id, now, finding(119));
     if (at === LOCATION_IDS.deepJag) {
+      // The repaired mine still requires personal Mining 5; seed it through real XP.
+      await db
+        .insert(rune.characterSkillXp)
+        .values({
+          characterId: character.id,
+          skillId: SKILL_IDS.mining,
+          totalXp: deepJagStartingXp,
+        })
+        .onConflictDoUpdate({
+          target: [rune.characterSkillXp.characterId, rune.characterSkillXp.skillId],
+          set: { totalXp: deepJagStartingXp },
+        });
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.deepJagCaveIn, {
         weldingProgress: getRepairTargetBalance(REPAIR_TARGET_IDS.deepJagCaveIn, balance)
           .repairIncrements,
@@ -180,7 +199,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
     const state = await mineOnce(userId, character.id, finding(DEEP_TOPAZ), "galvanite");
     expect(state.carriedByItemId[ITEM_IDS.galvanite]).toBe(1);
     expect(state.carriedByItemId[ITEM_IDS.uncutTopaz]).toBe(1);
-    expect(await miningXp(character.id)).toBe(45);
+    expect(await miningXp(character.id)).toBe(deepJagStartingXp + 45);
   });
 
   describe("Rune Fragments (#367)", () => {
@@ -213,7 +232,7 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
       expect(state.carriedByItemId[ITEM_IDS.runeFragment]).toBe(1);
       expect(state.carriedByItemId[ITEM_IDS.uncutTopaz] ?? 0).toBe(0);
       expect(state.carriedByItemId[ITEM_IDS.uncutSapphire] ?? 0).toBe(0);
-      expect(await miningXp(character.id)).toBe(45);
+      expect(await miningXp(character.id)).toBe(deepJagStartingXp + 45);
     });
 
     it("keeps every existing gem exactly where it was, and announces none of the Fragments", async () => {
