@@ -22,6 +22,7 @@ import { getLocalPlace } from "@/game/content/local-places";
 import { LOCAL_MAP_LOCATION_IDS_BY_PLANET } from "@/game/content/locations";
 import { expect, openMapSurface, openTestCharacter, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
+import { expectFlightOnServerTimeline, skewBrowserClock } from "./server-clock-skew";
 
 /**
  * Issue #375 — Stillreach Slice B, played end to end: the interplanetary Rivet leg
@@ -704,3 +705,42 @@ test("Last Leg Trading's terminal is its own Local Place: directory, entry, Back
     "3",
   );
 });
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`Rivet flight uses server time with browser skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedPilot(id, { berth: LOCATION_IDS.holoHollowLanding, fuel: 200 });
+    await page.setViewportSize(PHONE);
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await page.locator(SHIP).locator(BOARD).click();
+    await page
+      .locator(
+        `[data-ship-route="${SHIP_ROUTE_IDS.holoHollowLandingToStillreachLandingStation}"] [data-ship-launch]`,
+      )
+      .click();
+    const surface = page.locator("[data-flight-surface]");
+    await expect(surface).toBeVisible();
+    const row = await shipRow(id);
+    const start = row.flightStartedAt!;
+    const end = row.flightArrivesAt!;
+    const meter = page.getByRole("progressbar", { name: /Flight progress/ });
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, start, end);
+    await surface.locator("[data-flight-minimize]").click();
+    await expect(page.locator("[data-flight-minimized]")).toBeVisible();
+    await page.locator("[data-flight-reopen]").click();
+    await expectFlightOnServerTimeline(meter, start, end);
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, start, end);
+    expect((await shipRow(id)).flightStartedAt).toEqual(start);
+    expect(
+      (await db.select().from(characters).where(eq(characters.id, id)))[0]!.currentLocationId,
+    ).toBe(LOCATION_IDS.holoHollowLanding);
+  });
+}

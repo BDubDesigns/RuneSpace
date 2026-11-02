@@ -66,3 +66,22 @@ export async function expectMeterOnServerTimeline(
     Math.min(durationMs, maxElapsed),
   );
 }
+
+/** Judge a flight's visible countdown and meter against its recorded server instants. */
+export async function expectFlightOnServerTimeline(
+  meter: Locator,
+  startedAt: Date,
+  arrivesAt: Date,
+) {
+  const label = (await meter.getAttribute("aria-label")) ?? "";
+  const fill = Number(await meter.getAttribute("aria-valuenow"));
+  const readAt = Date.now();
+  const seconds = /([\d.]+) seconds? remaining/.exec(label);
+  expect(seconds, `missing flight countdown: ${label}`).not.toBeNull();
+  const remaining = Number(seconds![1]) * 1_000;
+  const duration = arrivesAt.getTime() - startedAt.getTime();
+  const elapsed = readAt - startedAt.getTime();
+  // Covers the display tick, response delay, and whole-second ceiling.
+  expect(Math.abs(remaining - (arrivesAt.getTime() - readAt))).toBeLessThan(2_000);
+  expect(Math.abs((fill / 100) * duration - elapsed)).toBeLessThan(2_000);
+}

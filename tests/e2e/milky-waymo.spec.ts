@@ -24,6 +24,7 @@ import {
 } from "@/game/domain/cabin-announcements";
 import { expect, openTestCharacter, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
+import { expectFlightOnServerTimeline, skewBrowserClock } from "./server-clock-skew";
 
 /**
  * Issue #404 — Milky Waymo, played end to end: the two check-in Local Places,
@@ -714,3 +715,31 @@ test("shows the arrival sign-off whole under reduced motion and still dismisses"
   await expect(modal).toHaveCount(0);
   await expect.poll(async () => (await journeyRow(characterId))!.acknowledgedAt).not.toBeNull();
 });
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  test(`Milky Waymo uses server time with browser skew ${skewMs}ms (#476)`, async ({
+    page,
+    testCharacter,
+  }) => {
+    const id = testCharacter.id;
+    await seedRider(id, { at: HOLO, credits: 1_000 });
+    await page.setViewportSize(PHONE);
+    await openTestCharacter(page, id);
+    await skewBrowserClock(page, skewMs);
+    await page.reload();
+    await enterDesk(page, HOLO_DESK);
+    await page.locator(`${KIOSK} [data-kiosk-book]`).click();
+    await page.locator(`${KIOSK} [data-kiosk-board]`).click();
+    await expect(page.locator(JOURNEY)).toBeVisible();
+    const row = (await journeyRow(id))!;
+    const meter = page.getByRole("progressbar", { name: /Journey progress/ });
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, row.startedAt, row.arrivesAt);
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expectFlightOnServerTimeline(meter, row.startedAt, row.arrivesAt);
+    expect((await journeyRow(id))!.startedAt).toEqual(row.startedAt);
+    expect((await characterRow(id)).currentLocationId).toBe(HOLO);
+    expect((await characterRow(id)).credits).toBe(800);
+  });
+}

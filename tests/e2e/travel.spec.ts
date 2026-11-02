@@ -26,6 +26,7 @@ import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { expectElementsInsideHexes } from "./map-geometry";
 import { captureReviewScreenshot } from "./review-screenshot";
+import { skewBrowserClock as skewTravelBrowserClock } from "./server-clock-skew";
 
 /** Scroll the local map into the center of the viewport so neither hex is
  * hidden by the fixed bottom navigation. */
@@ -1926,3 +1927,59 @@ test("Turn Back from the Crew Hauler warns about the fare first and does not ref
   // Cancelling a ride is not a walk's Scavenge reroll, so there is nothing to explain.
   await expect(page.locator("[data-scavenge-suppressed-notice]")).toHaveCount(0);
 });
+
+for (const skewMs of [0, -5_000, 5_000]) {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 1440, height: 900 },
+  ]) {
+    test(`walking map follows server time at ${viewport.width}px with skew ${skewMs}ms (#475)`, async ({
+      page,
+      testCharacter,
+    }) => {
+      const id = testCharacter.id;
+      await page.setViewportSize(viewport);
+      await openTestCharacter(page, id);
+      await skewTravelBrowserClock(page, skewMs);
+      await page.reload();
+      await openMapSurface(page);
+      await page
+        .getByRole("button", { name: /Abandoned Processing Yard/ })
+        .first()
+        .click();
+      await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+      await expect(page.getByText("Journey progress")).toBeVisible();
+      const action = (
+        await db.select().from(activeActions).where(eq(activeActions.characterId, id))
+      )[0]!;
+      const start = action.startedAt.getTime();
+      await openMapSurface(page);
+      const map = page.locator('[aria-label="Local map"]');
+      const route = map.locator("line[data-route-progress]");
+      await expect(route).toBeVisible();
+      const assertTimeline = async () => {
+        const staticLine = map.locator("line:not([data-route-progress])").first();
+        const [x1, x2, progressX] = await Promise.all([
+          staticLine.getAttribute("x1"),
+          staticLine.getAttribute("x2"),
+          route.getAttribute("x2"),
+        ]);
+        const readAt = Date.now();
+        const fraction = (Number(progressX) - Number(x1)) / (Number(x2) - Number(x1));
+        expect(Math.abs(fraction * 24_000 - (readAt - start))).toBeLessThan(2_000);
+      };
+      // Wait by observing the unskewed test clock, not by trusting the map.
+      await expect.poll(() => Date.now() - start).toBeGreaterThan(7_000);
+      await assertTimeline();
+      await page.reload();
+      await openMapSurface(page);
+      await expect(route).toBeVisible();
+      await assertTimeline();
+      expect((await characterRow(id)).currentLocationId).toBe(LOCATION_IDS.crashSite);
+      await page.getByRole("button", { name: "Back to Location" }).click();
+      await page.getByRole("button", { name: "Turn Back" }).click();
+      await expect(page.getByText("Journey progress")).toHaveCount(0);
+      expect((await characterRow(id)).currentLocationId).toBe(LOCATION_IDS.crashSite);
+    });
+  }
+}
