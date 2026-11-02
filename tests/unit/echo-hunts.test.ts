@@ -5,6 +5,7 @@ import { BEGINNER_ECHO_TARGET_POOLS } from "@/game/content/echo-hunts";
 import { getLocation, getLocationPlanetId, LOCATIONS } from "@/game/content/locations";
 import {
   beginnerEchoRewardPlanets,
+  formatEchoRewardChance,
   beginnerEchoRewardTable,
   checkEchoClue,
   echoReadingDirections,
@@ -118,67 +119,114 @@ describe("the fixed Beginner pools", () => {
   });
 });
 
-describe("the Beginner Echo reward tables (Slice J)", () => {
-  it("sum to exactly 100%: Rune Fragment 30% and one 0.2% Legendary per planet", () => {
-    expect(beginner.rewardWeightTotal).toBe(1_000);
-    const percent = (planetId: string) =>
-      Object.fromEntries(
-        beginnerEchoRewardTable(planetId)!.map((entry) => [entry.itemId, entry.weight / 10]),
-      );
-    expect(percent(PLANET_IDS.skatboll)).toEqual({
-      [ITEM_IDS.runeFragment]: 30,
-      [ITEM_IDS.uncutQuartz]: 24,
-      [ITEM_IDS.uncutTopaz]: 16,
-      [ITEM_IDS.uncutSapphire]: 10,
-      [ITEM_IDS.refinedFerrite]: 12,
-      [ITEM_IDS.galvanicStock]: 5,
-      [ITEM_IDS.runestone]: 2.8,
-      [ITEM_IDS.minersBoots]: 0.2,
+describe("the Beginner Echo reward tables (Slice J, #465)", () => {
+  it("are out of 1,500: exact weights per planet, each summing to the whole table (#465)", () => {
+    expect(beginner.rewardWeightTotal).toBe(1_500);
+    const weights = (planetId: string) =>
+      Object.fromEntries(beginnerEchoRewardTable(planetId)!.map((e) => [e.itemId, e.weight]));
+    expect(weights(PLANET_IDS.skatboll)).toEqual({
+      [ITEM_IDS.runeFragment]: 443,
+      [ITEM_IDS.uncutQuartz]: 360,
+      [ITEM_IDS.uncutTopaz]: 240,
+      [ITEM_IDS.uncutSapphire]: 150,
+      [ITEM_IDS.refinedFerrite]: 180,
+      [ITEM_IDS.galvanicStock]: 75,
+      [ITEM_IDS.runestone]: 42,
+      [ITEM_IDS.minersBoots]: 10,
     });
-    expect(percent(PLANET_IDS.stillreach)).toEqual({
-      [ITEM_IDS.runeFragment]: 30,
-      [ITEM_IDS.uncutQuartz]: 26,
-      [ITEM_IDS.uncutTopaz]: 20,
-      [ITEM_IDS.uncutSapphire]: 10,
-      [ITEM_IDS.emptySmallFuelCanister]: 10,
-      [ITEM_IDS.runestone]: 3.8,
-      [ITEM_IDS.minersGloves]: 0.2,
+    expect(weights(PLANET_IDS.stillreach)).toEqual({
+      [ITEM_IDS.runeFragment]: 443,
+      [ITEM_IDS.uncutQuartz]: 390,
+      [ITEM_IDS.uncutTopaz]: 300,
+      [ITEM_IDS.uncutSapphire]: 150,
+      [ITEM_IDS.emptySmallFuelCanister]: 150,
+      [ITEM_IDS.runestone]: 57,
+      [ITEM_IDS.minersGloves]: 10,
     });
     for (const planetId of [PLANET_IDS.skatboll, PLANET_IDS.stillreach]) {
       const total = beginnerEchoRewardTable(planetId)!.reduce((sum, e) => sum + e.weight, 0);
-      expect(total).toBe(1_000);
+      expect(total).toBe(1_500);
     }
+  });
+
+  it("keeps every probability except Rune Fragment exactly as it was before the 1,500 table", () => {
+    // Previous per-mille weights out of 1,000; equal chance means new * 1,000 === old * 1,500.
+    const previous: Record<string, Record<string, number>> = {
+      [PLANET_IDS.skatboll]: {
+        [ITEM_IDS.uncutQuartz]: 240,
+        [ITEM_IDS.uncutTopaz]: 160,
+        [ITEM_IDS.uncutSapphire]: 100,
+        [ITEM_IDS.refinedFerrite]: 120,
+        [ITEM_IDS.galvanicStock]: 50,
+        [ITEM_IDS.runestone]: 28,
+      },
+      [PLANET_IDS.stillreach]: {
+        [ITEM_IDS.uncutQuartz]: 260,
+        [ITEM_IDS.uncutTopaz]: 200,
+        [ITEM_IDS.uncutSapphire]: 100,
+        [ITEM_IDS.emptySmallFuelCanister]: 100,
+        [ITEM_IDS.runestone]: 38,
+      },
+    };
+    for (const [planetId, olds] of Object.entries(previous)) {
+      const table = beginnerEchoRewardTable(planetId)!;
+      for (const [itemId, old] of Object.entries(olds)) {
+        const entry = table.find((candidate) => candidate.itemId === itemId)!;
+        expect(entry.weight * 1_000).toBe(old * 1_500);
+      }
+      // Rune Fragment alone fell, 30% -> 443/1,500, to make room for the Legendary.
+      const fragment = table.find((e) => e.itemId === ITEM_IDS.runeFragment)!;
+      expect(fragment.weight * 1_000).toBeLessThan(300 * 1_500);
+    }
+  });
+
+  it("makes each planet's Legendary exactly 10/1,500 = 1 in 150, on its own planet only", () => {
+    const skatboll = beginnerEchoRewardTable(PLANET_IDS.skatboll)!;
+    const stillreach = beginnerEchoRewardTable(PLANET_IDS.stillreach)!;
+    expect(skatboll.find((e) => e.itemId === ITEM_IDS.minersBoots)?.weight).toBe(10);
+    expect(stillreach.find((e) => e.itemId === ITEM_IDS.minersGloves)?.weight).toBe(10);
+    expect(1_500 / 10).toBe(150);
+    expect(skatboll.some((e) => e.itemId === ITEM_IDS.minersGloves)).toBe(false);
+    expect(stillreach.some((e) => e.itemId === ITEM_IDS.minersBoots)).toBe(false);
+    // Counted over every draw: exactly 10 of the 1,500 land on the Legendary.
+    const legendaryDraws = (table: typeof skatboll, itemId: string) =>
+      Array.from({ length: 1_500 }, (_, draw) => echoRewardForDraw(table, draw)).filter(
+        (rewarded) => rewarded === itemId,
+      ).length;
+    expect(legendaryDraws(skatboll, ITEM_IDS.minersBoots)).toBe(10);
+    expect(legendaryDraws(stillreach, ITEM_IDS.minersGloves)).toBe(10);
   });
 
   it("maps every draw to exactly the span its weight owns, boundaries included", () => {
     for (const planetId of [PLANET_IDS.skatboll, PLANET_IDS.stillreach]) {
       const table = beginnerEchoRewardTable(planetId)!;
       const counts = new Map<string, number>();
-      for (let draw = 0; draw < 1_000; draw += 1) {
+      for (let draw = 0; draw < 1_500; draw += 1) {
         const itemId = echoRewardForDraw(table, draw);
         counts.set(itemId, (counts.get(itemId) ?? 0) + 1);
       }
       for (const entry of table) expect(counts.get(entry.itemId)).toBe(entry.weight);
-      expect(() => echoRewardForDraw(table, 1_000)).toThrow(RangeError);
+      expect(() => echoRewardForDraw(table, 1_500)).toThrow(RangeError);
     }
     const skatboll = beginnerEchoRewardTable(PLANET_IDS.skatboll)!;
     expect(echoRewardForDraw(skatboll, 0)).toBe(ITEM_IDS.runeFragment);
-    expect(echoRewardForDraw(skatboll, 299)).toBe(ITEM_IDS.runeFragment);
-    expect(echoRewardForDraw(skatboll, 300)).toBe(ITEM_IDS.uncutQuartz);
-    expect(echoRewardForDraw(skatboll, 969)).toBe(ITEM_IDS.galvanicStock);
-    expect(echoRewardForDraw(skatboll, 970)).toBe(ITEM_IDS.runestone);
-    expect(echoRewardForDraw(skatboll, 997)).toBe(ITEM_IDS.runestone);
-    expect(echoRewardForDraw(skatboll, 998)).toBe(ITEM_IDS.minersBoots);
-    expect(echoRewardForDraw(skatboll, 999)).toBe(ITEM_IDS.minersBoots);
-    expect(rollEchoReward(skatboll, draws(999))).toBe(ITEM_IDS.minersBoots);
+    expect(echoRewardForDraw(skatboll, 442)).toBe(ITEM_IDS.runeFragment);
+    expect(echoRewardForDraw(skatboll, 443)).toBe(ITEM_IDS.uncutQuartz);
+    expect(echoRewardForDraw(skatboll, 1_447)).toBe(ITEM_IDS.galvanicStock);
+    expect(echoRewardForDraw(skatboll, 1_448)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(skatboll, 1_489)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(skatboll, 1_490)).toBe(ITEM_IDS.minersBoots);
+    expect(echoRewardForDraw(skatboll, 1_499)).toBe(ITEM_IDS.minersBoots);
+    expect(rollEchoReward(skatboll, draws(1_499))).toBe(ITEM_IDS.minersBoots);
+    expect(() => rollEchoReward(skatboll, draws(1_500))).toThrow(RangeError);
     const stillreach = beginnerEchoRewardTable(PLANET_IDS.stillreach)!;
-    expect(echoRewardForDraw(stillreach, 299)).toBe(ITEM_IDS.runeFragment);
-    expect(echoRewardForDraw(stillreach, 300)).toBe(ITEM_IDS.uncutQuartz);
-    expect(echoRewardForDraw(stillreach, 959)).toBe(ITEM_IDS.emptySmallFuelCanister);
-    expect(echoRewardForDraw(stillreach, 960)).toBe(ITEM_IDS.runestone);
-    expect(echoRewardForDraw(stillreach, 997)).toBe(ITEM_IDS.runestone);
-    expect(echoRewardForDraw(stillreach, 998)).toBe(ITEM_IDS.minersGloves);
-    expect(echoRewardForDraw(stillreach, 999)).toBe(ITEM_IDS.minersGloves);
+    expect(echoRewardForDraw(stillreach, 442)).toBe(ITEM_IDS.runeFragment);
+    expect(echoRewardForDraw(stillreach, 443)).toBe(ITEM_IDS.uncutQuartz);
+    expect(echoRewardForDraw(stillreach, 1_432)).toBe(ITEM_IDS.emptySmallFuelCanister);
+    expect(echoRewardForDraw(stillreach, 1_433)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(stillreach, 1_489)).toBe(ITEM_IDS.runestone);
+    expect(echoRewardForDraw(stillreach, 1_490)).toBe(ITEM_IDS.minersGloves);
+    expect(echoRewardForDraw(stillreach, 1_499)).toBe(ITEM_IDS.minersGloves);
   });
 
   it("ships exactly one Legendary per planet, its own, and every other reward is an ordinary stack", () => {
@@ -189,8 +237,8 @@ describe("the Beginner Echo reward tables (Slice J)", () => {
     for (const [planetId, legendary] of Object.entries(legendaryByPlanet)) {
       const table = beginnerEchoRewardTable(planetId)!;
       const unique = table.filter((entry) => getItemDefinition(entry.itemId)?.kind === "unique");
-      // The one planet-specific prize, 2 of 1,000, and never the other planet's.
-      expect(unique).toEqual([{ itemId: legendary, weight: 2 }]);
+      // The one planet-specific prize, 10 of 1,500 (1 in 150), never the other planet's.
+      expect(unique).toEqual([{ itemId: legendary, weight: 10 }]);
       for (const entry of table.filter((candidate) => candidate.itemId !== legendary)) {
         expect(getItemDefinition(entry.itemId)?.kind).toBe("stack");
       }
@@ -209,17 +257,22 @@ describe("the Beginner Echo reward tables (Slice J)", () => {
 
   it("names each planet's chance for an item, and only where the table has it", () => {
     expect(beginnerEchoRewardPlanets(ITEM_IDS.galvanicStock)).toEqual([
-      { planetId: PLANET_IDS.skatboll, percent: 5 },
+      { planetId: PLANET_IDS.skatboll, percent: 5, weight: 75, weightTotal: 1_500 },
     ]);
-    expect(beginnerEchoRewardPlanets(ITEM_IDS.runeFragment)).toEqual([
-      { planetId: PLANET_IDS.skatboll, percent: 30 },
-      { planetId: PLANET_IDS.stillreach, percent: 30 },
+    expect(
+      beginnerEchoRewardPlanets(ITEM_IDS.runeFragment).map(({ planetId, weight }) => [
+        planetId,
+        weight,
+      ]),
+    ).toEqual([
+      [PLANET_IDS.skatboll, 443],
+      [PLANET_IDS.stillreach, 443],
     ]);
     expect(beginnerEchoRewardPlanets(ITEM_IDS.minersBoots)).toEqual([
-      { planetId: PLANET_IDS.skatboll, percent: 0.2 },
+      expect.objectContaining({ planetId: PLANET_IDS.skatboll, weight: 10, weightTotal: 1_500 }),
     ]);
     expect(beginnerEchoRewardPlanets(ITEM_IDS.minersGloves)).toEqual([
-      { planetId: PLANET_IDS.stillreach, percent: 0.2 },
+      expect.objectContaining({ planetId: PLANET_IDS.stillreach, weight: 10, weightTotal: 1_500 }),
     ]);
     expect(beginnerEchoRewardPlanets(SEEKER)).toEqual([]);
   });
@@ -612,4 +665,21 @@ it("says where a Legendary went: Inventory, or FedHex with where to claim it", (
   expect(mailed).toContain("FedHex");
   expect(mailed).toContain("Holo Hollow Landing");
   expect(mailed).toContain("Stillreach Landing Station");
+});
+
+describe("the player-facing chance text (#465)", () => {
+  it("shows the Legendary as exactly 1 in 150, never a bare rounded 0.7%", () => {
+    expect(formatEchoRewardChance(10, 1_500)).toBe("0.67% (exactly 1 in 150)");
+  });
+
+  it("shows chances that are exact percentages as just that", () => {
+    expect(formatEchoRewardChance(360, 1_500)).toBe("24%");
+    expect(formatEchoRewardChance(42, 1_500)).toBe("2.8%");
+    expect(formatEchoRewardChance(150, 1_500)).toBe("10%");
+    expect(formatEchoRewardChance(57, 1_500)).toBe("3.8%");
+  });
+
+  it("rounds Rune Fragment's non-terminating chance to two decimals", () => {
+    expect(formatEchoRewardChance(443, 1_500)).toBe("29.53%");
+  });
 });

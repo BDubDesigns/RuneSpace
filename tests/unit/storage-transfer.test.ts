@@ -187,6 +187,7 @@ function cargoState(): PlayGameplayState {
       aggregateContainerSlots: 8,
       carriedPowerCellQuantity: 0,
       miningSuccessLevelBonus: 0,
+      miningXpBonusBps: 0,
       slots: [],
     },
     run: {

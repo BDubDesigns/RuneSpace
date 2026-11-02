@@ -1388,8 +1388,9 @@ const balanceSchema = z.object({
     /**
      * The Legendary miner's set (#399), the rarest Beginner Echo prizes. Unique,
      * nonstackable equipment: each find is its own item instance. Equipped, each
-     * piece is worth one effective Mining level for success chance only, from its
-     * `wearable` equipment block — see `EquipmentDefinition`.
+     * piece is worth one effective Mining level for success chance and +5% Mining XP
+     * (500 bps, additive across pieces), from its `wearable` equipment block — see
+     * `EquipmentDefinition`.
      */
     minersBoots: z.object({
       itemId: z.literal(ITEM_IDS.minersBoots),
@@ -1398,6 +1399,7 @@ const balanceSchema = z.object({
         kind: z.literal("wearable"),
         slot: z.literal("feet"),
         miningSuccessLevelBonus: z.literal(1),
+        miningXpBonusBps: z.literal(500),
       }),
     }),
     minersGloves: z.object({
@@ -1407,6 +1409,7 @@ const balanceSchema = z.object({
         kind: z.literal("wearable"),
         slot: z.literal("hands"),
         miningSuccessLevelBonus: z.literal(1),
+        miningXpBonusBps: z.literal(500),
       }),
     }),
     /**
@@ -1480,11 +1483,12 @@ const balanceSchema = z.object({
    * fixed 50 Runeworking XP and rolls exactly one ordinary item from the
    * current planet's table.
    *
-   * Each table is integer weights out of `rewardWeightTotal` (per mille). The
-   * approved full tables reserve 0.2% for a Legendary that is not shipped yet
-   * (Slice J); until then that 0.2 point sits on Rune Fragment (30.2%), so each
-   * table is a complete ordinary-only roll. Where each planet's hidden targets
-   * may be is content (`game/content/echo-hunts`), not balance.
+   * Each table is integer weights out of `rewardWeightTotal` (1,500). That
+   * denominator is what lets each planet's one Legendary be exactly 10/1,500 =
+   * 1/150 (#465); 1,000 could not express it. Rune Fragment alone gave up the
+   * difference (443/1,500, was 30%); every other rate is unchanged. Where each
+   * planet's hidden targets may be is content (`game/content/echo-hunts`), not
+   * balance.
    */
   echoHunts: z.object({
     beginner: z.object({
@@ -1493,29 +1497,29 @@ const balanceSchema = z.object({
       readingDurationTicks: z.literal(8),
       seekersPerReading: z.literal(1),
       discoveryXp: z.literal(50),
-      rewardWeightTotal: z.literal(1_000),
+      rewardWeightTotal: z.literal(1_500),
       rewardTables: z.object({
         [PLANET_IDS.skatboll]: z.tuple([
-          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(300) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(240) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(160) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
-          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), weight: z.literal(120) }),
-          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), weight: z.literal(50) }),
-          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(28) }),
-          z.object({ itemId: z.literal(ITEM_IDS.minersBoots), weight: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(443) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(360) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(240) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(150) }),
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), weight: z.literal(180) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), weight: z.literal(75) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(42) }),
+          z.object({ itemId: z.literal(ITEM_IDS.minersBoots), weight: z.literal(10) }),
         ]),
         [PLANET_IDS.stillreach]: z.tuple([
-          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(300) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(260) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(200) }),
-          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(100) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runeFragment), weight: z.literal(443) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutQuartz), weight: z.literal(390) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutTopaz), weight: z.literal(300) }),
+          z.object({ itemId: z.literal(ITEM_IDS.uncutSapphire), weight: z.literal(150) }),
           z.object({
             itemId: z.literal(ITEM_IDS.emptySmallFuelCanister),
-            weight: z.literal(100),
+            weight: z.literal(150),
           }),
-          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(38) }),
-          z.object({ itemId: z.literal(ITEM_IDS.minersGloves), weight: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.runestone), weight: z.literal(57) }),
+          z.object({ itemId: z.literal(ITEM_IDS.minersGloves), weight: z.literal(10) }),
         ]),
       }),
     }),
@@ -2314,12 +2318,22 @@ const defaults = balanceSchema.parse({
     minersBoots: {
       itemId: ITEM_IDS.minersBoots,
       massGrams: 2_000,
-      equipment: { kind: "wearable", slot: "feet", miningSuccessLevelBonus: 1 },
+      equipment: {
+        kind: "wearable",
+        slot: "feet",
+        miningSuccessLevelBonus: 1,
+        miningXpBonusBps: 500,
+      },
     },
     minersGloves: {
       itemId: ITEM_IDS.minersGloves,
       massGrams: 1_000,
-      equipment: { kind: "wearable", slot: "hands", miningSuccessLevelBonus: 1 },
+      equipment: {
+        kind: "wearable",
+        slot: "hands",
+        miningSuccessLevelBonus: 1,
+        miningXpBonusBps: 500,
+      },
     },
     sealedResearchPacket: { itemId: ITEM_IDS.sealedResearchPacket, massGrams: 2_000 },
     geologicalSampleCase: { itemId: ITEM_IDS.geologicalSampleCase, massGrams: 100 },
@@ -2354,27 +2368,27 @@ const defaults = balanceSchema.parse({
       readingDurationTicks: 8,
       seekersPerReading: 1,
       discoveryXp: 50,
-      rewardWeightTotal: 1_000,
+      rewardWeightTotal: 1_500,
       rewardTables: {
         [PLANET_IDS.skatboll]: [
-          { itemId: ITEM_IDS.runeFragment, weight: 300 },
-          { itemId: ITEM_IDS.uncutQuartz, weight: 240 },
-          { itemId: ITEM_IDS.uncutTopaz, weight: 160 },
-          { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
-          { itemId: ITEM_IDS.refinedFerrite, weight: 120 },
-          { itemId: ITEM_IDS.galvanicStock, weight: 50 },
-          { itemId: ITEM_IDS.runestone, weight: 28 },
-          // Legendary (#399): 2/1000 = 0.2% = 1/500, one prize per planet.
-          { itemId: ITEM_IDS.minersBoots, weight: 2 },
+          { itemId: ITEM_IDS.runeFragment, weight: 443 },
+          { itemId: ITEM_IDS.uncutQuartz, weight: 360 },
+          { itemId: ITEM_IDS.uncutTopaz, weight: 240 },
+          { itemId: ITEM_IDS.uncutSapphire, weight: 150 },
+          { itemId: ITEM_IDS.refinedFerrite, weight: 180 },
+          { itemId: ITEM_IDS.galvanicStock, weight: 75 },
+          { itemId: ITEM_IDS.runestone, weight: 42 },
+          // Legendary (#399, #465): 10/1500 = 1/150 exactly, one prize per planet.
+          { itemId: ITEM_IDS.minersBoots, weight: 10 },
         ],
         [PLANET_IDS.stillreach]: [
-          { itemId: ITEM_IDS.runeFragment, weight: 300 },
-          { itemId: ITEM_IDS.uncutQuartz, weight: 260 },
-          { itemId: ITEM_IDS.uncutTopaz, weight: 200 },
-          { itemId: ITEM_IDS.uncutSapphire, weight: 100 },
-          { itemId: ITEM_IDS.emptySmallFuelCanister, weight: 100 },
-          { itemId: ITEM_IDS.runestone, weight: 38 },
-          { itemId: ITEM_IDS.minersGloves, weight: 2 },
+          { itemId: ITEM_IDS.runeFragment, weight: 443 },
+          { itemId: ITEM_IDS.uncutQuartz, weight: 390 },
+          { itemId: ITEM_IDS.uncutTopaz, weight: 300 },
+          { itemId: ITEM_IDS.uncutSapphire, weight: 150 },
+          { itemId: ITEM_IDS.emptySmallFuelCanister, weight: 150 },
+          { itemId: ITEM_IDS.runestone, weight: 57 },
+          { itemId: ITEM_IDS.minersGloves, weight: 10 },
         ],
       },
     },
@@ -2813,7 +2827,9 @@ export type ContainerDefinition = {
 /**
  * Hands and feet gear (#399). Each worn piece adds its authored bonus to the
  * Mining level used for SUCCESS CHANCE only: never the character's actual level,
- * never a gate, a duration, XP or a yield.
+ * never a gate, a duration or a yield. It also carries an additive Mining XP
+ * bonus in basis points (#465), summed across worn pieces and applied once per
+ * extraction attempt by Mining resolution; it touches no other skill.
  */
 export type WearableDefinition = {
   kind: "wearable";
@@ -2822,6 +2838,7 @@ export type WearableDefinition = {
   /** The one suit slot this piece fits: hands or feet. */
   suitSlotIds: readonly string[];
   miningSuccessLevelBonus: number;
+  miningXpBonusBps: number;
 };
 
 export type EquipmentDefinition = MiningToolDefinition | ContainerDefinition | WearableDefinition;
@@ -2857,6 +2874,7 @@ export function getEquipmentDefinition(
           : balance.carrying.feetSuitSlotId,
       ],
       miningSuccessLevelBonus: equipment.miningSuccessLevelBonus,
+      miningXpBonusBps: equipment.miningXpBonusBps,
     };
   }
   return {

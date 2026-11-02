@@ -166,6 +166,7 @@ export async function loadMiningSnapshot(
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
     successLevelBonus: play.equipmentLoadout.miningSuccessLevelBonus,
+    xpBonusBps: play.equipmentLoadout.miningXpBonusBps,
     // Read under the same character lock as everything else the resolution uses,
     // so a lazy or offline attempt resolves under the setting last committed.
     prioritizePrimaryResources: await loadPrioritizePrimaryResources(transaction, characterId),

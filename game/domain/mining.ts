@@ -214,6 +214,13 @@ export type MiningSnapshot<Id = string> = {
    */
   successLevelBonus?: number;
   /**
+   * Mining XP bonus in basis points from worn hands and feet gear (#465), the
+   * additive sum from the equipment loadout. Applied once to each attempt's
+   * eligible base XP (`applyMiningXpBonus`); gates, chance, yield and speed never
+   * read it. Absent means none.
+   */
+  xpBonusBps?: number;
+  /**
    * The character's Prioritize primary resources setting (#342), read under the
    * same character lock as the resolution. Off, the default and when omitted,
    * protects Secondary Finds: an attempt needs room for the source's full
@@ -274,13 +281,31 @@ export type MiningResolvedAttempt = {
    * Always empty for a failure and, today, at most one entry.
    */
   secondaryFinds: readonly MiningSecondaryFindAward[];
-  /** The attempt's COMBINED Mining XP: the source's own plus any finds'. */
+  /**
+   * The attempt's COMBINED Mining XP: the source's own plus any retained finds',
+   * with the worn-gear bonus applied once (#465). The one figure the run total,
+   * persisted XP and displayed state all use.
+   */
   xpAwarded: number;
   boosted: boolean;
   durationTicks: number;
   chargeConsumed: boolean;
   remainingCharge: number;
 };
+
+/**
+ * One attempt's Mining XP with the worn-gear bonus applied (#465):
+ * `ceil(baseXp * (10000 + bonusBps) / 10000)` in integers. `bonusBps` is the
+ * ADDITIVE total across worn pieces, so the bonus is rounded once per attempt,
+ * never per piece, never compounded and never once per run. Zero stays zero.
+ */
+export function applyMiningXpBonus(baseXp: number, bonusBps: number): number {
+  if (!Number.isInteger(baseXp) || baseXp < 0)
+    throw new RangeError("Base Mining XP must be a non-negative integer");
+  if (!Number.isInteger(bonusBps) || bonusBps < 0)
+    throw new RangeError("Mining XP bonus must be a non-negative integer of basis points");
+  return Math.ceil((baseXp * (10_000 + bonusBps)) / 10_000);
+}
 
 /**
  * One attempt's duration at one source with one Mining tool (#233), under the
@@ -509,6 +534,7 @@ export function resolveMining<Id>(input: {
     source,
   );
   const award = miningAwardFacts(balance, source);
+  const xpBonusBps = snapshot.xpBonusBps ?? 0;
   const prioritized = snapshot.prioritizePrimaryResources === true;
   // The least primary ore a success keeps: the source's full minimum, or one ore
   // when the character chose to prioritize primary resources (#342).
@@ -613,7 +639,7 @@ export function resolveMining<Id>(input: {
         itemId: source.itemId,
         quantityAwarded: lowYieldQuantity,
         secondaryFinds: [],
-        xpAwarded: lowYield?.xp ?? 0,
+        xpAwarded: applyMiningXpBonus(lowYield?.xp ?? 0, xpBonusBps),
         boosted,
         durationTicks,
         chargeConsumed: boosted,
@@ -670,7 +696,10 @@ export function resolveMining<Id>(input: {
       itemId: award.itemId,
       quantityAwarded: quantity,
       secondaryFinds: find ? [{ itemId: find.itemId, quantity: find.quantity }] : [],
-      xpAwarded: source.successXp + (find ? find.bonusXp * find.quantity : 0),
+      xpAwarded: applyMiningXpBonus(
+        source.successXp + (find ? find.bonusXp * find.quantity : 0),
+        xpBonusBps,
+      ),
       boosted,
       durationTicks,
       chargeConsumed: boosted,

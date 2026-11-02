@@ -331,7 +331,7 @@ const itemPresentations = {
     artworkSrc: "/item-art/miners-boots.webp",
     rarity: "legendary",
     description:
-      "Steel-reinforced work boots that grip loose rock like they were made for it. Worn on the feet, they add one effective Mining level to your success chance, and nothing else.",
+      "Steel-reinforced work boots that grip loose rock like they were made for it. Worn on the feet, they add one effective Mining level to your success chance and 5% to the Mining XP of every attempt, and nothing else.",
   },
   [ITEM_IDS.minersGloves]: {
     displayName: "Miner's Gloves",
@@ -342,7 +342,7 @@ const itemPresentations = {
     artworkSrc: "/item-art/miners-gloves.webp",
     rarity: "legendary",
     description:
-      "Steel-reinforced work gloves that find the grip in any seam. Worn on the hands, they add one effective Mining level to your success chance, and nothing else.",
+      "Steel-reinforced work gloves that find the grip in any seam. Worn on the hands, they add one effective Mining level to your success chance and 5% to the Mining XP of every attempt, and nothing else.",
   },
   // Mining Secondary Finds (#308). A cut gem keeps its uncut stone's rarity (#433).
   [ITEM_IDS.cutQuartz]: {

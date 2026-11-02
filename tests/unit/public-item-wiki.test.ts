@@ -230,6 +230,30 @@ describe("Wiki item pages", () => {
     ).toBe(true);
   });
 
+  it("states the Legendary Echo odds exactly on the right planet, and the XP bonus in the Wiki (#465)", () => {
+    const echoLine = (itemId: string) =>
+      allLines(itemId)
+        .map(lineText)
+        .find((text) => text.startsWith("Resonance Echo"));
+    expect(echoLine(ITEM_IDS.minersBoots)).toContain("Skatboll 0.67% (exactly 1 in 150)");
+    expect(echoLine(ITEM_IDS.minersBoots)).not.toContain("Stillreach");
+    expect(echoLine(ITEM_IDS.minersGloves)).toContain("Stillreach 0.67% (exactly 1 in 150)");
+    expect(echoLine(ITEM_IDS.minersGloves)).not.toContain("Skatboll");
+    // The ordinary tables never print a raw float.
+    expect(echoLine(ITEM_IDS.runeFragment)).toContain("Skatboll 29.53%, Stillreach 29.53%");
+    expect(echoLine(ITEM_IDS.uncutQuartz)).toContain("Skatboll 24%, Stillreach 26%");
+
+    const echoes = getWikiArticle("runeworking")!;
+    const text = JSON.stringify(echoes);
+    expect(text).toContain("Miner's Boots, at exactly 1 in 150");
+    expect(text).toContain("Miner's Gloves, at exactly 1 in 150");
+    expect(text).not.toContain("five hundred");
+    const gear = JSON.stringify(getWikiArticle("inventory-and-equipment")!);
+    expect(gear).toContain("adds 5% to the Mining XP of every extraction attempt");
+    expect(gear).toContain("a full pair is 10%");
+    expect(gear.toLowerCase()).not.toContain("global");
+  });
+
   it("labels Mission requirements as shown, equipped or handed in", () => {
     const cutter = buildWikiItemPage(ITEM_IDS.salvageCutter)!;
     const missions = cutter.usedIn.find((group) => group.heading === "Missions")!;

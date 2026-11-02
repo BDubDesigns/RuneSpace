@@ -67,6 +67,13 @@ export type EquipmentLoadout = {
    * reads it.
    */
   miningSuccessLevelBonus: number;
+  /**
+   * Mining XP bonus, in basis points, the worn hands and feet gear add (#465):
+   * the SUM of each equipped wearable's authored `miningXpBonusBps` (0, 500 or
+   * 1,000 today). Additive, never compounded. Mining resolution applies it once
+   * per extraction attempt; no other skill reads it.
+   */
+  miningXpBonusBps: number;
 };
 
 /**
@@ -187,6 +194,10 @@ export function deriveEquipmentLoadout(input: {
     const definition = getEquipmentDefinition(instance.itemId, balance);
     return definition?.kind === "wearable" ? total + definition.miningSuccessLevelBonus : total;
   }, 0);
+  const miningXpBonusBps = assigned.reduce((total, { instance }) => {
+    const definition = getEquipmentDefinition(instance.itemId, balance);
+    return definition?.kind === "wearable" ? total + definition.miningXpBonusBps : total;
+  }, 0);
   return {
     assignments,
     equippedItemInstanceIds,
@@ -198,6 +209,7 @@ export function deriveEquipmentLoadout(input: {
     carriedMassGrams,
     maximumCarryCapacityGrams: balance.carrying.startingCapacityGrams,
     miningSuccessLevelBonus,
+    miningXpBonusBps,
     ...(miningTool ? { miningTool } : {}),
   };
 }

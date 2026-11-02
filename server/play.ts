@@ -350,7 +350,10 @@ function slotItemProjection(
     massGrams: carriedItemMassGrams(instance.itemId, balance),
     ...(definition?.kind === "container" ? { slotCapacity: definition.slotCapacity } : {}),
     ...(definition?.kind === "wearable"
-      ? { miningSuccessLevelBonus: definition.miningSuccessLevelBonus }
+      ? {
+          miningSuccessLevelBonus: definition.miningSuccessLevelBonus,
+          miningXpBonusBps: definition.miningXpBonusBps,
+        }
       : {}),
     ...(unmet ? { requiredMiningLevel: unmet.requiredMiningLevel } : {}),
   };
@@ -599,6 +602,8 @@ export type MiningSourceProjection = {
   successChanceBps: number;
   /** Those effective levels, so the surface can say where the extra chance comes from. */
   successLevelBonus: number;
+  /** Worn gear's additive Mining XP bonus in basis points (#465), applied per attempt. */
+  xpBonusBps: number;
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
@@ -641,6 +646,8 @@ export type EquipmentSlotItemProjection = {
   slotCapacity?: number;
   /** A wearable's effective Mining levels for success chance only (#399). */
   miningSuccessLevelBonus?: number;
+  /** A wearable's Mining XP bonus in basis points (#465). */
+  miningXpBonusBps?: number;
   /** Present only while the character's Mining level is below the item's requirement. */
   requiredMiningLevel?: number;
   /**
@@ -1123,6 +1130,8 @@ export type PlayGameplayState = {
      * chance only. Never the character's level.
      */
     miningSuccessLevelBonus: number;
+    /** Worn gear's additive Mining XP bonus in basis points (#465). */
+    miningXpBonusBps: number;
     /**
      * Whichever authored Mining tool is equipped (#233) — its own identity,
      * charge against its own maximum, and its own effects at the source in
@@ -2930,6 +2939,7 @@ export async function stateFromTransaction(
             locationMiningSource,
           ),
           successLevelBonus: snapshot.equipmentLoadout.miningSuccessLevelBonus,
+          xpBonusBps: snapshot.equipmentLoadout.miningXpBonusBps,
           successXp: locationMiningSource.successXp,
           yieldMinimum: locationMiningSource.yieldMinimum,
           yieldMaximum: locationMiningSource.yieldMaximum,
@@ -3030,6 +3040,7 @@ export async function stateFromTransaction(
       aggregateContainerSlots: snapshot.equipmentLoadout.containerSlotCapacity,
       carriedPowerCellQuantity,
       miningSuccessLevelBonus: snapshot.equipmentLoadout.miningSuccessLevelBonus,
+      miningXpBonusBps: snapshot.equipmentLoadout.miningXpBonusBps,
       miningTool: equippedTool
         ? (() => {
             const tool = equippedTool.definition;

@@ -27,9 +27,9 @@ import {
  * at once — so the first reading may find the Echo where the player stands.
  * A wrong reading reports, from the exact hex it was taken at, which way the
  * target lies on each screen axis of the flat-top map. A discovery ends the hunt
- * and rolls exactly one item from the planet's table (a Legendary at 1/500, #399);
- * the next reading on that planet starts a new hunt. Nothing here reads a clock, a database or a random source of its
- * own: the server supplies all three.
+ * and rolls exactly one item from the planet's table (a Legendary at exactly 1/150, #399, #465);
+ * the next reading on that planet starts a new hunt. Nothing here reads a clock,
+ * a database or a random source of its own: the server supplies all three.
  */
 
 export type EchoAxisDirection<Positive extends string, Negative extends string> =
@@ -141,14 +141,51 @@ export function beginnerEchoRewardTable(
 export function beginnerEchoRewardPlanets(
   itemId: string,
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
-): readonly { planetId: string; percent: number }[] {
+): readonly {
+  planetId: string;
+  percent: number;
+  /** The entry's integer weight and the table's total: the exact chance is weight / weightTotal. */
+  weight: number;
+  weightTotal: number;
+}[] {
   const { rewardTables, rewardWeightTotal } = balance.echoHunts.beginner;
   return Object.entries(
     rewardTables as Readonly<Record<string, readonly BeginnerEchoRewardEntry[]>>,
   ).flatMap(([planetId, table]) => {
     const weight = table.find((entry) => entry.itemId === itemId)?.weight;
-    return weight ? [{ planetId, percent: (weight * 100) / rewardWeightTotal }] : [];
+    return weight
+      ? [
+          {
+            planetId,
+            percent: (weight * 100) / rewardWeightTotal,
+            weight,
+            weightTotal: rewardWeightTotal,
+          },
+        ]
+      : [];
   });
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+  return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
+
+/**
+ * A player-facing chance from integer weights (#465): a percentage to at most two
+ * decimals, plus the exact "1 in N" whenever the weight reduces to one-in-N and
+ * the rounded percentage would not be exact (1/150 reads "0.67% (exactly 1 in
+ * 150)", never a bare rounded 0.7%). A chance that is exact as a percentage
+ * (24%, 2.8%) is shown as just that.
+ */
+export function formatEchoRewardChance(weight: number, weightTotal: number): string {
+  const percent = Number(((weight * 100) / weightTotal).toFixed(2));
+  // Integer comparison (hundredths of a percent) so float noise cannot decide it.
+  const exactPercent = Math.round(percent * 100) * weightTotal === weight * 10_000;
+  const divisor = greatestCommonDivisor(weight, weightTotal);
+  const oneIn = weight / divisor === 1 ? weightTotal / divisor : undefined;
+  return oneIn !== undefined && !exactPercent
+    ? `${percent}% (exactly 1 in ${oneIn})`
+    : `${percent}%`;
 }
 
 /** A uniform integer in [0, exclusiveMaximum), from the server's random source. */

@@ -234,7 +234,12 @@ export type ItemReferenceSource =
        * discovery, on each planet whose table names it.
        */
       kind: "echo_hunt";
-      planets: readonly { planetId: string; percent: number }[];
+      planets: readonly {
+        planetId: string;
+        percent: number;
+        weight: number;
+        weightTotal: number;
+      }[];
       /** The Mission whose completion opens the Resonance Rig, where Seekers are made. */
       seekersFromMissionId: string;
     }

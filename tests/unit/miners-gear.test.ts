@@ -13,6 +13,7 @@ import {
   planEquipmentChange,
 } from "@/game/domain/equipment";
 import {
+  applyMiningXpBonus,
   miningSourceUnlocked,
   miningSuccessChanceBps,
   resolveMining,
@@ -67,6 +68,7 @@ describe("the authored items", () => {
       assignmentKind: "gear",
       suitSlotIds: ["feet"],
       miningSuccessLevelBonus: 1,
+      miningXpBonusBps: 500,
     });
     expect(getEquipmentDefinition(ITEM_IDS.minersGloves)).toEqual({
       kind: "wearable",
@@ -74,6 +76,7 @@ describe("the authored items", () => {
       assignmentKind: "gear",
       suitSlotIds: ["hands"],
       miningSuccessLevelBonus: 1,
+      miningXpBonusBps: 500,
     });
   });
 
@@ -84,6 +87,7 @@ describe("the authored items", () => {
       expect(presentation.artworkSrc).toMatch(/^\/item-art\/miners-(boots|gloves)\.webp$/);
       expect(presentation.accessibleDescription.length).toBeGreaterThan(40);
       expect(presentation.description).toContain("one effective Mining level");
+      expect(presentation.description).toContain("5% to the Mining XP");
       expect(ITEM_CATEGORY_BY_ITEM_ID[itemId]).toBe("tools-and-containers");
     }
     expect(resolveItemPresentation(ITEM_IDS.minersBoots, "").displayName).toBe("Miner's Boots");
@@ -137,6 +141,21 @@ describe("the equipped bonus", () => {
     expect(bonus([hands, gloves], [feet, boots])).toBe(2);
   });
 
+  it("adds +5% Mining XP each, additively: 500 bps alone, 1,000 together, 0 when neither is worn", () => {
+    const bps = (...items: [typeof hands | typeof feet, { id: string }][]) =>
+      deriveEquipmentLoadout({ ...base, assignments: assignments(...items) }).miningXpBonusBps;
+    expect(bps()).toBe(0);
+    expect(bps([feet, boots])).toBe(500);
+    expect(bps([hands, gloves])).toBe(500);
+    expect(bps([hands, gloves], [feet, boots])).toBe(1_000);
+  });
+
+  it("grants nothing for pieces that are carried but not assigned to a slot", () => {
+    const loadout = deriveEquipmentLoadout({ ...base, assignments: assignments() });
+    expect(loadout.miningSuccessLevelBonus).toBe(0);
+    expect(loadout.miningXpBonusBps).toBe(0);
+  });
+
   it("can be equipped at Mining 1, and never needs a natural level", () => {
     const evaluation = evaluateEquipmentChange({
       ...base,
@@ -160,6 +179,7 @@ describe("the equipped bonus", () => {
       miningLevel: 1,
     });
     expect(swapped.miningSuccessLevelBonus).toBe(1);
+    expect(swapped.miningXpBonusBps).toBe(500);
     expect(swapped.equippedItemInstanceIds.has(spareBoots.id)).toBe(true);
     expect(swapped.equippedItemInstanceIds.has(boots.id)).toBe(false);
     // The same instance cannot fill two slots, and the same item cannot be worn twice.
@@ -231,12 +251,125 @@ describe("the success chance", () => {
     expect(run({ successLevelBonus: 2 }, rolled).attempts[0]?.thresholdBasisPoints).toBe(boosted);
   });
 
-  it("changes nothing else: not the gate, the duration, the XP or the yield", () => {
+  it("changes nothing else: not the gate, the duration, or the yield", () => {
     expect(miningSourceUnlocked(1, { requiredMiningLevel: 5 })).toBe(false);
     const plain = run({}, 0);
     const geared = run({ successLevelBonus: 2 }, 0);
     expect(geared.consumedTicks).toBe(plain.consumedTicks);
     expect(geared.awardedXp).toBe(plain.awardedXp);
     expect(geared.createdStacks).toEqual(plain.createdStacks);
+  });
+});
+
+describe("the Mining XP bonus", () => {
+  it.each([
+    [0, 0, 0, 0],
+    [1, 1, 2, 2],
+    [20, 20, 21, 22],
+    [25, 25, 27, 28],
+    [100, 100, 105, 110],
+    [130, 130, 137, 143],
+  ])("rounds base %i up once: none %i, one piece %i, both %i", (base, none, one, both) => {
+    expect(applyMiningXpBonus(base, 0)).toBe(none);
+    expect(applyMiningXpBonus(base, 500)).toBe(one);
+    expect(applyMiningXpBonus(base, 1_000)).toBe(both);
+  });
+
+  it("is additive rather than compounded or rounded per piece", () => {
+    // Rounding each +5% piece separately over-pays: 20 -> 21 -> 23, against the correct 22.
+    expect(applyMiningXpBonus(applyMiningXpBonus(20, 500), 500)).toBe(23);
+    expect(applyMiningXpBonus(20, 1_000)).toBe(22);
+    // Compounding 1.05 x 1.05 = 1.1025 would pay 111 on 100; additive pays 110.
+    expect(applyMiningXpBonus(100, 1_000)).toBe(110);
+  });
+
+  it("rejects values that are not whole non-negative numbers", () => {
+    expect(() => applyMiningXpBonus(-1, 0)).toThrow(RangeError);
+    expect(() => applyMiningXpBonus(1.5, 0)).toThrow(RangeError);
+    expect(() => applyMiningXpBonus(10, -500)).toThrow(RangeError);
+  });
+
+  const source = balance.mining.sources.ferriteShale;
+  const ticks = source.attemptDurationTicks;
+  function mine(
+    snapshot: Partial<MiningSnapshot>,
+    options: { rolled?: number; attempts?: number; source?: unknown } = {},
+  ) {
+    const random: MiningRandom = {
+      nextBasisPoints: () => options.rolled ?? 0,
+      nextUnit: () => 0,
+    };
+    return resolveMining({
+      elapsedTicks: ticks * (options.attempts ?? 1),
+      snapshot: {
+        miningLevel: 1,
+        prioritizePrimaryResources: false,
+        tool: getEquipmentDefinition(ITEM_IDS.salvageCutter, balance) as MiningSnapshot["tool"],
+        cutterCharge: 0,
+        existingStacks: [],
+        slotsAvailable: 8,
+        massAvailableGrams: 30_000,
+        ...snapshot,
+      } as MiningSnapshot,
+      balance,
+      source: (options.source ?? { ...source, secondaryFinds: [] }) as typeof source,
+      random,
+    });
+  }
+
+  it("scales an attempt's XP once, with the attempt, the run total and nothing else agreeing", () => {
+    const none = mine({});
+    const one = mine({ xpBonusBps: 500 });
+    const both = mine({ xpBonusBps: 1_000 });
+    expect(none.attempts[0]?.xpAwarded).toBe(source.successXp);
+    expect(one.attempts[0]?.xpAwarded).toBe(applyMiningXpBonus(source.successXp, 500));
+    expect(both.attempts[0]?.xpAwarded).toBe(applyMiningXpBonus(source.successXp, 1_000));
+    for (const run of [none, one, both]) {
+      expect(run.awardedXp).toBe(run.attempts.reduce((sum, a) => sum + a.xpAwarded, 0));
+    }
+    // Speed, yield and the roll are untouched.
+    expect(both.consumedTicks).toBe(none.consumedTicks);
+    expect(both.createdStacks).toEqual(none.createdStacks);
+    expect(both.attempts[0]?.quantityAwarded).toBe(none.attempts[0]?.quantityAwarded);
+    expect(both.attempts[0]?.thresholdBasisPoints).toBe(none.attempts[0]?.thresholdBasisPoints);
+  });
+
+  it("rounds per attempt across a multi-attempt run, never once for the whole run", () => {
+    const attempts = 4;
+    const run = mine({ xpBonusBps: 500 }, { attempts });
+    expect(run.attempts).toHaveLength(attempts);
+    const perAttempt = applyMiningXpBonus(source.successXp, 500);
+    expect(run.attempts.every((attempt) => attempt.xpAwarded === perAttempt)).toBe(true);
+    expect(run.awardedXp).toBe(perAttempt * attempts);
+    // An identical set of separate single-attempt runs pays exactly the same.
+    const separate = Array.from({ length: attempts }, () => mine({ xpBonusBps: 500 }).awardedXp);
+    expect(run.awardedXp).toBe(separate.reduce((sum, xp) => sum + xp, 0));
+  });
+
+  it("applies on a source where success is already guaranteed", () => {
+    const guaranteedLevel = source.guaranteedSuccessLevel;
+    const run = mine({ miningLevel: guaranteedLevel, xpBonusBps: 1_000 }, { rolled: 9_999 });
+    expect(run.successes).toBe(1);
+    expect(run.awardedXp).toBe(applyMiningXpBonus(source.successXp, 1_000));
+  });
+
+  it("gives a miss at a source with no low yield nothing, bonus or not", () => {
+    const miss = mine({ xpBonusBps: 1_000 }, { rolled: 9_999 });
+    expect(miss.failures).toBe(1);
+    expect(miss.awardedXp).toBe(0);
+  });
+
+  it("pays a low yield its own XP with the bonus applied once", () => {
+    const oilShale = { ...balance.mining.sources.oilShale, secondaryFinds: [] };
+    expect(oilShale.lowYield).toEqual({ quantity: 1, xp: 20 });
+    const run = (xpBonusBps: number) =>
+      mine(
+        { xpBonusBps, miningLevel: oilShale.requiredMiningLevel },
+        { rolled: 9_999, source: oilShale },
+      );
+    expect(run(0).attempts[0]).toMatchObject({ lowYield: true, xpAwarded: 20 });
+    expect(run(500).attempts[0]?.xpAwarded).toBe(21);
+    expect(run(1_000).attempts[0]?.xpAwarded).toBe(22);
+    expect(run(1_000).awardedXp).toBe(22);
   });
 });

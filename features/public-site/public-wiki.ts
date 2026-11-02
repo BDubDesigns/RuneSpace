@@ -448,9 +448,9 @@ const authoredWikiArticles = [
         heading: "Gloves and Boots",
         paragraphs: [
           [
-            "Gloves and Boots are real equipment slots beside the Mining tool, one piece each: the Legendary Miner's Gloves go on your hands and the Legendary Miner's Boots on your feet. Each worn piece counts as one extra Mining level for your success chance only, so a full pair is two. Neither needs a Mining level to wear, and your real ",
+            "Gloves and Boots are real equipment slots beside the Mining tool, one piece each: the Legendary Miner's Gloves go on your hands and the Legendary Miner's Boots on your feet. Each worn piece counts as one extra Mining level for your success chance only, so a full pair is two, and adds 5% to the Mining XP of every extraction attempt, so a full pair is 10% (added together, rounded up once per attempt, and Mining only). Neither needs a Mining level to wear, and your real ",
             { text: "Mining", articleSlug: "mining-and-refining" },
-            " level does not change: they never unlock a mine, a recipe or a tool, and do not change how long an attempt takes, the XP, the ore or the finds. You can carry spares, swap the worn one, and trade a spare once it is carried and unequipped.",
+            " level does not change: they never unlock a mine, a recipe or a tool, and do not change how long an attempt takes, the ore or the finds. You can carry spares, swap the worn one, and trade a spare once it is carried and unequipped.",
           ],
           "Gloves weigh 1 kg and Boots 2 kg, and like any gear they count toward your weight limit while worn.",
         ],
@@ -1271,8 +1271,8 @@ const authoredWikiArticles = [
         heading: "What an Echo can give",
         paragraphs: ["Exactly one item per Echo, rolled from the planet you found it on:"],
         list: [
-          "Skatboll: Rune Fragment 30%, Uncut Quartz 24%, Uncut Topaz 16%, Refined Ferrite 12%, Uncut Sapphire 10%, Galvanic Stock 5%, intact Runestone 2.8%, and a Legendary, Miner's Boots, at 0.2% (about one Echo in five hundred).",
-          "Stillreach: Rune Fragment 30%, Uncut Quartz 26%, Uncut Topaz 20%, Uncut Sapphire 10%, Empty Small Fuel Canister 10%, intact Runestone 3.8%, and a Legendary, Miner's Gloves, at 0.2% (about one Echo in five hundred).",
+          "Skatboll: Rune Fragment 29.53%, Uncut Quartz 24%, Uncut Topaz 16%, Refined Ferrite 12%, Uncut Sapphire 10%, Galvanic Stock 5%, intact Runestone 2.8%, and a Legendary, Miner's Boots, at exactly 1 in 150 (0.67%).",
+          "Stillreach: Rune Fragment 29.53%, Uncut Quartz 26%, Uncut Topaz 20%, Uncut Sapphire 10%, Empty Small Fuel Canister 10%, intact Runestone 3.8%, and a Legendary, Miner's Gloves, at exactly 1 in 150 (0.67%).",
         ],
       },
     ],
