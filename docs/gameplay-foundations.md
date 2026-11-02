@@ -58,14 +58,16 @@ resolved attempt awards is recovered from the durable action ID.
 | Source | Where | Ticks | Success | Yield | XP |
 | --- | --- | ---: | --- | ---: | ---: |
 | Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
-| Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
+| Galvanite | Deep Jag, once braced, **Mining 5** | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
 | Oil Shale | The South Cut and Stillreach's The Dry Seam (#380), **Mining 5** | 100 | 35% at 1 → 100% at 50 | 2–4 (1 on a low yield) | 100 (20 on a low yield) |
 | Stone | Stillreach's Prospecting Quarry | 33 | 35% at 1 → 100% at 30 | 1–2 (a miss awards nothing) | 45 |
 | Rune Fragment | Stillreach's Harmonic Workings (#383), **Mining 8** | 75 | 35% at 1 → 46.66% at 8 → 100% at 40 | 1–2 (a miss awards nothing) | 130 |
 
-Every source also authors a `requiredMiningLevel` (the personal access gate; 1
-for The Jag and Deep Jag, so neither is newly gated) and a `lowYield` (`null` for
-those two, whose miss still awards nothing).
+Every source also authors a `requiredMiningLevel` (the personal access gate;
+Mining 1 for The Jag and Mining 5 for Deep Jag, matching its Brace Yourself
+progression requirement) and a `lowYield` (`null` for these two, whose misses
+still award nothing). The Galvanite success curve remains anchored at Mining 1;
+that does not change the Mining 5 access gate.
 
 **The Mining tool is authored too (#233).** Whichever Cutter is in the one
 Mining-tool slot supplies its own requirement, charge ceiling, permanent
@@ -140,7 +142,7 @@ no schema or stored state changes. The Last Leg terminal's existing 6 Credit
 Oil Shale buyback (#375) is how the haul is sold. The rest of this section
 describes The South Cut; every rule applies unchanged at The Dry Seam.
 
-Skatboll's first dedicated fuel-supply source, and the first source with a
+Skatboll's first dedicated fuel-supply source, with its own
 **personal Mining level gate**. It is one more `balance.mining.sources` entry
 read by the one resolver — not a second engine — so the existing Cutters, Power
 Cell charge, boosting, run history, active-action identity and lazy/offline
