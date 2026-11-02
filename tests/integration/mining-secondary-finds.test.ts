@@ -118,7 +118,11 @@ suite("issue #308 Mining Secondary Finds (real PostgreSQL)", () => {
       // The repaired mine still requires personal Mining 5; seed it through real XP.
       await db
         .insert(rune.characterSkillXp)
-        .values({ characterId: character.id, skillId: SKILL_IDS.mining, totalXp: deepJagStartingXp })
+        .values({
+          characterId: character.id,
+          skillId: SKILL_IDS.mining,
+          totalXp: deepJagStartingXp,
+        })
         .onConflictDoUpdate({
           target: [rune.characterSkillXp.characterId, rune.characterSkillXp.skillId],
           set: { totalXp: deepJagStartingXp },
