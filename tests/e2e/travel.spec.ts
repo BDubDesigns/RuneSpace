@@ -1969,7 +1969,7 @@ for (const skewMs of [0, -5_000, 5_000]) {
         expect(Math.abs(fraction * 24_000 - (readAt - start))).toBeLessThan(2_000);
       };
       // Wait by observing the unskewed test clock, not by trusting the map.
-      await expect.poll(() => Date.now() - start).toBeGreaterThan(7_000);
+      await expect.poll(() => Date.now() - start, { timeout: 10_000 }).toBeGreaterThan(7_000);
       await assertTimeline();
       await page.reload();
       await openMapSurface(page);
