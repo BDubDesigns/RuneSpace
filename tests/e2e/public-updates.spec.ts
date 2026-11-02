@@ -6,6 +6,41 @@ const updateSlug = "runespace-is-starting-to-feel-like-a-game";
 const updateTitle = "RuneSpace Is Starting to Feel Like a Game";
 
 test.describe("public Updates", () => {
+  test("publishes Route To on the index, article, homepage and RSS feed", async ({ page }) => {
+    const routeTitle = "Route To Is Here";
+    const routeSlug = "route-to-automatic-walking";
+
+    await page.goto("/updates");
+    const routeLink = page.getByRole("link", { name: routeTitle, exact: true });
+    await expect(routeLink).toHaveAttribute("href", `/updates/${routeSlug}`);
+    await routeLink.click();
+    await expect(page).toHaveURL(`/updates/${routeSlug}`);
+    await expect(page.getByRole("heading", { name: routeTitle, level: 1 })).toBeVisible();
+    await expect(
+      page.getByText(/Each eligible leg has its usual chance to Scavenge/),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Travel & Scavenging" })).toHaveAttribute(
+      "href",
+      "/wiki/travel-and-scavenging",
+    );
+    await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
+
+    await page.goto("/");
+    const latestUpdate = page.getByRole("heading", { name: routeTitle, level: 2 });
+    await expect(latestUpdate).toBeVisible();
+    await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
+      "href",
+      `/updates/${routeSlug}`,
+    );
+
+    const response = await page.request.get("/feed.xml");
+    expect(response.ok()).toBe(true);
+    const feed = await response.text();
+    expect(feed).toContain(`<title>${routeTitle}</title>`);
+    expect(feed).toContain(`/updates/${routeSlug}`);
+  });
+
   test("lists published Updates and renders an article and its patch notes", async ({ page }) => {
     await page.goto("/updates");
 

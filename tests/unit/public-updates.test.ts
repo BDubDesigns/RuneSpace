@@ -136,7 +136,7 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("soft-alpha-fixes-and-improvements");
+    expect(getLatestPublishedUpdate().slug).toBe("route-to-automatic-walking");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );
@@ -159,6 +159,42 @@ describe("public Updates content boundary", () => {
     // Approved but unshipped design stays out of a shipped Update.
     expect(text).not.toMatch(/lapidary|one who rocks|\bcut gems?\b|cutting skill/i);
     expect(text).not.toContain("Survey Line to");
+  });
+
+  it("publishes the Route To Update newest-first and links its existing Travel Wiki article", () => {
+    const update = getPublicUpdate("route-to-automatic-walking")!;
+    expect(update.title).toBe("Route To Is Here");
+    expect(update.publishedAt).toBe("2026-11-01T22:37:00-08:00");
+    expect(getLatestPublishedUpdate()).toEqual(update);
+    expect(getPublishedUpdates()[0]).toEqual(update);
+    expect(update.hero).toBeUndefined();
+
+    const text = JSON.stringify(update);
+    for (const detail of [
+      "24-second walk",
+      "Scavenge",
+      "claim any find yourself",
+      "Stop After This Leg",
+      "Turn Back",
+      "refresh",
+      "lose connection",
+      "Mycerale",
+    ]) {
+      expect(text).toContain(detail);
+    }
+
+    const links = update.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({
+      text: "Travel & Scavenging",
+      articleSlug: "travel-and-scavenging",
+    });
+    expect(getWikiArticle("travel-and-scavenging")?.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ heading: "Route To: walking further than one hex" }),
+      ]),
+    );
   });
 
   it("keeps the Milky Waymo Update published beneath it (#404)", () => {
