@@ -1431,10 +1431,13 @@ test("the destination panel keeps the travel decision in reach without leaving t
   await expect(panel.getByRole("button", { name: /^Walk/ })).toHaveCount(0);
   await captureReviewScreenshot(page, "travel-mobile-destination-current.png");
 
-  // A visible hex with no route from here is inspectable, with no Walk path.
+  // A visible hex with no direct edge is inspectable and offers Route To along
+  // ordinary walking legs (#450) — never a single Walk across a gap.
   await jag.click();
-  await expect(panel).toHaveAttribute("data-map-destination-status", "unreachable");
-  await expect(panel.locator("[data-map-destination-state]")).toHaveText("No route from here");
+  await expect(panel).toHaveAttribute("data-map-destination-status", "routable");
+  await expect(panel.locator("[data-map-route-preview]")).toContainText("The Jag");
+  await expect(panel.locator("[data-map-destination-meta]")).toContainText("2 legs · 48 sec walk");
+  await expect(panel.getByRole("button", { name: /^Route To The Jag, 2 legs/ })).toBeVisible();
   await expect(panel.getByRole("button", { name: /^Walk/ })).toHaveCount(0);
   await panel.getByRole("button", { name: "Details" }).click();
   await expect(panel.locator("[data-map-destination-details]")).toBeVisible();
@@ -1986,3 +1989,198 @@ for (const skewMs of [0, -5_000, 5_000]) {
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Issue #450: Route To — automatic multi-hex walking, one ordinary leg at a time.
+// ---------------------------------------------------------------------------
+
+async function travelRow(characterId: string) {
+  const [row] = await db
+    .select()
+    .from(characterTravelState)
+    .where(eq(characterTravelState.characterId, characterId));
+  return row;
+}
+
+async function actionRow(characterId: string) {
+  const [row] = await db
+    .select()
+    .from(activeActions)
+    .where(eq(activeActions.characterId, characterId));
+  return row;
+}
+
+/** Put the active leg's authoritative clock `ageMs` into the past, as if the player had waited. */
+async function ageActiveLeg(characterId: string, ageMs: number) {
+  const legStartedAt = new Date(Date.now() - ageMs);
+  await db
+    .update(activeActions)
+    .set({ startedAt: legStartedAt, resolvedThroughAt: legStartedAt })
+    .where(eq(activeActions.characterId, characterId));
+  return legStartedAt;
+}
+
+test("Route To walks Crash Site → Long Scramble → The Jag, committing each leg, through reloads (#450)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // The route and its total walking time are shown before anything starts.
+  await page.locator('[data-map-location="the_jag"]').click();
+  const panel = page.locator("[data-map-destination-panel]");
+  await expect(panel).toHaveAttribute("data-map-destination-status", "routable");
+  await expect(panel.locator("[data-map-route-preview]")).toContainText("The Long Scramble");
+  await expect(page.locator('[data-map-route-plan="crash_site->the_long_scramble"]')).toHaveCount(
+    1,
+  );
+  await expect(page.locator('[data-map-route-plan="the_long_scramble->the_jag"]')).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+  await expectPanelAboveBottomNav(page);
+  await captureReviewScreenshot(page, "route-to-mobile-preview.png");
+  await panel.getByRole("button", { name: /^Route To The Jag, 2 legs — 48 sec/ }).click();
+
+  // Leg one is an ordinary walk with its own Journey; the character is still at A.
+  const route = page.locator("[data-journey-route]");
+  await expect(route).toHaveAttribute("data-journey-route", LOCATION_IDS.theJag);
+  await expect(route.locator("[data-journey-route-leg]")).toHaveAttribute(
+    "data-journey-route-leg",
+    "1/2",
+  );
+  await expect(route.locator('[data-journey-route-stop="here"]')).toContainText("Crash Site");
+  await expect(route.getByRole("button", { name: "Stop After This Leg" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn Back" })).toBeVisible();
+  await expect(page.locator("[data-turn-back]")).toContainText("leaves you at Crash Site");
+  expect((await travelRow(characterId))?.routeLocationIds).toEqual([
+    LOCATION_IDS.crashSite,
+    LOCATION_IDS.theLongScramble,
+    LOCATION_IDS.theJag,
+  ]);
+  expect((await characterRow(characterId)).currentLocationId).toBe(LOCATION_IDS.crashSite);
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "route-to-mobile-journey-leg-1.png");
+
+  // Leg one completes: B is committed, and leg two begins at that exact instant.
+  const legOneStartedAt = await ageActiveLeg(characterId, 25_000);
+  await page.reload();
+  await expect(route.locator("[data-journey-route-leg]")).toHaveAttribute(
+    "data-journey-route-leg",
+    "2/2",
+  );
+  expect((await characterRow(characterId)).currentLocationId).toBe(LOCATION_IDS.theLongScramble);
+  expect((await actionRow(characterId))?.startedAt.getTime()).toBe(
+    legOneStartedAt.getTime() + 24_000,
+  );
+  await expect(route.locator('[data-journey-route-stop="passed"]')).toContainText("Crash Site");
+  await expect(route.locator('[data-journey-route-stop="here"]')).toContainText(
+    "The Long Scramble",
+  );
+  await expect(route.locator("[data-journey-route-final-leg]")).toContainText("The Jag");
+  await expect(route.getByRole("button", { name: "Stop After This Leg" })).toHaveCount(0);
+
+  // The Map agrees: the leg's ends, read-only, on the committed location's map.
+  await openMapSurface(page);
+  await expect(page.locator('[data-map-location="the_long_scramble"]')).toHaveAttribute(
+    "data-map-transit-role",
+    "origin",
+  );
+  await expect(page.locator('[data-map-location="the_jag"]')).toHaveAttribute(
+    "data-map-transit-role",
+    "destination",
+  );
+  await expect(page.locator("line[data-route-progress]")).toHaveAttribute(
+    "data-route-start-location",
+    LOCATION_IDS.theLongScramble,
+  );
+  await page.getByRole("button", { name: "Back to Journey" }).click();
+
+  // The final leg completes and ordinary stationary play returns at C.
+  await ageActiveLeg(characterId, 25_000);
+  await page.reload();
+  await expect(page.locator("[data-journey-surface]")).toHaveCount(0);
+  expect((await characterRow(characterId)).currentLocationId).toBe(LOCATION_IDS.theJag);
+  expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
+  await openMapSurface(page);
+  await expect(page.locator('[data-map-location="the_jag"]')).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.locator("[data-map-transit-role]")).toHaveCount(0);
+});
+
+test("Route To keeps each leg's Scavenge, stops after a leg, and turns back to the last stop (#450)", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openMapSurface(page);
+
+  // Route to Rusk Recovery: Crash Site → Holo Hollow → Rusk Recovery.
+  await page.locator('[data-map-location="rusk_recovery"]').click();
+  await page.getByRole("button", { name: /^Route To Rusk Recovery, 2 legs/ }).click();
+  const route = page.locator("[data-journey-route]");
+  await expect(route).toBeVisible();
+  await captureReviewScreenshot(page, "route-to-desktop-journey.png");
+
+  // Leg two's window is an ordinary walking window the player can claim.
+  await ageActiveLeg(characterId, 25_000);
+  await page.reload();
+  await expect(route.locator("[data-journey-route-leg]")).toHaveAttribute(
+    "data-journey-route-leg",
+    "2/2",
+  );
+  await ageActiveLeg(characterId, 1_850);
+  await db
+    .update(characterTravelState)
+    .set({ scavengeOpportunityStartTick: 3 })
+    .where(eq(characterTravelState.characterId, characterId));
+  await page.reload();
+  await page
+    .locator('[data-scavenge-state="available"]')
+    .getByRole("button", { name: "SCAVENGE NOW" })
+    .click();
+  await expectClaimCommitted(page, characterId);
+  // The reveal is presentation only; clear it so the Journey is in view again.
+  await db
+    .delete(characterScavengeReveals)
+    .where(eq(characterScavengeReveals.characterId, characterId));
+  await page.reload();
+  // The claim belongs to leg two alone and survives the reload.
+  expect((await travelRow(characterId))?.scavengeOutcomeId).not.toBeNull();
+
+  // Turn Back on leg two leaves the character at the stop they reached: B, never A.
+  await page.getByRole("button", { name: "Turn Back" }).click();
+  await expect(page.locator("[data-journey-surface]")).toHaveCount(0);
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.holoHollow,
+    scavengeSuppressed: true,
+  });
+  expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
+
+  // Stop After This Leg: the leg finishes normally and nothing further begins.
+  await openMapSurface(page);
+  await page.locator('[data-map-location="crash_site"]').click();
+  await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  await ageActiveLeg(characterId, 25_000);
+  await page.reload();
+  await openMapSurface(page);
+  await page.locator('[data-map-location="the_south_cut"]').click();
+  await page.getByRole("button", { name: /^Route To The South Cut, 2 legs/ }).click();
+  await route.getByRole("button", { name: "Stop After This Leg" }).click();
+  await expect(route.locator("[data-journey-route-final-leg]")).toContainText("South Access Track");
+  expect((await travelRow(characterId))?.routeLocationIds).toEqual([
+    LOCATION_IDS.crashSite,
+    LOCATION_IDS.southAccessTrack,
+  ]);
+  await ageActiveLeg(characterId, 25_000);
+  await page.reload();
+  await expect(page.locator("[data-journey-surface]")).toHaveCount(0);
+  // A completed walk, not a cancelled one: suppression lifts as it always does.
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.southAccessTrack,
+    scavengeSuppressed: false,
+  });
+  expect(await journeyRowCount(characterId)).toEqual({ actions: 0, travel: 0 });
+});

@@ -391,6 +391,16 @@ export const characterTravelState = pgTable(
     scavengeOpportunityStartTick: integer("scavenge_opportunity_start_tick"),
     scavengeOutcomeId: text("scavenge_outcome_id"),
     scavengeAwardQuantity: integer("scavenge_award_quantity").notNull().default(0),
+    /**
+     * Route To (#450): the whole planned walking route, origin first and final
+     * destination last, while this walk is one leg of it. NULL is an ordinary
+     * single walk (or a ride). The row's own origin and destination are always
+     * the active leg; the hexes after that destination are the legs still to
+     * come. Each leg is an ordinary walk with its own Scavenge window, and the
+     * route lives on this row so that anything ending the Journey — Turn Back,
+     * an operator force-idle — ends the rest of the route with it.
+     */
+    routeLocationIds: text("route_location_ids").array(),
   },
   (table) => [
     check(
@@ -413,6 +423,11 @@ export const characterTravelState = pgTable(
     check(
       "character_travel_state_scavenge_award_quantity_non_negative",
       sql`${table.scavengeAwardQuantity} >= 0`,
+    ),
+    // Only a walk follows a route, and a route is at least one leg.
+    check(
+      "character_travel_state_route_requires_walk",
+      sql`${table.routeLocationIds} IS NULL OR (${table.mode} = 'walk' AND cardinality(${table.routeLocationIds}) >= 2)`,
     ),
   ],
 );

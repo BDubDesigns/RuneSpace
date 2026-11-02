@@ -128,11 +128,16 @@ test("only the Track is walkable from the Landing Station, and every other hex s
     /Mining|Refining|Daily cells/,
   );
 
-  // Two legs out is not an authored edge, whatever the grid looks like.
+  // Two legs out is not an authored edge, whatever the grid looks like: no
+  // single Walk, only Route To along ordinary walking legs (#450).
   for (const name of [/Hilltop Workshop/, /Prospecting Quarry/, /The Dry Seam/]) {
     await page.getByRole("button", { name }).click();
     await expect(page.getByRole("button", { name: /^Walk to / })).toHaveCount(0);
-    await expect(page.locator("[data-map-destination-panel]")).toContainText("No route from here");
+    await expect(page.locator("[data-map-destination-panel]")).toHaveAttribute(
+      "data-map-destination-status",
+      "routable",
+    );
+    await expect(page.getByRole("button", { name: /^Route To / })).toBeVisible();
   }
 });
 
@@ -509,10 +514,16 @@ test("the map links the lab to the Quarry and Harmonic Workings but not The Surv
     await page.getByRole("button", { name }).click();
     await expect(page.getByRole("button", { name: /^Walk to / })).toBeVisible();
   }
-  // The Survey Line touches the lab on the hex grid, but no route is authored.
+  // The Survey Line touches the lab on the hex grid, but no edge is authored:
+  // the only way there is Route To, two ordinary legs round by Harmonic
+  // Workings or the Quarry (#450).
   await page.getByRole("button", { name: /The Survey Line/ }).click();
   await expect(page.getByRole("button", { name: /^Walk to / })).toHaveCount(0);
-  await expect(page.locator("[data-map-destination-panel]")).toContainText("No route from here");
+  await expect(page.locator("[data-map-destination-panel]")).toHaveAttribute(
+    "data-map-destination-status",
+    "routable",
+  );
+  await expect(page.locator("[data-map-destination-meta]")).toContainText("2 legs");
   await expectNoPageOverflow(page);
   await captureReviewScreenshot(page, "werners-lab-map-mobile.png");
 });

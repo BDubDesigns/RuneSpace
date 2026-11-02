@@ -2781,6 +2781,18 @@ or pathfinding, and nothing computes "the best way to get somewhere".
   DONE only acknowledges the presentation; it cannot award, reroll, or change
   Travel and is idempotent.
 
+### Route To (issue #450)
+
+A Route To is a chain of ordinary walks, not a travel mode. The server plans the
+deterministic shortest same-planet walking path (`planWalkingRoute`), stores it on
+the active leg's `character_travel_state` row, and the Travel resolver begins each
+next leg at the previous leg's exact arrival instant after committing that arrival
+to `characters.current_location_id`. Every leg is 40 ticks with one Scavenge window
+roll; overdue legs after an absence commit in order with their windows missed.
+Turn Back ends the active leg and the rest of the route at the leg's origin (with
+#312 suppression); Stop After This Leg only shortens the route, so the leg arrives
+normally. See `docs/travel-map-design.md` ("Route To") for the full contract.
+
 ### Turn Back and Scavenge suppression (issue #312)
 
 - **Turn Back** is a player command on an active Journey, walk or ride. The owned

@@ -24,6 +24,8 @@ export function MapDestinationPanel({
   detailsOpen,
   onToggleDetails,
   onWalk,
+  route,
+  onRoute,
   feedback,
 }: {
   id: string;
@@ -39,13 +41,23 @@ export function MapDestinationPanel({
   detailsOpen: boolean;
   onToggleDetails: () => void;
   onWalk: () => void;
+  /**
+   * Route To (#450): the walking route to a `routable` destination, origin
+   * first, as display names. Shown before the player commits, with its total
+   * ordinary walking time.
+   */
+  route?: readonly string[];
+  onRoute?: () => void;
   feedback?: ReactNode;
 }) {
   const detailsId = `${id}-details`;
   // A blocked route already names its status in the reason line below.
+  const legCount = route ? route.length - 1 : 0;
+  const routeSeconds = legCount * walkSeconds;
   const meta = [
     status === "blocked" ? undefined : mapStatus,
     status === "reachable" ? `${walkSeconds} sec walk` : undefined,
+    status === "routable" && route ? `${legCount} legs · ${routeSeconds} sec walk` : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -76,7 +88,15 @@ export function MapDestinationPanel({
           {description}
         </p>
       ) : null}
-      {status === "reachable" && workActive ? (
+      {status === "routable" && route ? (
+        // The whole path, before anything starts: each arrow is one ordinary
+        // walk, so the player can see every place they will stand on the way.
+        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]" data-map-route-preview>
+          <span className="sr-only">Route: </span>
+          {route.join(" → ")}
+        </p>
+      ) : null}
+      {(status === "reachable" || status === "routable") && workActive ? (
         <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
           Departing resolves your completed work and stops the active activity before the journey
           begins.
@@ -112,6 +132,22 @@ export function MapDestinationPanel({
                 inline wrapper, so ActionButton's flex gap cannot split it. */}
             <span>
               Walk<span className="sr-only"> to {name}</span> — {walkSeconds} sec
+            </span>
+          </ActionButton>
+        ) : status === "routable" && route && onRoute ? (
+          <ActionButton
+            className="min-w-0 flex-1"
+            data-map-route-to
+            disabled={walkDisabled}
+            intent="primary"
+            onClick={onRoute}
+            type="button"
+          >
+            {/* Short on a phone; the accessible name keeps the destination and
+                the leg count ("Route To The Jag, 2 legs — 48 sec"). */}
+            <span>
+              Route To
+              <span className="sr-only">{` ${name}, ${legCount} legs`}</span> — {routeSeconds} sec
             </span>
           </ActionButton>
         ) : status === "blocked" ? (

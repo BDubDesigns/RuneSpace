@@ -57,9 +57,22 @@ export const TurnBackTravelRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
-/** Scavenge supplies only the owned character identity; timing and reward are server-owned. */
+/**
+ * Stop After This Leg (#450) supplies only the owned character identity; which
+ * leg is under way, and where the route then ends, are server-owned.
+ */
+export const StopRouteAfterLegRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/**
+ * Scavenge supplies the owned character identity and, optionally, the start
+ * of the walking leg whose window the player saw (#450). Timing and reward
+ * stay server-owned; the leg identity can only make a claim stricter.
+ */
 export const ScavengeClaimRequestSchema = z.object({
   characterId: z.string().uuid(),
+  travelStartedAt: z.string().datetime().optional(),
 });
 
 /** Acknowledgment is presentation-only and identifies one owned reveal row. */

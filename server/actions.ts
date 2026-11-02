@@ -22,6 +22,7 @@ import { submitAppeal } from "@/server/moderation-notices";
 import {
   getPlayGameplayState,
   beginTransportTravel,
+  beginRouteTravel,
   beginTravel,
   claimScavenge,
   acknowledgeScavengeReveal,
@@ -138,7 +139,7 @@ import {
   type PassengerArrivalAcknowledgmentResult,
 } from "@/server/passenger-commands";
 import { TravelRuleError } from "@/server/travel";
-import { turnBackTravel } from "@/server/travel-commands";
+import { stopRouteAfterLeg, turnBackTravel } from "@/server/travel-commands";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import { markChatMentionsRead, postPromotedTradeAd, sendChatMessage } from "@/server/chat";
@@ -213,6 +214,7 @@ import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
+  StopRouteAfterLegRequestSchema,
   TurnBackTravelRequestSchema,
   ScavengeClaimRequestSchema,
   ScavengeRevealAcknowledgmentRequestSchema,
@@ -1219,6 +1221,34 @@ export async function beginTravelAction(input: unknown): Promise<PlayActionResul
   }
 }
 
+/** Route To (#450): walk to a same-planet location leg by leg. The path is planned server-side. */
+export async function beginRouteTravelAction(input: unknown): Promise<PlayActionResult> {
+  const request = BeginTravelRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid route command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await beginRouteTravel(
+        user.id,
+        request.data.characterId,
+        request.data.destinationLocationId,
+      ),
+    };
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof TravelRuleError) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Stop After This Leg (#450). Arrival wins any race; see `stopRouteAfterLeg`. */
+export async function stopRouteAfterLegAction(input: unknown): Promise<PlayActionResult> {
+  const request = StopRouteAfterLegRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid stop command." };
+  return runPlayAction(request.data.characterId, stopRouteAfterLeg);
+}
+
 /** Board a paid transport ride. The fare and route are resolved server-side. */
 export async function beginTransportTravelAction(input: unknown): Promise<PlayActionResult> {
   const request = BeginTravelRequestSchema.safeParse(input);
@@ -1256,7 +1286,13 @@ export async function claimScavengeAction(input: unknown): Promise<ScavengeClaim
   if (!request.success) return { error: "Invalid Scavenge command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return await claimScavenge(user.id, request.data.characterId);
+    return await claimScavenge(
+      user.id,
+      request.data.characterId,
+      undefined,
+      undefined,
+      request.data.travelStartedAt,
+    );
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError || error instanceof TravelRuleError)

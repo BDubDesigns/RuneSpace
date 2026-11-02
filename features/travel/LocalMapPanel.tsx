@@ -17,7 +17,7 @@ import { GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation, getLocationPlanetId } from "@/game/content/locations";
 import { getPlanetPresentation } from "@/game/content/planets";
-import { beginTravelAction } from "@/server/actions";
+import { beginRouteTravelAction, beginTravelAction } from "@/server/actions";
 import { travelErrorMessage } from "./travel-errors";
 import { usePlay } from "@/features/play/PlayContext";
 import { isPlayInTransit } from "@/features/ship/flight";
@@ -31,9 +31,9 @@ import {
   type LocalMapScrollAffordances,
   type LocalMapScrollDirection,
 } from "./local-map-scroll-affordances";
-import { mapDestinationStatus } from "./map-destination";
+import { mapDestinationRoute, mapDestinationStatus } from "./map-destination";
 import { MapDestinationPanel } from "./MapDestinationPanel";
-import { routeProgressSegment } from "./route-progress";
+import { routeProgressSegment, routeSegmentKey } from "./route-progress";
 import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 
 const WALK_SECONDS = Math.round(
@@ -120,7 +120,11 @@ type HexButtonProps = {
   description: string;
   selected: boolean;
   current: boolean;
-  transitRole?: "origin" | "destination";
+  /**
+   * The hex's part in the Journey under way: the active leg's two ends, and on
+   * a Route To (#450) the hexes still ahead and where the route ends.
+   */
+  transitRole?: "origin" | "destination" | "on_route" | "route_end";
   disabled: boolean;
   /** Whether this tile is directly reachable from the current location (adjacent). */
   directlyReachable: boolean;
@@ -146,9 +150,12 @@ function HexButton({
 }: HexButtonProps) {
   const youAreHere = current;
   const stateLabel = transitRole
-    ? transitRole === "origin"
-      ? "Origin"
-      : "Destination"
+    ? {
+        origin: "Origin",
+        destination: "Destination",
+        on_route: "On route",
+        route_end: "Route end",
+      }[transitRole]
     : youAreHere
       ? "You are here"
       : selected
@@ -184,6 +191,7 @@ function HexButton({
       aria-label={accessibleLabel}
       aria-describedby={`loc-desc-${locationId}`}
       data-map-location={locationId}
+      data-map-transit-role={transitRole}
       data-mission-guidance={missionMarker ? missionMarkerTone(missionMarker) : undefined}
       data-map-mission={missionMarker?.mission ? "true" : undefined}
       data-map-turn-in={missionMarker?.turnIn ? "true" : undefined}
@@ -259,6 +267,7 @@ function HexMapSvg({
   transitProgress,
   travelOriginLocationId,
   travelDestinationLocationId,
+  plannedRouteLocationIds,
   missionTargets,
 }: {
   geometry: LocalMapGeometry;
@@ -268,6 +277,11 @@ function HexMapSvg({
   transitProgress: number;
   travelOriginLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
   travelDestinationLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
+  /**
+   * Route To (#450): the walking legs still ahead, as consecutive hexes — the
+   * previewed route before departure, or the rest of the route in transit.
+   */
+  plannedRouteLocationIds?: readonly string[];
   missionTargets: MissionGuidanceTargets;
 }) {
   const hexWidth = geometry.hexWidth;
@@ -299,6 +313,14 @@ function HexMapSvg({
           progress: transitProgress,
         })
       : undefined;
+
+  // Each planned leg is drawn over its own authored walking edge, so a route
+  // can only ever be shown along lines the map already draws.
+  const plannedRouteSegments = (plannedRouteLocationIds ?? []).flatMap((locationId, index, ids) => {
+    const next = ids[index + 1];
+    const segment = next ? geometry.routeSegments[routeSegmentKey(locationId, next)] : undefined;
+    return next && segment ? [{ key: `${locationId}->${next}`, segment }] : [];
+  });
 
   return (
     <svg
@@ -425,6 +447,21 @@ function HexMapSvg({
           y2={route.endpoints.end.y}
           className="stroke-[color:var(--rs-accent-secondary)]"
           strokeWidth="3"
+          strokeLinecap="round"
+        />
+      ))}
+      {plannedRouteSegments.map(({ key, segment }) => (
+        <line
+          key={`planned-${key}`}
+          data-map-route-plan={key}
+          x1={segment.start.x}
+          y1={segment.start.y}
+          x2={segment.end.x}
+          y2={segment.end.y}
+          className="stroke-[color:var(--rs-accent-arcane)]"
+          strokeDasharray="7 6"
+          strokeOpacity="0.85"
+          strokeWidth="3.5"
           strokeLinecap="round"
         />
       ))}
@@ -568,13 +605,14 @@ export function LocalMapPanel({
     };
   }, [serverNowMs, travel]);
 
-  function travelTo(destinationId: string) {
+  function travelTo(destinationId: string, request: "walk" | "route" = "walk") {
     const execute = () => {
       setTransitioning(true);
       startTransition(() => {
         (async () => {
           try {
-            const result = await beginTravelAction({
+            const command = request === "route" ? beginRouteTravelAction : beginTravelAction;
+            const result = await command({
               characterId: state.characterId,
               destinationLocationId: destinationId,
             });
@@ -621,13 +659,34 @@ export function LocalMapPanel({
   // destination's own derived state decides whether that edge is usable right
   // now, which is what keeps a collapsed Deep Jag from offering a Walk control
   // the server would only refuse.
-  const selectedStatus = selectedLocation
-    ? mapDestinationStatus({
+  // Every other hex is held to its own derived state too, so Route To (#450)
+  // only previews a path through places the character may currently enter.
+  const isTravelable = (locationId: string) =>
+    state.locationStates[locationId]?.travelable !== false;
+  const destinationInput = selectedLocation
+    ? {
         locationId: selectedLocation.id,
         currentLocationId,
         travelable: selectedState?.travelable,
-      })
+        isTravelable,
+      }
     : undefined;
+  const selectedStatus = destinationInput ? mapDestinationStatus(destinationInput) : undefined;
+  const selectedRoute =
+    destinationInput && selectedStatus === "routable"
+      ? mapDestinationRoute(destinationInput)
+      : undefined;
+  const locationName = (locationId: string) =>
+    state.locationStates[locationId]?.displayName ??
+    getLocation(locationId)?.displayName ??
+    locationId;
+  // In transit on a route, the legs still ahead; before departure, the
+  // previewed route to the selected destination.
+  const travelRoute = inTransit ? travel?.route : undefined;
+  const plannedRouteLocationIds =
+    travel && travelRoute && travelRoute.remainingLocationIds.length > 0
+      ? [travel.destinationLocationId, ...travelRoute.remainingLocationIds]
+      : selectedRoute;
 
   // Every new destination opens compact, so its travel action is in view.
   function selectLocation(locationId: string) {
@@ -689,8 +748,8 @@ export function LocalMapPanel({
         ) : null}
       </div>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-        Locations are hexes connected by routes. Select a reachable hex to inspect it, then confirm
-        to walk there.
+        Locations are hexes connected by routes. Select a hex to inspect it, then confirm to walk
+        there — one step to a neighbor, or Route To somewhere further along the way.
       </p>
 
       {/* Flat-top hexes form the local map. The SVG renders plated chassis,
@@ -731,6 +790,7 @@ export function LocalMapPanel({
               transitProgress={transitProgress}
               travelOriginLocationId={travel?.originLocationId}
               travelDestinationLocationId={travel?.destinationLocationId}
+              plannedRouteLocationIds={plannedRouteLocationIds}
               missionTargets={missionTargets}
             />
             {mapGeometry.layouts.map((layout) => {
@@ -757,7 +817,11 @@ export function LocalMapPanel({
                       ? "origin"
                       : inTransit && travel?.destinationLocationId === location.id
                         ? "destination"
-                        : undefined
+                        : travelRoute?.finalDestinationLocationId === location.id
+                          ? "route_end"
+                          : travelRoute?.remainingLocationIds.includes(location.id)
+                            ? "on_route"
+                            : undefined
                   }
                   disabled={inTransit}
                   directlyReachable={
@@ -802,6 +866,8 @@ export function LocalMapPanel({
           name={selectedState?.displayName ?? selectedLocation.displayName}
           onToggleDetails={() => setDetailsFor(detailsOpen ? undefined : selectedLocation.id)}
           onWalk={() => travelTo(selectedLocation.id)}
+          onRoute={() => travelTo(selectedLocation.id, "route")}
+          route={selectedRoute?.map(locationName)}
           status={selectedStatus}
           walkDisabled={busy || transitioning}
           walkSeconds={WALK_SECONDS}

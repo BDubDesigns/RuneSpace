@@ -407,6 +407,13 @@
       "when": 1793382935488,
       "tag": "0057_resonance_rig_arrival",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793469335488,
+      "tag": "0058_route_to",
+      "breakpoints": true
     }
   ]
 }

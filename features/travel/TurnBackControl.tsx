@@ -19,7 +19,14 @@ import { turnBackTravelAction } from "@/server/actions";
  * the accepted authoritative state replaces this panel either way, and there is
  * no client-side latch to clear.
  */
-export function TurnBackControl({ rideFare }: { rideFare: boolean }) {
+export function TurnBackControl({
+  rideFare,
+  routeNote,
+}: {
+  rideFare: boolean;
+  /** On a Route To (#450): what Turn Back ends, and where it leaves the player. */
+  routeNote?: string;
+}) {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState(false);
@@ -59,6 +66,7 @@ export function TurnBackControl({ rideFare }: { rideFare: boolean }) {
         Turn Back
       </ActionButton>
       {rideFare ? <Feedback>Fare won&apos;t be refunded.</Feedback> : null}
+      {routeNote ? <Feedback>{routeNote}</Feedback> : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
     </div>
   );
