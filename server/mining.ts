@@ -108,6 +108,8 @@ export type MiningSnapshot = {
   miningLevel: number;
   /** Worn hands and feet gear's success-chance-only bonus (#399). */
   successLevelBonus: number;
+  /** Worn gear's additive Mining XP bonus in basis points, applied per attempt (#465). */
+  xpBonusBps: number;
   /** The character's Prioritize primary resources setting (#342). */
   prioritizePrimaryResources: boolean;
   /** The equipped Mining tool's authored definition, or undefined (#233). */
