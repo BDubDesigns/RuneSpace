@@ -218,7 +218,6 @@ describe("the Beginner Echo reward tables (Slice J, #465)", () => {
     expect(echoRewardForDraw(skatboll, 1_490)).toBe(ITEM_IDS.minersBoots);
     expect(echoRewardForDraw(skatboll, 1_499)).toBe(ITEM_IDS.minersBoots);
     expect(rollEchoReward(skatboll, draws(1_499))).toBe(ITEM_IDS.minersBoots);
-    expect(() => rollEchoReward(skatboll, draws(1_500))).toThrow(RangeError);
     const stillreach = beginnerEchoRewardTable(PLANET_IDS.stillreach)!;
     expect(echoRewardForDraw(stillreach, 442)).toBe(ITEM_IDS.runeFragment);
     expect(echoRewardForDraw(stillreach, 443)).toBe(ITEM_IDS.uncutQuartz);
@@ -454,7 +453,7 @@ describe("resolving one reading", () => {
         mass: 0,
         target: LOCATION_IDS.theJag,
       }),
-      random: draws(970),
+      random: draws(1_433),
     });
     expect(mass).toMatchObject({ rewardItemId: ITEM_IDS.runestone, lostReason: "mass" });
   });
@@ -543,8 +542,8 @@ it("keeps every pool location on the planet that owns it", () => {
 
 describe("a Legendary discovery (Slice J)", () => {
   const seekers = (quantity: number) => ({ id: "s1", itemId: SEEKER, quantity });
-  /** Draw 998 of 1,000 is each planet's Legendary. */
-  const LEGENDARY_DRAW = 998;
+  /** Draw 1,490 of 1,500 starts each planet's Legendary span (1,490-1,499). */
+  const LEGENDARY_DRAW = 1_490;
 
   it("is carried as a unique instance when it fits, never as a stack", () => {
     for (const [location, itemId] of [

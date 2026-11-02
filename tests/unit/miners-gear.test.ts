@@ -300,7 +300,9 @@ describe("the Mining XP bonus", () => {
       nextUnit: () => 0,
     };
     return resolveMining({
-      elapsedTicks: ticks * (options.attempts ?? 1),
+      elapsedTicks:
+        ((options.source as { attemptDurationTicks?: number } | undefined)?.attemptDurationTicks ??
+          ticks) * (options.attempts ?? 1),
       snapshot: {
         miningLevel: 1,
         prioritizePrimaryResources: false,
