@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #481 — announce Route To after #450 shipped.
+    slug: "route-to-automatic-walking",
+    title: "Route To Is Here",
+    publishedAt: "2026-11-01T22:37:00-08:00",
+    summary:
+      "Choose a reachable place farther away and let Route To handle each ordinary walk along the way.",
+    body: [
+      "You can now choose a reachable place on your planet's Map, even when it is more than one hex away. Select it to preview the route, every stop, the number of legs and the total walking time, then choose Route To to begin. The route follows the shortest legal walking path.",
+      "Every leg is still a normal 24-second walk. There's no speed boost or special transportation: you arrive at each stop along the way, and the next leg starts when you get there. Each eligible leg has its usual chance to Scavenge, but you need to claim any find yourself while its window is open.",
+      "The Journey shows which leg you're on, your current stop, the remaining path and your destination. Stop After This Leg completes the walk you're on and ends the route when you arrive. Turn Back cancels the active walk and the rest of the route, leaving you where that leg began.",
+      "Your route keeps progressing according to server time if you refresh, lose connection or close the game. When you return, you'll be where the completed walks took you; any Scavenge finds you weren't there to claim are gone.",
+      [
+        "Thanks to Mycerale, whose soft-alpha feedback first asked for an easier way to start longer walks. For route details, see ",
+        { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+        ".",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Route To for previewing and automatically walking the shortest legal path to a reachable non-adjacent hex, with progress and stop controls in the Journey.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Multi-hex routes use ordinary 24-second walks and per-leg Scavenge opportunities, with manual claims and travel that continues across refreshes and disconnections.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #466 — consolidated soft-alpha fixes and improvements.
     slug: "soft-alpha-fixes-and-improvements",
     title: "Soft-Alpha Fixes & Improvements",
