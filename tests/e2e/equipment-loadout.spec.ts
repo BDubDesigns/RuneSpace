@@ -273,6 +273,7 @@ test.describe("Equipment loadout grid (#364)", () => {
     await expect(glovesDetails).not.toContainText("Miner's Boots");
     await glovesDetails.locator("[data-candidate]").click();
     await expect(glovesDetails).toContainText("+1 effective Mining level for success chance");
+    await expect(glovesDetails).toContainText("+5% Mining XP");
     await glovesDetails.getByRole("button", { name: "Equip in Gloves" }).click();
     await expect(equipmentSlotTile(equipment, "Gloves").getByRole("button")).toHaveAccessibleName(
       "Gloves: Miner's Gloves, equipped",
@@ -280,6 +281,7 @@ test.describe("Equipment loadout grid (#364)", () => {
     await expect(equipment.locator("[data-mining-success-bonus]")).toContainText(
       "+1 effective Mining level for success chance only",
     );
+    await expect(equipment.locator("[data-mining-xp-bonus-bps]")).toContainText("+5% Mining XP");
 
     const bootsDetails = await selectEquipmentSlot(equipment, "Boots");
     await bootsDetails.locator("[data-candidate]").click();
@@ -287,6 +289,7 @@ test.describe("Equipment loadout grid (#364)", () => {
     await expect(equipment.locator("[data-mining-success-bonus]")).toContainText(
       "+2 effective Mining levels for success chance only",
     );
+    await expect(equipment.locator("[data-mining-xp-bonus-bps]")).toContainText("+10% Mining XP");
     // Both stay independently operable: unequipping one leaves the other worn.
     await bootsDetails.getByRole("button", { name: "Unequip" }).click();
     await expect(equipment.locator("[data-mining-success-bonus]")).toContainText("+1 effective");

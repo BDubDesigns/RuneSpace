@@ -31,6 +31,7 @@ import {
   type ItemReferenceSource,
   type ItemReferenceUse,
 } from "@/game/domain/item-reference";
+import { formatEchoRewardChance } from "@/game/domain/echo-hunts";
 import { formatMassGrams } from "@/game/domain/mass";
 import { getWikiArticles, WIKI_ITEMS_PATH } from "./public-wiki";
 
@@ -387,7 +388,7 @@ function sourceLine(itemId: string, source: ItemReferenceSource): WikiItemLine {
         source.planets
           .map(
             (planet) =>
-              `${getPlanetPresentation(planet.planetId as PlanetId).displayName} ${planet.percent}%`,
+              `${getPlanetPresentation(planet.planetId as PlanetId).displayName} ${formatEchoRewardChance(planet.weight, planet.weightTotal)}`,
           )
           .join(", "),
         " per Echo. Hunting needs Beginner Echo Seekers, made at the Resonance Rig once you have completed ",

@@ -470,8 +470,8 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
       const { userId, characterId } = await makeCharacter("Found");
       await give(characterId, SEEKER, 3);
       await plantHunt(characterId, PLANET_IDS.stillreach, LOCATION_IDS.hilltopWorkshop);
-      // Draw 970 is the first of Stillreach's Runestone span (960-997).
-      const { end, state } = await read(userId, characterId, start, rolls(970));
+      // Draw 1,433 is the first of Stillreach's Runestone span (1,433-1,489 of 1,500).
+      const { end, state } = await read(userId, characterId, start, rolls(1_433));
       expect(await hunts(characterId)).toEqual([]);
       expect(await runeworkingXp(characterId)).toBe(50);
       expect(await carried(characterId, ITEM_IDS.runestone)).toBe(1);
@@ -530,8 +530,8 @@ suite("issue #393 Beginner Echo hunts (real PostgreSQL)", () => {
   });
 
   describe("a Legendary discovery (Slice J)", () => {
-    /** Draw 998 of 1,000 is the current planet's Legendary on both planets. */
-    const LEGENDARY = 998;
+    /** Draw 1,490 of 1,500 is the first of the current planet's Legendary span (1,490-1,499) on both planets. */
+    const LEGENDARY = 1_490;
 
     it("creates one unique instance in Inventory, announces it once, and pays the XP", async () => {
       const { userId, characterId } = await makeCharacter("LegendCarried");

@@ -26,10 +26,15 @@ import {
   type EquipmentSlotState,
 } from "./equipment-loadout";
 
+function formatMiningXpBonusPercent(bps: number): string {
+  return `${bps / 100}%`;
+}
+
 function itemFacts(item: {
   massGrams: number;
   slotCapacity?: number;
   miningSuccessLevelBonus?: number;
+  miningXpBonusBps?: number;
 }) {
   return (
     <>
@@ -37,6 +42,9 @@ function itemFacts(item: {
       {item.slotCapacity !== undefined ? ` · +${item.slotCapacity} Inventory slots` : ""}
       {item.miningSuccessLevelBonus !== undefined
         ? ` · +${item.miningSuccessLevelBonus} effective Mining level for success chance`
+        : ""}
+      {item.miningXpBonusBps
+        ? ` · +${formatMiningXpBonusPercent(item.miningXpBonusBps)} Mining XP`
         : ""}
     </>
   );
@@ -215,6 +223,15 @@ export function EquipmentPanel({
           Worn gear: +{state.equipment.miningSuccessLevelBonus} effective Mining{" "}
           {state.equipment.miningSuccessLevelBonus === 1 ? "level" : "levels"} for success chance
           only. Your Mining level and every unlock are unchanged.
+        </p>
+      ) : null}
+      {state.equipment.miningXpBonusBps > 0 ? (
+        <p
+          className="mt-1 text-xs text-[color:var(--rs-text-secondary)]"
+          data-mining-xp-bonus-bps={state.equipment.miningXpBonusBps}
+        >
+          Worn gear: +{formatMiningXpBonusPercent(state.equipment.miningXpBonusBps)} Mining XP on
+          each extraction attempt. Other skills, yields and extraction speed are unchanged.
         </p>
       ) : null}
       <div

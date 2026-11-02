@@ -450,6 +450,15 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           chance only; you are still Mining {state.mining.level}.
         </p>
       ) : null}
+      {source.xpBonusBps > 0 ? (
+        <p
+          className="text-xs text-[color:var(--rs-text-secondary)]"
+          data-mining-xp-bonus-bps={source.xpBonusBps}
+        >
+          Your worn gear adds +{source.xpBonusBps / 100}% Mining XP to each attempt, rounded up once
+          per attempt. Yield and speed are unchanged.
+        </p>
+      ) : null}
       {levelLocked ? (
         <div data-mining-level-gate={source.requiredMiningLevel}>
           <Feedback tone="muted">

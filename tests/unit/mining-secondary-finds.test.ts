@@ -10,6 +10,7 @@ import { getMerchant } from "@/game/content/merchants";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
+  applyMiningXpBonus,
   miningAwardFacts,
   miningPreflightStopReason,
   resolveMining,
@@ -743,6 +744,35 @@ describe("Rune Fragments as a Secondary Find (#367)", () => {
       secondaryFinds: [{ itemId: FRAGMENT, quantity: 1 }],
       xpAwarded: 35,
     });
+  });
+
+  it("applies the worn-gear Mining XP bonus once to the success plus a retained find's XP (#465)", () => {
+    // The Jag: 15 success XP + 20 for the Fragment = 35 base.
+    const xp = (xpBonusBps: number) =>
+      resolveOne({
+        source: jag,
+        snapshot: { xpBonusBps },
+        draws: { integers: [rollFor(jag, FRAGMENT)] },
+      }).attempt?.xpAwarded;
+    expect(xp(0)).toBe(35);
+    expect(xp(500)).toBe(applyMiningXpBonus(35, 500)); // 37: ceil(36.75)
+    expect(xp(1_000)).toBe(applyMiningXpBonus(35, 1_000)); // 39: ceil(38.5)
+    expect(xp(500)).toBe(37);
+    expect(xp(1_000)).toBe(39);
+  });
+
+  it("gives a forfeited find no XP and no bonus on it, bonus or not (#465)", () => {
+    const forfeited = (xpBonusBps: number) =>
+      resolveOne({
+        source: jag,
+        snapshot: { prioritizePrimaryResources: true, massAvailableGrams: 100, xpBonusBps },
+        draws: { integers: [rollFor(jag, FRAGMENT)] },
+      });
+    expect(forfeited(0).attempt?.xpAwarded).toBe(15);
+    // Only the 15 base is eligible: 15 -> 16 (one piece), 17 (both); never 35's 37 / 39.
+    expect(forfeited(500).attempt).toMatchObject({ secondaryFinds: [], xpAwarded: 16 });
+    expect(forfeited(1_000).attempt).toMatchObject({ secondaryFinds: [], xpAwarded: 17 });
+    expect(forfeited(1_000).resolution.awardedXp).toBe(17);
   });
 
   it("is ordinary: no rarity, no merchant price and no announcement", () => {

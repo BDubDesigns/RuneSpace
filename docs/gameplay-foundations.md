@@ -1992,24 +1992,27 @@ Mission credit stand. A **Legendary** that does not fit is the one exception:
 it is mailed through FedHex instead of lost (see "FedHex and the Legendary
 miner's set" below). Use is never blocked because the inventory looks full.
 
-**Reward tables (Slice J).** Integer weights out of 1,000
-(`balance.echoHunts.beginner.rewardTables`). Rune Fragment is **30.0%** on both
-planets and the freed 0.2% is each planet's one Legendary: Skatboll's **Miner's
-Boots** and Stillreach's **Miner's Gloves**, **2/1,000 = 0.2% = 1/500** of
-completed Echoes, never the other planet's. Every other rate is Slice I's.
+**Reward tables (Slice J, #465).** Integer weights out of **1,500**
+(`balance.echoHunts.beginner.rewardTables`). Each planet's one Legendary,
+Skatboll's **Miner's Boots** and Stillreach's **Miner's Gloves**, is
+**10/1,500 = exactly 1 in 150** (0.666…%) of completed Echoes, never the other
+planet's; 1,000 could not express 1/150, hence the denominator. Rune Fragment
+alone gave up the difference (**443/1,500 = 29.53%**, was 30%); every other
+rate is unchanged. No pity, guarantee or extra requirement, and an Echo that
+already resolved is never rerolled.
 
-| Item | Skatboll | Stillreach |
+| Item | Skatboll (weight) | Stillreach (weight) |
 | --- | ---: | ---: |
-| Rune Fragment | 30% | 30% |
-| Uncut Quartz | 24% | 26% |
-| Uncut Topaz | 16% | 20% |
-| Uncut Sapphire | 10% | 10% |
-| Refined Ferrite | 12% | — |
-| Galvanic Stock | 5% | — |
-| Empty Small Fuel Canister | — | 10% |
-| Intact Runestone | 2.8% | 3.8% |
-| **Legendary** Miner's Boots | 0.2% | — |
-| **Legendary** Miner's Gloves | — | 0.2% |
+| Rune Fragment | 29.53% (443) | 29.53% (443) |
+| Uncut Quartz | 24% (360) | 26% (390) |
+| Uncut Topaz | 16% (240) | 20% (300) |
+| Uncut Sapphire | 10% (150) | 10% (150) |
+| Refined Ferrite | 12% (180) | — |
+| Galvanic Stock | 5% (75) | — |
+| Empty Small Fuel Canister | — | 10% (150) |
+| Intact Runestone | 2.8% (42) | 3.8% (57) |
+| **Legendary** Miner's Boots | 1 in 150 (10) | — |
+| **Legendary** Miner's Gloves | — | 1 in 150 (10) |
 
 **The result is durable.** Each resolved reading writes one
 `echo_reading_notices` row keyed by its own completion instant, shown as a
@@ -2023,8 +2026,25 @@ own `item_instances` row, duplicates are allowed, and a character equips at most
 one per slot. Equipped, each is worth **+1 effective Mining level for success
 chance only** (+2 together), applied to the server-authoritative Mining roll and
 the projected success chance, capped by the existing curve. It never changes the
-natural Mining level, the access gates, durations, XP, primary yield, charged
-bonuses or secondary rates. They need no Mining level to equip. Equip, swap and
+natural Mining level, the access gates, durations, primary yield, charged
+bonuses or secondary rates. They need no Mining level to equip.
+
+**Mining XP bonus (#465).** Each worn piece also authors
+`miningXpBonusBps: 500` (+5% Mining XP). `deriveEquipmentLoadout` sums it
+across the genuinely equipped pieces (0, 500 or 1,000 bps: **additive**, never
+1.05 × 1.05) and the Mining snapshot carries it into `resolveMining`, which
+applies `applyMiningXpBonus(baseXp, bps) = ceil(baseXp × (10000 + bps) / 10000)`
+**once per extraction attempt**. The base is everything that attempt legitimately
+awarded: the source's success XP plus the XP of a Secondary Find actually
+retained, or a low yield's XP; a find forfeited under Prioritize primary
+resources earns none. Base 20 → 20 / 21 / 22, 25 → 25 / 27 / 28, 100 → 100 /
+105 / 110 (none / one / both), and 0 stays 0. The rounded figure is the attempt's
+`xpAwarded`, and the run total, the persisted skill XP and the displayed state
+all sum it, so a long run equals the same attempts taken separately. Only
+equipped gear counts (carried, stashed or Cargo-held pieces give nothing), an
+attempt already resolved never changes when gear is swapped later, and the bonus
+applies on sources where success is already guaranteed. It is Mining XP only: no
+other skill, yield, speed or gate reads it. Equip, swap and
 unequip use the existing equipment evaluator, so a full Inventory refuses an
 unequip like any other item. They trade through the unchanged same-location
 player trade once carried and unequipped; a Legendary or Ultra Rare item in

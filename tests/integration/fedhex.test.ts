@@ -405,6 +405,8 @@ suite("issue #399 FedHex mailbox and Legendary gear (real PostgreSQL)", () => {
       const base = await read();
       const natural = base.miningSource!.successChanceBps;
       expect(base.equipment.miningSuccessLevelBonus).toBe(0);
+      expect(base.equipment.miningXpBonusBps).toBe(0);
+      expect(base.miningSource!.xpBonusBps).toBe(0);
 
       const [gloves] = await instancesOf(who.characterId, GLOVES);
       const one = await equipment.changeEquipment(
@@ -414,6 +416,8 @@ suite("issue #399 FedHex mailbox and Legendary gear (real PostgreSQL)", () => {
         start,
       );
       expect(one.equipment.miningSuccessLevelBonus).toBe(1);
+      expect(one.equipment.miningXpBonusBps).toBe(500);
+      expect(one.miningSource!.xpBonusBps).toBe(500);
       expect(one.miningSource!.successChanceBps).toBeGreaterThan(natural);
       expect(one.miningSource!.successLevelBonus).toBe(1);
       const two = await equipment.changeEquipment(
@@ -423,6 +427,8 @@ suite("issue #399 FedHex mailbox and Legendary gear (real PostgreSQL)", () => {
         start,
       );
       expect(two.equipment.miningSuccessLevelBonus).toBe(2);
+      expect(two.equipment.miningXpBonusBps).toBe(1_000);
+      expect(two.miningSource!.xpBonusBps).toBe(1_000);
       expect(two.miningSource!.successChanceBps).toBeGreaterThan(
         one.miningSource!.successChanceBps,
       );
@@ -439,6 +445,7 @@ suite("issue #399 FedHex mailbox and Legendary gear (real PostgreSQL)", () => {
         start,
       );
       expect(unequipped.equipment.miningSuccessLevelBonus).toBe(1);
+      expect(unequipped.equipment.miningXpBonusBps).toBe(500);
     });
 
     it("refuses to put Boots on the hands, and the slots accept only their own piece", async () => {
