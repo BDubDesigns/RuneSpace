@@ -137,13 +137,13 @@ export function pow({ x, y, at: t, text = 'BONK!', dur = 1000, rot = -8, scale =
 }
 
 /** Ring of expanding impact rays. */
-export function rays({ x, y, at: t, n = 12, r0 = 30, r1 = 90, dur = 420, stroke = '#111', width = 6 }) {
+export function rays({ x, y, at: t, n = 12, r0 = 30, r1 = 90, dur = 420, stroke = '#111', width = 6, late = false }) {
   let s = '';
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
     s += `<line x1="${(Math.cos(a) * r0).toFixed(1)}" y1="${(Math.sin(a) * r0).toFixed(1)}" x2="${(Math.cos(a) * r1).toFixed(1)}" y2="${(Math.sin(a) * r1).toFixed(1)}" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round"/>`;
   }
-  return at(x, y, `<g class="fx fx-rays" style="${v({ at: t, dur })}">${s}</g>`);
+  return at(x, y, `<g class="fx fx-rays${late ? ' fx-late' : ''}" style="${v({ at: t, dur })}">${s}</g>`);
 }
 
 /** Floating snore Zs. */
@@ -264,7 +264,7 @@ export function arc({ x, y, at: t, dur = 140, n = 6, r = 40 }) {
   return at(
     x,
     y,
-    `<g class="fx fx-arc" style="${v({ at: t, dur, n })}">
+    `<g class="fx fx-arc fx-late" style="${v({ at: t, dur, n })}">
        <circle r="${r * 0.9}" fill="#fff" opacity=".38"/><circle r="${r * 0.55}" fill="#fff" opacity=".7"/>
        ${star(r * 1.5, 0)}${star(r * 0.9, 45)}<circle r="${r * 0.22}" fill="#fff"/>
      </g>`
@@ -306,7 +306,7 @@ export function lightbulb({ x, y, at: t, dur = 1800, scale = 1 }) {
 export function rings({ x, y, at: t, n = 3, gap = 140, dur = 700, r = 120, width = 7 }) {
   let s = '';
   for (let i = 0; i < n; i++) {
-    s += `<circle class="fx fx-ring" r="${r}" fill="none" stroke="#111" stroke-width="${width}" style="${v({ at: t + i * gap, dur })}"/>`;
+    s += `<circle class="fx fx-ring fx-late" r="${r}" fill="none" stroke="#111" stroke-width="${width}" style="${v({ at: t + i * gap, dur })}"/>`;
   }
   return at(x, y, s);
 }

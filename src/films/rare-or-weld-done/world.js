@@ -183,6 +183,16 @@ function plainDoor(id, x) {
   </g>`;
 }
 
+/** The dark opening cut in the wall (front view), down to the plaza line. Draw it AFTER the wall when it should appear later. */
+export function wallHole() {
+  const B = GY - 22;
+  return `<g>
+    <path d="M${WALL.cx - WALL.hw - 8} ${B} L${WALL.cx - WALL.hw - 8} ${WALL.top + 60} Q${WALL.cx - WALL.hw - 8} ${WALL.top - 14} ${WALL.cx} ${WALL.top - 14} Q${WALL.cx + WALL.hw + 8} ${WALL.top - 14} ${WALL.cx + WALL.hw + 8} ${WALL.top + 60} L${WALL.cx + WALL.hw + 8} ${B}Z" fill="${INK}" stroke="${INK}" stroke-width="6"/>
+    <path d="M${WALL.cx - WALL.hw} ${B} L${WALL.cx - WALL.hw} ${WALL.top + 60} Q${WALL.cx - WALL.hw} ${WALL.top} ${WALL.cx} ${WALL.top} Q${WALL.cx + WALL.hw} ${WALL.top} ${WALL.cx + WALL.hw} ${WALL.top + 60} L${WALL.cx + WALL.hw} ${B}Z" fill="url(#g-hole)"/>
+    <path d="M${WALL.cx - WALL.hw - 8} ${WALL.top + 90} l-10 -8 l8 -12 M${WALL.cx + WALL.hw + 8} ${WALL.top + 120} l10 -6 l-6 -14" stroke="${INK}" stroke-width="4" fill="none"/>
+  </g>`;
+}
+
 /**
  * The museum wall from outside. o: { hole: bool (draw the dark opening), day: bool, door: bool, cam: bool }.
  * `${id}.sweep` is the searchlight; `${id}.cam*` the camera.
@@ -196,13 +206,7 @@ export function museumFront(id, { hole = false, day = false, door = true, cam = 
     panels += `<path d="M${x} 168 L${x} ${GY - 4}" stroke="${seam}" stroke-width="7"/>${rivets(x + 24, 190, x + 300, 55)}${rivets(x + 24, 330, x + 300, 55)}${rivets(x + 24, 470, x + 300, 55)}`;
   }
   const crenel = [...Array(54)].map((_, i) => `<rect x="${-1200 + i * 70}" y="60" width="42" height="52" fill="${day ? '#8a8a8a' : '#4a4a4a'}" ${S} stroke-width="5"/>`).join('');
-  const holeSvg = hole
-    ? `<g>
-        <path d="M${WALL.cx - WALL.hw - 8} ${GY} L${WALL.cx - WALL.hw - 8} ${WALL.top + 60} Q${WALL.cx - WALL.hw - 8} ${WALL.top - 14} ${WALL.cx} ${WALL.top - 14} Q${WALL.cx + WALL.hw + 8} ${WALL.top - 14} ${WALL.cx + WALL.hw + 8} ${WALL.top + 60} L${WALL.cx + WALL.hw + 8} ${GY}Z" fill="${INK}" stroke="${INK}" stroke-width="6"/>
-        <path d="M${WALL.cx - WALL.hw} ${GY} L${WALL.cx - WALL.hw} ${WALL.top + 60} Q${WALL.cx - WALL.hw} ${WALL.top} ${WALL.cx} ${WALL.top} Q${WALL.cx + WALL.hw} ${WALL.top} ${WALL.cx + WALL.hw} ${WALL.top + 60} L${WALL.cx + WALL.hw} ${GY}Z" fill="url(#g-hole)"/>
-        <path d="M${WALL.cx - WALL.hw - 8} ${WALL.top + 90} l-10 -8 l8 -12 M${WALL.cx + WALL.hw + 8} ${WALL.top + 120} l10 -6 l-6 -14" stroke="${INK}" stroke-width="4" fill="none"/>
-      </g>`
-    : '';
+  const holeSvg = hole ? wallHole() : '';
   return `${sky}
     <path d="M-1200 ${GY - 220} L-1200 ${GY} L2480 ${GY} L2480 ${GY - 260} L2200 ${GY - 260} L2200 ${GY - 340} L1900 ${GY - 340} L1900 ${GY - 220} L1500 ${GY - 220} L1500 ${GY - 300} L1260 ${GY - 300} L1260 ${GY - 200} L700 ${GY - 200} L700 ${GY - 410} L520 ${GY - 410} L520 ${GY - 250} L-300 ${GY - 250} L-300 ${GY - 330} L-560 ${GY - 330} L-560 ${GY - 220}Z" fill="${day ? '#bdbdbd' : '#1b1b1b'}" opacity=".0"/>
     <rect x="-1200" y="108" width="3680" height="${GY - 108}" fill="${wallFill}" ${S} stroke-width="6"/>

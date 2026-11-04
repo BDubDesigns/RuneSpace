@@ -166,3 +166,6 @@
   0%   { opacity: 0.9; transform: scale(0.25); }
   100% { opacity: 0; transform: scale(1.6); }
 }
+
+/* An effect whose first keyframe is visible must not show during its start delay: fill forwards only. */
+.fx-late { animation-fill-mode: forwards; }

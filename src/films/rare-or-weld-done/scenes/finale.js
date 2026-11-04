@@ -6,7 +6,7 @@
  *   reread, plate                he rereads "ONE WEEK ONLY!", then welds a plate over the sign: OPEN DAILY
  */
 import { prospector } from '../../../art/prospector.js';
-import { torch, gasCart, booth, signboard, plate, scroll, scrollPoint, TORCH_TIP } from '../../../art/weld.js';
+import { torch, gasCart, connectHose, dragCart, booth, signboard, plate, scroll, scrollPoint, TORCH_TIP } from '../../../art/weld.js';
 import { newspaper, creditPile, coin } from '../../../art/heist.js';
 import { tourist } from '../../../art/crowd.js';
 import { placed, INK } from '../../../art/props.js';
@@ -27,15 +27,23 @@ const smoke = (p, t, o = {}) => puff({ x: p.x, y: p.y, at: t, dur: o.dur ?? 1400
 /** One arc window per entry [startMs, endMs] (scene-relative), as markup for the torch tip. */
 const flares = (at, windows, r = 30) => windows.map(([a, b]) => arc({ x: 0, y: 0, at: at(a), dur: 130, n: Math.max(1, Math.round((b - a) / 130)), r })).join('');
 
+/** A gas cart the thief drags by its hose, plus the hose itself (markup; draw it before the thief). */
+const rig = (cues, at, id, thief, { x, y, t1, dist = 240, len = 420 }) => {
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x, y });
+  dragCart(cues, cart, `${id}.gc.wheel`, thief, at(0), t1, { dist });
+  return `${cart.html}${connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1, len })}`;
+};
+
 /* ------------------------------------------------------------------ despair */
 
 export function despair(ctx) {
   const { cues, at, id } = ctx;
   const cam = new Camera(cues, id, { x: 640, y: 380, s: 1.0 });
   const EX = 330;
-  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 800, y: GY, scale: SC, face: 'sad', goggles: 'up', armF: -146, armB: -150, legF: -90, legB: -82 });
+  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 800, y: GY, scale: SC, face: 'sad', goggles: 'up', armF: -146, armB: -150, legF: -90, legB: -82, props: { F: torch(`${id}.tc`) } });
   thief.bob.set(at(0), { y: 60 }); // sits on the ground: the hips drop to the floor
-  const tc = placed(cues, `${id}.torch`, `<g transform="scale(.9)">${torch(`${id}.tc`)}</g>`, { x: 930, y: GY + 18, rot: -3 });
+  show(cues, `${id}.thief.propF`, at(790), true); // the torch is in his hand once it drops
+  thief.propF.set(at(790), { rot: 30 });
   const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: 1060, y: GY + 6 });
   const cr = { x: EX, y: GY + 6, rx: 250, ry: 44 };
   const gem = `<g transform="translate(${EX} ${GY + 34}) rotate(4) scale(1.4)">${emerald(`${id}.em`, { w: 300, h: 360 })}</g>`;
@@ -69,7 +77,7 @@ export function despair(ctx) {
     sparkle({ x: 928, y: GY - 6, at: at(4100), dur: 900, r: 26, n: 3, s: 1.2 }) +
     sparkle({ x: 300, y: 300, at: at(3300), dur: 900, r: 34, n: 3, s: 1.3 }) +
     lightbulb({ x: 800, y: GY - 300, at: at(4700), dur: 1300, scale: 1.0 });
-  return cam.html(`${distantRoad(id)}${craterBack(id, cr)}${gem}${craterFront(id, cr)}${cart.html}${tc.html}${thief.html}${fx}`);
+  return cam.html(`${distantRoad(id)}${craterBack(id, cr)}${gem}${craterFront(id, cr)}${cart.html}${connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(800), t1: at(ctx.dur), len: 420 })}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ montage: posts */
@@ -78,45 +86,46 @@ export function posts(ctx) {
   const { cues, at, id } = ctx;
   const cam = new Camera(cues, id, { x: 520, y: 430, s: 1.0 });
   const y = yard(cues, id, { posts: 'anim', runs: { fl: 'none', fr: 'none', lw: 'none', rw: 'none', bk: 'none' }, gate: 'none', noLight: true });
-  const W = [[260, 520], [620, 880], [1380, 1640], [2280, 2540]];
+  const W = [[364, 728], [868, 1232], [1932, 2296], [3192, 3556]];
   const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 520, y: FY, scale: SC, flip: -1, face: 'plot', goggles: 'down', props: { F: torch(`${id}.tc`, flares(at, W)) }, armF: -70 });
   thief.propF.set(at(0), { rot: 40 });
   const tip = (i, dx) => ({ x: YARD.posts[i].x + dx, y: YARD.posts[i].y - 10 });
   const aim = (t0, dur, p) => aimAlong(thief, at(t0), dur, (s) => ({ x: p.x, y: p.y - 60 * (1 - s) }), { toolLen: TORCH_TIP.x, step: 90, prefer: 5, lead: 90 });
   const flip = (t, dir) => thief.root.to(at(t), 1, { flip: dir }, { ease: 'linear', reduce: 'snap' });
 
-  aim(260, 260, tip(4, 10));
-  y.post(4, at(330));
-  flip(570, 1);
-  aim(620, 260, tip(5, -10));
-  y.post(5, at(690));
-  flip(899, -1);
-  thief.walk(at(900), 400, 330, { stride: 200, amp: 34, bounce: 7, swing: 0 });
-  aim(1380, 260, tip(0, 12));
-  y.post(0, at(1450));
-  flip(1659, 1);
-  thief.walk(at(1660), 560, 715, { stride: 220, amp: 34, bounce: 7, swing: 0 });
-  aim(2280, 260, tip(1, -12));
-  y.post(1, at(2350));
+  aim(364, 364, tip(4, 10));
+  y.post(4, at(462));
+  flip(798, 1);
+  aim(868, 364, tip(5, -10));
+  y.post(5, at(966));
+  flip(1259, -1);
+  thief.walk(at(1260), 560, 330, { stride: 200, amp: 34, bounce: 7, swing: 0 });
+  aim(1932, 364, tip(0, 12));
+  y.post(0, at(2030));
+  flip(2323, 1);
+  thief.walk(at(2324), 784, 715, { stride: 220, amp: 34, bounce: 7, swing: 0 });
+  aim(3192, 364, tip(1, -12));
+  y.post(1, at(3290));
   // --- the rest go up in a flurry: torch swept toward the back, goggles up, hop
-  thief.goggles(at(2600), 'up');
-  thief.face(at(2600), 'cheer');
-  thief.armF.to(at(2600), 260, { rot: -150 }, { ease: 'ease-out' });
-  thief.propF.to(at(2600), 260, { rot: 70 }, { ease: 'ease-out' });
-  thief.bob.hop(at(2650), 320, 36);
-  y.post(2, at(2700), 240);
-  y.post(3, at(2800), 240);
+  thief.goggles(at(3640), 'up');
+  thief.face(at(3640), 'cheer');
+  thief.armF.to(at(3640), 260, { rot: -150 }, { ease: 'ease-out' });
+  thief.propF.to(at(3640), 260, { rot: 70 }, { ease: 'ease-out' });
+  thief.bob.hop(at(3710), 320, 36);
+  y.post(2, at(3780), 240);
+  y.post(3, at(3920), 240);
 
   const fx =
-    spark(tip(4, 10), at(300), { seed: 1 }) + spark(tip(4, 10), at(430), { seed: 2, n: 6 }) + smoke(tip(4, 10), at(380)) +
-    spark(tip(5, -10), at(660), { seed: 3 }) + spark(tip(5, -10), at(790), { seed: 4, n: 6 }) + smoke(tip(5, -10), at(740)) +
-    spark(tip(0, 12), at(1420), { seed: 5 }) + spark(tip(0, 12), at(1550), { seed: 6, n: 6 }) + smoke(tip(0, 12), at(1500)) +
-    spark(tip(1, -12), at(2320), { seed: 7 }) + spark(tip(1, -12), at(2450), { seed: 8, n: 6 }) + smoke(tip(1, -12), at(2400)) +
-    dust({ x: 500, y: FY + 4, at: at(1200), n: 4, spread: 60, r: 20, dir: 1, seed: 3, dur: 600 }) +
-    dust({ x: 560, y: FY + 4, at: at(2000), n: 4, spread: 60, r: 20, dir: -1, seed: 4, dur: 600 }) +
-    [2, 3].map((i, k) => spark({ x: YARD.posts[i].x, y: YARD.posts[i].y - 100 }, at(2720 + k * 100), { n: 14, power: 190, seed: 20 + k, spread: 3.4 }) + rays({ x: YARD.posts[i].x, y: YARD.posts[i].y - 90, at: at(2720 + k * 100), r0: 30, r1: 90, n: 10, dur: 360, width: 5 })).join('') +
-    pow({ x: 520, y: 330, at: at(2780), text: 'ZZZAP!', scale: 0.7, rot: -6, font: 58, dur: 900 });
-  return `${cam.html(`${y.before}${y.after}${thief.html}${fx}`)}${flash({ at: at(2700), dur: 200, peak: 0.55 })}`;
+    spark(tip(4, 10), at(420), { seed: 1 }) + spark(tip(4, 10), at(602), { seed: 2, n: 6 }) + smoke(tip(4, 10), at(532)) +
+    spark(tip(5, -10), at(924), { seed: 3 }) + spark(tip(5, -10), at(1106), { seed: 4, n: 6 }) + smoke(tip(5, -10), at(1036)) +
+    spark(tip(0, 12), at(1988), { seed: 5 }) + spark(tip(0, 12), at(2170), { seed: 6, n: 6 }) + smoke(tip(0, 12), at(2100)) +
+    spark(tip(1, -12), at(3248), { seed: 7 }) + spark(tip(1, -12), at(3430), { seed: 8, n: 6 }) + smoke(tip(1, -12), at(3360)) +
+    dust({ x: 500, y: FY + 4, at: at(1680), n: 4, spread: 60, r: 20, dir: 1, seed: 3, dur: 600 }) +
+    dust({ x: 560, y: FY + 4, at: at(2800), n: 4, spread: 60, r: 20, dir: -1, seed: 4, dur: 600 }) +
+    [2, 3].map((i, k) => spark({ x: YARD.posts[i].x, y: YARD.posts[i].y - 100 }, at(3800 + k * 140), { n: 14, power: 190, seed: 20 + k, spread: 3.4 }) + rays({ late: true, x: YARD.posts[i].x, y: YARD.posts[i].y - 90, at: at(3800 + k * 140), r0: 30, r1: 90, n: 10, dur: 360, width: 5 })).join('') +
+    pow({ x: 520, y: 330, at: at(3892), text: 'ZZZAP!', scale: 0.7, rot: -6, font: 58, dur: 900 });
+  const rg = rig(cues, at, id, thief, { x: 700, y: FY + 8, t1: at(ctx.dur) });
+  return `${cam.html(`${y.before}${y.after}${rg}${thief.html}${fx}`)}${flash({ at: at(3780), dur: 200, peak: 0.55 })}`;
 }
 
 /* ------------------------------------------------------------------ montage: iron */
@@ -169,7 +178,8 @@ export function iron(ctx) {
     return `<path d="M${x - 18} 700 L${x - 18} 164 L${x} 140 L${x + 18} 164 L${x + 18} 700Z" fill="#3c3c3c" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/><path d="M${x - 6} 180 L${x - 6} 690" stroke="#bbb" stroke-width="4" opacity=".6"/>`;
   }).join('');
   const rails = [588, 297].map((yy) => `<path d="M-300 ${yy} L1600 ${yy}" stroke="${INK}" stroke-width="30"/><path d="M-300 ${yy} L1600 ${yy}" stroke="#7a7a7a" stroke-width="16"/><path d="M-300 ${yy - 4} L1600 ${yy - 4}" stroke="#d6d6d6" stroke-width="4"/>`).join('');
-  return `${bg}${cam.html(`${pickets}${rails}<g transform="translate(${O1.x} ${O1.y})">${scroll(`${id}.s1`, S1)}</g>${extra}${thief.html}${fx}`)}`;
+  const hs = connectHose(cues, `${id}.hose`, { thief, anchor: { x: -260, y: 900 }, t0: at(0), t1: at(ctx.dur), len: 1000 });
+  return `${bg}${cam.html(`${pickets}${rails}<g transform="translate(${O1.x} ${O1.y})">${scroll(`${id}.s1`, S1)}</g>${extra}${hs}${thief.html}${fx}`)}`;
 }
 
 /* ------------------------------------------------------------------ montage: gate + booth */
@@ -217,7 +227,8 @@ export function gateBooth(ctx) {
     dust({ x: B.x, y: B.y + 6, at: at(2150), n: 5, spread: 90, r: 22, dir: 0, seed: 6, dur: 700 }) +
     mark({ x: B.x + 60, y: B.y - 400, at: at(2500), text: '*DING*', dur: 900, size: 46 }) +
     sparkle({ x: B.x - 70, y: B.y - 330, at: at(2350), dur: 900, r: 24, n: 2, s: 1.2 });
-  return cam.html(`${y.before}${y.after}${bBack.html}${bFront.html}${thief.html}${fx}`);
+  const rg = rig(cues, at, id, thief, { x: 330, y: FY + 8, t1: at(ctx.dur) });
+  return cam.html(`${y.before}${y.after}${bBack.html}${bFront.html}${rg}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ montage: the sign */
@@ -264,7 +275,8 @@ export function signUp(ctx) {
   thief.propF.to(at(3000), 260, { rot: 80 }, { ease: 'ease-out' });
   fx += sparkle({ x: S.x - 120, y: S.y - 260, at: at(3100), dur: 900, r: 30, n: 3, s: 1.3 }) + sparkle({ x: S.x + 120, y: S.y - 150, at: at(3300), dur: 900, r: 26, n: 3, s: 1.2 });
   const boothStatic = `<g transform="translate(${YARD.booth.x} ${YARD.booth.y}) scale(${YARD.booth.s})">${bo.back}${bo.front}</g>`;
-  return cam.html(`${y.before}${y.after}${boothStatic}${sign.html}${thief.html}${fx}`);
+  const rg = rig(cues, at, id, thief, { x: -120, y: TY + 6, t1: at(ctx.dur), dist: 200 });
+  return cam.html(`${y.before}${y.after}${boothStatic}${sign.html}${rg}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ montage: ready */
@@ -292,10 +304,11 @@ export function ready(ctx) {
     sparkle({ x: 520, y: 220, at: at(300), dur: 1000, r: 44, n: 3, s: 1.4 }) +
     sparkle({ x: 440, y: 400, at: at(900), dur: 1000, r: 34, n: 3, s: 1.3 }) +
     sparkle({ x: 640, y: 320, at: at(1400), dur: 1000, r: 38, n: 3, s: 1.3 }) +
-    rays({ x: 520, y: 400, at: at(300), r0: 160, r1: 330, n: 18, dur: 700, width: 6 });
+    rays({ late: true, x: 520, y: 400, at: at(300), r0: 160, r1: 330, n: 18, dur: 700, width: 6 });
   const boothStatic = `<g transform="translate(${YARD.booth.x} ${YARD.booth.y}) scale(${YARD.booth.s})">${bo.back}${bo.front}</g>`;
   const signStatic = `<g transform="translate(${S.x} ${S.y})">${sb.html}</g>`;
-  return cam.html(`${y.before}${y.after}${boothStatic}${signStatic}${lights}${thief.html}${fx}`);
+  const rg = rig(cues, at, id, thief, { x: 470, y: FY + 8, t1: at(ctx.dur) });
+  return cam.html(`${y.before}${y.after}${boothStatic}${signStatic}${lights}${rg}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ the next morning: the queue */
@@ -379,7 +392,8 @@ export function reread(ctx) {
   const QY = YARD.queueY;
   const T = Array.from({ length: 8 }, (_, j) => tourist(cues, `${id}.t${j}`, { v: j + 2, x: B.x + 96 * (j + 1) + 20, y: QY, scale: 0.88, flip: -1 }));
   const inside = SPOTS_INSIDE.map((x, k) => tourist(cues, `${id}.i${k}`, { v: k, x, y: GY + 52, scale: 0.8, flip: -1 }));
-  const paper = placed(cues, `${id}.np`, newspaper({ w: 880, h: 1080, id: `${id}.pg`, lines: { name: TEXT.paperName, head: TEXT.headline, sub: TEXT.headlineSub } }), { x: B.x, y: B.y - 100, sx: 0.0001, sy: 0.0001 });
+  const mitt = (x, f) => `<g transform="translate(${x} -60) scale(${f * 3.2} 3.2)"><path d="M-44 -34 Q-44 -56 -20 -50 L36 -34 Q52 -28 48 -10 L40 28 Q28 52 -8 46 Q-48 38 -44 -34Z" fill="#fff" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/><path d="M-20 -48 L-10 -4 M6 -42 L12 2 M24 -34 L28 8" fill="none" stroke="#999" stroke-width="3.4" stroke-linecap="round"/></g>`;
+  const paper = placed(cues, `${id}.np`, newspaper({ w: 880, h: 1080, id: `${id}.pg`, lines: { name: TEXT.paperName, head: TEXT.headline, sub: TEXT.headlineSub } }) + mitt(-430, 1) + mitt(430, -1), { x: B.x, y: B.y - 100, sx: 0.0001, sy: 0.0001 });
   const ins = `<g data-t="${id}.ins" style="opacity:0"><rect width="1280" height="720" fill="#f1efe9"/><rect width="1280" height="720" fill="url(#p-paper)" opacity=".6"/>
       <text x="640" y="170" font-size="54" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Georgia, serif" letter-spacing="3">${TEXT.headline[0]}</text>
       <text x="640" y="270" font-size="100" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Georgia, serif" letter-spacing="3">${TEXT.headline[1]}</text>
@@ -470,5 +484,5 @@ export function plateScene(ctx) {
   const QY = YARD.queueY;
   const T = Array.from({ length: 6 }, (_, j) => tourist(cues, `${id}.t${j}`, { v: j + 1, x: B.x + 96 * (j + 1) + 20, y: QY, scale: 0.88, flip: -1 }));
   const inside = SPOTS_INSIDE.map((x, k) => tourist(cues, `${id}.i${k}`, { v: k, x, y: GY + 52, scale: 0.8, flip: -1 }));
-  return cam.html(`${y.before}${inside.map((i) => i.html).join('')}${y.after}${signMarkup(id)}${pl.html}${bm.back}${bm.front}${pile}${T.map((t) => t.html).join('')}${thief.html}${fx}`);
+  return cam.html(`${y.before}${inside.map((i) => i.html).join('')}${y.after}${signMarkup(id)}${pl.html}${bm.back}${bm.front}${pile}${T.map((t) => t.html).join('')}${rig(cues, at, id, thief, { x: 860, y: TY + 6, t1: at(ctx.dur) })}${thief.html}${fx}`);
 }

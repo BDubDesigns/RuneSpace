@@ -14,7 +14,9 @@
  *   signboard(id, lines)    low admission sign standing on the ground -> { html, lineY, w, h }
  *   plate(id, w, h, lines)  riveted steel plate with stencilled text lines, origin = centre
  */
-import { INK } from './props.js';
+import { INK, placed } from './props.js';
+import { Track } from '../acting.js';
+import { poseAt, gripAt } from '../kit.js';
 
 const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
 const SERIF = "Georgia, 'Times New Roman', serif";
@@ -24,7 +26,7 @@ export const TORCH_TIP = { x: 124, y: 0 };
 
 export function torch(id, extra = '') {
   return `<g>
-    <path d="M-6 7 Q-30 40 -74 30 Q-110 22 -130 48" fill="none" ${S} stroke-width="11"/><path d="M-6 7 Q-30 40 -74 30 Q-110 22 -130 48" fill="none" stroke="#6b6b6b" stroke-width="5"/>
+    <path d="M-16 4 Q-24 10 -30 6" fill="none" ${S} stroke-width="11"/><path d="M-16 4 Q-24 10 -30 6" fill="none" stroke="#6b6b6b" stroke-width="5"/>
     <rect x="-16" y="-10" width="52" height="20" rx="8" fill="#4a4a4a" ${S} stroke-width="4.6"/>
     <path d="M-6 -6 L-6 6 M4 -6 L4 6 M14 -6 L14 6 M24 -6 L24 6" stroke="#8a8a8a" stroke-width="2.4"/>
     <rect x="2" y="-22" width="9" height="14" rx="3" fill="#e2e2e2" ${S} stroke-width="3.4"/><rect x="18" y="-22" width="9" height="14" rx="3" fill="#bdbdbd" ${S} stroke-width="3.4"/>
@@ -241,4 +243,76 @@ export function swagSack() {
     <path d="M-20 18 Q-24 36 -12 46" fill="none" stroke="#fff" stroke-width="4" opacity=".7" stroke-linecap="round"/>
     <text y="40" font-size="14" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${STENCIL}" letter-spacing="1">SWAG</text>
   </g>`;
+}
+
+
+/** Where a gas cart's valve is, relative to its ground point, at the cart's drawn size (`s`). */
+export const cartValve = (s = 0.9) => ({ x: 3 * s, y: -196 * s });
+
+/**
+ * A rubber hose between two moving points. `from(t)` / `to(t)` give world points (a cart's valve, a hand's `gripAt`);
+ * it is sampled every `step` ms from `t0` to `t1`, stretches taut or sags (`len` = its real length) and is only visible in
+ * that window. Returns markup (draw it after the cart, before the hand). Call after the cues it samples have been emitted.
+ */
+export function hose(cues, id, { from, to, t0, t1, len = 420, step = 80, rope = false }) {
+  const pose = (t) => {
+    let a = from(t);
+    let b = to(t);
+    if (a.x > b.x) [a, b] = [b, a];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const L = Math.max(1, Math.hypot(dx, dy));
+    const sag = L < len ? Math.min(150, Math.max(3, Math.sqrt(0.375 * L * (len - L)))) : 3;
+    return { x: a.x, y: a.y, rot: (Math.atan2(dy, dx) * 180) / Math.PI, sx: L, sy: sag };
+  };
+  const f0 = pose(t0);
+  const trk = new Track(cues, id, f0);
+  const css = trk.css;
+  const n = Math.max(2, Math.round((t1 - t0) / step));
+  const frames = [];
+  for (let i = 1; i <= n; i++) frames.push({ o: i / n, ...pose(t0 + ((t1 - t0) * i) / n) });
+  trk.keys(t0, t1 - t0, frames, { ease: 'linear', reduce: 'snap' });
+  cues.push({ at: t0, dur: 1, target: id, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' });
+  const d = 'M0 0 Q0.5 2 1 0';
+  const line = (w, col) => `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+  return `<g data-t="${id}" style="${css}">${line(rope ? 11 : 12, INK)}${line(rope ? 6.5 : 6, rope ? '#d9d9d9' : '#6b6b6b')}${line(1.8, rope ? '#8a8a8a' : '#bdbdbd')}</g>`;
+}
+
+/** hose() from a gas cart's valve (`tank` = the cart's Track, or a fixed `anchor` {x, y}) to a character's front hand. */
+export function connectHose(cues, id, { thief, tank, anchor, t0, t1, len = 400, s = 0.9, step, rope = false }) {
+  const from = tank
+    ? (t) => {
+        const p = poseAt(cues, tank.target, t, tank.p0);
+        const v = cartValve(s);
+        return { x: p.x + v.x, y: p.y + v.y };
+      }
+    : () => anchor;
+  return hose(cues, id, { from, to: (t) => gripAt(thief, cues, t), t0, t1, len, step, rope });
+}
+
+/**
+ * The cart is dragged by its hose: it stays where it is until the character gets more than `dist` px away, then
+ * trails behind (speed-limited), its wheel turning with the distance rolled. `cart` is a placed() (or Track) whose
+ * pose x is the cart's ground point; `wheelId` its wheel's data-t.
+ */
+export function dragCart(cues, cart, wheelId, thief, t0, t1, { dist = 230, speed = 0.7, step = 80, radius = 25 } = {}) {
+  const trk = cart.track || cart;
+  let x = trk.p.x;
+  let roll = 0;
+  const frames = [];
+  const wheel = [];
+  const n = Math.max(2, Math.round((t1 - t0) / step));
+  for (let i = 1; i <= n; i++) {
+    const t = t0 + ((t1 - t0) * i) / n;
+    const tx = poseAt(cues, thief.root.target, t, thief.root.p0).x;
+    const gap = tx - x;
+    let nx = x;
+    if (Math.abs(gap) > dist) nx = x + Math.sign(gap) * Math.min(Math.abs(gap) - dist, speed * step);
+    roll += ((nx - x) / radius) * (180 / Math.PI);
+    x = nx;
+    frames.push({ o: i / n, x });
+    wheel.push({ transform: `rotate(${roll.toFixed(1)}deg)`, offset: i / n });
+  }
+  trk.keys(t0, t1 - t0, frames, { ease: 'linear', reduce: 'snap' });
+  cues.push({ at: t0, dur: t1 - t0, target: wheelId, easing: 'linear', keyframes: [{ transform: 'rotate(0deg)', offset: 0 }, ...wheel], reduce: 'skip' });
 }

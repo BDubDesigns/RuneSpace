@@ -53,7 +53,10 @@ export default defineFilm({
     shot('vault', heist.vault),
 
     // --- 3. the impossible getaway
-    shot('sack', getaway.sack),
+    shot('sack', getaway.sack, { in: 'iris', irisIn: [30, 62], inMs: 450 }),
+    shot('push', getaway.push, { in: 'iris', irisIn: [50, 60], inMs: 450 }),
+    shot('shoulder', getaway.shoulder, { in: 'iris', irisIn: [25, 64], inMs: 450 }),
+    shot('ropeTry', getaway.ropeTry, { in: 'iris', irisIn: [80, 62], inMs: 450 }),
     shot('kickRun', getaway.kickRun),
     shot('kick', getaway.kick),
 

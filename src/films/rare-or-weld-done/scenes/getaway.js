@@ -5,7 +5,7 @@
  *   kick    : the run, the JUMP-KICK, BOOOONG, the rebound, the heap with stars.
  */
 import { prospector } from '../../../art/prospector.js';
-import { swagSack } from '../../../art/weld.js';
+import { swagSack, connectHose } from '../../../art/weld.js';
 import { emerald } from '../../../art/emerald.js';
 import { placed, INK } from '../../../art/props.js';
 import { dust, puff, mark, pow, rays, drops, flash, sparkle, rings, dizzy, speedLines, chips } from '../../../fx/effects.js';
@@ -27,102 +27,132 @@ export function gemOnMat(cues, id, extra = {}) {
   return { gem: g, mat };
 }
 
-const ropeLine = () => `<rect x="0" y="-5" width="1" height="10" fill="#d6d6d6" stroke="${INK}" stroke-width="3.4" vector-effect="non-scaling-stroke"/>`;
+/** A fresh take of the gallery for one failed attempt: the Emerald on its mat, the thief, and a camera. */
+function attempt(ctx, thiefOpts, cam0) {
+  const { cues, id } = ctx;
+  const cam = new Camera(cues, id, cam0);
+  const { gem, mat } = gemOnMat(cues, id);
+  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', scale: SC, y: GY, goggles: 'up', ...thiefOpts });
+  return { cam, gem, mat, thief };
+}
+const shudder = (cues, at, gem, t, n, px) => gem.track.keys(at(t), n * 110, Array.from({ length: n }, (_, i) => ({ o: (i + 1) / n, x: EMX + (i % 2 ? px : -px) })).concat([{ o: 1, x: EMX }]), { ease: 'linear', reduce: 'skip' });
 
-/* ------------------------------------------------------------------ sack */
+/* ------------------------------------------------------------------ attempt 1: the sack */
 
 export function sack(ctx) {
   const { cues, at, id } = ctx;
-  const cam = new Camera(cues, id, { x: 540, y: 330, s: 0.92 });
-  const { gem, mat } = gemOnMat(cues, id);
-  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 300, y: GY, scale: SC, face: 'normal', goggles: 'up', props: { F: swagSack() }, armF: -60 });
-  const ropeP = placed(cues, `${id}.rope`, ropeLine(), { x: RIGHT - 6, y: GY - 130, sx: 0.01 });
-  const shudder = (t, n, px) => gem.track.keys(at(t), n * 110, Array.from({ length: n }, (_, i) => ({ o: (i + 1) / n, x: EMX + (i % 2 ? px : -px) })).concat([{ o: 1, x: EMX }]), { ease: 'linear', reduce: 'skip' });
+  const { cam, gem, mat, thief } = attempt(ctx, { x: 200, face: 'normal', props: { F: swagSack() }, armF: -60 }, { x: 520, y: 430, s: 1.25 });
+  // he walks up and holds the little sack against the gem: the sack's edge touches its face (x = 490)
+  thief.walk(at(100), 800, 366, { stride: 330, amp: 16, bounce: 5, swing: 0 });
+  thief.armF.to(at(1000), 380, { rot: -108 }, { ease: 'ease-out' });
+  thief.face(at(1000), 'smug');
+  thief.face(at(1700), 'glance');
+  thief.head.to(at(1700), 260, { rot: fwd(thief, 9) });
+  thief.face(at(2300), 'normal');
+  thief.head.to(at(2300), 260, { rot: fwd(thief, -8) });
+  thief.face(at(2900), 'sad');
+  thief.armF.to(at(3000), 340, { rot: -30 }, { ease: 'ease-in-out' });
+  show(cues, `${id}.thief.propF`, at(3500), false);
+  const fx = sparkle({ x: 760, y: 190, at: at(300), dur: 1000, r: 34, n: 3, s: 1.3 }) + mark({ x: 420, y: 330, at: at(2900), text: '?', dur: 1000, size: 84 });
+  return cam.html(`${sectionBack(id)}${mat}${gem.html}${thief.html}${sectionFront()}${fx}`);
+}
 
-  // --- 1. the sack: it is obviously too small
-  thief.walk(at(100), 300, 360, { stride: 300, amp: 16, bounce: 5, swing: 0 });
-  thief.armF.to(at(420), 240, { rot: -96 }, { ease: 'ease-out' });
-  thief.face(at(420), 'smug');
-  thief.face(at(720), 'glance');
-  thief.head.to(at(720), 200, { rot: fwd(thief, 8) });
-  thief.face(at(1050), 'normal');
-  thief.head.to(at(1050), 200, { rot: fwd(thief, -6) });
-  thief.face(at(1300), 'sad');
-  thief.armF.to(at(1380), 240, { rot: -30 }, { ease: 'ease-in-out' });
-  show(cues, `${id}.thief.propF`, at(1650), false);
+/* ------------------------------------------------------------------ attempt 2: push */
 
-  // --- 2. push
-  const PUSH = 1800;
-  thief.face(at(PUSH), 'angry');
-  thief.walk(at(PUSH), 340, 410, { stride: 200, amp: 24, bounce: 4, swing: 0 });
-  thief.armF.to(at(PUSH), 300, { rot: -86 }, { ease: 'ease-out' });
-  thief.armB.to(at(PUSH), 300, { rot: -90 }, { ease: 'ease-out' });
-  thief.root.to(at(PUSH + 340), 260, { rot: fwd(thief, 22) }, { ease: 'ease-out' });
-  thief.legF.keys(at(PUSH + 340), 650, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, rot: i % 2 ? 26 : -8 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  thief.legB.keys(at(PUSH + 340), 650, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, rot: i % 2 ? -8 : 26 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  thief.vibrate(at(PUSH + 340), 650, 3);
-  shudder(PUSH + 340, 6, 1.5);
-  const GIVE = PUSH + 1000;
-  thief.face(at(GIVE), 'sad');
-  thief.root.to(at(GIVE), 250, { rot: 0 }, { ease: 'ease-in-out' });
-  thief.legF.to(at(GIVE), 200, { rot: 0 });
-  thief.legB.to(at(GIVE), 200, { rot: 0 });
-  thief.armF.to(at(GIVE), 300, { rot: -10 });
-  thief.armB.to(at(GIVE), 300, { rot: 0 });
-
-  // --- 3. the shoulder
-  const SH = GIVE + 500;
-  thief.face(at(SH - 250), 'plot');
-  thief.walk(at(SH - 250), 250, 300, { stride: 220, amp: 20, bounce: 3, swing: 0 });
-  thief.walk(at(SH), 240, 440, { stride: 160, amp: 36, bounce: 5, swing: 0 });
-  thief.torso.to(at(SH), 240, { rot: fwd(thief, 26) }, { ease: 'ease-in' });
-  const HIT = SH + 240;
-  thief.face(at(HIT), 'shock');
-  thief.torso.to(at(HIT), 180, { rot: 0 }, { ease: 'ease-out' });
-  thief.root.keys(at(HIT), 500, [{ o: 0.4, x: 380, rot: fwd(thief, -22) }, { o: 1, x: 340, rot: 0 }], { ease: 'ease-out', reduce: 'snap' });
-  thief.armB.to(at(HIT + 150), 200, { rot: -150 }, { ease: 'ease-out' }); // clutches the shoulder
-  thief.legF.to(at(HIT + 100), 160, { rot: 0 });
-  thief.legB.to(at(HIT + 100), 160, { rot: 0 });
-  thief.bob.hop(at(HIT + 250), 260, 14);
-  gem.track.keys(at(HIT), 420, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, x: EMX + (i % 2 ? 1.2 : -1.2) })).concat([{ o: 1, x: EMX }]), { ease: 'linear', reduce: 'skip' });
-  cam.shake(at(HIT), 300, 6);
-
-  // --- 4. the rope: he walks round to the hole side (still clutching the shoulder) and heaves
-  const WALK = HIT + 520;
-  thief.face(at(WALK), 'angry');
-  thief.walk(at(WALK), 520, 1085, { stride: 380, amp: 22, bounce: 5, swing: 0 });
-  cam.look(at(WALK), 1100, { x: 780, y: 330, s: 0.92 }, 'ease-in-out');
-  const ROPE = WALK + 520;
-  thief.root.to(at(ROPE), 150, { flip: -1 }, { ease: 'ease-in-out', reduce: 'snap' });
-  thief.armF.to(at(ROPE), 220, { rot: -86 }, { ease: 'ease-out' });
-  thief.armB.to(at(ROPE), 220, { rot: -92 }, { ease: 'ease-out' });
-  const handX = (x) => x - 92;
-  tween(cues, `${id}.rope`, at(ROPE + 150), 1, { opacity: 0 }, { opacity: 1 });
-  ropeP.track.set(at(ROPE + 150), { x: RIGHT - 6, y: GY - 128, sx: handX(1085) - (RIGHT - 6) });
-  thief.root.to(at(ROPE + 300), 460, { rot: fwd(thief, -26), x: 1112 }, { ease: 'ease-out', reduce: 'snap' });
-  ropeP.track.to(at(ROPE + 300), 460, { sx: handX(1112) - (RIGHT - 6) - 18, rot: -1.5 }, { ease: 'ease-out', reduce: 'snap' });
-  thief.vibrate(at(ROPE + 700), 700, 3.2);
-  thief.legF.keys(at(ROPE + 700), 700, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? 10 : -22 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  thief.legB.keys(at(ROPE + 700), 700, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? -22 : 10 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  const SNAP = ROPE + 1250;
-  show(cues, `${id}.rope`, at(SNAP), false);
-  thief.root.keys(at(SNAP), 420, [{ o: 1, x: 1180, y: GY - 14, rot: fwd(thief, -84) }], { ease: 'cubic-bezier(.3,0,.8,.7)', reduce: 'snap' });
-  thief.face(at(SNAP), 'ko');
-
+export function push(ctx) {
+  const { cues, at, id } = ctx;
+  const { cam, gem, mat, thief } = attempt(ctx, { x: 250, face: 'normal', armF: -20 }, { x: 540, y: 440, s: 1.35 });
+  const FACE = LEFT; // the gem's flat left face
+  // walks up, both palms flat on the gem's face (hand = root.x + 89 with the arm raised 10 degrees)
+  thief.walk(at(100), 800, FACE + 10 - 89, { stride: 300, amp: 22, bounce: 4, swing: 0 });
+  thief.face(at(900), 'angry');
+  thief.armF.to(at(900), 300, { rot: -100 }, { ease: 'ease-out' });
+  thief.armB.to(at(900), 300, { rot: -96 }, { ease: 'ease-out' });
+  // leans in: the root pivots at the feet, so slide it back by the amount the hands move to keep them on the stone
+  const x0 = FACE + 10 - 89;
+  thief.root.to(at(1300), 450, { rot: fwd(thief, 12), x: x0 - 27 }, { ease: 'ease-out', reduce: 'snap' });
+  thief.legF.keys(at(1800), 1100, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, rot: i % 2 ? 24 : -8 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.legB.keys(at(1800), 1100, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, rot: i % 2 ? -8 : 24 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.vibrate(at(1800), 1100, 3.2);
+  shudder(cues, at, gem, 1800, 8, 1.5);
+  // gives up: slumps off the stone
+  thief.face(at(3000), 'sad');
+  thief.legF.to(at(3000), 240, { rot: 0 });
+  thief.legB.to(at(3000), 240, { rot: 0 });
+  thief.root.to(at(3000), 500, { rot: 0, x: x0 - 60 }, { ease: 'ease-in-out', reduce: 'snap' });
+  thief.armF.to(at(3000), 400, { rot: -10 });
+  thief.armB.to(at(3000), 400, { rot: 0 });
+  thief.head.to(at(3000), 400, { rot: fwd(thief, 14) });
   const fx =
-    sparkle({ x: 760, y: 190, at: at(300), dur: 1000, r: 34, n: 5, s: 1.3 }) +
-    mark({ x: 400, y: 350, at: at(1300), text: '?', dur: 900, size: 84 }) +
-    dust({ x: 380, y: GY + 4, at: at(PUSH + 500), n: 4, spread: 40, r: 18, dir: -1, seed: 7, dur: 700 }) +
-    drops({ x: 460, y: 380, at: at(PUSH + 900), n: 3, seed: 8, spread: 70 }) +
-    pow({ x: 360, y: 330, at: at(PUSH + 450), text: 'HNNG!', scale: 0.5, rot: -8, font: 58, dur: 800 }) +
-    pow({ x: 470, y: 330, at: at(HIT + 10), text: 'THUD', scale: 0.46, rot: 6, font: 58, dur: 600 }) +
-    rays({ x: 495, y: 470, at: at(HIT), r0: 20, r1: 60, n: 9, dur: 280, width: 5 }) +
-    dust({ x: 470, y: GY + 4, at: at(HIT), n: 4, spread: 40, r: 20, dir: -1, seed: 9, dur: 700 }) +
-    drops({ x: 1090, y: 380, at: at(ROPE + 1000), n: 3, seed: 3, spread: 70 }) +
-    pow({ x: 1020, y: 300, at: at(SNAP + 10), text: 'SNAP!', scale: 0.55, rot: 8, font: 60, dur: 700 }) +
-    dust({ x: 1170, y: GY + 4, at: at(SNAP + 380), n: 5, spread: 50, r: 22, dir: 1, seed: 10, dur: 800 }) +
-    dizzy({ x: 1130, y: GY - 120, at: at(SNAP + 450), dur: 1000, rx: 46, ry: 11, count: 3 });
-  return cam.html(`${sectionBack(id)}${mat}${gem.html}${ropeP.html}${thief.html}${sectionFront()}${fx}`);
+    dust({ x: x0 - 10, y: GY + 4, at: at(1700), n: 5, spread: 40, r: 18, dir: -1, seed: 7, dur: 900 }) +
+    drops({ x: x0 + 40, y: 400, at: at(2400), n: 3, seed: 8, spread: 70 }) +
+    pow({ x: 400, y: 330, at: at(1750), text: 'HNNG!', scale: 0.5, rot: -8, font: 58, dur: 900 });
+  return cam.html(`${sectionBack(id)}${mat}${gem.html}${thief.html}${sectionFront()}${fx}`);
+}
+
+/* ------------------------------------------------------------------ attempt 3: the shoulder */
+
+export function shoulder(ctx) {
+  const { cues, at, id } = ctx;
+  const { cam, gem, mat, thief } = attempt(ctx, { x: 190, face: 'plot', armF: -10 }, { x: 460, y: 450, s: 1.2 });
+  const HITX = LEFT - 114; // leaning 30 degrees, the leading shoulder is 114 px ahead of the feet: it meets the face at x = 490
+  // backs off, crouches, charges, SLAM
+  thief.walk(at(300), 600, 120, { stride: 260, amp: 20, bounce: 3, swing: 0 });
+  thief.bob.keys(at(1000), 500, [{ o: 0.5, sy: 0.84, sx: 1.06 }, { o: 1, sy: 0.88, sx: 1.04 }], { ease: 'ease-in-out' });
+  const GO = 1700;
+  thief.bob.to(at(GO - 100), 120, { sy: 1, sx: 1 }, { ease: 'ease-out' });
+  thief.root.to(at(GO), 520, { x: HITX, rot: fwd(thief, 30) }, { ease: 'cubic-bezier(.6,0,.9,.6)', reduce: 'snap' });
+  thief.legF.keys(at(GO), 520, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? -36 : 36 })), { seg: 'linear', ease: 'linear', reduce: 'skip' });
+  thief.legB.keys(at(GO), 520, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? 36 : -36 })), { seg: 'linear', ease: 'linear', reduce: 'skip' });
+  const HIT = GO + 520;
+  thief.face(at(HIT), 'shock');
+  thief.legF.to(at(HIT + 40), 200, { rot: 0 });
+  thief.legB.to(at(HIT + 40), 200, { rot: 0 });
+  gem.track.keys(at(HIT), 500, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, x: EMX + (i % 2 ? 1.5 : -1.5) })).concat([{ o: 1, x: EMX }]), { ease: 'linear', reduce: 'skip' });
+  cam.shake(at(HIT), 400, 7);
+  // recoils, clutching the shoulder
+  thief.root.keys(at(HIT + 150), 900, [{ o: 0.4, x: HITX - 60, rot: fwd(thief, -20) }, { o: 1, x: HITX - 90, rot: 0 }], { ease: 'ease-out', reduce: 'snap' });
+  thief.armB.to(at(HIT + 300), 300, { rot: -150 }, { ease: 'ease-out' });
+  thief.armF.to(at(HIT + 300), 300, { rot: -20 });
+  thief.bob.hop(at(HIT + 700), 300, 16);
+  thief.face(at(HIT + 600), 'sad');
+  const fx =
+    pow({ x: 470, y: 330, at: at(HIT + 20), text: 'THUD', scale: 0.55, rot: 6, font: 58, dur: 700 }) +
+    rays({ late: true, x: LEFT - 6, y: 470, at: at(HIT), r0: 20, r1: 64, n: 9, dur: 300, width: 5 }) +
+    dust({ x: LEFT - 20, y: GY + 4, at: at(HIT), n: 5, spread: 50, r: 20, dir: -1, seed: 9, dur: 800 }) +
+    dust({ x: 150, y: GY + 4, at: at(GO), n: 4, spread: 40, r: 18, dir: -1, seed: 4, dur: 600 });
+  return cam.html(`${sectionBack(id)}${mat}${gem.html}${thief.html}${sectionFront()}${fx}`);
+}
+
+/* ------------------------------------------------------------------ attempt 4: the rope */
+
+export function ropeTry(ctx) {
+  const { cues, at, id } = ctx;
+  const { cam, gem, mat, thief } = attempt(ctx, { x: 1260, flip: -1, face: 'angry', armF: -10, armB: -10 }, { x: 820, y: 440, s: 1.1 });
+  const TIE = { x: RIGHT - 4, y: GY - 128 }; // the rope is tied round the gem's right flank
+  // comes in through the hole, takes up the rope's end, and heaves
+  thief.walk(at(100), 800, 1088, { stride: 320, amp: 22, bounce: 5, swing: 0 });
+  thief.armF.to(at(1000), 320, { rot: -88 }, { ease: 'ease-out' });
+  thief.armB.to(at(1000), 320, { rot: -92 }, { ease: 'ease-out' });
+  thief.root.to(at(1500), 520, { rot: fwd(thief, -24), x: 1116 }, { ease: 'ease-out', reduce: 'snap' });
+  thief.vibrate(at(2100), 900, 3.2);
+  thief.legF.keys(at(2100), 900, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? 10 : -22 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.legB.keys(at(2100), 900, Array.from({ length: 5 }, (_, i) => ({ o: (i + 1) / 5, rot: i % 2 ? -22 : 10 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  const SNAP = 3100;
+  thief.face(at(SNAP), 'ko');
+  thief.root.keys(at(SNAP), 520, [{ o: 1, x: 1190, y: GY - 14, rot: fwd(thief, -84) }], { ease: 'cubic-bezier(.3,0,.8,.7)', reduce: 'snap' });
+  thief.armF.to(at(SNAP), 300, { rot: -150 });
+  thief.armB.to(at(SNAP), 300, { rot: -160 });
+  // the rope runs from the knot on the gem to the thief's hand (it follows the hand), and parts at SNAP
+  const rp = connectHose(cues, `${id}.rope`, { thief, anchor: TIE, t0: at(900), t1: at(SNAP), len: 0, rope: true, step: 60 });
+  cues.push({ at: at(SNAP), dur: 1, target: `${id}.rope`, keyframes: [{ opacity: 1 }, { opacity: 0 }], easing: 'linear' });
+  const knot = `<g transform="translate(${TIE.x} ${TIE.y})"><circle r="13" fill="#d9d9d9" stroke="${INK}" stroke-width="5"/><circle r="4" fill="${INK}"/></g>`;
+  const fx =
+    drops({ x: 1090, y: 380, at: at(2200), n: 3, seed: 3, spread: 70 }) +
+    pow({ x: 1000, y: 300, at: at(SNAP + 10), text: 'SNAP!', scale: 0.55, rot: 8, font: 60, dur: 800 }) +
+    dust({ x: 1190, y: GY + 4, at: at(SNAP + 500), n: 5, spread: 50, r: 22, dir: 1, seed: 10, dur: 800 }) +
+    dizzy({ x: 1130, y: GY - 120, at: at(SNAP + 600), dur: 1100, rx: 46, ry: 11, count: 3 });
+  return cam.html(`${sectionBack(id)}${mat}${gem.html}${knot}${rp}${thief.html}${sectionFront()}${fx}`);
 }
 
 /* ------------------------------------------------------------------ kickRun */
@@ -232,7 +262,7 @@ export function kick(ctx) {
     trail +
     rings({ x: LEFT + 10, y: GY - 150, at: at(HIT), n: 4, gap: 110, dur: 900, r: 180, width: 8 }) +
     pow({ x: 330, y: 250, at: at(HIT + 10), text: 'BOOOONG!', scale: 1.3, rot: -8, font: 42, dur: 1500 }) +
-    rays({ x: LEFT + 10, y: GY - 150, at: at(HIT), r0: 60, r1: 160, n: 14, dur: 420, width: 7 }) +
+    rays({ late: true, x: LEFT + 10, y: GY - 150, at: at(HIT), r0: 60, r1: 160, n: 14, dur: 420, width: 7 }) +
     chips({ x: LEFT + 20, y: GY - 150, at: at(HIT), n: 8, power: 160, seed: 5, fill: '#fff', angle: Math.PI, spread: 1.6 }) +
     dust({ x: HX, y: GY + 4, at: at(LAND), n: 8, spread: 120, r: 36, dir: -1, seed: 41, dur: 1100 }) +
     dizzy({ x: HX - 190, y: GY - 80, at: at(LAND + 500), dur: 2200, rx: 60, ry: 14, count: 4 }) +

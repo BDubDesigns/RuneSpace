@@ -58,7 +58,7 @@ export const TIMING = {
   // 1. the newspaper
   read: 4800,
   paper: 4100,
-  plan: 6900,
+  plan: 7300,
   grab: 2700,
 
   // 2. the great heist
@@ -70,13 +70,16 @@ export const TIMING = {
   vault: 6200,
 
   // 3. the impossible getaway
-  sack: 6300,
+  sack: 3900,
+  push: 3700,
+  shoulder: 3200,
+  ropeTry: 4100,
   kickRun: 3800,
   kick: 5500,
 
   // 4. the balloons
-  balloons: 9300,
-  rise: 6200,
+  balloons: 10300,
+  rise: 7200,
   pop: 5700,
   crash: 5800,
 
@@ -86,7 +89,7 @@ export const TIMING = {
   illBring: 5000,
 
   // 6. the construction montage
-  posts: 3200,
+  posts: 4400,
   iron: 3000,
   gate: 2900,
   signUp: 3600,
@@ -116,7 +119,10 @@ export const CAPTION = {
   cut: 'He cuts a doorway through the wall: sparks, smoke, a heavy gas tank that bumps him, and an accidental boot-to-floor weld. The cut-out slab drops.',
   squeeze: 'He sucks in his gut, turns sideways and squeezes through the hole.',
   vault: 'He squeezes through and finds the Emerald, far bigger than he expected.',
-  sack: 'A tiny sack. He pushes. He shoulders. He tries a rope. The Emerald does not move.',
+  sack: 'Attempt one: a tiny sack, obviously too small for the Emerald.',
+  push: 'Attempt two: he puts both hands on it and pushes. It does not move.',
+  shoulder: 'Attempt three: a running shoulder charge. The Emerald does not budge.',
+  ropeTry: 'Attempt four: a rope. He heaves, the rope snaps, and he lands in a heap.',
   kickRun: 'He backs up. And up. And up.',
   kick: 'JUMP-KICK! BOOOONG! The Emerald stays put; the thief ends up in a heap with stars.',
   balloons: 'He finds balloons and ties more and more to the Emerald until it floats.',

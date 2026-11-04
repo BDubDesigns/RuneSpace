@@ -1,6 +1,6 @@
 /**
  * Film-agnostic scene helpers shared by every film (they only depend on acting.js and the
- * prospector rig): Camera, driftClouds, idle, fwd, blow, popIn, reach, aimAlong, filmHelpers.
+ * prospector rig): Camera, driftClouds, idle, fwd, blow, popIn, reach, aimAlong, poseAt, gripAt, filmHelpers.
  */
 import { Track, tween } from './acting.js';
 import { card } from './art/cards.js';
@@ -164,6 +164,82 @@ export function aimAlong(c, at, dur, path, { toolLen, stand, step = 120, prefer 
   c.propF.keys(at, dur, fp, { ease: 'linear', reduce });
   if (stand) c.root.keys(at, dur, fr, { ease: 'linear', reduce: 'snap' });
   return tips;
+}
+
+/* ------------------------------------------------------------------ sampling poses back out of the cues */
+
+const TF = /translate\((-?[\d.e+-]+)px, (-?[\d.e+-]+)px\) rotate\((-?[\d.e+-]+)deg\) scale\((-?[\d.e+-]+), (-?[\d.e+-]+)\)/;
+const parseTf = (s) => {
+  const m = TF.exec(s || '');
+  return m ? { x: +m[1], y: +m[2], rot: +m[3], sx: +m[4], sy: +m[5] } : null;
+};
+const lerpPose = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, rot: a.rot + (b.rot - a.rot) * u, sx: a.sx + (b.sx - a.sx) * u, sy: a.sy + (b.sy - a.sy) * u });
+
+function cubic(x1, y1, x2, y2) {
+  const f = (t, a, b) => 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t;
+  return (x) => {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (f(mid, x1, x2) < x) lo = mid;
+      else hi = mid;
+    }
+    return f((lo + hi) / 2, y1, y2);
+  };
+}
+const NAMED = { linear: [0, 0, 1, 1], ease: [0.25, 0.1, 0.25, 1], 'ease-in': [0.42, 0, 1, 1], 'ease-out': [0, 0, 0.58, 1], 'ease-in-out': [0.42, 0, 0.58, 1] };
+function easeFn(e) {
+  if (!e || e === 'linear') return (x) => x;
+  const m = /cubic-bezier\(([^)]+)\)/.exec(e);
+  const v = m ? m[1].split(',').map(Number) : NAMED[e];
+  return v ? cubic(...v) : (x) => x;
+}
+
+/**
+ * The pose (`{ x, y, rot, sx, sy }`, signed sx includes the flip) a Track-driven target has at absolute film time `t`,
+ * recovered from the cues themselves (it replays their keyframes and easing). Use it to hang one thing off another:
+ * a hose end on a hand, a cart that is dragged behind a character. Needs the cues to be emitted already.
+ */
+export function poseAt(cues, target, t, initial = null) {
+  const list = cues.filter((c) => c.target === target && c.keyframes[0] && c.keyframes[0].transform).sort((a, b) => a.at - b.at);
+  let pose = list.length ? parseTf(list[0].keyframes[0].transform) : initial && { x: initial.x, y: initial.y, rot: initial.rot, sx: initial.sx * initial.flip, sy: initial.sy };
+  for (const c of list) {
+    if (t < c.at) break;
+    const n = c.iterations || 1;
+    const frames = c.keyframes;
+    const end = parseTf(frames[frames.length - 1].transform);
+    if (t >= c.at + c.dur * n) {
+      pose = c.direction === 'alternate' && Math.floor(n) % 2 === 0 ? parseTf(frames[0].transform) : end;
+      continue;
+    }
+    let p = (t - c.at) / c.dur;
+    const it = Math.floor(p);
+    p -= it;
+    if (c.direction === 'alternate' && it % 2) p = 1 - p;
+    p = easeFn(c.easing)(p);
+    const offs = frames.map((k, i) => (k.offset != null ? k.offset : i / (frames.length - 1)));
+    let i = 0;
+    while (i < frames.length - 2 && p >= offs[i + 1]) i++;
+    const u = offs[i + 1] === offs[i] ? 1 : Math.min(1, Math.max(0, (p - offs[i]) / (offs[i + 1] - offs[i])));
+    return lerpPose(parseTf(frames[i].transform), parseTf(frames[i + 1].transform), easeFn(frames[i].easing)(u));
+  }
+  return pose;
+}
+
+/** World position of a prospector character's front hand (where a held tool's grip sits) at film time `t`. */
+export function gripAt(c, cues, t) {
+  const k = c.dims;
+  const root = poseAt(cues, c.root.target, t, c.root.p0);
+  const bob = poseAt(cues, c.bob.target, t, c.bob.p0) || { y: 0 };
+  const arm = poseAt(cues, c.armF.target, t, c.armF.p0);
+  const a = (arm.rot * Math.PI) / 180;
+  const lx = k.sh - k.armL * Math.sin(a);
+  const ly = -k.L - k.T + k.shY + bob.y + k.armL * Math.cos(a);
+  const th = (root.rot * Math.PI) / 180;
+  const sx = lx * root.sx;
+  const sy = ly * root.sy;
+  return { x: root.x + sx * Math.cos(th) - sy * Math.sin(th), y: root.y + sx * Math.sin(th) + sy * Math.cos(th) };
 }
 
 /** Sign pops into existence at (x, y) with a little overshoot. */

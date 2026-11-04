@@ -7,13 +7,13 @@
  *   vault   : inside. He discovers the giant Emerald, far bigger than he expected.
  */
 import { prospector } from '../../../art/prospector.js';
-import { torch, gasCart, TORCH_TIP } from '../../../art/weld.js';
+import { torch, gasCart, connectHose, dragCart, TORCH_TIP } from '../../../art/weld.js';
 import { emerald, plinth, stanchion, rope, placard } from '../../../art/emerald.js';
 import { placed, INK } from '../../../art/props.js';
 import { arc, dust, puff, sparks, mark, pow, rays, drops, flash, sparkle, chips } from '../../../fx/effects.js';
 import { Camera, fwd, aimAlong, idle } from '../../../kit.js';
 import { tween, show } from '../../../acting.js';
-import { museumFront, wallClose, galleryFront, GY, WALL } from '../world.js';
+import { museumFront, wallHole, wallClose, galleryFront, GY, WALL } from '../world.js';
 import { TEXT } from '../config.js';
 
 const SC = 0.95;
@@ -78,7 +78,10 @@ export function wall(ctx) {
     mark({ x: 520, y: 300, at: at(2060), dur: 1000, size: 90 }) +
     drops({ x: 560, y: 410, at: at(2150), n: 3, seed: 5, spread: 70 }) +
     sparkle({ x: 692, y: 540, at: at(5750), dur: 700, r: 18, n: 2, s: 1.2 });
-  return cam.html(`${museumFront(id)}${thief.html}${fx}`);
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: -400, y: GY });
+  dragCart(cues, cart, `${id}.gc.wheel`, thief, at(0), at(ctx.dur), { dist: 240 });
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  return cam.html(`${museumFront(id)}${cart.html}${hs}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ arc */
@@ -112,7 +115,8 @@ export function arcShot(ctx) {
     sparks({ x: tipX + 20, y: tipY, at: at(2300), n: 12, power: 170, angle: -0.2, spread: 2.4, seed: 23, size: 1.1, dur: 620 }) +
     puff({ x: tipX + 60, y: tipY - 20, at: at(1800), dur: 1300, r: 50, dy: -120, dx: 40, fill: 'url(#g-smoke)' }) +
     puff({ x: tipX + 40, y: tipY - 10, at: at(2150), dur: 1300, r: 44, dy: -110, dx: 20, fill: 'url(#g-smoke)' });
-  return `${wallClose(id)}${cam.html(`${thief.html}${fx}`)}`;
+  const hs = connectHose(cues, `${id}.hose`, { thief, anchor: { x: -240, y: 840 }, t0: at(0), t1: at(ctx.dur), len: 900 });
+  return `${wallClose(id)}${cam.html(`${hs}${thief.html}${fx}`)}`;
 }
 
 /* ------------------------------------------------------------------ cut */
@@ -281,10 +285,12 @@ export function cut(ctx) {
   fx += puff({ x: BOOT.x, y: BOOT.y - 10, at: at(FREE + 300), dur: 1400, r: 30, dy: -90, fill: 'url(#g-smoke)' });
   fx += pow({ x: WALL.cx + 20, y: 300, at: at(FALL + 20), text: 'CLANG!', scale: 0.66, rot: -7, dur: 1200 });
   fx += dust({ x: WALL.cx, y: FLOOR + 4, at: at(FALL), n: 9, spread: 150, r: 42, dir: 0, seed: 12, dur: 1500 });
-  fx += rays({ x: WALL.cx, y: FLOOR - 20, at: at(FALL), r0: 40, r1: 110, n: 12, dur: 400, width: 6 });
+  fx += rays({ late: true, x: WALL.cx, y: FLOOR - 20, at: at(FALL), r0: 40, r1: 110, n: 12, dur: 400, width: 6 });
   fx += chips({ x: WALL.cx, y: FLOOR - 10, at: at(FALL), n: 8, power: 150, seed: 5, fill: '#bbb' });
 
-  return `${cam.html(`${museumFront(id, { hole: true })}${slab.html}<g>${line}</g>${tank.html}${bootSeam}${thief.html}${fx}`)}${flash({ at: at(FALL), dur: 160, peak: 0.45 })}`;
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: tank.track, t0: at(0), t1: at(ctx.dur), len: 400 });
+  cues.push({ at: at(PUSH - 40), dur: 1, target: `${id}.hole`, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' });
+  return `${cam.html(`${museumFront(id)}<g data-t="${id}.hole">${wallHole()}</g>${slab.html}<g>${line}</g>${tank.html}${hs}${bootSeam}${thief.html}${fx}`)}${flash({ at: at(FALL), dur: 160, peak: 0.45 })}`;
 }
 
 /* ------------------------------------------------------------------ squeeze */
@@ -293,15 +299,16 @@ export function squeeze(ctx) {
   const { cues, at, id } = ctx;
   const cam = new Camera(cues, id, { x: 770, y: 460, s: 1.3 });
   cam.look(at(200), 2800, { x: 760, y: 470, s: 1.45 }, 'ease-in-out');
-  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 600, y: GY, scale: SC, face: 'smug', goggles: 'up', props: { F: torch(`${id}.tc`) }, armF: -20 });
+  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 690, y: GY, scale: SC, face: 'smug', goggles: 'up', props: { F: torch(`${id}.tc`) }, armF: -20 });
   thief.propF.set(at(0), { rot: 30 });
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: 560, y: GY });
   const dark = placed(cues, `${id}.dark`, `<path d="M-96 0 L-96 -178 Q0 -304 96 -178 L96 0Z" fill="#000"/>`, { x: WALL.cx, y: FLOOR });
   tween(cues, `${id}.dark`, at(0), 1, { opacity: 0 }, { opacity: 0 });
 
   // sizes up the hole, sucks in his gut, turns sideways
   thief.face(at(0), 'glance');
   thief.head.to(at(0), 200, { rot: fwd(thief, 6) });
-  thief.walk(at(150), 550, 662, { stride: 330, amp: 14, bounce: 5, swing: 5 });
+  thief.walk(at(150), 550, 712, { stride: 330, amp: 14, bounce: 5, swing: 5 });
   thief.face(at(750), 'plot');
   thief.bob.to(at(800), 260, { sx: 1.1, sy: 0.96 }, { ease: 'ease-out' });
   thief.bob.to(at(1060), 200, { sx: 0.96, sy: 1.0 });
@@ -322,7 +329,8 @@ export function squeeze(ctx) {
     puff({ x: 700, y: FLOOR - 6, at: at(2650), dur: 1000, r: 36, dy: -50, dx: -30 }) +
     puff({ x: 740, y: FLOOR - 6, at: at(2730), dur: 1000, r: 32, dy: -40, dx: 30 }) +
     dust({ x: 700, y: GY + 4, at: at(1500), n: 3, spread: 30, r: 16, dir: -1, seed: 8, dur: 500 });
-  return cam.html(`${museumFront(id, { hole: true })}${thief.html}${dark.html}${fx}`);
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  return cam.html(`${museumFront(id, { hole: true })}${cart.html}${hs}${thief.html}${dark.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ vault */
@@ -368,5 +376,6 @@ export function vault(ctx) {
   const base = `<g transform="translate(860 560)">${plinth(480, 130)}</g>`;
   const ropes = `${stan(520, 700)}${stan(1200, 700)}<g transform="translate(520 700)">${rope(680)}</g>`;
   const plac = `<g transform="translate(860 720)">${placard(TEXT.placard)}</g>`;
-  return cam.html(`${gal}${base}${gem.html}${ropes}${plac}${thief.html}${fx}`);
+  const hs = connectHose(cues, `${id}.hose`, { thief, anchor: { x: -700, y: FLOORV }, t0: at(0), t1: at(ctx.dur), len: 1100 });
+  return cam.html(`${gal}${base}${gem.html}${ropes}${plac}${hs}${thief.html}${fx}`);
 }

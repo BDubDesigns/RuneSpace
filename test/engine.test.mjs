@@ -149,7 +149,7 @@ test('the public entry imports in plain Node (no document / window needed: SSR-s
 
 test('fx: welding arc, balloon pop burst, lightbulb and rings are deterministic CSS effects on the master clock', () => {
   const a = arc({ x: 1, y: 2, at: 500, dur: 130, n: 4, r: 30 });
-  assert.match(a, /class="fx fx-arc"/);
+  assert.match(a, /class="fx fx-arc fx-late"/);
   assert.match(a, /--at:500;--dur:130;--n:4/);
   assert.equal(a, arc({ x: 1, y: 2, at: 500, dur: 130, n: 4, r: 30 }), 'same inputs give the same markup');
   assert.match(popBurst({ x: 0, y: 0, at: 10 }), /class="fx fx-popburst"/);

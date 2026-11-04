@@ -138,7 +138,7 @@ export class BalloonCloud {
     const parts = this.items
       .map(
         (it, i) =>
-          `<g data-t="${this.id}.s${i}" style="${it.str.css}"><path d="M0 0 L0 -1" stroke="#0d0d0d" stroke-width="2.4"/></g>` +
+          `<g data-t="${this.id}.s${i}" style="${it.str.css}"><path d="M0 0 L0 -1" stroke="#0d0d0d" stroke-width="3.6" vector-effect="non-scaling-stroke"/></g>` +
           `<g data-t="${this.id}.b${i}" style="${it.b.css}">${balloon(it.tone, it.s)}</g>` +
           `<g data-t="${this.id}.r${i}" style="${it.scrap.css}">${scrap()}</g>`
       )

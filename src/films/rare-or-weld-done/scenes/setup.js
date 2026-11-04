@@ -8,7 +8,7 @@
 import { prospector } from '../../../art/prospector.js';
 import { newspaper, bubble, dealer, creditPile } from '../../../art/heist.js';
 import { emerald } from '../../../art/emerald.js';
-import { torch, gasCart } from '../../../art/weld.js';
+import { torch, gasCart, connectHose } from '../../../art/weld.js';
 import { placed } from '../../../art/props.js';
 import { dust, puff, mark, sparkle } from '../../../fx/effects.js';
 import { Camera, idle, fwd } from '../../../kit.js';
@@ -99,40 +99,40 @@ export function plan(ctx) {
   thief.face(at(800), 'plot'); // a thought is forming
   // --- bubble: three tail dots, then the cloud pops
   [0, 1, 2].forEach((i) => {
-    cues.push({ at: at(900 + i * 220), dur: 220, target: `${id}.b.t${i}`, easing: 'cubic-bezier(.2,1.6,.4,1)', keyframes: [{ transform: 'scale(0)' }, { transform: 'scale(1)' }] });
+    cues.push({ at: at(900 + i * 340), dur: 220, target: `${id}.b.t${i}`, easing: 'cubic-bezier(.2,1.6,.4,1)', keyframes: [{ transform: 'scale(0)' }, { transform: 'scale(1)' }] });
     // tails scale about their own centres
   });
-  cues.push({ at: at(1450), dur: 420, target: `${id}.b.cloud`, easing: 'cubic-bezier(.2,1.4,.4,1)', keyframes: [{ transform: 'scale(0.05)' }, { transform: 'scale(1)' }] });
+  cues.push({ at: at(1850), dur: 420, target: `${id}.b.cloud`, easing: 'cubic-bezier(.2,1.4,.4,1)', keyframes: [{ transform: 'scale(0.05)' }, { transform: 'scale(1)' }] });
   // contents appear with the cloud: dealer first
-  tween(cues, `${id}.scene`, at(1400), 1, { opacity: 0 }, { opacity: 1 });
-  dealerP.track.keys(at(1750), 420, [{ o: 0.6, sx: 1.12, sy: 1.12 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  tween(cues, `${id}.scene`, at(1800), 1, { opacity: 0 }, { opacity: 1 });
+  dealerP.track.keys(at(2150), 420, [{ o: 0.6, sx: 1.12, sy: 1.12 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
   // the dealer: shifty eyes, smoke
-  cues.push({ at: at(2200), dur: 400, iterations: 3, target: `${id}.dl.eyes`, easing: 'steps(1,end)', keyframes: [{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }], direction: 'alternate', reduce: 'skip' });
+  cues.push({ at: at(2600), dur: 400, iterations: 3, target: `${id}.dl.eyes`, easing: 'steps(1,end)', keyframes: [{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }], direction: 'alternate', reduce: 'skip' });
   // 'here comes the Emerald': it slides in from the left, the dealer's hand comes out
-  gemP.track.keys(at(2650), 460, [{ o: 0.6, sx: 1.1, sy: 1.1 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
-  gemP.track.to(at(3200), 500, { x: -110 }, { ease: 'ease-in-out' });
-  cues.push({ at: at(3200), dur: 500, target: `${id}.dl.arm`, easing: 'ease-in-out', keyframes: [{ transform: 'translate(44px, -122px) rotate(0deg)' }, { transform: 'translate(44px, -122px) rotate(-18deg)' }] });
+  gemP.track.keys(at(3050), 460, [{ o: 0.6, sx: 1.1, sy: 1.1 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  gemP.track.to(at(3600), 500, { x: -110 }, { ease: 'ease-in-out' });
+  cues.push({ at: at(3600), dur: 500, target: `${id}.dl.arm`, easing: 'ease-in-out', keyframes: [{ transform: 'translate(44px, -122px) rotate(0deg)' }, { transform: 'translate(44px, -122px) rotate(-18deg)' }] });
   // the trade: the gem vanishes into his coat, the mountain of Credits grows
-  gemP.track.keys(at(3800), 260, [{ o: 1, sx: 0, sy: 0, x: -40 }], { ease: 'ease-in' });
-  pileP.track.keys(at(3800), 760, [{ o: 0.55, sx: 1.25, sy: 1.25 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
-  pileP.track.keys(at(4700), 500, [{ o: 0.5, sx: 1.2, sy: 1.16 }, { o: 1, sx: 1.12, sy: 1.1 }], { ease: 'ease-in-out' });
-  dealerP.track.to(at(3800), 300, { x: -4 }, { ease: 'ease-out' });
+  gemP.track.keys(at(4200), 260, [{ o: 1, sx: 0, sy: 0, x: -40 }], { ease: 'ease-in' });
+  pileP.track.keys(at(4200), 760, [{ o: 0.55, sx: 1.25, sy: 1.25 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  pileP.track.keys(at(5100), 500, [{ o: 0.5, sx: 1.2, sy: 1.16 }, { o: 1, sx: 1.12, sy: 1.1 }], { ease: 'ease-in-out' });
+  dealerP.track.to(at(4200), 300, { x: -4 }, { ease: 'ease-out' });
   // --- the thief grins
-  thief.face(at(3900), 'greed');
-  thief.bob.hop(at(3900), 300, 26);
-  thief.head.keys(at(4300), 900, [{ o: 0.3, rot: fwd(thief, 4) }, { o: 0.6, rot: fwd(thief, -3) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  thief.vibrate(at(4600), 1800, 3);
+  thief.face(at(4300), 'greed');
+  thief.bob.hop(at(4300), 300, 26);
+  thief.head.keys(at(4700), 900, [{ o: 0.3, rot: fwd(thief, 4) }, { o: 0.6, rot: fwd(thief, -3) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.vibrate(at(5000), 1800, 3);
   // bubble pops away at the end (he has made up his mind)
-  cues.push({ at: at(6100), dur: 380, target: `${id}.bub`, easing: 'ease-in', keyframes: [{ opacity: 1 }, { opacity: 0 }], reduce: 'snap' });
-  thief.face(at(5400), 'plot');
-  thief.bob.keys(at(5400), 500, [{ o: 0.5, sy: 1.02, sx: 0.99 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
+  cues.push({ at: at(6500), dur: 380, target: `${id}.bub`, easing: 'ease-in', keyframes: [{ opacity: 1 }, { opacity: 0 }], reduce: 'snap' });
+  thief.face(at(5800), 'plot');
+  thief.bob.keys(at(5800), 500, [{ o: 0.5, sy: 1.02, sx: 0.99 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
 
   const fx =
     puff({ x: 460, y: 400, at: at(900), dur: 600, r: 24, dy: -20, opacity: 0.6 }) +
-    puff({ x: 905, y: 150, at: at(2200), dur: 1300, r: 22, dy: -50, dx: 24, opacity: 0.6, fill: 'url(#g-dust)' }) +
-    sparkle({ x: 900, y: 250, at: at(4000), dur: 900, r: 24, n: 3, s: 1.2 }) +
-    sparkle({ x: 1060, y: 190, at: at(4300), dur: 900, r: 20, n: 3, s: 1.2 }) +
-    sparkle({ x: 980, y: 380, at: at(4600), dur: 900, r: 22, n: 2, s: 1.2 });
+    puff({ x: 905, y: 150, at: at(2600), dur: 1300, r: 22, dy: -50, dx: 24, opacity: 0.6, fill: 'url(#g-dust)' }) +
+    sparkle({ x: 900, y: 250, at: at(4400), dur: 900, r: 24, n: 3, s: 1.2 }) +
+    sparkle({ x: 1060, y: 190, at: at(4700), dur: 900, r: 20, n: 3, s: 1.2 }) +
+    sparkle({ x: 980, y: 380, at: at(5000), dur: 900, r: 22, n: 2, s: 1.2 });
   return `<rect width="1280" height="720" fill="#d0d0d0"/>${cam.html(`${thief.html}${bubP.html}${fx}`)}`;
 }
 
@@ -164,5 +164,5 @@ export function grab(ctx) {
   thief.armF.to(at(2150), 300, { rot: -120 }, { ease: 'ease-in-out' });
   thief.bob.keys(at(2100), 300, [{ o: 0.5, sy: 0.93, sx: 1.05 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-out', reduce: 'skip' });
   const fx = dust({ x: 760, y: GY + 4, at: at(700), n: 4, spread: 50, r: 20, dir: -1, seed: 6, dur: 600 }) + sparkle({ x: 1050, y: 360, at: at(1800), dur: 700, r: 22, n: 2 });
-  return cam.html(`${apartment(id)}<g transform="translate(640 ${GY})">${armchairBack()}</g><g transform="translate(790 ${GY})">${footstool()}</g>${rack.html}${goggP.html}${cartP.html}${thief.html}<g transform="translate(640 ${GY})">${armchairFront()}</g>${fx}`);
+  return cam.html(`${apartment(id)}<g transform="translate(640 ${GY})">${armchairBack()}</g><g transform="translate(790 ${GY})">${footstool()}</g>${rack.html}${goggP.html}${cartP.html}${connectHose(cues, `${id}.hose`, { thief, tank: cartP.track, t0: at(1800), t1: at(ctx.dur), len: 480 })}${thief.html}<g transform="translate(640 ${GY})">${armchairFront()}</g>${fx}`);
 }

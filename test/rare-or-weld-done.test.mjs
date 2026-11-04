@@ -64,8 +64,8 @@ test('placeholder lore lives in config.js only: no scene hard-codes the Emerald\
   assert.match(built.markup, new RegExp(NAMES.emerald.split(' ').slice(0, -1).join(' ')), 'the headline comes from config');
 });
 
-test('runtime is on target: about 2 to 2.5 minutes, every scene has a duration and a caption', () => {
-  assert.ok(built.duration >= 120000 && built.duration <= 160000, `runtime ${built.duration} ms`);
+test('runtime is on target: about 2 to 3 minutes, every scene has a duration and a caption', () => {
+  assert.ok(built.duration >= 120000 && built.duration <= 175000, `runtime ${built.duration} ms`);
   for (const s of built.scenes) assert.ok(s.caption.trim().length > 4, `${s.id} caption`);
   assert.ok(Object.values(TIMING).every((n) => n >= 1500));
 });

@@ -14,6 +14,7 @@ export class Track {
     this.cues = cues;
     this.target = target;
     this.p = { x: 0, y: 0, rot: 0, sx: 1, sy: 1, flip: 1, ...pose };
+    this.p0 = { ...this.p }; // the pose it was built with (poseAt() uses it before the first cue)
   }
 
   static tf(p) {
