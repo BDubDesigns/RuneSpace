@@ -25,7 +25,7 @@ final frame. Playback needs a *visible* page (a hidden tab freezes the clock).
 **Docs, in reading order**
 
 1. `NEXT_FILM_HANDOFF.md`: status, exact next steps, known issues, open decisions (start here for new work).
-2. `MOVIE_AUTHORING_GUIDE.md`: architecture, timeline internals, how to build a film, testing, packaging, pitfalls.
+2. `MOVIE_AUTHORING_GUIDE.md`: architecture, timeline internals, how to build a film, testing (including the visual QA review, §9.5), packaging, pitfalls, and the lessons learned making film two (§13).
 3. This README: setup, running, testing, packaging, public API.
 
 ---
@@ -73,6 +73,8 @@ npm test          # ~0.3 s. node:test, no browser. Runs against EVERY registered
 npm run verify    # ~20 s. Real engine in headless Chrome, for every registered film.
 node dev/verify-headless.mjs that-mines-mine      # one film
 npm run shoot -- rare-or-weld-done /tmp/frames/k s-kick+2100 s-plate+7000   # render stills (see dev/shoot.mjs)
+# the whole film as stamped one-second contact sheets, for the visual review in guide section 9.5:
+STAMP=1 SHEETS=8 COLS=4 W=640 H=360 SETTLE=60 npm run shoot -- rare-or-weld-done /tmp/qa/f every:1000
 ```
 
 - `npm test` checks each film's structure (every cue target exists in the markup, every cue starts in its
@@ -82,9 +84,12 @@ npm run shoot -- rare-or-weld-done /tmp/frames/k s-kick+2100 s-plate+7000   # re
   (`test/film1-approved.test.mjs`) and the locked story points of film two (`test/rare-or-weld-done.test.mjs`).
 - `npm run verify` proves the behaviour that matters: seek determinism (same picture however you arrive
   at a time), one scene/face visible at a time, pause freezes *everything* (including film grain), natural
-  end/replay/restart, reduced motion, `load()`/`destroy()` leak nothing, and a 375 px phone-width player.
+  end/replay/restart, that no effect is lost after playback mixed with scrubbing, chapter jumps, skip and replay, reduced motion,
+  `load()`/`destroy()` leak nothing, and a 375 px phone-width player.
 - Still manual (see the guide, §9.3): looking at it. Seek every scene, read every card, watch on a phone.
-  `npm run shoot` renders any frame so you can check a gag without a browser session.
+  `npm run shoot` renders any frame so you can check a gag without a browser session. For a whole film, the visual review in
+  the guide (section 9.5: one-second stamped contact sheets split between independent cheap reviewers, then your own verification)
+  finds continuity and pacing problems the tests cannot; its limits are in 9.6, and it does not replace `npm run verify` or watching the film.
 
 ## 4. Project structure
 

@@ -5,7 +5,8 @@ exists today (file names, function names and argument lists are real). If the co
 ever disagree, the code wins: fix the guide, and `test/docs.test.mjs` will tell you when a path in
 it goes stale.
 
-Read this once top to bottom, then keep sections 5, 6 and 10 open while working.
+Read this once top to bottom, then keep sections 5, 6 and 10 open while working. Before you start a film, skim section 13
+(lessons from film two); before you call one finished, run the visual review in section 9.5.
 
 ---
 
@@ -25,7 +26,8 @@ Read this once top to bottom, then keep sections 5, 6 and 10 open while working.
 8. **Don't edit "That Mines Mine!"** unless asked. It is approved. Tests and `film1-approved` (git tag) protect it.
 9. **Run `npm test` and `npm run verify` before calling anything done** (section 9).
 10. **Look at it.** Seek to every scene in a real browser, including a phone-width one. Green tests do not mean funny.
-    (`npm run shoot -- <film> <prefix> <scene+ms> ...` renders stills headlessly.)
+    (`npm run shoot -- <film> <prefix> <scene+ms> ...` renders stills headlessly; `... every:1000` renders the whole film
+    for the contact-sheet review in 9.5.)
 11. **Sequence the cues on a Track; never overlap them.** Every `Track` cue starts from the *end pose* of the previous
     one, so two cues running at once make the picture jump to the first one's end pose. While `walk()` / `aimAlong()` /
     `hop()` runs on a character, do not touch the same body part (`root`, `bob`, `legF`, `armF` ...) in that window; use
@@ -370,7 +372,7 @@ All grayscale, ink-outlined, drawn around a documented origin; each is on `dev/s
 
 | module | what |
 |---|---|
-| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack`, `cartValve`, `hose` / `connectHose(cues, id, { thief, tank \| anchor, t0, t1, len })` (a hose that runs from a valve or fixed anchor to the character's hand and sags or stretches with it; `rope: true` for a rope), `dragCart(cues, cart, wheelId, thief, t0, t1)` (the cart trails the character by the hose length, wheels rolling) |
+| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack` (a bank bag with the Credits mark and an open mouth; origin = the centre of the mouth, which faces up, so scaling it stretches it out from the rim), `cartValve`, `hose` / `connectHose(cues, id, { thief, tank \| anchor, t0, t1, len })` (a hose that runs from a valve or fixed anchor to the character's hand and sags or stretches with it; `rope: true` for a rope), `dragCart(cues, cart, wheelId, thief, t0, t1)` (the cart trails the character by the hose length, wheels rolling) |
 | `art/emerald.js` | `emerald(id, {w,h})` (origin bottom centre; the facets alternate near-white / near-black so it reads as a gem without colour), `plinth`, `stanchion`, `rope`, `placard` |
 | `art/balloons.js` | `balloon(tone, s)`, `bird(id)`, `BalloonCloud` (a cloud of balloons tied to a hub in *its carrier's* frame: `releaseRange`, `stretch`, `pop`, `html`) |
 | `art/heist.js` | `newspaper`, `bubble`, `dealer`, `coin`, `creditPile`, `creditBag` |
@@ -610,7 +612,8 @@ Node ≥ 22 and Chrome/Chromium (`CHROME_BIN=…` to point at one). Checks, in t
 - exactly **one scene visible** at every boundary; exactly **one face** visible per character
 - API semantics: seek keeps paused/playing; idle → paused; `skip()` equals `seek(duration)`
 - **pause freezes every animation** (none `running`, picture unchanged); playback tracks wall-clock
-- natural end, replay, `restart()` give identical frames
+- natural end, replay, `restart()` give identical frames; **no effect is lost** after real playback mixed with scrubbing,
+  chapter jumps, skip and replay (every sample frame must still equal its first viewing and the film-look overlays still run)
 - **reduced motion**: rebuilds in place, hides decoration, seek is order independent, toggling back
   restores the identical picture
 - `load()` twice leaks no animations and keeps the film-look layers alive; `destroy()` cancels everything
@@ -639,6 +642,121 @@ at the two times and diff them; the element named in the diff is the culprit.
 Seeking does not need a ticking clock, so `?t=…&bare=1&ui=0` + a screenshot is the quickest way to review
 a frame. **Real playback needs a *visible* page**: in a backgrounded/hidden pane or tab the clock appears
 frozen. In the Claude desktop app, bring the preview pane forward before judging playback.
+
+### 9.5 Visual QA by contact sheets (multi-agent review)
+
+Tests prove the picture is deterministic and structurally sound; they cannot tell you that a hose is not connected to its tank, that a
+crater appears before the rock lands, or that a gag happens too fast to read. For film two we added a **visual review**: render the whole
+film as one-second frames, split the sheets between several cheap, independent, vision-capable reviewers, consolidate what they
+report, verify each finding yourself and only then edit. It complements `npm test`, `npm run verify` and watching the film: it
+replaces none of them (see 9.6).
+
+**What we actually did on film two (this is the evidence behind the workflow).** Four Haiku agents were started with the Agent tool
+(`subagent_type: "general-purpose"`, `model: "haiku"`), each told not to edit anything. They looked at seven contact sheets of ~22
+frames each (one frame per second, sampled at 0.5 s, 1.5 s ... , four columns, ~320 px per frame) and were given overlapping stretches:
+A = sheets 0-1, B = 1-3, C = 3-5, D = 5-6, i.e. four consecutive chronological sections with a sheet of overlap so nothing at a
+boundary was lost. The prompt listed the scenes with their start and end times, the story beat each one tells and a checklist (hose
+connections, contact between hands and objects, floating / vanishing / duplicated / wrong-sized things, things visible too early or late,
+actions too fast to read); each report was "a concise bullet list: approximate film time, scene name, the problem, severity", at most 25 bullets.
+What went right and wrong:
+
+- **Confirmed defects the review found, which I then verified in stills and in the code and fixed:** the crater visible before the Emerald
+  lands (reported high by agent C); the torch hose dangling or not meeting a tank in the apartment, wall, despair and welding montage
+  scenes (A, B, C, D, so reported four times independently); the wall opening drawn the moment the cut starts (A); the gas cart
+  vanishing during the squeeze (B, high); no visible contact between the thief and the Emerald in the attempts (B); the torch lying on the
+  ground instead of in his hand in the despair scene (C); the newspaper floating without hands (D). While verifying I also found the same proprietor drawn twice in the plate scene, which no reviewer
+  had listed. The owner independently noticed the hose, the missing contact and the crater that appeared before the landing, so those three
+  were also confirmed by a human.
+- **Judged by design on inspection, left alone** (re-checked while writing this guide, not at the time): gloved hands without arms on the newspaper close-up (the `paper` scene draws only his gloves on purpose);
+  the thought bubble "popping in within a second" (it is a pop-in); an empty frame at the start of the wall scene (he walks in from off screen).
+- **Not reliable at that resolution:** position estimates (reported by the agents themselves as +/-20 px), "verify" items, and anything about
+  hands touching things. One agent zoomed to full-resolution frames for its flagged items, which made its findings the most useful;
+  others reported they could not zoom. Several findings were low severity, and **no per-item record of which low-severity notes were
+  fixed or declined was kept** (the moon appearing without a fade was declined). Do better: keep the consolidated list in a file.
+- **A tooling miss:** the ImageMagick sheet labels came out blank (no font), so the agents counted grid positions to infer times. This is why
+  `dev/shoot.mjs` now burns the time and scene id into every frame (`STAMP=1`).
+
+#### The workflow
+
+1. **Know the cut.** Owner timestamps and reviewer timestamps refer to the *current* film; adding or changing a scene moves everything
+   after it. Print the scene table and give it to every reviewer:
+   ```bash
+   node --input-type=module -e "import {loadFilm} from './src/films/index.js'; const b=(await loadFilm('<film-id>')).build(); for (const s of b.scenes) console.log((s.start/1000).toFixed(1), (s.end/1000).toFixed(1), s.id, '-', s.caption)"
+   ```
+2. **Render the whole film, stamped, at ~1 s intervals** (about 50 s for a three-minute film; no dependencies besides Chrome and ImageMagick):
+   ```bash
+   mkdir -p /tmp/qa && STAMP=1 SHEETS=8 COLS=4 W=640 H=360 SETTLE=60 npm run shoot -- <film-id> /tmp/qa/<film-id> every:1000
+   ```
+   `every:1000` samples the middle of each second; `STAMP=1` burns `m:ss.s scene-id` into each frame; `SHEETS=8` writes
+   `/tmp/qa/<film-id>-sheet-1.png` ... `-8.png` of ~22 frames (a 3-minute film) so each image stays readable; the individual frames
+   `/tmp/qa/<film-id>-NNN.png` are kept for zooming. See `dev/shoot.mjs` for the other options (`REDUCED=1`, `UI=1`, `CHROME_BIN`).
+3. **Split into four consecutive sections** (the quarters of the sheets) and give each to one independent reviewer, with one sheet of
+   overlap at each boundary. Use any inexpensive vision-capable model; nothing here depends on one provider. Reviewers must not edit
+   files and should not see each other's reports (independence is what makes a finding reported by two of them credible).
+4. **Give each reviewer the context it needs:** the film's one-paragraph premise, the approved beats from `STORY.md` (and which text and
+   endings are locked, so they do not "fix" them), the scene table from step 1 with a one-line description of what each scene is *meant* to
+   show, the sheet layout (columns, frame interval, where the stamps are), and what is intentionally unusual (grayscale, silent, cartoon
+   physics, a gag that is *supposed* to be too fast).
+5. **Ask them to look for:** visual elements appearing too early or too late; actions too quick to understand; unnecessarily long holds;
+   title cards gone before they can be read; character or prop continuity errors (a hat, a held tool, a hose, a rope, a count of balloons); objects teleporting,
+   overlapping or vanishing; wrong facial expressions or reactions; poor comedic timing (no beat before the punch, a reaction that
+   comes too early); effects at the wrong place or moment; camera framing (subject cropped, empty frame, a pan with no hold on its
+   target); scene transitions that hide important action.
+6. **Require this report format** and nothing vaguer: for every finding the exact timestamp (from the stamp) and scene id, what is
+   visible in which frame (the evidence), severity (high = the story is unreadable or something is plainly wrong, medium = noticeable,
+   low = polish), a suggested change, and whether it needs a closer look ("verify at full resolution / at 100 ms steps / in playback").
+   Also ask for what works, briefly, so you do not undo it.
+7. **Consolidate** into one list in a file (a findings table is enough): merge duplicates, mark findings reported by more than one reviewer,
+   separate *defects* from *taste* and from *uncertain*.
+8. **Verify independently before editing.** Render the frames around each timestamp yourself at full size
+   (`npm run shoot -- <film> /tmp/qa/v s-kick+2100 ...`, or step 100-250 ms around it), read the scene code, and classify the finding as
+   **confirmed defect**, **false positive** (design intent or a misread low-resolution frame), **subjective improvement** (ask the owner) or
+   **unresolved**. Do not fix what you have not seen.
+9. **Fix confirmed problems without disturbing approved material:** touch only the film's own folder (and shared art if it is a real
+   bug there), keep locked text and endings, never edit an approved film, and prefer the smallest change that removes the cause (see
+   section 13 for the causes we met).
+10. **Re-render and regress:** shoot the affected scenes again at full size, re-run `npm test` (sequence/overlap errors show up
+    immediately) and `npm run verify`, re-run the contact sheets for the scenes whose length changed (the scene table moved), and look at the
+    first and last frame of the neighbouring scenes.
+
+A reusable reviewer prompt (fill the angle brackets):
+
+```text
+You are reviewing contact sheets of a silent black-and-white cartoon, "<title>", for continuity, clarity and timing. Do NOT edit files.
+Premise: <one paragraph>. Locked, do not criticise: <locked cards / ending>.
+Sheets: <paths>. Each is a <4>-column grid, one frame per second (sampled mid-second), read left to right then top to bottom.
+Every frame has its time and scene id burned into the top-left corner; use those, never your own count.
+Scenes in your section (start-end seconds, id, what it is meant to show): <scene table with captions>.
+Look for: elements appearing too early or too late; actions too fast to follow (a big pose change between adjacent frames);
+holds that last too long; cards gone before they can be read; continuity of characters and props (held tools, hoses, ropes, counts);
+objects teleporting, overlapping or vanishing; wrong expressions; weak comic timing; effects in the wrong place or moment;
+framing and camera moves with no pause on their target; transitions that hide important action.
+For every finding give: timestamp (from the stamp), scene id, what you see in which frames, severity (high/medium/low),
+a suggested change, and "needs closer look" if one-second frames cannot settle it. Max 25 findings, most severe first.
+Also list up to five things that work well. Say plainly when you are unsure; do not guess positions to the pixel.
+```
+
+### 9.6 What the contact-sheet review cannot do (and what to do about it)
+
+One frame per second is excellent for overall continuity and pacing and is the wrong tool for several things. Add the matching
+check instead of trusting the sheets:
+
+| need | why one-second sheets fail | do this |
+|---|---|---|
+| a fast action (a kick, a pop, a snap, a squeeze) | a gag that lasts 400 ms may fall between two frames, so it looks missing or "teleported" | re-shoot that window every 100-250 ms (`npm run shoot -- <film> /tmp/qa/w <scene>+1900 <scene>+2000 ...`) or use `every:250` on a short film |
+| scene boundaries | the sampling rarely lands on the first and last frame of a shot, which is where cut-and-iris continuity errors live | shoot `<scene>+0`, `<scene>+1` and `<film ms of scene end - 1>` for every cut (the verify tool already samples the boundaries for determinism, not for looks) |
+| contact (a hand on a surface, a tool tip on a seam) | at ~320 px a 20 px gap is invisible, and reviewers have said so | have the reviewer name the frame, then look at it at full size or compute the contact from the art (13.1) |
+| motion quality and comic timing | a still has no speed or rhythm | watch it, in a visible window, at the real speed, and read every card at normal pace |
+| phone layout | the sheets use the desktop player size | `UI=1 W=375 H=812 npm run shoot -- <film> ...` and the `verify` mobile check |
+| effects that only static frames cannot validate (an effect that vanishes after a seek, a CSS animation not on the clock, reduced motion) | the sheets always seek forward from a fresh page | `npm run verify` (seek determinism, pause, replay, reduced motion, "no effect is lost after the controls") and the manual checklist in 9.3 |
+
+Reviewers should say when a finding needs one of these. The sheets are a *cheap first pass that finds where to look*; they never
+replace the automated timeline verification or a full playback review by a person.
+
+**Making it routine for the next film or an in-universe advertisement.** The command in step 2 is the whole tool; do not build a
+framework around it. A sensible habit: render the sheets when the first complete cut exists, again after each round of fixes
+that changes timing, and keep the consolidated findings file next to the film (`STORY.md` is a good neighbour). If a short
+commercial (say 30 s) is made, use `every:500` and two reviewers.
 
 ---
 
@@ -786,3 +904,142 @@ import { tourist } from './src/art/crowd.js';
 ```
 
 Commands: `npm run dev` · `npm test` · `npm run verify` · `npm run pack:check` · `node dev/verify-headless.mjs <film-id>`.
+
+---
+
+## 13. Lessons from film two ("Rare or Weld Done?")
+
+Everything here is backed by the git history (`git log` from `fb1b8c3` on), the review findings in 9.5, or code that exists now.
+Each lesson says which it is. Items marked *(owner taste)* are the owner's art direction in review, not defects.
+
+### 13.1 Make contact, anchors and attachments computed, never eyeballed (confirmed defects; the owner and the reviewers both found them)
+
+A hand that is 20 px short of the surface it pushes, a hose that ends in the air and a rope that is not tied to anything were the most
+common defects of the first cut. What works:
+
+- **Replay the cues to know where a hand is.** `poseAt(cues, target, t, initial)` and `gripAt(c, cues, t, hand)` (`src/kit.js`)
+  recover a pose or a hand position at any film time from the cues already emitted. Everything that must stay attached to a moving
+  hand (hose, rope) samples this.
+- **Hoses and carts:** `connectHose` runs from the gas cart's valve (or a fixed anchor) to the hand, sagging or stretching by its real length;
+  `dragCart` makes the cart trail the character by the hose length, wheels turning. From `scenes/heist.js` (`wall`):
+  ```js
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: -400, y: GY });
+  dragCart(cues, cart, `${id}.gc.wheel`, thief, at(0), at(ctx.dur), { dist: 240 });
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  return cam.html(`${museumFront(id)}${cart.html}${hs}${thief.html}${fx}`); // hose after the cart, before the thief
+  ```
+  Call `connectHose` *after* every cue it samples has been emitted. When the tank is off screen, use `anchor: { x, y }` off the frame.
+  If a shot cuts to a close-up, place the cart where it was left (`spot` and `study` place it at `SPOT_X - 240`): the audit's
+  "the cart vanishes" finding was exactly this.
+- **Large object plus pusher:** give the pusher the same easing and timing as the object and a fixed gap
+  (`scenes/sky.js`, `rise`): `thief.walk(at(400), 1300, 805 - GAP_FLOAT, { ..., ease: 'ease-in-out' })` next to
+  `lg.gem.to(at(400), 1300, { x: 805 }, { ease: 'ease-in-out' })`. `walk` accepts `ease` and `noRoot`. The two gap constants
+  (`GAP_FLOAT`, `GAP_LEAN`) were *derived with `gripAt`* from the gem's chamfer geometry (a floating gem meets his hands on its slanted
+  lower corner, not on its flat face) and are commented with how. When the thing you touch is not flat, compute where the surface is at the
+  hand's height.
+- **Sinking one object into another:** hide its base behind the *front lip* of the hole. A crater is drawn as back, object, front;
+  the object only looks embedded once its base is below the front lip band (`craterFront`'s band is about 51-69 px below the crater's
+  `y`): we sank the Emerald to `GY + 66` (crash, despair) and `YARD.gem.y = GY + 64`. Owner feedback twice: "it should be lower in the hole".
+
+### 13.2 Lean with the whole body, not the torso (confirmed, flagged by the owner twice)
+
+`torso.rot` bends the upper body away from planted legs; it reads as a broken figure. Lean by rotating the **root** (it pivots at the feet) and
+slide `root.x` back by the amount the hands move, as in `rise` (`thief.root.to(at(JAM + 300), 400, { rot: fwd(thief, 12), x: 806 - GAP_LEAN }, ...)`)
+and in `crash` (a stooped walk: `thief.walk(..., { noRoot: true })` plus one `root.to(..., { x, rot })` so `x` and `rot` are a single cue). Reserve `torso`
+for small jolts and vibration.
+
+### 13.3 Hold a prop at a chosen angle by counter-rotating it (confirmed; the owner corrected the bank bag twice)
+
+A held prop turns with the arm. To keep it at a chosen on-screen angle, set the prop's rotation to `net - armRot`
+(`scenes/getaway.js`, `sack`):
+```js
+const hold = (t, dur, arm, net = 0, ease = 'ease-out') => {
+  thief.armF.to(at(t), dur, { rot: arm }, { ease });
+  thief.propF.to(at(t), dur, { rot: net - arm }, { ease, reduce: 'snap' });
+};
+hold(1000, 380, ARM, NET); // NET 45: the bag's open mouth points up-right, square onto the gem's slanted lower-left face
+```
+Stretch a prop with `propF` `sx/sy` (it scales about the grip, so put the grip at the part that must stay put: the bag's origin is its mouth).
+**Write down the physical set-up before animating a gag** (which way does the opening face; which surface does it touch; where is the grip),
+then check one full-size frame. We drew the first bag with the opening facing the wrong way and the second upright; the third matched the idea.
+
+### 13.4 Cause before effect (confirmed defects)
+
+A crater, a hole, a crack or a dust ring must not exist before the thing that makes it. The first cut drew the crater from frame one
+and the cut-out opening before the torch had cut it. Put the consequence in its own `<g data-t>` and reveal it with a one-ms cue at the
+impact (`sky.js`, `crash`: `['craterB','craterF'].forEach(n => cues.push({ at: at(IMPACT - 1), dur: 1, target: `${id}.${n}`, ... }))`), and
+let the falling object land on bare ground first. Likewise a CSS effect whose first keyframe is visible shows during its start delay
+(`fill-mode: both`): add `.fx-late` (`arc`, `rings` carry it; pass `rays({ late: true })`).
+
+### 13.5 Persistent world state across shots (confirmed; new in the last review round)
+
+A gag that breaks something must leave it broken in every later shot, in the same place. In `world.js`: `museumFront(id, { light: 'broken',
+cam: 'broken' })` draws the dead lamp, the snapped bracket and, through the shared `WRECK` constants, the fallen camera and rock exactly where
+the `spot` shot's cues leave them; `yard.js` passes the same options. Keep one set of constants and use it in both the animation
+end pose and the static aftermath. A looping decoration that is interrupted needs a shot whose length makes the loop end on its first
+pose: `wall` runs two full searchlight sweeps (`SWEEP = 2200`, duration 4400) so `spot` starts the beam at the same angle.
+Share the position a character leaves one shot with the next as a constant (`SPOT_X`, `ROCK_X`, `STUDY_X`).
+
+### 13.6 Timing and the camera
+
+- **Slapstick needs more time than you think** *(confirmed by the audit: big pose changes between adjacent one-second frames)*: we slowed the
+  squeeze, the balloon lift-off, the welding posts and the thought bubble. The card rule (1 s + 0.4 s per word) was right and was
+  never complained about: leave cards alone.
+- **A camera move needs a beat on its target** *(owner feedback twice, `despair` and `reread`)*: a move of about 1 s, then a hold of about
+  1 to 1.2 s on each focal point before the next move; do not return to a wide shot between focal points. See `scenes/finale.js` (`despair`:
+  FENCE sign, Emerald, torch, bulb; `reread`: tourists, sign, proprietor) where each `cam.look` is commented with how long it holds.
+  This lengthened those scenes by 3 s and 3.6 s; it was what the owner wanted.
+- **A failed-attempts sequence reads best as a montage of short shots** *(owner request)*: `sack`, `push`, `shoulder`, `ropeTry` each `in: 'iris'` with a
+  different `irisIn` centre (in `index.js`), instead of one long scene with the same set-up repeated.
+- **Runtime grows with every review round** *(a fact, and a decision for the owner)*: 2:34 at first review, 2:46 after the continuity pass, 3:01 after
+  the rock gag, the bag gag and the held camera beats. The runtime ceiling in `test/rare-or-weld-done.test.mjs` started at 2:40 and was raised
+  with it (175 s, 180 s, now 190 s). If a runtime budget matters, name it before the review rounds start and trim non-text holds first.
+
+### 13.7 Choreographing several moving parts
+
+- Two bodies sharing a timeline: sample one from the other (see 13.1) rather than timing both by hand.
+- A thrown object: build the flight from `lob()` keyframes (x linear, y on a parabola) and start it from `gripAt(thief, cues, t, 'B')`, the position of the
+  *back* hand at the release time (`scenes/heist.js`, `spot`). The rock bounces off the lamp (a second `lob`) and falls with the camera it knocked off.
+- An object that carries things (the Emerald with sling, rope tail and balloons) is one `Track` group (`loadedGem` in `sky.js`); `BalloonCloud` positions the
+  balloons in that group's frame. The review flagged unexplained balloon counts; the fix was a visible harness and a carried bunch held in his raised hand.
+- An escalating attempt (1, 3, 8, then 18 balloons) needs a settle time after every toss; the toss helper returns the time the last
+  balloon settles so the next run starts after it.
+- A crowd of 14 stays cheap when each person is one tracked group (`art/crowd.js`, `tourist`).
+
+### 13.8 Visual storytelling without audio
+
+Things that carried the story with no sound and survived review: lettered impact words (`BOOOONG!`, `POP!`, `KRA-KOOM!`, `CRASH!`, `CLUNK!`, `BOING!`), a thought bubble to plant a
+joke the ending pays off (the FENCE dealer), signs and posters that show information (a wanted poster with his photo and the reward), close-up inserts
+(the headline banner), and expression changes on beats (`shock`, `plot`, `smug`, `ko`). Goggles hide his face, so the body, mouth and hat carry
+the welding scenes.
+*(owner taste)* Do not add decoration nobody asked for (we removed the drawn-on scrollwork and smoke from the ironwork scene: "just run the torch
+along the fence, sparks only"); make repeated background art sparse and varied (the gallery's identical, dense mountain pictures became planets, ships and
+galaxies, never the same twice in a row: `paintings()` in `world.js`); attach a new part *next to* an old one when told "on the right-hand side",
+never over its text (the OPEN DAILY plate overhangs nothing and covers no letter).
+
+### 13.9 Welding
+
+A believable weld in this engine is: goggles down (`thief.goggles(at, 'down')`), a pilot flame (`show(cues, `${id}.tc.pilot`, ...)`), the torch tip placed with
+`aimAlong` on a path, `arc()` flicker windows on the torch, `sparks` and `puff` on the returned tip samples, a `strokeDashoffset` or clip-path reveal
+of the seam *only where the story needs a visible result*, and a cut or a flash for the first strike (`flash()` outside the camera group). The ironwork scene
+shows the minimum: the tip runs along a rail while sparks fly.
+
+### 13.10 Performance
+
+Film two keeps about 2,400 live animations (film one about 1,340). In headless Chrome with software rendering the busiest scenes ran at
+roughly 20 to 36 ms per frame, comparable to film one measured the same way. This was **not** measured on a real phone. Prefer CSS `.fx` effects to cues for scatter,
+one tracked group per crowd member, and a `BalloonCloud` rather than 30 independent Tracks. After a change that adds many cues, run `npm run verify` (it loads
+the whole film) and note the live animation count it prints.
+
+### 13.11 Process pitfalls we hit
+
+- **The commit message is not the diff.** One commit claimed "tests, guide and handoff updated" and the handoff was in fact unchanged; it was
+  discovered a review round later. Check `git show --stat` before saying a thing was documented.
+- **The browser pane lies about size.** Screenshots in the desktop app's browser pane were zoomed and cropped; `npm run shoot` (headless Chrome) is the reliable way to look.
+- **Owner timestamps drift** as scenes are added (the owner said so). Always map a timestamp through the scene table (9.5 step 1) and say which scene you decided it was.
+- **Ambiguity cost iterations** (the bag's orientation, the plate's position, "the rock" that was the Emerald). When a note can be read two ways, state your reading
+  in the reply so it can be corrected in one round.
+- **A locked line can be changed by its owner.** The second card read "I'LL BRING THE FENCE" and became "I'LL BRING A FENCE" in review; the test, `config.js` and `STORY.md` were updated together.
+- **An effect disappearing after seeking was reported once and did not reproduce** (3.4). The guard that exists is a `verify` check; do not invent a fix without evidence.
+- **Overlapping cues** were the biggest source of silent bugs (62 on the first full pass); the test now fails the build, so sequence cues or use another Track.
+

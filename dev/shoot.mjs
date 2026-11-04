@@ -2,13 +2,20 @@
 // so this seeks and screenshots; use it to LOOK at a scene (tests cannot tell you whether a gag is funny).
 //
 //   node dev/shoot.mjs <film-id> <out-prefix> <time> [<time> ...]
+//   node dev/shoot.mjs <film-id> <out-prefix> every:1000        # a frame every second across the WHOLE film (visual QA)
 //
 // A <time> is film milliseconds ("41000") or a scene id plus an offset ("s-kick+2100", "c-ifIcant+2500").
+// `every:<ms>` samples the middle of each interval (every:1000 -> 500, 1500, 2500 ...), as the review workflow in
+// MOVIE_AUTHORING_GUIDE.md section 9.5 does.
 // Writes <out-prefix>-00.png, -01.png, ... and, for several frames, a contact sheet <out-prefix>-sheet.png
 // (needs ImageMagick's `montage`; skipped quietly if it is not installed).
 //
 //   COLS=3       contact-sheet columns (default 2)        W=1280 H=720   frame size
 //   REDUCED=1    render in reduced-motion mode            CHROME_BIN=...  which Chrome to use
+//   STAMP=1      burn "m:ss.s scene-id" into the corner of every frame (use it for reviews: sheet labels made by ImageMagick
+//                can come out blank when no font is installed, a stamp cannot)
+//   SHEETS=4     split the frames into this many consecutive contact sheets <out-prefix>-sheet-1.png ... (default: one)
+//   SETTLE=250   ms to wait after each seek before the screenshot
 //   UI=1         shoot the whole demo page (picker, chapter buttons, control bar) instead of just the picture;
 //                combine with W=375 H=812 to check the phone layout
 //
@@ -19,9 +26,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { startServer } from './serve.mjs';
 
-const [film, prefix, ...times] = process.argv.slice(2);
+const [film, prefix, ...argTimes] = process.argv.slice(2);
+let times = argTimes;
 if (!film || !prefix || !times.length) {
-  console.error('usage: node dev/shoot.mjs <film-id> <out-prefix> <time|scene+offset> [...]');
+  console.error('usage: node dev/shoot.mjs <film-id> <out-prefix> <time|scene+offset|every:ms> [...]');
   process.exit(2);
 }
 const W = Number(process.env.W || 1280);
@@ -59,6 +67,15 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?film=${film}${proc
 await sleep(1200);
 await run('window.__filmReady');
 const scenes = JSON.parse(await run('JSON.stringify(window.__film.scenes)'));
+const every = times.length === 1 && /^every:(\d+)$/.exec(times[0]);
+if (every) {
+  const step = Number(every[1]);
+  const dur = Number(await run('window.__film.duration'));
+  times = [];
+  for (let t = step / 2; t < dur; t += step) times.push(String(Math.round(t)));
+}
+const SETTLE = Number(process.env.SETTLE || 250);
+const fmt = (ms) => `${Math.floor(ms / 60000)}:${String(((ms % 60000) / 1000).toFixed(1)).padStart(4, '0')}`;
 
 mkdirSync(dirname(prefix), { recursive: true });
 const files = [];
@@ -71,7 +88,11 @@ for (const t of times) {
     ms = sc.start + Number(off || 0);
   }
   await run(`window.__film.seek(${ms})`);
-  await sleep(250);
+  if (process.env.STAMP === '1') {
+    const sc = scenes.find((s) => ms >= s.start && ms < s.end) || scenes[scenes.length - 1];
+    await run(`(() => { let e = document.getElementById('__stamp'); if (!e) { e = document.createElement('div'); e.id = '__stamp'; e.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;padding:2px 8px;background:#000;color:#fff;font:bold ${Math.round(H / 14)}px monospace;opacity:.85;pointer-events:none'; document.body.appendChild(e); } e.textContent = ${JSON.stringify(`${fmt(ms)}  ${sc.id}`)}; })()`);
+  }
+  await sleep(SETTLE);
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   const f = `${prefix}-${String(files.length).padStart(2, '0')}.png`;
   writeFileSync(f, Buffer.from(shot.data, 'base64'));
@@ -84,8 +105,15 @@ server.close();
 if (files.length > 1) {
   try {
     const cols = Number(process.env.COLS || 2);
-    execFileSync('montage', [...files.flatMap(([f, t]) => ['-label', t, f]), '-tile', `${cols}x`, '-geometry', `${Math.round(1280 / cols)}x${Math.round((H * 1280) / W / cols)}+4+4`, '-background', '#222', '-fill', 'white', `${prefix}-sheet.png`]);
-    console.log(`${prefix}-sheet.png`);
+    const sheets = Math.max(1, Number(process.env.SHEETS || 1));
+    const per = Math.ceil(files.length / sheets);
+    for (let k = 0; k < sheets; k++) {
+      const chunk = files.slice(k * per, (k + 1) * per);
+      if (!chunk.length) break;
+      const out = sheets === 1 ? `${prefix}-sheet.png` : `${prefix}-sheet-${k + 1}.png`;
+      execFileSync('montage', [...chunk.flatMap(([f, t]) => ['-label', t, f]), '-tile', `${cols}x`, '-geometry', `${Math.round(1280 / cols)}x${Math.round((H * 1280) / W / cols)}+4+4`, '-background', '#222', '-fill', 'white', out]);
+      console.log(out, `${chunk.length} frames, ${chunk[0][1]} .. ${chunk[chunk.length - 1][1]}`);
+    }
   } catch {
     console.log('(ImageMagick `montage` not available: no contact sheet)');
   }
