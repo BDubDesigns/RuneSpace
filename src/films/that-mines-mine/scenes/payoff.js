@@ -8,7 +8,7 @@ import { Track, tween } from '../../../acting.js';
 import { prospector } from '../../../art/prospector.js';
 import { cart, orePile, boulder, sign, ore, placed, cutter, cartSpot, CART_LOAD_COUNT } from '../../../art/props.js';
 import { dust, sparks, chips, sparkle, mark, pow, rays, dizzy, zzz, flash, speedLines, puff, drops } from '../../../fx/effects.js';
-import { Camera, driftClouds, idle, fwd, popIn } from '../kit.js';
+import { Camera, driftClouds, idle, fwd, popIn } from '../../../kit.js';
 import { frontBack, frontFore, cactus, backWorld, BACK_GROUND_Y, backTrackY, BACK_SLOPE_DEG } from '../world.js';
 import { TEXT } from '../config.js';
 

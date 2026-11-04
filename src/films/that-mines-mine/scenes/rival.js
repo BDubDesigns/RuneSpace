@@ -7,7 +7,7 @@
 import { prospector } from '../../../art/prospector.js';
 import { cutter, mallet, sign, placed } from '../../../art/props.js';
 import { dust, sparks, mark, pow, rays, puff, zzz, drops } from '../../../fx/effects.js';
-import { Camera, driftClouds, idle, blow, popIn, fwd } from '../kit.js';
+import { Camera, driftClouds, idle, blow, popIn, fwd } from '../../../kit.js';
 import { frontBack, frontFore, cactus } from '../world.js';
 import { TEXT } from '../config.js';
 

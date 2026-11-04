@@ -1,12 +1,38 @@
 {
   "name": "runespace-movies",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Standalone silent-film module for the RuneSpace holo-drive-in. No dependencies, no build step.",
+  "description": "Standalone silent-film engine + player for the RuneSpace holo-drive-in. No dependencies, no build step. Ships \"That Mines Mine!\"; add films under src/films/.",
   "main": "src/index.js",
   "types": "src/index.d.ts",
   "scripts": {
-    "dev": "node dev/serve.mjs 5173"
+    "dev": "node dev/serve.mjs 5173",
+    "test": "node --test \"test/*.test.mjs\"",
+    "verify": "node dev/verify-headless.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "MOVIE_AUTHORING_GUIDE.md",
+    "NEXT_FILM_HANDOFF.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./player.css": "./src/player/player.css",
+    "./effects.css": "./src/fx/effects.css",
+    "./film-look.css": "./src/fx/film-look.css",
+    "./films/*": "./src/films/*",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

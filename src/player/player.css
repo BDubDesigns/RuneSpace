@@ -16,6 +16,7 @@
   font: 14px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  container: mm-player / inline-size; /* narrow-layout rules below follow the PLAYER's width, not the window's */
 }
 .mm-player * { box-sizing: border-box; }
 
@@ -119,8 +120,8 @@
 .mm-scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5px; border-radius: 50%; background: #fff; border: 2px solid var(--mm-accent); }
 .mm-scrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--mm-accent); }
 
-/* narrow screens: seek bar gets its own row, buttons stay thumb-sized */
-@media (max-width: 560px) {
+/* narrow players (phones, or a narrow panel in a wide window): seek bar gets its own row, buttons stay thumb-sized */
+@container mm-player (max-width: 560px) {
   .mm-controls { flex-wrap: wrap; row-gap: 0; padding: 4px 6px 6px; }
   .mm-scrub { order: -1; flex: 1 1 100%; margin: 0 4px; height: 34px; }
   .mm-time { margin-left: auto; min-width: 4.8em; font-size: 12px; }

@@ -257,7 +257,15 @@ export function createTimeline(root, { duration, cues = [], reducedMotion = fals
       if (destroyed) return;
       destroyed = true;
       cancelAnimationFrame(raf);
-      anims.forEach((a) => a.cancel());
+      // Cancel only what this timeline created. The CSS keyframe animations were adopted from the
+      // page, and some belong to the player chrome (grain, flicker, weave) which outlives a film
+      // swap: cancelling those would switch them off for good. Hand them back to the browser.
+      const t = time();
+      const mine = new Set([master, ...cueAnims]);
+      anims.forEach((a) => {
+        if (mine.has(a)) a.cancel();
+        else if (t < a.effect.getComputedTiming().endTime) a.play();
+      });
       clock.remove();
       root.classList.remove('is-reduced');
       Object.keys(listeners).forEach((k) => delete listeners[k]);

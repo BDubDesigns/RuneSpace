@@ -10,7 +10,7 @@ import { Track, tween } from '../../../acting.js';
 import { prospector } from '../../../art/prospector.js';
 import { cutter, cart, ore, placed, cartSpot, CART_LOAD_COUNT, CART_TOP } from '../../../art/props.js';
 import { dust, sparks, chips, sparkle, mark, pow, drops, puff, speedLines, rays } from '../../../fx/effects.js';
-import { Camera, driftClouds, fwd } from '../kit.js';
+import { Camera, driftClouds, fwd } from '../../../kit.js';
 import { frontBack, frontFore, cactus, caveWall, frontTrackY } from '../world.js';
 
 const GY = 604;

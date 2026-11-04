@@ -10,6 +10,15 @@
  * `at` is always ABSOLUTE film time in ms (use ctx.at(rel)).
  */
 
+/**
+ * SVG <defs> that the effects below paint with. Every film must include this in its `defs`
+ * (spread it into the string passed to defineFilm), otherwise dust / smoke puffs are invisible.
+ *   #g-dust  soft light puff   (puff / dust default)
+ *   #g-smoke soft dark puff    (pass fill: 'url(#g-smoke)' to puff / dust for smoke or welding fumes)
+ */
+export const FX_DEFS = `<radialGradient id="g-dust" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#f6f6f6" stop-opacity=".95"/><stop offset=".6" stop-color="#dcdcdc" stop-opacity=".7"/><stop offset="1" stop-color="#cfcfcf" stop-opacity="0"/></radialGradient>
+  <radialGradient id="g-smoke" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#555" stop-opacity=".9"/><stop offset="1" stop-color="#333" stop-opacity="0"/></radialGradient>`;
+
 const v = (o) =>
   Object.entries(o)
     .map(([k, val]) => `--${k}:${typeof val === 'number' ? Math.round(val * 100) / 100 : val}`)

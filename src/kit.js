@@ -1,8 +1,9 @@
 /**
- * Small helpers shared by the scene files.
+ * Film-agnostic scene helpers shared by every film (they only depend on acting.js and the
+ * prospector rig): Camera, driftClouds, idle, fwd, blow, popIn, filmHelpers.
  */
-import { Track } from '../../acting.js';
-import { tween } from '../../acting.js';
+import { Track, tween } from './acting.js';
+import { card } from './art/cards.js';
 
 /** Camera: a tracked group; pose is expressed as a focus point + zoom. */
 export class Camera extends Track {
@@ -38,7 +39,10 @@ export class Camera extends Track {
   }
 }
 
-/** Slow cloud drift for the length of a scene. */
+/**
+ * Slow cloud drift for the length of a scene. Targets `${id}.cloudA|cloudB|cloudC`, the three
+ * clouds that `sky(id)` in a film's world.js draws; a film with no clouds simply doesn't call it.
+ */
 export function driftClouds(ctx, id) {
   const dur = ctx.dur;
   [['cloudA', 40], ['cloudB', 26], ['cloudC', 55]].forEach(([c, px]) => {
@@ -71,4 +75,46 @@ export function blow(c, t, up = 230, dn = 90) {
 export function popIn(sign, at, x, y) {
   sign.track.set(at - 1, { x, y, sx: 0, sy: 0 });
   sign.track.keys(at, 280, [{ o: 0.6, sx: 1.14, sy: 1.14, ease: 'ease-out' }, { o: 1, sx: 1, sy: 1 }], { ease: 'linear' });
+}
+
+/**
+ * Scene-definition helpers bound to one film's TIMING and CAPTION tables (config.js).
+ *
+ *   const { titleCard, shot } = filmHelpers({ TIMING, CAPTION });
+ *   titleCard('lonely', TEXT.lonely)                      // fades through black
+ *   titleCard('thatMine', TEXT.thatMine, { dialogue: true }) // cuts in and out like a spoken line
+ *   shot('trudge', discovery.trudge, { in: 'iris', irisIn: [50, 62] })
+ *
+ * Both read `duration` and `caption` from TIMING[id] / CAPTION[id]; the scene id becomes
+ * `c-<id>` (card) or `s-<id>` (shot). `extra` is merged last, so it can override any scene field.
+ */
+export function filmHelpers({ TIMING, CAPTION }) {
+  /** Largest serif size that keeps the longest line inside the card border. */
+  const fit = (lines) => {
+    const longest = Math.max(...lines.map((l) => l.length));
+    return Math.max(40, Math.min(96, Math.floor((1040 / longest - 4) / 0.66)));
+  };
+
+  /** A title-card scene. `o` goes to card() ({ size, kind, sub, dy }) plus `dialogue`. */
+  const titleCard = (id, lines, o = {}, extra = {}) => {
+    const size = o.size || fit(lines);
+    const items = lines.map((t) => (typeof t === 'string' ? { t, size } : t));
+    return {
+      id: `c-${id}`,
+      label: lines.map((l) => (typeof l === 'string' ? l : l.t)).join(' '),
+      duration: TIMING[id],
+      caption: CAPTION[id],
+      in: o.dialogue ? 'cut' : 'fade',
+      out: o.dialogue ? 'cut' : 'fade',
+      inMs: 300,
+      outMs: 300,
+      build: (ctx) => card(ctx, items, o),
+      ...extra,
+    };
+  };
+
+  /** A live-action (well, live-cartoon) scene. */
+  const shot = (id, build, extra = {}) => ({ id: `s-${id}`, label: id, duration: TIMING[id], caption: CAPTION[id], build, ...extra });
+
+  return { titleCard, shot, fit };
 }

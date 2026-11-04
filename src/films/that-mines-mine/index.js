@@ -5,7 +5,7 @@
  * Durations and text come from config.js; the action lives in scenes/*.js.
  */
 import { defineFilm } from '../../engine/film.js';
-import { card } from '../../art/cards.js';
+import { filmHelpers } from '../../kit.js';
 import { TEXT, TIMING, CAPTION } from './config.js';
 import { WORLD_DEFS } from './world.js';
 import * as discovery from './scenes/discovery.js';
@@ -14,35 +14,7 @@ import * as bonk from './scenes/bonk.js';
 import * as mining from './scenes/mining.js';
 import * as payoff from './scenes/payoff.js';
 
-/** Largest serif size that keeps the longest line inside the card border. */
-const fit = (lines) => {
-  const longest = Math.max(...lines.map((l) => l.length));
-  return Math.max(40, Math.min(96, Math.floor((1040 / longest - 4) / 0.66)));
-};
-
-/**
- * A title-card scene. `dialogue: true` cuts in and out (like a spoken line);
- * otherwise the card fades through black.
- */
-const titleCard = (id, lines, o = {}, extra = {}) => {
-  const size = o.size || fit(lines);
-  const items = lines.map((t) => (typeof t === 'string' ? { t, size } : t));
-  return {
-    id: `c-${id}`,
-    label: lines.map((l) => (typeof l === 'string' ? l : l.t)).join(' '),
-    duration: TIMING[id],
-    caption: CAPTION[id],
-    in: o.dialogue ? 'cut' : 'fade',
-    out: o.dialogue ? 'cut' : 'fade',
-    inMs: 300,
-    outMs: 300,
-    build: (ctx) => card(ctx, items, o),
-    ...extra,
-  };
-};
-
-/** A live-action (well, live-cartoon) scene. */
-const shot = (id, build, extra = {}) => ({ id: `s-${id}`, label: id, duration: TIMING[id], caption: CAPTION[id], build, ...extra });
+const { titleCard, shot } = filmHelpers({ TIMING, CAPTION });
 
 export default defineFilm({
   id: 'that-mines-mine',

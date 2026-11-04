@@ -4,18 +4,17 @@
  * match the prospectors.
  */
 import { INK, ore } from '../../art/props.js';
-import { rng } from '../../fx/effects.js';
+import { rng, FX_DEFS } from '../../fx/effects.js';
 
 const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
 
-/** Shared <defs>: gradients and hatching used by the backgrounds and by the fx. */
+/** Shared <defs>: gradients and hatching used by the backgrounds, plus the effects' own FX_DEFS. */
 export const WORLD_DEFS = `
   <linearGradient id="g-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f4"/><stop offset="1" stop-color="#b9b9b9"/></linearGradient>
   <linearGradient id="g-ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b4b4b4"/><stop offset="1" stop-color="#6d6d6d"/></linearGradient>
   <linearGradient id="g-ground-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a6a6a6"/><stop offset="1" stop-color="#636363"/></linearGradient>
   <radialGradient id="g-sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
-  <radialGradient id="g-dust" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#f6f6f6" stop-opacity=".95"/><stop offset=".6" stop-color="#dcdcdc" stop-opacity=".7"/><stop offset="1" stop-color="#cfcfcf" stop-opacity="0"/></radialGradient>
-  <radialGradient id="g-smoke" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#555" stop-opacity=".9"/><stop offset="1" stop-color="#333" stop-opacity="0"/></radialGradient>
+  ${FX_DEFS}
   <radialGradient id="g-cave" cx=".5" cy=".62" r=".7"><stop offset="0" stop-color="#3a3a3a"/><stop offset=".55" stop-color="#151515"/><stop offset="1" stop-color="#050505"/></radialGradient>
   <radialGradient id="g-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
   <pattern id="p-hatch" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0 L0 12" stroke="#111" stroke-width="1.6" opacity=".28"/></pattern>

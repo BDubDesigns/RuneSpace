@@ -51,3 +51,9 @@ export function createMoviePlayer(container: HTMLElement, options?: MoviePlayerO
 export function createTimeline(root: Element, opts: { duration: number; cues: unknown[]; reducedMotion?: boolean }): unknown;
 export function defineFilm(def: unknown): Film;
 export const thatMinesMine: Film;
+
+export interface FilmEntry { id: string; title: string; hidden?: boolean; load(): Promise<{ default: Film }> }
+export const FILMS: FilmEntry[];
+export function listFilms(opts?: { includeHidden?: boolean }): FilmEntry[];
+/** Lazily import a registered film by id. Rejects for an unknown id. */
+export function loadFilm(id: string): Promise<Film>;
