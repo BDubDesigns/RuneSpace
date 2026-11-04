@@ -279,13 +279,13 @@ export function sectionFront() {
   const { slabX, slabW, gapTop, ceil } = SEC;
   const x1 = slabX + slabW;
   return `<g>
-    <rect x="${slabX}" y="-1800" width="${slabW}" height="${gapTop + 1800}" fill="#6a6a6a" ${S} stroke-width="7"/>
-    <rect x="${slabX}" y="-1800" width="${slabW}" height="${gapTop + 1800}" fill="url(#p-hatch)"/>
-    <path d="M${slabX + 40} -1800 L${slabX + 40} ${gapTop} M${slabX + 110} -1800 L${slabX + 110} ${gapTop}" stroke="#2c2c2c" stroke-width="5" opacity=".7"/>
+    <rect x="${slabX}" y="${ceil - 70}" width="${slabW}" height="${gapTop - ceil + 70}" fill="#6a6a6a" ${S} stroke-width="7"/>
+    <rect x="${slabX}" y="${ceil - 70}" width="${slabW}" height="${gapTop - ceil + 70}" fill="url(#p-hatch)"/>
+    <path d="M${slabX + 40} ${ceil} L${slabX + 40} ${gapTop} M${slabX + 110} ${ceil} L${slabX + 110} ${gapTop}" stroke="#2c2c2c" stroke-width="5" opacity=".7"/>
     <rect x="${slabX}" y="${GY}" width="${slabW}" height="300" fill="#5a5a5a" ${S} stroke-width="7"/>
     <path d="M${slabX} ${gapTop} L${x1} ${gapTop}" stroke="#d0d0d0" stroke-width="5"/>
     <path d="M${slabX + 2} ${gapTop} l16 22 l8 -16 M${x1 - 2} ${gapTop} l-14 18 l-10 -14" stroke="${INK}" stroke-width="4" fill="none"/>
-    <rect x="${slabX - 600}" y="${ceil - 70}" width="${slabW + 600}" height="70" fill="#4e4e4e" ${S} stroke-width="7"/>
+    <rect x="-3000" y="${ceil - 70}" width="${slabX + slabW + 3000}" height="70" fill="#4e4e4e" ${S} stroke-width="7"/>
   </g>`;
 }
 

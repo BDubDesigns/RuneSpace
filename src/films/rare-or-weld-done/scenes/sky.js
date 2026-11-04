@@ -21,6 +21,11 @@ const HUB = { x: 0, y: -504 }; // top of the Emerald (a rope sling), in the load
 const CLOUD = { count: 30, seed: 11, minLen: 90, maxLen: 125, spread: 210 };
 export const CRATER_X = 1580;
 const BOULDER_X = 1980;
+// Thief root.x minus the Emerald's x while his palms are on its left face (arms out at -130 / -126; hand = root.x + 77, 168 px up).
+// While it floats 96 px up his hands meet its lower chamfer; once he has shoved it down and he leans 12 degrees (hand = root.x + 110,
+// 148 px up) they are on the flat face. Both numbers come from gripAt().
+const GAP_FLOAT = 223;
+const GAP_LEAN = 312;
 
 const tailArt = () => `<path d="M0 0 Q-16 40 6 80 Q22 110 -4 140" fill="none" stroke="${INK}" stroke-width="12" stroke-linecap="round"/><path d="M0 0 Q-16 40 6 80 Q22 110 -4 140" fill="none" stroke="#d6d6d6" stroke-width="6" stroke-linecap="round"/><circle cx="-4" cy="146" r="11" fill="#d6d6d6" stroke="${INK}" stroke-width="4"/>`;
 
@@ -178,36 +183,42 @@ export function rise(ctx) {
   const FLOAT0 = EM_BASE - 96;
   const cam = new Camera(cues, id, { x: 560, y: 250, s: 0.8 });
   const lg = loadedGem(cues, id, { x: EMX, y: FLOAT0 });
-  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: EMX - 300, y: GY, scale: SC, face: 'cheer', goggles: 'up', armF: -160, armB: -160 });
+  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: EMX - GAP_FLOAT, y: GY, scale: SC, face: 'cheer', goggles: 'up', armF: -160, armB: -160 });
   const mat = `<ellipse cx="${EMX}" cy="${GY - 4}" rx="290" ry="18" fill="#3c3c3c" stroke="${INK}" stroke-width="5"/><ellipse cx="${EMX}" cy="${GY - 8}" rx="250" ry="11" fill="#6a6a6a"/>`;
 
   // --- he steers it toward the hole, hands on its flank
   thief.face(at(0), 'smug');
-  thief.armF.to(at(0), 380, { rot: -86 }, { ease: 'ease-out' });
-  thief.armB.to(at(0), 380, { rot: -92 }, { ease: 'ease-out' });
+  // hands on its flank; the thief's x is always the Emerald's x minus a fixed gap, with the same easing and timing,
+  // so the palms stay on the stone for the whole push
+  thief.armF.to(at(0), 380, { rot: -130 }, { ease: 'ease-out' });
+  thief.armB.to(at(0), 380, { rot: -126 }, { ease: 'ease-out' });
   sway(cues, lg.tail, at(0), 1600, 6, 5);
   lg.gem.to(at(400), 1300, { x: 805 }, { ease: 'ease-in-out', reduce: 'snap' });
-  thief.walk(at(400), 1300, 505, { stride: 300, amp: 22, bounce: 4, swing: 0 });
+  thief.walk(at(400), 1300, 805 - GAP_FLOAT, { stride: 300, amp: 22, bounce: 4, swing: 0, ease: 'ease-in-out' });
   // jam: the Emerald meets the wall
   const JAM = 1700;
-  lg.gem.keys(at(JAM), 380, [{ o: 0.4, x: 800, rot: -1.5 }, { o: 1, x: 806, rot: 0 }], { ease: 'ease-out', reduce: 'skip' });
+  lg.gem.keys(at(JAM), 300, [{ o: 0.4, x: 800, rot: -1.5 }, { o: 1, x: 806, rot: 0 }], { ease: 'ease-out', reduce: 'skip' });
   thief.face(at(JAM), 'angry');
-  thief.torso.to(at(JAM + 100), 300, { rot: fwd(thief, 14) }, { ease: 'ease-out' });
+  // he braces and shoves it down into the slot, leaning in with his whole body (the root pivots at the feet, so the feet
+  // step back as the hands stay on the stone)
+  thief.root.to(at(JAM + 300), 400, { rot: fwd(thief, 12), x: 806 - GAP_LEAN }, { ease: 'ease-out', reduce: 'snap' });
+  thief.legF.keys(at(JAM + 700), 800, Array.from({ length: 4 }, (_, i) => ({ o: (i + 1) / 4, rot: i % 2 ? 24 : -8 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.legB.keys(at(JAM + 700), 800, Array.from({ length: 4 }, (_, i) => ({ o: (i + 1) / 4, rot: i % 2 ? -8 : 24 })), { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
   thief.vibrate(at(JAM + 400), 1100, 3);
   cam.shake(at(JAM), 380, 8);
   cam.look(at(2200), 1800, { x: 1000, y: 280, s: 0.8 }, 'ease-in-out');
   // a very tight squeeze: the whole load flattens into the opening, then oozes through
   const SQ = 2400;
   const SQ_END = 5000;
-  lg.gem.to(at(2100), 280, { y: EM_BASE - 20 }, { ease: 'ease-in-out', reduce: 'snap' });
+  lg.gem.to(at(JAM + 300), 400, { y: EM_BASE - 20 }, { ease: 'ease-out', reduce: 'snap' });
   lg.gem.keys(at(SQ), 800, [{ o: 1, sy: 0.3, sx: 1.02 }], { ease: 'cubic-bezier(.3,0,.2,1)', reduce: 'snap' });
   lg.gem.to(at(SQ + 800), SQ_END - SQ - 800, { x: 1400 }, { ease: 'ease-in-out', reduce: 'snap' });
-  thief.walk(at(SQ + 800), SQ_END - SQ - 800, 1100, { stride: 380, amp: 22, bounce: 4, swing: 0 });
+  thief.walk(at(SQ + 800), SQ_END - SQ - 800, 1400 - GAP_LEAN, { stride: 380, amp: 22, bounce: 4, swing: 0, ease: 'ease-in-out' });
   // out it pops, with a boing
   lg.gem.keys(at(SQ_END), 640, [{ o: 0.3, sy: 1.34, sx: 0.84, y: EM_BASE - 70 }, { o: 0.6, sy: 0.9, sx: 1.08 }, { o: 1, sy: 1, sx: 1, y: EM_BASE - 96 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
   thief.face(at(SQ_END), 'cheer');
-  thief.torso.to(at(SQ_END), 200, { rot: 0 });
-  thief.walk(at(SQ_END + 200), 700, 1250, { stride: 300, amp: 22, bounce: 6, swing: 0 });
+  thief.root.to(at(SQ_END), 200, { rot: 0 }, { ease: 'ease-out', reduce: 'snap' });
+  thief.walk(at(SQ_END + 250), 650, 1250, { stride: 300, amp: 22, bounce: 6, swing: 0 });
   thief.armF.to(at(SQ_END + 200), 260, { rot: -165 });
   thief.armB.to(at(SQ_END + 200), 260, { rot: -165 });
   cam.look(at(5200), 1000, { x: 1350, y: 150, s: 0.68 }, 'ease-in-out');

@@ -18,7 +18,7 @@ Last updated at the end of the "build film two" session (git: see `git log`).
 - **Film 1, "That Mines Mine!": complete and approved.** 1:43. Git tag `film1-approved`. Its `build()` output is pinned
   by `test/film1-approved.test.mjs` (hashes recorded from that tag), so a change to shared code that alters it fails `npm test`.
 - **Film 2, "Rare or Weld Done?": built, tested and reviewed frame by frame; awaiting the owner's approval.**
-  2:34 (154.1 s), 32 scenes (25 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
+  about 2:46 (166 s), 35 scenes (28 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
   tag yet: create it only after the owner approves** (`git tag film2-approved`). Nothing has been pushed anywhere; there is no remote.
 - Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, hidden `template`. Demo page: `?film=<id>`.
 
@@ -40,6 +40,11 @@ The approved screenplay is in `src/films/rare-or-weld-done/STORY.md` (locked; th
 
 Names that are placeholders live **only** in `src/films/rare-or-weld-done/config.js` (`NAMES`: the Emerald's working name, a
 neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not the Drive-In ticket price). A test fails if a scene hard-codes them.
+
+### Continuity passes since the first build
+
+1. Hoses (valve to hand via `connectHose` / `dragCart`), real contact in the attempts (four iris-cut shots `sack`, `push`, `shoulder`, `ropeTry`), crater and wall hole only after their cause, slower beats.
+2. The `rise` scene: palms stay on the Emerald's face for the whole push (thief x = Emerald x minus a gap derived with `gripAt`; the lean is a whole-body root rotation, not torso-only). The museum's wall slab now ends at the roof instead of towering over the bird, and the roof lip runs the full width of the gallery.
 
 ## 2. What was verified (and how)
 
@@ -89,9 +94,9 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
   where `at(0)` was meant. `test/films.test.mjs` allow-lists exactly those two cues; delete the entry if you fix them (that
   changes film 1's picture subtly: it needs re-approval and new hashes in `test/film1-approved.test.mjs`). Film 1 also has
   43 overlapping Track cues; `OVERLAPS_ALLOWED` in `films.test.mjs` exempts it. New films get no exceptions.
-- **Film 2 runtime is 2:34**, a few seconds past the "about 2 minutes, up to roughly 2:30" target. Card timings follow the
+- **Film 2 runtime is about 2:46** after the continuity pass (the owner found the action too fast in places, so the squeeze, lift-off, posts, thought bubble and the failed-attempts montage were slowed; the text cards were left alone), past the "about 2 minutes, up to roughly 2:30" target. Card timings follow the
   ~1 s + 0.4 s/word rule (film 1's lesson) and were not shortened; the trims were all in holds and in the long walks. The
-  likeliest places to cut more, if the owner wants it: `sack` (7 s), `balloons` (9.3 s), `cut` (8.7 s), `vault` (6.2 s).
+  places to cut more, if the owner wants it, are non-text holds (`balloons`, `cut`, `vault`), not the slowed actions.
 - **Performance.** Film 2 keeps ~2,400 Web Animations alive (film 1: ~1,340). In headless Chrome with *software* rendering
   (no GPU) film 2's busiest scenes run at ~20-36 ms/frame, comparable to film 1 measured the same way. **Untested on a real
   low-end phone.** Cheap wins if needed: fewer `sparks`/`puff` along the cut (`scenes/heist.js`), fewer pebbles/stars in `world.js`,

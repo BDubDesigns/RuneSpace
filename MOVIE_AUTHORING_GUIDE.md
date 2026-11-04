@@ -279,6 +279,7 @@ return cam.html(`${back}${actors}${fx}`) // everything inside moves with the cam
 | `blow(c, t, up, dn)` | overhead mallet blow; returns the impact time. Character must hold a mallet in `propF`/front hand |
 | `popIn(sign, at, x, y)` | a placed prop pops into existence with overshoot |
 | `reach(c, x, y, toolLen, prefer?, pose?)` | two-link IK: `{ arm, prop }` rotations for `c.armF` / `c.propF` that put a hand-held tool's tip on world point (x, y). `pose` overrides the root (e.g. `{ x }`) to solve for where it WILL stand |
+| `poseAt(cues, target, t, initial)` / `gripAt(c, cues, t)` | replay a Track's cues to recover its pose (or a character's front-hand position) at film time `t`: use them to anchor a hose, rope or contact point to a moving hand instead of guessing numbers |
 | `aimAlong(c, at, dur, path, { toolLen, stand?, step?, prefer?, lead? })` | sweeps the tool tip along `path(s) -> {x, y}` (s in 0..1): emits chained arm/tool (and `root.x` via `stand(s)`) cues; returns the tip samples `[{ t, x, y }]` to hang sparks, smoke and flares on |
 | `filmHelpers({TIMING, CAPTION})` | returns `{ titleCard, shot, fit }` |
 
@@ -352,7 +353,7 @@ All grayscale, ink-outlined, drawn around a documented origin; each is on `dev/s
 
 | module | what |
 |---|---|
-| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack` |
+| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack`, `cartValve`, `hose` / `connectHose(cues, id, { thief, tank \| anchor, t0, t1, len })` (a hose that runs from a valve or fixed anchor to the character's hand and sags or stretches with it; `rope: true` for a rope), `dragCart(cues, cart, wheelId, thief, t0, t1)` (the cart trails the character by the hose length, wheels rolling) |
 | `art/emerald.js` | `emerald(id, {w,h})` (origin bottom centre; the facets alternate near-white / near-black so it reads as a gem without colour), `plinth`, `stanchion`, `rope`, `placard` |
 | `art/balloons.js` | `balloon(tone, s)`, `bird(id)`, `BalloonCloud` (a cloud of balloons tied to a hub in *its carrier's* frame: `releaseRange`, `stretch`, `pop`, `html`) |
 | `art/heist.js` | `newspaper`, `bubble`, `dealer`, `coin`, `creditPile`, `creditBag` |
