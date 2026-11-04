@@ -12,6 +12,7 @@
  */
 export const FILMS = [
   { id: 'that-mines-mine', title: 'That Mines Mine!', load: () => import('./that-mines-mine/index.js') },
+  { id: 'rare-or-weld-done', title: 'Rare or Weld Done?', load: () => import('./rare-or-weld-done/index.js') },
   { id: 'template', title: 'Template Film', hidden: true, load: () => import('./_template/index.js') },
 ];
 

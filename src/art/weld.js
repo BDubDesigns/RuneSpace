@@ -111,11 +111,40 @@ export function fenceRun({ a, b, ha = 200, hb = ha, n = 8, dark = '#3c3c3c' }) {
   return `<g>${pk}${rail(0.2)}${rail(0.72)}${scrolls}</g>`;
 }
 
-/** A spiral flourish. The stroke path is `pathLength=1` so a dash-offset cue draws it on. */
+/** The spiral flourish's path (local coords), as cubic segments [P0, C1, C2, P1]. */
+export const SCROLL_SEGS = [
+  [[0, 0], [40, -4], [70, -40], [54, -74]],
+  [[54, -74], [38, -106], [-6, -100], [-14, -64]],
+  [[-14, -64], [-20, -36], [8, -22], [22, -36]],
+  [[22, -36], [32, -46], [24, -62], [12, -58]],
+];
+
+/** A point on the flourish, `s` in 0..1 by arc length (so a torch tip can follow it at constant speed). */
+export function scrollPoint(s) {
+  const bez = (seg, u) => {
+    const k = 1 - u;
+    const f = (i) => k * k * k * seg[0][i] + 3 * k * k * u * seg[1][i] + 3 * k * u * u * seg[2][i] + u * u * u * seg[3][i];
+    return [f(0), f(1)];
+  };
+  const pts = [];
+  SCROLL_SEGS.forEach((seg) => {
+    for (let i = 0; i < 40; i++) pts.push(bez(seg, i / 40));
+  });
+  pts.push(SCROLL_SEGS[SCROLL_SEGS.length - 1][3]);
+  const len = [0];
+  for (let i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const d = Math.min(1, Math.max(0, s)) * len[len.length - 1];
+  let i = 1;
+  while (i < len.length - 1 && len[i] < d) i++;
+  const u = (d - len[i - 1]) / Math.max(1e-6, len[i] - len[i - 1]);
+  return { x: pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u, y: pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u };
+}
+
+/** A spiral flourish. Both strokes (`${id}.k` dark kerf, `${id}.line` bright core) are `pathLength=1` and start undrawn: animate strokeDashoffset 1 -> 0. */
 export function scroll(id, s = 1) {
-  const d = 'M0 0 C40 -4 70 -40 54 -74 C38 -106 -6 -100 -14 -64 C-20 -36 8 -22 22 -36 C32 -46 24 -62 12 -58';
+  const d = SCROLL_SEGS.map((g, i) => `${i === 0 ? `M${g[0]} ` : ''}C${g[1]} ${g[2]} ${g[3]}`).join(' ');
   return `<g transform="scale(${s})">
-    <path d="${d}" fill="none" stroke="${INK}" stroke-width="22" stroke-linecap="round"/>
+    <path data-t="${id}.k" d="${d}" pathLength="1" fill="none" stroke="${INK}" stroke-width="22" stroke-linecap="round" stroke-dasharray="1 1" style="stroke-dashoffset:1"/>
     <path data-t="${id}.line" d="${d}" pathLength="1" fill="none" stroke="#cfcfcf" stroke-width="12" stroke-linecap="round" stroke-dasharray="1 1" style="stroke-dashoffset:1"/>
   </g>`;
 }
@@ -161,22 +190,25 @@ export function booth(id) {
 }
 
 /**
- * Low, wide admission sign standing on the ground (origin = ground centre). `lines` are lettered top to bottom;
- * the last one is stencilled (the price). Line i sits at y = -h + 62 + i * step so scenes can aim a torch at them.
- * Returns { html, lineY: [..] (local y of each baseline), w, h }.
+ * Low admission sign standing on the ground (origin = ground centre). `lines` are lettered top to bottom; the first
+ * is small serif, the second big serif, the rest stencilled. Each line is one `data-t="${id}.l<i>"` group (so it can
+ * be revealed) and each font size is shrunk to fit the board.
+ * Returns { html, lineY: [..] (local baseline of each line), w, h }.
  */
-export function signboard(id, lines = ['THE NEBULA HEART', 'EMERALD', '5 CREDITS ADMISSION'], { w = 440, h = 300 } = {}) {
-  const step = (h - 90) / Math.max(1, lines.length - 1);
-  const lineY = lines.map((_, i) => -h + 70 + i * step);
+export function signboard(id, lines = ['THE NEBULA HEART', 'EMERALD', '5 CREDITS', 'ADMISSION'], { w = 360, h = 330 } = {}) {
+  const first = -h + 78;
+  const last = -66;
+  const step = lines.length > 1 ? (last - first) / (lines.length - 1) : 0;
+  const lineY = lines.map((_, i) => first + i * step);
   const text = lines
     .map((t, i) => {
-      const last = i === lines.length - 1;
-      const size = last ? 34 : i === 0 ? 40 : 56;
-      return `<g data-t="${id}.l${i}"><text y="${lineY[i] + (last ? 0 : 6)}" font-size="${size}" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${last ? STENCIL : SERIF}" letter-spacing="${last ? 3 : 2}">${t}</text></g>`;
+      const max = i === 0 ? 34 : i === 1 ? 62 : 50;
+      const size = Math.min(max, Math.floor((w - 56) / (t.length * (i < 2 ? 0.66 : 0.6))));
+      return `<g data-t="${id}.l${i}"><text y="${lineY[i]}" font-size="${size}" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${i < 2 ? SERIF : STENCIL}" letter-spacing="${i < 2 ? 1.5 : 3}">${t}</text></g>`;
     })
     .join('');
   const html = `<g>
-    <rect x="${-w / 2 + 40}" y="${-60}" width="20" height="60" fill="#5a5a5a" ${S} stroke-width="5"/><rect x="${w / 2 - 60}" y="${-60}" width="20" height="60" fill="#5a5a5a" ${S} stroke-width="5"/>
+    <rect x="${-w / 2 + 40}" y="-60" width="20" height="60" fill="#5a5a5a" ${S} stroke-width="5"/><rect x="${w / 2 - 60}" y="-60" width="20" height="60" fill="#5a5a5a" ${S} stroke-width="5"/>
     <g data-t="${id}.face">
       <rect x="${-w / 2}" y="${-h}" width="${w}" height="${h - 20}" rx="10" fill="#f2f2f2" ${S} stroke-width="8"/>
       <rect x="${-w / 2 + 14}" y="${-h + 14}" width="${w - 28}" height="${h - 48}" rx="4" fill="none" stroke="${INK}" stroke-width="3"/>
