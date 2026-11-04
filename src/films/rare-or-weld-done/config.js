@@ -126,7 +126,7 @@ export const CAPTION = {
   cut: 'He cuts a doorway through the wall: sparks, smoke, a heavy gas tank that bumps him, and an accidental boot-to-floor weld. The cut-out slab drops.',
   squeeze: 'He sucks in his gut, turns sideways and squeezes through the hole.',
   vault: 'He squeezes through and finds the Emerald, far bigger than he expected.',
-  sack: 'Attempt one: a bank bag. He stretches it to double its size trying to stuff the Emerald in, but it will not fit and snaps back.',
+  sack: 'Attempt one: a bank bag. He presses its open mouth against the Emerald and stretches it to double its size trying to press the gem in, but it will not fit and snaps back.',
   push: 'Attempt two: he puts both hands on it and pushes. It does not move.',
   shoulder: 'Attempt three: a running shoulder charge. The Emerald does not budge.',
   ropeTry: 'Attempt four: a rope. He heaves, the rope snaps, and he lands in a heap.',

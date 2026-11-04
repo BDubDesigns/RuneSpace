@@ -42,31 +42,35 @@ const shudder = (cues, at, gem, t, n, px) => gem.track.keys(at(t), n * 110, Arra
 export function sack(ctx) {
   const { cues, at, id } = ctx;
   const { cam, gem, mat, thief } = attempt(ctx, { x: 200, face: 'normal', props: { F: swagSack() }, armF: -60 }, { x: 520, y: 430, s: 1.25 });
-  // The bag is held by its belly, mouth up. The arm turns the hand frame, so the prop turns back by the same amount to keep it upright.
-  const hold = (t, dur, arm, lean = 0, ease = 'ease-out') => {
+  // He holds the bag by its rim. The arm turns the hand frame, so the prop turns back by the same amount: `net` is the bag's own
+  // angle on screen (0 = mouth up; 45 = mouth pointing up and to the right, square onto the Emerald's slanted lower-left face).
+  const hold = (t, dur, arm, net = 0, ease = 'ease-out') => {
     thief.armF.to(at(t), dur, { rot: arm }, { ease });
-    thief.propF.to(at(t), dur, { rot: -arm + lean }, { ease, reduce: 'snap' });
+    thief.propF.to(at(t), dur, { rot: net - arm }, { ease, reduce: 'snap' });
   };
+  const NET = 45;
+  const ARM = -40;
   thief.propF.set(at(0), { rot: 60 });
-  // he walks up and holds the open bag beside the gem, the mouth just under its left face (x = 490)
-  thief.walk(at(100), 800, 352, { stride: 330, amp: 16, bounce: 5, swing: 0 });
-  hold(1000, 380, -92);
+  // he walks up and presses the open mouth of the bag against the gem's lower-left face (hand = root.x + 70, 87 px up, which is
+  // the middle of that slanted face)
+  thief.walk(at(100), 800, 453, { stride: 330, amp: 16, bounce: 5, swing: 0 });
+  hold(1000, 380, ARM, NET);
   thief.face(at(1000), 'smug');
-  // he really tries to put the Emerald in through the mouth: he pushes the bag against it, the bag stretches to half again,
-  // then to double its size... and the gem is still nowhere near fitting
+  // he really tries to press the Emerald into the bag: the mouth stays against it while the bag stretches to half again, then to
+  // double its size... and the gem is still nowhere near fitting
   const stretch = (t, dur, k, ease = 'ease-in-out') => thief.propF.to(at(t), dur, { sx: k, sy: k }, { ease, reduce: 'snap' });
   thief.face(at(1500), 'angry');
   stretch(1500, 800, 1.5);
-  thief.propF.keys(at(2300), 500, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, sx: 1.5 + (i % 2 ? 0.05 : -0.04), sy: 1.5 + (i % 2 ? -0.04 : 0.05), rot: 92 + (i % 2 ? -12 : 4) })).concat([{ o: 1, sx: 1.5, sy: 1.5, rot: 92 }]), { ease: 'linear', reduce: 'skip' });
+  thief.propF.keys(at(2300), 500, Array.from({ length: 6 }, (_, i) => ({ o: (i + 1) / 6, sx: 1.5 + (i % 2 ? 0.05 : -0.04), sy: 1.5 + (i % 2 ? -0.04 : 0.05), rot: NET - ARM + (i % 2 ? -4 : 2) })).concat([{ o: 1, sx: 1.5, sy: 1.5, rot: NET - ARM }]), { ease: 'linear', reduce: 'skip' });
   thief.head.keys(at(2300), 500, [{ o: 0.5, rot: fwd(thief, 6) }, { o: 1, rot: fwd(thief, 0) }], { ease: 'ease-in-out', reduce: 'skip' });
   stretch(2800, 900, 2.0);
-  thief.propF.keys(at(3700), 600, Array.from({ length: 8 }, (_, i) => ({ o: (i + 1) / 8, sx: 2 + (i % 2 ? 0.07 : -0.05), sy: 2 + (i % 2 ? -0.05 : 0.07), rot: 92 + (i % 2 ? -10 : 3) })).concat([{ o: 1, sx: 2, sy: 2, rot: 92 }]), { ease: 'linear', reduce: 'skip' });
+  thief.propF.keys(at(3700), 600, Array.from({ length: 8 }, (_, i) => ({ o: (i + 1) / 8, sx: 2 + (i % 2 ? 0.07 : -0.05), sy: 2 + (i % 2 ? -0.05 : 0.07), rot: NET - ARM + (i % 2 ? -4 : 2) })).concat([{ o: 1, sx: 2, sy: 2, rot: NET - ARM }]), { ease: 'linear', reduce: 'skip' });
   thief.vibrate(at(2800), 1500, 2.6);
   // it gives up: the bag snaps back with a boing and he is left holding a small bag
   thief.propF.keys(at(4400), 520, [{ o: 0.3, sx: 0.78, sy: 0.78 }, { o: 0.6, sx: 1.1, sy: 1.1 }, { o: 1, sx: 1, sy: 1 }], { seg: 'ease-out', ease: 'linear', reduce: 'snap' });
   thief.face(at(4400), 'shock');
   thief.head.to(at(4400), 200, { rot: fwd(thief, -6) });
-  hold(4950, 260, -70);
+  hold(4950, 260, -70, 20);
   thief.face(at(5000), 'sad');
   thief.head.to(at(5000), 300, { rot: fwd(thief, 10) });
   hold(5300, 340, -30, 0, 'ease-in-out');
