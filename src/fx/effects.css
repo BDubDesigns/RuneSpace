@@ -138,3 +138,31 @@
 .is-reduced .fx-keep { animation-name: fx-simple; animation-iteration-count: 1; }
 .is-reduced .fx-orbx, .is-reduced .fx-orby { animation: none; }
 @keyframes fx-simple { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---- welding arc: a hard strobing flare (n flickers, then out) */
+.fx-arc { animation-name: fx-arc; animation-timing-function: steps(1, end); }
+@keyframes fx-arc {
+  0%   { opacity: 1;   transform: scale(1)    rotate(0deg); }
+  17%  { opacity: 0.45; transform: scale(0.66) rotate(24deg); }
+  33%  { opacity: 1;   transform: scale(1.2)  rotate(-12deg); }
+  50%  { opacity: 0.6; transform: scale(0.82) rotate(40deg); }
+  67%  { opacity: 1;   transform: scale(1.08) rotate(8deg); }
+  83%  { opacity: 0.35; transform: scale(0.7) rotate(-30deg); }
+  100% { opacity: 0;   transform: scale(0.7)  rotate(0deg); }
+}
+
+/* ---- balloon pop burst */
+.fx-popburst { animation-name: fx-popburst; animation-timing-function: linear; }
+@keyframes fx-popburst {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-12deg); animation-timing-function: cubic-bezier(.2,1.4,.4,1); }
+  22%  { opacity: 1; transform: scale(1.1) rotate(4deg); }
+  60%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(1.35) rotate(0deg); }
+}
+
+/* ---- struck-bell rings */
+.fx-ring { animation-name: fx-ring; animation-timing-function: ease-out; }
+@keyframes fx-ring {
+  0%   { opacity: 0.9; transform: scale(0.25); }
+  100% { opacity: 0; transform: scale(1.6); }
+}

@@ -9,8 +9,11 @@
  * neck...). The returned object exposes a Track per part plus a few higher level
  * actions (face, walk, yap, shake) that emit cues into the shared cue list.
  *
- * Two characters ship with it ("pip" the round scruffy one, "rex" the tall
- * skinny one); `KINDS` is the place to add more for other films.
+ * Three characters ship with it ("pip" the round scruffy one, "rex" the tall
+ * skinny one, and "thief", the striped-shirt burglar of "Rare or Weld Done?");
+ * `KINDS` is the place to add more for other films. The thief additionally has
+ * welding goggles (up on the cap / down over the eyes), a top hat and a bow tie:
+ * see `c.goggles()` and `c.dressUp()` on the returned object.
  */
 import { Track } from '../acting.js';
 import { INK } from './props.js';
@@ -20,6 +23,7 @@ const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
 const KINDS = {
   pip: { L: 46, T: 86, hip: 19, sh: 43, shY: 18, armL: 54, legW: 20, skin: '#ececec', face: [7, -39, 1.14] },
   rex: { L: 104, T: 98, hip: 13, sh: 30, shY: 14, armL: 78, legW: 14, skin: '#f4f4f4', face: [4, -55, 1.0] },
+  thief: { L: 70, T: 84, hip: 15, sh: 35, shY: 16, armL: 60, legW: 17, skin: '#f1f1f1', face: [3, -53, 0.96] },
 };
 
 export const FACES = ['normal', 'glance', 'shock', 'greed', 'angry', 'plot', 'ko', 'sleep', 'smug', 'cheer', 'sad'];
@@ -180,6 +184,77 @@ function foldArt(k, who) {
     <circle cx="${-w + 4}" cy="3" r="12" fill="#fff" ${S} stroke-width="4.2"/><circle cx="${w - 4}" cy="-3" r="12" fill="#fff" ${S} stroke-width="4.2"/>`;
 }
 
+
+/* ---------------------------------------------------------- the thief */
+
+function thiefLegArt(k) {
+  const { L, legW } = k;
+  return `<path d="M0 0 L0 ${L - 14}" ${S} stroke-width="${legW + 9}"/><path d="M0 0 L0 ${L - 14}" stroke="#4a4a4a" stroke-width="${legW}" stroke-linecap="round"/>
+    <rect x="-6" y="${L * 0.38}" width="12" height="13" rx="2" fill="#d6d6d6" ${S} stroke-width="2.4"/><path d="M-3 ${L * 0.38 + 6.5} L3 ${L * 0.38 + 6.5}" stroke="#555" stroke-width="1.6"/>
+    <path d="M-18 ${L - 1} Q-19 ${L - 22} -1 ${L - 22} Q24 ${L - 25} 33 ${L - 8} Q38 ${L + 1} 29 ${L + 1} L-13 ${L + 1} Q-18 ${L + 1} -18 ${L - 1}Z" fill="#1c1c1c" ${S} stroke-width="3"/>
+    <path d="M-8 ${L - 15} Q4 ${L - 21} 18 ${L - 16}" fill="none" stroke="#fff" stroke-width="2.6" opacity=".4" stroke-linecap="round"/>
+    <path d="M-17 ${L - 6} L33 ${L - 6}" stroke="#555" stroke-width="2"/>`;
+}
+
+function thiefTorso(k, id, dressed) {
+  // body outline; the stripes are bands cut to the outline's half-width at each height
+  const hw = (y) => 34 - Math.abs(y + 44) * 0.18 - (y < -66 ? (-66 - y) * 0.9 : 0) - (y > -10 ? (y + 10) * 0.9 : 0);
+  const band = (y0, y1) => `<path d="M${-hw(y0)} ${y0} L${hw(y0)} ${y0} L${hw(y1)} ${y1} L${-hw(y1)} ${y1}Z" fill="#2c2c2c"/>`;
+  const bands = [-8, -22, -36, -50, -64].map((y) => band(y, y - 7)).join('');
+  const outline = 'M-27 4 C-38 -16 -39 -58 -28 -78 Q0 -90 28 -78 C39 -58 38 -16 27 4 Q0 11 -27 4Z';
+  return `<g transform="translate(0 ${-k.L})">
+    <path d="${outline}" fill="#f2f2f2"/>${bands}<path d="${outline}" fill="none" ${S} stroke-width="5"/>
+    <rect x="-30" y="-12" width="60" height="13" rx="3" fill="#6a6a6a" ${S} stroke-width="4"/><rect x="-7" y="-11" width="14" height="11" rx="2" fill="#e8e8e8" ${S} stroke-width="2.6"/>
+    <path d="M17 -6 Q30 -3 31 12 Q30 24 17 20Z" fill="#7a7a7a" ${S} stroke-width="3.4"/><path d="M19 4 L28 4" stroke="#333" stroke-width="2"/>
+    <path d="M-20 -78 L0 -64 L20 -78 L12 -86 L-12 -86Z" fill="#fff" ${S} stroke-width="3.6"/>
+    <g data-t="${id}.bow" style="opacity:${dressed ? 1 : 0}"><g transform="translate(0 -73) rotate(-9)"><path d="M0 0 L-24 -13 L-24 13Z M0 0 L24 -13 L24 13Z" fill="#202020" ${S} stroke-width="3.4"/><rect x="-6" y="-6" width="12" height="12" rx="3" fill="#444" ${S} stroke-width="3"/></g></g>
+    <path d="M-30 -30 Q-33 -22 -29 -14" fill="none" stroke="#777" stroke-width="2.6"/>
+  </g>`;
+}
+
+const STUBBLE = [[-24, -16], [-19, -9], [-14, -4], [-8, -2], [-2, -1], [6, -2], [12, -4], [18, -9], [23, -16], [-22, -24], [22, -24], [-12, -10], [0, -8], [11, -10], [-6, -14], [7, -15], [-18, -17], [17, -17]];
+
+function thiefHead(id, skin) {
+  return `<g>
+    <circle cx="-35" cy="-38" r="9" fill="${skin}" ${S} stroke-width="4"/><circle cx="35" cy="-38" r="9" fill="${skin}" ${S} stroke-width="4"/>
+    <ellipse cx="0" cy="-42" rx="35" ry="41" fill="${skin}" ${S} stroke-width="5"/>
+    <path d="M-30 -22 Q-26 2 0 0 Q26 2 30 -22 Q22 -10 0 -10 Q-22 -10 -30 -22Z" fill="#d4d4d4"/>
+    ${STUBBLE.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.7" fill="${INK}" opacity=".7"/>`).join('')}
+    <path d="M-35 -40 Q-36 -2 0 1 Q36 -2 35 -40" fill="none" ${S} stroke-width="5"/>
+    <path d="M-2 -46 Q14 -42 12 -31 Q10 -22 0 -24 Q-7 -28 -2 -46Z" fill="#e0e0e0" ${S} stroke-width="4"/>
+    <path d="M-1 -29 Q4 -24 9 -28" fill="none" ${S} stroke-width="2.4" opacity=".7"/>
+  </g>`;
+}
+
+/** Flat cap (brim line at the group origin, bill toward +x), a stack of goggle lenses (up) and a tall crooked top hat. */
+function thiefHat(id, o) {
+  const lens = (x) => `<g transform="translate(${x} -16)"><circle r="14" fill="#2b2b2b" ${S} stroke-width="5"/><circle r="9" fill="#555"/><path d="M-6 -5 Q-2 -9 3 -7" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>`;
+  return `<g data-t="${id}.cap" style="opacity:${o.dressed ? 0 : 1}">
+      <path d="M-40 4 C-46 -26 -22 -42 6 -41 C34 -40 46 -22 42 4 Q0 12 -40 4Z" fill="#454545" ${S} stroke-width="5"/>
+      <path d="M-6 -41 Q6 -22 4 6 M-24 -34 Q-20 -14 -26 4 M20 -38 Q26 -18 24 4" fill="none" ${S} stroke-width="2.6" opacity=".7"/>
+      <path d="M20 -2 Q58 -2 66 10 Q48 20 14 10Z" fill="#2e2e2e" ${S} stroke-width="4.5"/>
+      <circle cx="4" cy="-42" r="5" fill="#757575" ${S} stroke-width="3"/>
+      <path d="M-36 -8 Q0 3 38 -9" fill="none" stroke="#8a8a8a" stroke-width="3"/>
+    </g>
+    <g data-t="${id}.gUp" style="opacity:${o.goggles === 'up' ? 1 : 0}">
+      <path d="M-40 -12 Q0 -2 40 -14" fill="none" ${S} stroke-width="8"/><path d="M-40 -12 Q0 -2 40 -14" fill="none" stroke="#999" stroke-width="3.4"/>
+      ${lens(-16)}${lens(14)}
+    </g>
+    <g data-t="${id}.top" style="opacity:${o.dressed ? 1 : 0}"><g transform="rotate(-9 0 0)">
+      <ellipse cx="0" cy="0" rx="50" ry="9.5" fill="#151515" ${S} stroke-width="5"/>
+      <path d="M-30 -2 L-26 -92 Q0 -102 26 -92 L30 -2Z" fill="#242424" ${S} stroke-width="5"/>
+      <path d="M-29 -16 Q0 -6 29 -16 L28 -4 Q0 6 -28 -4Z" fill="#8c8c8c" ${S} stroke-width="3.4"/>
+      <rect x="-7" y="-16" width="14" height="12" rx="2" fill="#f2f2f2" ${S} stroke-width="2.4"/>
+      <path d="M-17 -80 Q-12 -90 -3 -88" fill="none" stroke="#999" stroke-width="5" stroke-linecap="round"/>
+    </g></g>`;
+}
+
+/** Welding goggles pulled down over the eyes (drawn on top of the face layers). */
+function thiefGoggles() {
+  const lens = (x) => `<g transform="translate(${x} 0)"><circle r="23" fill="#d0d0d0" ${S} stroke-width="6"/><circle r="17" fill="#161616" ${S} stroke-width="2.4"/><path d="M-9 -7 Q-3 -13 5 -11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="7" cy="8" r="2.6" fill="#fff" opacity=".6"/></g>`;
+  return `<path d="M-38 -4 L38 -4" ${S} stroke-width="12"/><path d="M-38 -4 L38 -4" stroke="#777" stroke-width="6"/>${lens(-15)}${lens(15)}<rect x="-6" y="-9" width="12" height="10" rx="3" fill="#bbb" ${S} stroke-width="3.4"/>`;
+}
+
 /* --------------------------------------------------------------- the rig */
 
 /**
@@ -211,12 +286,24 @@ export function prospector(cues, id, o = {}) {
     (n) => `<g data-t="${id}.f.${n}" style="opacity:${n === (o.face || 'normal') ? 1 : 0}">${faceArt(n, id, k.skin)}</g>`
   ).join('');
   const faceGroup = `<g transform="translate(${fx} ${fy}) scale(${fs})">${faces}</g>`;
-  const hatY = kind === 'pip' ? -64 : -76;
+  const hatY = kind === 'pip' ? -64 : kind === 'thief' ? -70 : -76;
 
   const shoulderY = -k.L - k.T + k.shY;
   const foldGroup = `<g transform="translate(0 ${shoulderY + (kind === 'pip' ? 22 : 18)})"><g data-t="${id}.fold" style="opacity:0">${foldArt(k, kind)}</g></g>`;
+  const thiefBody = `<g transform="translate(${-k.sh} ${shoulderY})"><g data-t="${id}.armB" style="${armB.css}">${armArt(k, kind, o.props?.B, id, 'B')}</g></g>
+         <g transform="translate(${-k.hip} ${-k.L})"><g data-t="${id}.legB" style="${legB.css}">${thiefLegArt(k)}</g></g>
+         <g transform="translate(${k.hip} ${-k.L})"><g data-t="${id}.legF" style="${legF.css}">${thiefLegArt(k)}</g></g>
+         <g data-t="${id}.torso" style="${torso.css}">${thiefTorso(k, id, o.dressed)}</g>
+         <g transform="translate(0 ${-k.L - k.T + 6})"><g data-t="${id}.head" style="${head.css}">
+           ${thiefHead(id, k.skin)}${faceGroup}<g data-t="${id}.gDown" style="opacity:${o.goggles === 'down' ? 1 : 0}"><g transform="translate(${fx} ${fy})">${thiefGoggles()}</g></g>
+           <g transform="translate(0 ${hatY})"><g data-t="${id}.hat" style="${hat.css}">${thiefHat(id, o)}</g></g>
+         </g></g>
+         <g transform="translate(${k.sh} ${shoulderY})"><g data-t="${id}.armF" style="${armF.css}">${armArt(k, kind, o.props?.F, id, 'F')}</g></g>
+         ${foldGroup}`;
   const body =
-    kind === 'pip'
+    kind === 'thief'
+      ? thiefBody
+      : kind === 'pip'
       ? `${o.pack ? pipPack(k) : ''}
          <g transform="translate(${-k.sh} ${shoulderY})"><g data-t="${id}.armB" style="${armB.css}">${armArt(k, kind, o.props?.B, id, 'B')}</g></g>
          <g transform="translate(${-k.hip} ${-k.L})"><g data-t="${id}.legB" style="${legB.css}">${legArt(k, kind)}</g></g>
@@ -240,11 +327,13 @@ export function prospector(cues, id, o = {}) {
          ${foldGroup}`;
 
   const html = `<g data-t="${id}" class="mm-actor" style="${root.css}">
-      <ellipse data-t="${id}.shadow" cx="0" cy="3" rx="${kind === 'pip' ? 62 : 54}" ry="11" fill="#000" opacity=".3"/>
+      <ellipse data-t="${id}.shadow" cx="0" cy="3" rx="${kind === 'pip' ? 62 : kind === 'thief' ? 58 : 54}" ry="11" fill="#000" opacity=".3"/>
       <g data-t="${id}.bob">${body}</g>
     </g>`;
 
   let faceNow = o.face || 'normal';
+  let gogglesNow = o.goggles || 'off';
+  let dressedNow = !!o.dressed;
 
   const c = {
     id,
@@ -270,6 +359,32 @@ export function prospector(cues, id, o = {}) {
       cues.push({ at, dur: 1, target: `${id}.f.${faceNow}`, keyframes: [{ opacity: 1 }, { opacity: 0 }], easing: 'linear' });
       cues.push({ at, dur: 1, target: `${id}.f.${name}`, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' });
       faceNow = name;
+      return c;
+    },
+
+    /**
+     * Thief only. Welding goggles: 'up' (pushed up on the cap), 'down' (over the eyes) or 'off'.
+     * Instant swap at `at`.
+     */
+    goggles(at, mode) {
+      if (kind !== 'thief' || mode === gogglesNow) return c;
+      const op = (target, a, b) => cues.push({ at, dur: 1, target, keyframes: [{ opacity: a }, { opacity: b }], easing: 'linear' });
+      const key = { up: 'gUp', down: 'gDown' };
+      if (key[gogglesNow]) op(`${id}.${key[gogglesNow]}`, 1, 0);
+      if (key[mode]) op(`${id}.${key[mode]}`, 0, 1);
+      gogglesNow = mode;
+      return c;
+    },
+
+    /** Thief only. Swap the flat cap for the ridiculous top hat and add the crooked bow tie (or undo it). */
+    dressUp(at, on = true) {
+      if (kind !== 'thief' || on === dressedNow) return c;
+      const op = (target, a, b) => cues.push({ at, dur: 1, target, keyframes: [{ opacity: a }, { opacity: b }], easing: 'linear' });
+      op(`${id}.cap`, on ? 1 : 0, on ? 0 : 1);
+      op(`${id}.top`, on ? 0 : 1, on ? 1 : 0);
+      op(`${id}.bow`, on ? 0 : 1, on ? 1 : 0);
+      if (on && gogglesNow === 'up') c.goggles(at, 'off');
+      dressedNow = on;
       return c;
     },
 

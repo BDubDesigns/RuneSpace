@@ -253,3 +253,60 @@ export function flash({ at: t, dur = 160, peak = 0.9, w = 1280, h = 720 }) {
 export function dim({ at: t, dur = 600, peak = 0.35, w = 1280, h = 720 }) {
   return `<rect class="fx fx-flash" width="${w}" height="${h}" fill="#000" style="${v({ at: t, dur, o: peak })}"/>`;
 }
+
+/**
+ * Welding arc: a hard flickering white flare (stars + halo rings) that repeats `n` times then goes out.
+ * Drawn with its own dark outline so it stays visible on light backgrounds. Place it at the torch tip
+ * (pass it as `extra` to torch() and it travels with the torch) or at the spot being welded.
+ */
+export function arc({ x, y, at: t, dur = 140, n = 6, r = 40 }) {
+  const star = (rad, rot) => `<path transform="rotate(${rot})" d="M0 ${-rad} L${rad * 0.17} ${-rad * 0.17} L${rad} 0 L${rad * 0.17} ${rad * 0.17} L0 ${rad} L${-rad * 0.17} ${rad * 0.17} L${-rad} 0 L${-rad * 0.17} ${-rad * 0.17}Z" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/>`;
+  return at(
+    x,
+    y,
+    `<g class="fx fx-arc" style="${v({ at: t, dur, n })}">
+       <circle r="${r * 0.9}" fill="#fff" opacity=".38"/><circle r="${r * 0.55}" fill="#fff" opacity=".7"/>
+       ${star(r * 1.5, 0)}${star(r * 0.9, 45)}<circle r="${r * 0.22}" fill="#fff"/>
+     </g>`
+  );
+}
+
+/** A balloon pop: jagged burst with rag shards. `s` scales it. Decoration (hidden in reduced motion). */
+export function popBurst({ x, y, at: t, dur = 380, s = 1, seed = 3 }) {
+  return at(
+    x,
+    y,
+    `<g class="fx fx-popburst" style="${v({ at: t, dur })}"><polygon points="${starburstPoints(11, 58 * s, 24 * s, seed)}" fill="#fff" stroke="#111" stroke-width="5" stroke-linejoin="round"/></g>`
+  );
+}
+
+/** A plain idea lightbulb (the good kind: no horns). Same timing as badIdea. */
+export function lightbulb({ x, y, at: t, dur = 1800, scale = 1 }) {
+  const rays = [...Array(12)]
+    .map((_, i) => {
+      const a = (i / 12) * Math.PI * 2;
+      return `<line x1="${(Math.cos(a) * 62).toFixed(0)}" y1="${(Math.sin(a) * 62 - 8).toFixed(0)}" x2="${(Math.cos(a) * 94).toFixed(0)}" y2="${(Math.sin(a) * 94 - 8).toFixed(0)}"/>`;
+    })
+    .join('');
+  return at(
+    x,
+    y,
+    `<g class="fx fx-bulb fx-keep" style="${v({ at: t, dur })}">
+       <g stroke="#111" stroke-width="6" stroke-linecap="round" fill="none">${rays}</g>
+       <circle cx="0" cy="-8" r="40" fill="#fff" stroke="#111" stroke-width="6"/>
+       <path d="M-16 32 L-16 48 L16 48 L16 32 Q0 38 -16 32Z" fill="#999" stroke="#111" stroke-width="5" stroke-linejoin="round"/>
+       <path d="M-12 -2 L-6 -16 L0 -2 L6 -16 L12 -2" fill="none" stroke="#111" stroke-width="4" stroke-linejoin="round"/>
+       <path d="M-24 -26 Q-18 -34 -8 -34" fill="none" stroke="#bbb" stroke-width="5" stroke-linecap="round"/>
+     </g>`,
+    ` scale(${scale})`
+  );
+}
+
+/** Expanding sound rings (a struck bell): `n` rings, `gap` ms apart. Decoration. */
+export function rings({ x, y, at: t, n = 3, gap = 140, dur = 700, r = 120, width = 7 }) {
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    s += `<circle class="fx fx-ring" r="${r}" fill="none" stroke="#111" stroke-width="${width}" style="${v({ at: t + i * gap, dur })}"/>`;
+  }
+  return at(x, y, s);
+}
