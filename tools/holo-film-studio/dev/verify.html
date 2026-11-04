@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Film verification (dev)</title>
+  <link rel="stylesheet" href="../src/player/player.css">
+  <link rel="stylesheet" href="../src/fx/effects.css">
+  <link rel="stylesheet" href="../src/fx/film-look.css">
+  <style>
+    body { margin: 0; background: #0b0e12; color: #e8edf0; font: 14px/1.5 system-ui, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    #host { width: 800px; max-width: 100%; margin-bottom: 16px; }
+    li { list-style: none; padding: 3px 0; } ul { padding: 0; }
+    .ok::before { content: '✔ '; color: #6fdc8c; } .bad::before { content: '✘ '; color: #ff7b7b; } .bad { color: #ff7b7b; }
+    small { color: #8c97a0; } #sum { font-size: 18px; font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <p>Open <code>?film=&lt;id&gt;</code> (default: first registered film). Results also land in <code>window.__verify</code>.</p>
+  <div id="host"></div>
+  <p id="sum">running…</p>
+  <ul id="out"></ul>
+</main>
+<script type="module">
+  import { runChecks } from './verify.js';
+  import { FILMS } from '../src/films/index.js';
+  const id = new URLSearchParams(location.search).get('film') || FILMS[0].id;
+  const sum = document.getElementById('sum');
+  const out = document.getElementById('out');
+  const res = await runChecks(id, { onProgress: (n) => (sum.textContent = `running: ${n}`) });
+  sum.textContent = `${res.film}: ${res.ok ? 'ALL CHECKS PASSED' : 'FAILED'} (${res.results.filter((r) => r.ok).length}/${res.results.length}, ${res.ms} ms)`;
+  sum.style.color = res.ok ? '#6fdc8c' : '#ff7b7b';
+  for (const r of res.results) {
+    const li = document.createElement('li');
+    li.className = r.ok ? 'ok' : 'bad';
+    li.innerHTML = `${r.name} <small></small>`;
+    li.querySelector('small').textContent = r.detail;
+    out.appendChild(li);
+  }
+  window.__verify = res;
+</script>
+</body>
+</html>
