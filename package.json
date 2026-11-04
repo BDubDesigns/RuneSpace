@@ -1,16 +1,17 @@
 {
   "name": "runespace-movies",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Standalone silent-film engine + player for the RuneSpace holo-drive-in. No dependencies, no build step. Ships \"That Mines Mine!\"; add films under src/films/.",
+  "description": "Standalone silent-film engine + player for the RuneSpace holo-drive-in. No dependencies, no build step. Ships \"That Mines Mine!\" and \"Rare or Weld Done?\"; add films under src/films/.",
   "main": "src/index.js",
   "types": "src/index.d.ts",
   "scripts": {
     "dev": "node dev/serve.mjs 5173",
     "test": "node --test \"test/*.test.mjs\"",
     "verify": "node dev/verify-headless.mjs",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "shoot": "node dev/shoot.mjs"
   },
   "sideEffects": [
     "**/*.css"

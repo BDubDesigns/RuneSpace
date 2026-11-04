@@ -4,9 +4,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Track, tween, show } from '../src/acting.js';
 import { defineFilm, TRANSITION_MS } from '../src/engine/film.js';
-import { puff, dust, sparks, pow, flash, rng, FX_DEFS } from '../src/fx/effects.js';
-import { Camera } from '../src/kit.js';
-import { prospector } from '../src/art/prospector.js';
+import { puff, dust, sparks, pow, flash, rng, arc, popBurst, lightbulb, rings, FX_DEFS } from '../src/fx/effects.js';
+import { Camera, reach, aimAlong } from '../src/kit.js';
+import { prospector, FACES } from '../src/art/prospector.js';
+import { BalloonCloud } from '../src/art/balloons.js';
+import { scrollPoint, TORCH_TIP, torch, fenceRun, signboard } from '../src/art/weld.js';
+import { tourist } from '../src/art/crowd.js';
 
 test('Track: poses are absolute and cumulative; each move starts where the last ended', () => {
   const cues = [];
@@ -140,4 +143,115 @@ test('the public entry imports in plain Node (no document / window needed: SSR-s
   for (const k of ['createMoviePlayer', 'createTimeline', 'defineFilm', 'loadFilm', 'listFilms', 'FILMS', 'thatMinesMine']) {
     assert.ok(k in api, `missing export ${k}`);
   }
+});
+
+/* ------------------------------------------------------------ additions for "Rare or Weld Done?" */
+
+test('fx: welding arc, balloon pop burst, lightbulb and rings are deterministic CSS effects on the master clock', () => {
+  const a = arc({ x: 1, y: 2, at: 500, dur: 130, n: 4, r: 30 });
+  assert.match(a, /class="fx fx-arc"/);
+  assert.match(a, /--at:500;--dur:130;--n:4/);
+  assert.equal(a, arc({ x: 1, y: 2, at: 500, dur: 130, n: 4, r: 30 }), 'same inputs give the same markup');
+  assert.match(popBurst({ x: 0, y: 0, at: 10 }), /class="fx fx-popburst"/);
+  assert.match(lightbulb({ x: 0, y: 0, at: 10 }), /fx-bulb fx-keep/, 'the lightbulb is a story symbol: it survives reduced motion');
+  assert.equal((rings({ x: 0, y: 0, at: 0, n: 3 }).match(/fx-ring/g) || []).length, 3);
+});
+
+test('thief rig: goggles and top hat swap by opacity cues, and exactly one face is shown', () => {
+  const cues = [];
+  const th = prospector(cues, 't', { kind: 'thief', goggles: 'up' });
+  for (const f of FACES) assert.match(th.html, new RegExp(`data-t="t\\.f\\.${f}"`));
+  th.goggles(100, 'down');
+  th.goggles(200, 'off');
+  th.dressUp(300, true);
+  const byTarget = (name) => cues.filter((c) => c.target === name).map((c) => [c.at, c.keyframes[0].opacity, c.keyframes[1].opacity]);
+  assert.deepEqual(byTarget('t.gUp'), [[100, 1, 0]]);
+  assert.deepEqual(byTarget('t.gDown'), [[100, 0, 1], [200, 1, 0]]);
+  assert.deepEqual(byTarget('t.cap'), [[300, 1, 0]]);
+  assert.deepEqual(byTarget('t.top'), [[300, 0, 1]]);
+  assert.deepEqual(byTarget('t.bow'), [[300, 0, 1]]);
+  th.dressUp(300, true); // idempotent
+  assert.equal(cues.filter((c) => c.target === 't.top').length, 1);
+});
+
+test('reach(): the two-link solution puts the tool tip on the target, whichever way the character faces', () => {
+  const rad = Math.PI / 180;
+  for (const flip of [1, -1]) {
+    const c = prospector([], 't', { kind: 'thief', x: 400, y: 600, scale: 0.95, flip });
+    const k = c.dims;
+    for (const [dx, dy] of [[110, -60], [90, -20], [120, -100], [140, -20]]) {
+      const tx = 400 + flip * dx;
+      const ty = 600 + dy;
+      const { arm, prop } = reach(c, tx, ty, TORCH_TIP.x);
+      const hx = k.sh - k.armL * Math.sin(arm * rad);
+      const hy = -k.L - k.T + k.shY + k.armL * Math.cos(arm * rad);
+      const px = hx + TORCH_TIP.x * Math.cos((arm + prop) * rad);
+      const py = hy + TORCH_TIP.x * Math.sin((arm + prop) * rad);
+      const wx = 400 + flip * 0.95 * px;
+      const wy = 600 + 0.95 * py;
+      assert.ok(Math.hypot(wx - tx, wy - ty) < 0.5, `flip ${flip}: tip (${wx.toFixed(1)}, ${wy.toFixed(1)}) should be (${tx}, ${ty})`);
+    }
+  }
+});
+
+test('aimAlong(): returns the sampled tip points and emits chained arm cues that never overlap', () => {
+  const cues = [];
+  const c = prospector(cues, 't', { kind: 'thief', x: 400, y: 600, scale: 0.95 });
+  const tips = aimAlong(c, 1000, 600, (s) => ({ x: 500 + 40 * s, y: 520 }), { toolLen: TORCH_TIP.x, step: 100, lead: 200 });
+  assert.equal(tips.length, 7);
+  assert.deepEqual([tips[0].t, tips.at(-1).t], [1000, 1600]);
+  assert.deepEqual([tips[0].x, tips.at(-1).x], [500, 540]);
+  const arm = cues.filter((x) => x.target === 't.armF');
+  assert.deepEqual(arm.map((x) => [x.at, x.dur]), [[800, 200], [1000, 600]]);
+});
+
+test('scrollPoint(): walks the flourish by arc length (constant speed) from its start to its end', () => {
+  assert.deepEqual([scrollPoint(0).x, scrollPoint(0).y], [0, 0]);
+  const e = scrollPoint(1);
+  assert.deepEqual([Math.round(e.x), Math.round(e.y)], [12, -58]);
+  const steps = [];
+  let prev = scrollPoint(0);
+  for (let i = 1; i <= 20; i++) {
+    const p = scrollPoint(i / 20);
+    steps.push(Math.hypot(p.x - prev.x, p.y - prev.y));
+    prev = p;
+  }
+  assert.ok(Math.max(...steps) / Math.min(...steps) < 1.6, 'even spacing: a torch following it moves at a steady speed');
+});
+
+test('BalloonCloud: balloons tie on, stretch, and pop; every cue target exists in its markup', () => {
+  const cues = [];
+  const cloud = new BalloonCloud(cues, 'b', { hub: { x: 0, y: -100 }, count: 6, seed: 3 });
+  cloud.releaseRange(0, 3, 100, 50);
+  cloud.stretch(1000, 300, 1.4);
+  cloud.pop(1, 1500);
+  const html = cloud.html;
+  const names = new Set([...html.matchAll(/data-t="([^"]+)"/g)].map((m) => m[1]));
+  for (const c of cues) assert.ok(names.has(c.target), `${c.target} is in the markup`);
+  assert.match(html, /fx-popburst/);
+  assert.equal(cloud.live.size, 2, 'three tied on, one popped');
+  const placedCloud = new BalloonCloud([], 'p', { count: 4, placed: true });
+  assert.equal(placedCloud.live.size, 4, 'placed: every balloon is already floating');
+});
+
+test('tourist(): one tracked group; walk() slides the root and hops the body; awe() swaps the mouth once', () => {
+  const cues = [];
+  const t = tourist(cues, 'x', { v: 9, x: 100, y: 600 });
+  assert.match(t.html, /data-t="x"/);
+  assert.match(t.html, /data-t="x\.bob"/);
+  assert.match(t.html, /data-t="x\.head"/);
+  t.walk(0, 800, 300);
+  assert.equal(t.root.p.x, 300);
+  const n = cues.length;
+  t.awe(900);
+  t.awe(950);
+  assert.equal(cues.length, n + 4, 'awe() is idempotent: mouth swap (2) + head tilt + hop');
+});
+
+test('props: fence runs and signs are plain markup with per-line groups for reveals', () => {
+  assert.match(fenceRun({ a: [0, 100], b: [200, 100], n: 5 }), /<path/);
+  const sb = signboard('s', ['A', 'B', 'C']);
+  for (const i of [0, 1, 2]) assert.match(sb.html, new RegExp(`data-t="s\\.l${i}"`));
+  assert.equal(sb.lineY.length, 3);
+  assert.match(torch('tc', '<g id="flare"/>'), /id="flare"/, 'extra markup rides at the torch tip');
 });

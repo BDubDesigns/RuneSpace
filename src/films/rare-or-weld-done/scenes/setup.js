@@ -62,17 +62,17 @@ export function paper(ctx) {
   const cam = new Camera(cues, id, { x: 640, y: 270, s: 1 });
   // masthead + headline, then the tilt down to the drawing of the Emerald
   cam.look(at(0), 160, { x: 640, y: 290 }, 'linear');
-  cam.look(at(3000), 1800, { x: 640, y: 770, s: 1 }, 'ease-in-out');
+  cam.look(at(2100), 1500, { x: 640, y: 770, s: 1 }, 'ease-in-out');
   const np = placed(cues, `${id}.np`, newspaper({ w: 880, h: 1080, id: `${id}.pg`, lines: { name: TEXT.paperName, head: TEXT.headline, sub: TEXT.headlineSub } }), { x: 640, y: 600, rot: -1.2 });
-  np.track.keys(at(0), 5200, [{ o: 0.25, rot: -0.6, x: 644 }, { o: 0.5, rot: -1.6, x: 636 }, { o: 0.75, rot: -0.8, x: 642 }, { o: 1, rot: -1.2, x: 640 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  np.track.keys(at(0), 4400, [{ o: 0.25, rot: -0.6, x: 644 }, { o: 0.5, rot: -1.6, x: 636 }, { o: 0.75, rot: -0.8, x: 642 }, { o: 1, rot: -1.2, x: 640 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
   // the "ONE WEEK ONLY!" banner pulses so it sticks
   cues.push({ at: at(1700), dur: 900, target: `${id}.pg.banner`, easing: 'ease-in-out', keyframes: [{ transform: 'scale(1)' }, { transform: 'scale(1.05)', offset: 0.4 }, { transform: 'scale(1)' }], reduce: 'skip' });
   // his hands hold the sheet
   const hand = (x, y, f) => `<g transform="translate(${x} ${y}) scale(${f} 1)"><path d="M-44 -34 Q-44 -56 -20 -50 L36 -34 Q52 -28 48 -10 L40 28 Q28 52 -8 46 Q-48 38 -44 -34Z" fill="#fff" stroke="#0d0d0d" stroke-width="7" stroke-linejoin="round"/><path d="M-20 -48 L-10 -4 M6 -42 L12 2 M24 -34 L28 8" fill="none" stroke="#999" stroke-width="3.4" stroke-linecap="round"/></g>`;
   const fx =
-    sparkle({ x: 590, y: 880, at: at(3600), dur: 900, r: 46, n: 3, s: 1.4 }) +
-    sparkle({ x: 700, y: 820, at: at(4000), dur: 800, r: 30, n: 2, s: 1.2 }) +
-    sparkle({ x: 660, y: 930, at: at(4300), dur: 800, r: 24, n: 2, s: 1.2 });
+    sparkle({ x: 590, y: 880, at: at(3000), dur: 900, r: 46, n: 3, s: 1.4 }) +
+    sparkle({ x: 700, y: 820, at: at(3300), dur: 800, r: 30, n: 2, s: 1.2 }) +
+    sparkle({ x: 660, y: 930, at: at(3550), dur: 800, r: 24, n: 2, s: 1.2 });
   return `<rect x="-400" y="-200" width="2100" height="2000" fill="#777"/>${cam.html(`${np.html}${hand(168, 860, 1)}${hand(1112, 860, -1)}${fx}`)}`;
 }
 
@@ -93,46 +93,46 @@ export function plan(ctx) {
 
   // --- the idea: thief stares at the page, then his eyes go distant
   thief.face(at(0), 'shock');
-  thief.face(at(700), 'glance');
-  thief.head.to(at(700), 300, { rot: fwd(thief, -7) });
-  thief.bob.keys(at(700), 600, [{ o: 0.5, sy: 1.01 }, { o: 1, sy: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
-  thief.face(at(1200), 'plot'); // a thought is forming
+  thief.face(at(450), 'glance');
+  thief.head.to(at(450), 300, { rot: fwd(thief, -7) });
+  thief.bob.keys(at(450), 600, [{ o: 0.5, sy: 1.01 }, { o: 1, sy: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
+  thief.face(at(800), 'plot'); // a thought is forming
   // --- bubble: three tail dots, then the cloud pops
   [0, 1, 2].forEach((i) => {
-    cues.push({ at: at(1250 + i * 230), dur: 220, target: `${id}.b.t${i}`, easing: 'cubic-bezier(.2,1.6,.4,1)', keyframes: [{ transform: 'scale(0)' }, { transform: 'scale(1)' }] });
+    cues.push({ at: at(900 + i * 220), dur: 220, target: `${id}.b.t${i}`, easing: 'cubic-bezier(.2,1.6,.4,1)', keyframes: [{ transform: 'scale(0)' }, { transform: 'scale(1)' }] });
     // tails scale about their own centres
   });
-  cues.push({ at: at(1950), dur: 420, target: `${id}.b.cloud`, easing: 'cubic-bezier(.2,1.4,.4,1)', keyframes: [{ transform: 'scale(0.05)' }, { transform: 'scale(1)' }] });
+  cues.push({ at: at(1450), dur: 420, target: `${id}.b.cloud`, easing: 'cubic-bezier(.2,1.4,.4,1)', keyframes: [{ transform: 'scale(0.05)' }, { transform: 'scale(1)' }] });
   // contents appear with the cloud: dealer first
-  tween(cues, `${id}.scene`, at(1900), 1, { opacity: 0 }, { opacity: 1 });
-  dealerP.track.keys(at(2250), 420, [{ o: 0.6, sx: 1.12, sy: 1.12 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  tween(cues, `${id}.scene`, at(1400), 1, { opacity: 0 }, { opacity: 1 });
+  dealerP.track.keys(at(1750), 420, [{ o: 0.6, sx: 1.12, sy: 1.12 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
   // the dealer: shifty eyes, smoke
-  cues.push({ at: at(2700), dur: 400, iterations: 3, target: `${id}.dl.eyes`, easing: 'steps(1,end)', keyframes: [{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }], direction: 'alternate', reduce: 'skip' });
+  cues.push({ at: at(2200), dur: 400, iterations: 3, target: `${id}.dl.eyes`, easing: 'steps(1,end)', keyframes: [{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }], direction: 'alternate', reduce: 'skip' });
   // 'here comes the Emerald': it slides in from the left, the dealer's hand comes out
-  gemP.track.keys(at(3300), 460, [{ o: 0.6, sx: 1.1, sy: 1.1 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
-  gemP.track.to(at(3900), 500, { x: -110 }, { ease: 'ease-in-out' });
-  cues.push({ at: at(3900), dur: 500, target: `${id}.dl.arm`, easing: 'ease-in-out', keyframes: [{ transform: 'translate(44px, -122px) rotate(0deg)' }, { transform: 'translate(44px, -122px) rotate(-18deg)' }] });
+  gemP.track.keys(at(2650), 460, [{ o: 0.6, sx: 1.1, sy: 1.1 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  gemP.track.to(at(3200), 500, { x: -110 }, { ease: 'ease-in-out' });
+  cues.push({ at: at(3200), dur: 500, target: `${id}.dl.arm`, easing: 'ease-in-out', keyframes: [{ transform: 'translate(44px, -122px) rotate(0deg)' }, { transform: 'translate(44px, -122px) rotate(-18deg)' }] });
   // the trade: the gem vanishes into his coat, the mountain of Credits grows
-  gemP.track.keys(at(4500), 260, [{ o: 1, sx: 0, sy: 0, x: -40 }], { ease: 'ease-in' });
-  pileP.track.keys(at(4500), 760, [{ o: 0.55, sx: 1.25, sy: 1.25 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
-  pileP.track.keys(at(5400), 500, [{ o: 0.5, sx: 1.2, sy: 1.16 }, { o: 1, sx: 1.12, sy: 1.1 }], { ease: 'ease-in-out' });
-  dealerP.track.to(at(4500), 300, { x: -4 }, { ease: 'ease-out' });
+  gemP.track.keys(at(3800), 260, [{ o: 1, sx: 0, sy: 0, x: -40 }], { ease: 'ease-in' });
+  pileP.track.keys(at(3800), 760, [{ o: 0.55, sx: 1.25, sy: 1.25 }, { o: 1, sx: 1, sy: 1 }], { ease: 'ease-out' });
+  pileP.track.keys(at(4700), 500, [{ o: 0.5, sx: 1.2, sy: 1.16 }, { o: 1, sx: 1.12, sy: 1.1 }], { ease: 'ease-in-out' });
+  dealerP.track.to(at(3800), 300, { x: -4 }, { ease: 'ease-out' });
   // --- the thief grins
-  thief.face(at(4600), 'greed');
-  thief.bob.hop(at(4600), 300, 26);
-  thief.head.keys(at(4900), 900, [{ o: 0.3, rot: fwd(thief, 4) }, { o: 0.6, rot: fwd(thief, -3) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  thief.vibrate(at(5200), 2200, 3);
+  thief.face(at(3900), 'greed');
+  thief.bob.hop(at(3900), 300, 26);
+  thief.head.keys(at(4300), 900, [{ o: 0.3, rot: fwd(thief, 4) }, { o: 0.6, rot: fwd(thief, -3) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.vibrate(at(4600), 1800, 3);
   // bubble pops away at the end (he has made up his mind)
-  cues.push({ at: at(7500), dur: 380, target: `${id}.bub`, easing: 'ease-in', keyframes: [{ opacity: 1 }, { opacity: 0 }], reduce: 'snap' });
-  thief.face(at(6500), 'plot');
-  thief.bob.keys(at(6500), 500, [{ o: 0.5, sy: 1.02, sx: 0.99 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
+  cues.push({ at: at(6100), dur: 380, target: `${id}.bub`, easing: 'ease-in', keyframes: [{ opacity: 1 }, { opacity: 0 }], reduce: 'snap' });
+  thief.face(at(5400), 'plot');
+  thief.bob.keys(at(5400), 500, [{ o: 0.5, sy: 1.02, sx: 0.99 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-in-out', reduce: 'skip' });
 
   const fx =
-    puff({ x: 460, y: 400, at: at(1250), dur: 600, r: 24, dy: -20, opacity: 0.6 }) +
-    puff({ x: 905, y: 150, at: at(2700), dur: 1300, r: 22, dy: -50, dx: 24, opacity: 0.6, fill: 'url(#g-dust)' }) +
-    sparkle({ x: 900, y: 250, at: at(4700), dur: 900, r: 24, n: 3, s: 1.2 }) +
-    sparkle({ x: 1060, y: 190, at: at(5000), dur: 900, r: 20, n: 3, s: 1.2 }) +
-    sparkle({ x: 980, y: 380, at: at(5300), dur: 900, r: 22, n: 2, s: 1.2 });
+    puff({ x: 460, y: 400, at: at(900), dur: 600, r: 24, dy: -20, opacity: 0.6 }) +
+    puff({ x: 905, y: 150, at: at(2200), dur: 1300, r: 22, dy: -50, dx: 24, opacity: 0.6, fill: 'url(#g-dust)' }) +
+    sparkle({ x: 900, y: 250, at: at(4000), dur: 900, r: 24, n: 3, s: 1.2 }) +
+    sparkle({ x: 1060, y: 190, at: at(4300), dur: 900, r: 20, n: 3, s: 1.2 }) +
+    sparkle({ x: 980, y: 380, at: at(4600), dur: 900, r: 22, n: 2, s: 1.2 });
   return `<rect width="1280" height="720" fill="#d0d0d0"/>${cam.html(`${thief.html}${bubP.html}${fx}`)}`;
 }
 

@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 // Paths of films that are planned but intentionally not created yet (the docs tell the next agent to create them).
-const PLANNED = [/rare-or-weld-done/];
+const PLANNED = [];
 const DOCS = ['README.md', 'MOVIE_AUTHORING_GUIDE.md', 'NEXT_FILM_HANDOFF.md'];
 const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
 

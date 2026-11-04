@@ -52,7 +52,7 @@ const sway = (cues, track, at, dur, deg = 1.6, n = 4) =>
 
 export function balloons(ctx) {
   const { cues, at, id } = ctx;
-  const cam = new Camera(cues, id, { x: 470, y: 240, s: 0.8 });
+  const cam = new Camera(cues, id, { x: 470, y: 190, s: 0.8 });
   const mat = `<ellipse cx="${EMX}" cy="${GY - 4}" rx="290" ry="18" fill="#3c3c3c" stroke="${INK}" stroke-width="5"/><ellipse cx="${EMX}" cy="${GY - 8}" rx="250" ry="11" fill="#6a6a6a"/>`;
   const lg = loadedGem(cues, id, { x: EMX, y: EM_BASE, placed: false });
   const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 300, y: GY, scale: SC, face: 'sad', goggles: 'up' });
@@ -92,12 +92,12 @@ export function balloons(ctx) {
 
   // --- he comes to and spots the balloons: a terrible idea
   thief.head.keys(at(0), 500, [{ o: 0.5, rot: fwd(thief, -6) }, { o: 1, rot: 0 }], { ease: 'ease-in-out', reduce: 'skip' });
-  thief.face(at(450), 'glance');
-  thief.root.to(at(450), 1, { flip: -1 }, { ease: 'linear' }); // looks toward the stall
-  thief.face(at(900), 'shock');
-  thief.bob.hop(at(900), 240, 14);
-  thief.face(at(1250), 'plot');
-  thief.vibrate(at(1300), 400, 2.2);
+  thief.face(at(350), 'glance');
+  thief.root.to(at(350), 1, { flip: -1 }, { ease: 'linear' }); // looks toward the stall
+  thief.face(at(700), 'shock');
+  thief.bob.hop(at(700), 240, 14);
+  thief.face(at(1000), 'plot');
+  thief.vibrate(at(1050), 300, 2.2);
 
   const S = 205; // stall side
   const T = 440; // toss spot, left of the Emerald
@@ -125,34 +125,34 @@ export function balloons(ctx) {
   };
 
   // run 1: ONE balloon. Nothing.
-  leg(1650, 300, S, 520, -1);
-  grab(2200, 0);
-  leg(2260, S, T, 560, 0);
-  const done1 = toss(2900, 0, 0, 1);
-  thief.face(at(done1 - 200), 'sad');
+  leg(1350, 300, S, 420, -1);
+  grab(1800, 0);
+  leg(1830, S, T, 450, 0);
+  const done1 = toss(2420, 0, 0, 1);
+  thief.face(at(done1 - 500), 'sad');
   // run 2: three. Nothing.
-  leg(3500, T, S, 520, -1);
-  grab(4050, 1);
-  leg(4110, S, T, 560, 1);
-  const done2 = toss(4750, 1, 1, 4);
-  thief.face(at(done2 - 200), 'angry');
+  leg(2800, T, S, 400, -1);
+  grab(3230, 1);
+  leg(3260, S, T, 450, 1);
+  const done2 = toss(3850, 1, 1, 4);
+  thief.face(at(done2 - 500), 'angry');
   // run 3: eight. The Emerald shivers.
-  leg(5400, T, S, 480, -1);
-  grab(5900, 2);
-  leg(5960, S, T, 560, 2);
-  const done3 = toss(6600, 2, 4, 12);
-  lg.gem.keys(at(done3 - 500), 700, Array.from({ length: 8 }, (_, i) => ({ o: (i + 1) / 8, x: EMX + (i % 2 ? 3 : -3), y: EM_BASE - (i % 3 ? 4 : 0) })).concat([{ o: 1, x: EMX, y: EM_BASE }]), { ease: 'linear', reduce: 'skip' });
-  thief.face(at(done3 - 400), 'greed');
+  leg(4200, T, S, 380, -1);
+  grab(4610, 2);
+  leg(4640, S, T, 450, 2);
+  const done3 = toss(5230, 2, 4, 12);
+  lg.gem.keys(at(done3 - 700), 700, Array.from({ length: 8 }, (_, i) => ({ o: (i + 1) / 8, x: EMX + (i % 2 ? 3 : -3), y: EM_BASE - (i % 3 ? 4 : 0) })).concat([{ o: 1, x: EMX, y: EM_BASE }]), { ease: 'linear', reduce: 'skip' });
+  thief.face(at(done3 - 600), 'greed');
   // run 4: all the rest. The load lifts HIM off the ground.
-  leg(7550, T, S, 440, -1);
-  grab(7950, 3);
-  leg(8010, S, T, 640, 3, 34);
-  const done4 = toss(8750, 3, 12, 30);
+  leg(5600, T, S, 360, -1);
+  grab(5990, 3);
+  leg(6020, S, T, 560, 3, 34);
+  const done4 = toss(6700, 3, 12, 30);
   // --- liftoff
-  const LIFT = 9300;
-  lg.gem.keys(at(LIFT), 1100, [{ o: 0.3, y: EM_BASE - 4 }, { o: 1, y: EM_BASE - 96 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
-  sway(cues, lg.gem, at(LIFT + 1100), 400, 1.4, 2);
-  sway(cues, lg.tail, at(LIFT + 400), 1400, 7, 5);
+  const LIFT = 7800;
+  lg.gem.keys(at(LIFT), 1000, [{ o: 0.3, y: EM_BASE - 4 }, { o: 1, y: EM_BASE - 96 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
+  sway(cues, lg.gem, at(LIFT + 1000), 300, 1.4, 2);
+  sway(cues, lg.tail, at(LIFT + 400), 1200, 7, 5);
   thief.face(at(LIFT), 'cheer');
   thief.bob.hop(at(LIFT + 150), 320, 30);
   thief.bob.hop(at(LIFT + 650), 320, 30);
@@ -161,11 +161,11 @@ export function balloons(ctx) {
   void done4;
 
   const fx =
-    badIdea({ x: 285, y: GY - 270, at: at(1250), dur: 1100, scale: 0.9 }) +
-    mark({ x: 275, y: GY - 270, at: at(900), dur: 700, size: 70 }) +
+    badIdea({ x: 285, y: GY - 270, at: at(1000), dur: 1000, scale: 0.9 }) +
+    mark({ x: 275, y: GY - 270, at: at(700), dur: 600, size: 70 }) +
     dust({ x: EMX, y: GY + 4, at: at(LIFT), n: 8, spread: 200, r: 30, dir: 0, seed: 5, dur: 900 }) +
     sparkle({ x: 740, y: 180, at: at(LIFT + 400), dur: 900, r: 34, n: 3, s: 1.3 }) +
-    [1, 2, 3].map((i) => puff({ x: 340 + i * 40, y: GY - 6, at: at(1650 + i * 80), dur: 500, r: 18, dy: -14, dx: -20 })).join('');
+    [1, 2, 3].map((i) => puff({ x: 340 + i * 40, y: GY - 6, at: at(1350 + i * 80), dur: 500, r: 18, dy: -14, dx: -20 })).join('');
   return cam.html(`${sectionBack(id)}${stall}${groups.join('')}${mat}${lg.html}${thief.html}${carry}${sectionFront()}${fx}`);
 }
 
@@ -224,7 +224,7 @@ export function rise(ctx) {
   thief.bob.hop(at(5800), 360, 90);
   thief.armF.to(at(5360), 120, { rot: -175 });
   thief.armB.to(at(5360), 120, { rot: -178 });
-  thief.face(at(6200), 'sad');
+  thief.face(at(6000), 'sad');
   cam.look(at(5400), 900, { x: 1400, y: -120, s: 0.5 }, 'ease-in-out');
 
   const fx =
@@ -247,8 +247,8 @@ export function pop(ctx) {
   const GY0 = -140; // Emerald base y when the scene opens (it keeps drifting up)
   const cam = new Camera(cues, id, { x: 1500, y: -180, s: 0.4 });
   const lg = loadedGem(cues, id, { x: GX, y: GY0 });
-  cam.look(at(700), 2300, { x: 1515, y: -760, s: 1.0 }, 'ease-in-out'); // push in on the balloons as the bird arrives
-  cam.look(at(4300), 900, { x: 1500, y: -200, s: 0.42 }, 'ease-in-out'); // and back out for the cascade
+  cam.look(at(500), 2300, { x: 1515, y: -760, s: 1.0 }, 'ease-in-out'); // push in on the balloons as the bird arrives
+  cam.look(at(4000), 900, { x: 1500, y: -200, s: 0.42 }, 'ease-in-out'); // and back out for the cascade
   const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 1400, y: GY, scale: SC, face: 'shock', goggles: 'up', armF: -150, armB: -10 });
   const crow = new Track(cues, `${id}.bird`, { x: 380, y: -760, sx: 1.7, sy: 1.7 });
   const head = new Track(cues, `${id}.bird.head`);
@@ -257,7 +257,7 @@ export function pop(ctx) {
   const birdArt = bird(`${id}.bird`);
 
   // --- the Emerald drifts up; he shades his eyes
-  lg.gem.keys(at(0), 4000, [{ o: 0.25, y: GY0 - 15, x: GX + 8, rot: 1.2 }, { o: 0.5, y: GY0 - 30, x: GX + 14, rot: -1.2 }, { o: 0.75, y: GY0 - 45, x: GX + 12, rot: 1 }, { o: 1, y: GY0 - 58, x: GX + 10, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
+  lg.gem.keys(at(0), 3700, [{ o: 0.25, y: GY0 - 15, x: GX + 8, rot: 1.2 }, { o: 0.5, y: GY0 - 30, x: GX + 14, rot: -1.2 }, { o: 0.75, y: GY0 - 45, x: GX + 12, rot: 1 }, { o: 1, y: GY0 - 58, x: GX + 10, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
   sway(cues, lg.tail, at(0), 3000, 10, 6);
   thief.head.to(at(0), 300, { rot: fwd(thief, -14) });
   thief.root.keys(at(300), 2400, [{ o: 0.3, rot: fwd(thief, -3) }, { o: 0.6, rot: fwd(thief, 2) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
@@ -269,8 +269,8 @@ export function pop(ctx) {
   const by = gyAt + bt.y - 40;
 
   // --- the bird: it simply flies across, flapping, as if nothing is going on
-  const FL0 = 900;
-  const FL1 = 3100;
+  const FL0 = 700;
+  const FL1 = 2800;
   const flap = (t, dur, n) => {
     wA.keys(at(t), dur / n, [{ o: 0.5, rot: -34 }, { o: 1, rot: 22 }], { seg: 'ease-in-out', ease: 'linear', iterations: n, reduce: 'skip' });
     wB.keys(at(t), dur / n, [{ o: 0.5, rot: 22 }, { o: 1, rot: -30 }], { seg: 'ease-in-out', ease: 'linear', iterations: n, reduce: 'skip' });
@@ -284,7 +284,7 @@ export function pop(ctx) {
     { o: 1, x: bx, y: by },
   ], { seg: 'ease-in-out', ease: 'linear', reduce: 'snap' });
   // wind-up (head back) ... PECK
-  const PECK = 3500;
+  const PECK = 3200;
   head.keys(at(FL1), PECK - FL1, [{ o: 0.5, rot: 10 }, { o: 1, rot: -26 }], { ease: 'ease-in-out', reduce: 'skip' });
   head.to(at(PECK), 90, { rot: 24 }, { ease: 'cubic-bezier(.6,0,1,.6)' });
   head.to(at(PECK + 160), 260, { rot: 0 }, { ease: 'ease-out' });
@@ -315,7 +315,7 @@ export function pop(ctx) {
     t += gap;
     gap = Math.max(22, gap * (k < 3 ? 0.9 : 0.78));
   });
-  const FALL = 5000;
+  const FALL = 4700;
   lg.gem.keys(at(FALL), 1000, [{ o: 1, y: GY0 + 580, x: GX, rot: -3 }], { ease: 'cubic-bezier(.5,.05,.9,.6)', reduce: 'snap' });
   // he bolts for the boulder
   thief.face(at(FALL - 600), 'shock');
@@ -334,7 +334,7 @@ export function crash(ctx) {
   const { cues, at, id } = ctx;
   const IMPACT = 1050;
   const cam = new Camera(cues, id, { x: 1740, y: 400, s: 0.9 });
-  cam.look(at(3200), 2800, { x: 1620, y: 420, s: 1.05 }, 'ease-in-out');
+  cam.look(at(3000), 2800, { x: 1620, y: 420, s: 1.05 }, 'ease-in-out');
   const lg = loadedGem(cues, id, { x: CRATER_X, y: -150, count: 0 });
   const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: BOULDER_X - 40, y: GY, scale: SC, face: 'shock', goggles: 'up' });
   const rock = `<g transform="translate(${BOULDER_X} ${GY + 6})">${boulder(330, 250)}</g>`;
@@ -355,13 +355,13 @@ export function crash(ctx) {
   thief.face(at(IMPACT - 200), 'ko');
   thief.bob.to(at(IMPACT), 160, { sy: 0.62, sx: 1.1 }, { ease: 'ease-out' });
   // after the dust: hat first, then eyes
-  const PEEK = 3400;
+  const PEEK = 3000;
   thief.bob.to(at(PEEK), 500, { sy: 0.97, sx: 1 }, { ease: 'ease-in-out' });
   thief.face(at(PEEK + 100), 'glance');
   thief.armF.to(at(PEEK), 400, { rot: 0 });
   thief.armB.to(at(PEEK), 400, { rot: 0 });
   // crawls out, stooped and dusty, and trudges to the Emerald
-  const OUT = 4300;
+  const OUT = 3800;
   thief.face(at(OUT - 200), 'sad');
   thief.root.to(at(OUT), 1, { flip: -1 }, { ease: 'linear', reduce: 'snap' });
   thief.walk(at(OUT), 1500, 1275, { stride: 330, amp: 20, bounce: 3, swing: 0 });
@@ -372,7 +372,6 @@ export function crash(ctx) {
 
   const clouds = [0, 1, 2, 3, 4, 5].map((i) => dust({ x: CRATER_X - 300 + i * 120, y: GY + 10, at: at(IMPACT + i * 60), n: 6, spread: 120, r: 70, dir: i < 3 ? -1 : 1, seed: 50 + i, dur: 2200 })).join('');
   const fx =
-    flash({ at: at(IMPACT), dur: 260, peak: 0.95, w: 4000, h: 3000 }) +
     clouds +
     rings({ x: CRATER_X, y: GY + 20, at: at(IMPACT), n: 3, gap: 150, dur: 900, r: 360, width: 9 }) +
     chips({ x: CRATER_X, y: GY + 10, at: at(IMPACT), n: 14, power: 360, seed: 8, fill: '#444', size: 1.8, dur: 1400 }) +
@@ -383,5 +382,5 @@ export function crash(ctx) {
     puff({ x: 1285, y: GY - 120, at: at(OUT + 1800), dur: 900, r: 36, dy: -40, dx: -20, opacity: 0.7 }) +
     puff({ x: 1290, y: GY - 160, at: at(OUT + 2000), dur: 900, r: 30, dy: -40, dx: 20, opacity: 0.7 }) +
     sparkle({ x: CRATER_X + 40, y: 360, at: at(OUT + 600), dur: 900, r: 34, n: 3, s: 1.3 });
-  return cam.html(`${sectionBack(id)}${craterBack(id, { x: CRATER_X, rx: 300, ry: 46 })}${lg.html}${craterFront(id, { x: CRATER_X, rx: 300, ry: 46 })}${cracks}${thief.html}${rock}${sectionFront()}${clouds ? '' : ''}${fx}`);
+  return `${cam.html(`${sectionBack(id)}${craterBack(id, { x: CRATER_X, rx: 300, ry: 46 })}${lg.html}${craterFront(id, { x: CRATER_X, rx: 300, ry: 46 })}${cracks}${thief.html}${rock}${sectionFront()}${fx}`)}${flash({ at: at(IMPACT), dur: 240, peak: 0.8 })}`;
 }

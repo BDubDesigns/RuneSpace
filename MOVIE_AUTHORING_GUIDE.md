@@ -9,7 +9,7 @@ Read this once top to bottom, then keep sections 5, 6 and 10 open while working.
 
 ---
 
-## 0. The ten rules (read these even if you read nothing else)
+## 0. The eleven rules (read these even if you read nothing else)
 
 1. **Films are data.** A film is a `defineFilm({...})` object: scene builders return SVG strings and
    push *cues* (timed animations) into one shared list. The engine turns that into one seekable clock.
@@ -25,6 +25,12 @@ Read this once top to bottom, then keep sections 5, 6 and 10 open while working.
 8. **Don't edit "That Mines Mine!"** unless asked. It is approved. Tests and `film1-approved` (git tag) protect it.
 9. **Run `npm test` and `npm run verify` before calling anything done** (section 9).
 10. **Look at it.** Seek to every scene in a real browser, including a phone-width one. Green tests do not mean funny.
+    (`npm run shoot -- <film> <prefix> <scene+ms> ...` renders stills headlessly.)
+11. **Sequence the cues on a Track; never overlap them.** Every `Track` cue starts from the *end pose* of the previous
+    one, so two cues running at once make the picture jump to the first one's end pose. While `walk()` / `aimAlong()` /
+    `hop()` runs on a character, do not touch the same body part (`root`, `bob`, `legF`, `armF` ...) in that window; use
+    another Track (`torso` for a lean or a jolt, `head`, `hat`, `propF`) or start the next cue when the last one ends.
+    `npm test` fails with the offending cues for any new film.
 
 ---
 
@@ -73,11 +79,17 @@ src/                                      THE MODULE (what gets shipped / copied
   ── REUSABLE ART + EFFECTS (film-agnostic building blocks) ────────────────────────────
   fx/effects.js  fx/effects.css             particles/impact words as SVG + CSS keyframes; FX_DEFS
   fx/film-look.css                          grain, vignette, flicker, scratches, gate weave
-  art/prospector.js                         parametric cartoon character rig (cast: pip, rex)
+  art/prospector.js                         parametric cartoon character rig (cast: pip, rex, thief)
   art/props.js                              ore, cutter, mallet, sign, mine cart, ore pile, boulder
   art/cards.js                              silent-film title cards
+  art/weld.js                               torch, gas cart, fence runs/posts, gate, ticket booth, admission sign, plate, scroll
+  art/emerald.js                            the giant gem, plinth, stanchions, rope, placard
+  art/balloons.js                           balloon, bird, scrap, BalloonCloud (tie on / stretch / pop)
+  art/heist.js                              newspaper, thought bubble, the FENCE dealer, Credits (coin, pile, bag)
+  art/crowd.js                              tourist(): seven cheap background people
   ── FILMS (everything specific to one movie) ──────────────────────────────────────────
   films/index.js                            registry: FILMS, listFilms(), loadFilm(id)
+  films/rare-or-weld-done/                  film two (STORY.md = the approved screenplay; scenes/yard.js = the fence set)
   films/that-mines-mine/                    the approved first film
     config.js                                 TEXT (cards), TIMING (scene ms), CAPTION (CC text)
     index.js                                  scene order, transitions, chapters
@@ -266,6 +278,8 @@ return cam.html(`${back}${actors}${fx}`) // everything inside moves with the cam
 | `fwd(c, deg)` | a lean in degrees that respects the character's `flip` (positive = the way it faces) |
 | `blow(c, t, up, dn)` | overhead mallet blow; returns the impact time. Character must hold a mallet in `propF`/front hand |
 | `popIn(sign, at, x, y)` | a placed prop pops into existence with overshoot |
+| `reach(c, x, y, toolLen, prefer?, pose?)` | two-link IK: `{ arm, prop }` rotations for `c.armF` / `c.propF` that put a hand-held tool's tip on world point (x, y). `pose` overrides the root (e.g. `{ x }`) to solve for where it WILL stand |
+| `aimAlong(c, at, dur, path, { toolLen, stand?, step?, prefer?, lead? })` | sweeps the tool tip along `path(s) -> {x, y}` (s in 0..1): emits chained arm/tool (and `root.x` via `stand(s)`) cues; returns the tip samples `[{ t, x, y }]` to hang sparks, smoke and flares on |
 | `filmHelpers({TIMING, CAPTION})` | returns `{ titleCard, shot, fit }` |
 
 ### 4.3 Character rig (`src/art/prospector.js`)
@@ -291,7 +305,10 @@ Faces (`FACES`): `normal glance shock greed angry plot ko sleep smug cheer sad`;
 `walk()` slides `root` to `toX` while swinging limbs and bobbing; limbs return to rest at the end.
 `noRoot: true` swings limbs without moving the root (for a walk-in-place or when you move root yourself).
 
-Characters shipped: **pip** (short, round, bearded, scruffy) and **rex** (tall, thin, moustache, top hat).
+Characters shipped: **pip** (short, round, bearded, scruffy), **rex** (tall, thin, moustache, top hat) and **thief**
+(lanky, striped shirt, stubble, flat cap; `kind: 'thief'`). The thief also has `goggles: 'up' | 'down'` (welding goggles
+on the cap / over the eyes; swap with `c.goggles(at, 'up' | 'down' | 'off')`) and a `dressed` look, a ridiculous top hat
+and a crooked bow tie (`dressed: true`, or `c.dressUp(at, true)`).
 Look at them all on `dev/sheet.html`.
 
 ### 4.4 Props (`src/art/props.js`)
@@ -320,10 +337,31 @@ All take **absolute** `at`. Catalogue:
 | `zzz({x,y,at,dur})` | snore Zs | fades in place |
 | `dizzy({x,y,at,dur,rx,ry,count})` | orbiting stars | fades in place |
 | `badIdea({x,y,at,dur,scale})` | the horned lightbulb | fades in place |
-| `flash({at,dur,peak})`, `dim({at,dur,peak})` | full-frame white flash / dark dip | hidden |
+| `flash({at,dur,peak})`, `dim({at,dur,peak})` | full-frame white flash / dark dip. **Put them outside the camera group** or a zoomed/panned camera leaves an edge | hidden |
+| `arc({x,y,at,dur,n,r})` | hard strobing welding flare (`n` flickers). Pass it as `torch(id, extra)` and it rides the torch tip | hidden |
+| `popBurst({x,y,at,dur,s})` | jagged balloon-pop burst | hidden |
+| `lightbulb({x,y,at,dur,scale})` | the *good* idea bulb (no horns) | fades in place |
+| `rings({x,y,at,n,gap,dur,r})` | expanding sound rings (a struck bell) | hidden |
 | `rng(seed)` | seeded random for deterministic scatter | – |
 
 `FX_DEFS` is the `<defs>` they paint with (`#g-dust`, `#g-smoke`). Put it in your film's `defs`.
+
+### 4.6 Other shared art (film two)
+
+All grayscale, ink-outlined, drawn around a documented origin; each is on `dev/sheet.html`.
+
+| module | what |
+|---|---|
+| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack` |
+| `art/emerald.js` | `emerald(id, {w,h})` (origin bottom centre; the facets alternate near-white / near-black so it reads as a gem without colour), `plinth`, `stanchion`, `rope`, `placard` |
+| `art/balloons.js` | `balloon(tone, s)`, `bird(id)`, `BalloonCloud` (a cloud of balloons tied to a hub in *its carrier's* frame: `releaseRange`, `stretch`, `pop`, `html`) |
+| `art/heist.js` | `newspaper`, `bubble`, `dealer`, `coin`, `creditPile`, `creditBag` |
+| `art/crowd.js` | `tourist(cues, id, { v, x, y, scale, flip })` -> `{ html, root, bob, head, walk(), awe() }`: one tracked group each, so a queue of 14 stays cheap |
+
+Patterns worth reusing: **reveal** a welded part with a `clipPath: 'inset(0 100% 0 0)' -> 'inset(0 0% 0 0)'` cue on its `<g>` (works on SVG
+groups, deterministic, snaps in reduced motion) or draw a path on with `strokeDashoffset 1 -> 0` (give the path `pathLength="1"` and
+`stroke-dasharray="1 1"`); **follow a path with a tool** with `aimAlong()` and put the arc, sparks and smoke on the returned samples;
+**rig a thing that carries things** (the Emerald with its balloons, rope tail and sling) as one `Track` group so it can rise, squash and fall together.
 
 `card(ctx, lines, opts)` (usually via `titleCard`) draws the black card with a double-rule border and
 reveals each line with a staggered fade/rise (`at(120 + i*380)`). `opts.kind`: `'studio'` (reel emblem),
@@ -513,6 +551,10 @@ sound off. Film 1's reusable devices:
 | sign war | `placed()` signs that pop/sink/fly; same object three times with different outcomes |
 | punchline picture | final wide shot that restates the joke visually (rival on the ore pile with the MINE! flag), then the card |
 | hat reunion | a `hat` Track dropped from off-screen (`hatY: -1500`) lands on a head that doesn't notice |
+| jump-kick that changes nothing (film 2) | crouch (hold it) -> accelerating run (`cubic-bezier(.65,0,.9,.5)`, legs/arms keyed fast) -> one `root` cue arcing to `rot: -84` with `y` raised (feet at the origin = the pivot) -> 1-frame `flash` + `rings` + `pow` while the target shudders (`x` +/- decaying, `sx`) -> a spinning rebound whose `rot` runs a full extra turn, then `set` it back to the equivalent angle before the recovery |
+| escalating load + cascade (film 2) | `BalloonCloud`: tie on 1, 3, 8, 18; `stretch` them, then `pop` in a shuffled order with the gap shrinking (`gap *= .78`, floor 22 ms); the carrier falls on one accelerating `keys` cue |
+| a tool that welds a path (film 2) | `aimAlong()` + a `strokeDashoffset` cue on the kerf over the same duration + `arc` windows inside the torch + sparks/smoke on the returned samples |
+| the squeeze (film 2) | squash the whole load group (`sy: .3`) into the opening, ooze it through, then a `boing`: `sy 1.34 / sx .84 -> .9 / 1.08 -> 1` |
 
 When you need a **new animated device**, build it from `Track` + existing effects first. If it needs a
 new particle or symbol, add a generator in `effects.js` and a `@keyframes` + class in `effects.css`:
@@ -532,7 +574,9 @@ Layers, cheapest first. All of them must pass; the last one is you.
 deterministic; scenes are contiguous and captioned; chapters resolve; every cue is finite and inside the
 film; **every cue target exists in the markup** (a typo is otherwise silent); every `url(#id)` resolves
 (forgot `FX_DEFS`); no `data-t` name is shared between scenes; **every cue starts inside the scene that
-owns its target** (forgot `at()`). `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
+owns its target** (forgot `at()`); **no two cues overlap on the same element property** (rule 11; the approved
+film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the `film1-approved` tag's
+hashes, so a shared-library change that alters the approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
 regression), `defineFilm`, effects and the SSR-safe import. `test/docs.test.mjs` checks that file paths
 and `npm run` commands named in the docs exist.
 
@@ -682,6 +726,16 @@ Notes:
 19. **Don't import across films; don't edit film 1.** `git tag film1-approved` is the reference; the tests plus
     `npm run verify` must stay green for it after any engine change.
 20. **Keep it dependency-free.** No GSAP, no framework, no build step. Anything that needs one belongs in the host.
+21. **Don't overlap cues on a Track** (rule 11). It is the easiest bug to write: `walk()` plus a `bob.to()` in the same
+    window, a `camera.look()` that overlaps a `shake()` (the shake is cut and the camera snaps to the look's pose), two `keys()`
+    on a group that must both end in one cue. Merge them into one cue, move one to another Track, or sequence them.
+    A looping decoration (`iterations`) counts for its whole length.
+22. **Full-frame effects go outside the camera group.** `flash()` / `dim()` are rects at the origin: inside a panned or zoomed
+    `cam.html()` they leave an edge. `return `${cam.html(...)}${flash(...)}``.
+23. **Rotations that turn through more than 180 degrees**: keys interpolate the numbers you give. A spin of -372 deg is a full
+    turn and a bit; afterwards `set()` the equivalent small angle (-12) before animating again, or the next cue unwinds the spin.
+24. **Poses of a cartoon "sit" and "lie" are just rotations about the feet** (the root origin is between the feet): a seated
+    thief is `legF/legB.rot = -90` plus `bob.y = +hip height`; a flying kick is `root.rot = -84` with `y` raised.
 
 ---
 
@@ -702,10 +756,14 @@ const tl = createTimeline(rootEl, { duration, cues, reducedMotion }); // tl.play
 
 // authoring
 import { Track, tween, show } from './src/acting.js';
-import { Camera, driftClouds, idle, fwd, blow, popIn, filmHelpers } from './src/kit.js';
+import { Camera, driftClouds, idle, fwd, blow, popIn, reach, aimAlong, filmHelpers } from './src/kit.js';
 import { prospector } from './src/art/prospector.js';
 import { cutter, mallet, sign, cart, orePile, boulder, ore, placed } from './src/art/props.js';
-import { puff, dust, sparks, chips, drops, rays, speedLines, sparkle, pow, mark, zzz, dizzy, badIdea, flash, dim, rng, FX_DEFS } from './src/fx/effects.js';
+import { puff, dust, sparks, chips, drops, rays, speedLines, sparkle, pow, mark, zzz, dizzy, badIdea, lightbulb, arc, popBurst, rings, flash, dim, rng, FX_DEFS } from './src/fx/effects.js';
+import { torch, fenceRun, booth, signboard, plate } from './src/art/weld.js';
+import { emerald } from './src/art/emerald.js';
+import { BalloonCloud, bird } from './src/art/balloons.js';
+import { tourist } from './src/art/crowd.js';
 ```
 
 Commands: `npm run dev` · `npm test` · `npm run verify` · `npm run pack:check` · `node dev/verify-headless.mjs <film-id>`.

@@ -8,7 +8,19 @@ panel (or any webview) without rewriting anything.
 | Film | Runtime | Status |
 |---|---|---|
 | **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (git tag `film1-approved`) |
-| **Rare or Weld Done?** | – | next; see `NEXT_FILM_HANDOFF.md` |
+| **Rare or Weld Done?** (`rare-or-weld-done`) | 2:33, black-and-white, 16:9 | complete, **awaiting owner approval** (no `film2-approved` tag yet) |
+
+**Watching the films** (after `npm run dev`):
+
+| Film | Open |
+|---|---|
+| That Mines Mine! | <http://127.0.0.1:5173/?film=that-mines-mine> |
+| Rare or Weld Done? | <http://127.0.0.1:5173/?film=rare-or-weld-done> |
+
+Press the big play button (or `Space`). The chapter buttons under the picture jump to the story beats; the picker
+above the picture switches films. Handy extras: `&cc=1` captions, `&t=40000` start paused at 40 s, `&reduced=1`
+reduced motion, `&autoplay=1`. Fullscreen is the `F` key or the control bar. `Home` / `R` restart, `End` skips to the
+final frame. Playback needs a *visible* page (a hidden tab freezes the clock).
 
 **Docs, in reading order**
 
@@ -49,7 +61,7 @@ Demo page URL parameters:
 | `?bare=1` | picture only, edge to edge |
 
 `window.__film` is the player instance (await `window.__filmReady` first in scripts).
-`dev/sheet.html` is an art sheet of every character face, prop and character. `dev/verify.html?film=<id>`
+`dev/sheet.html` is an art sheet of every character face, prop, set piece and crowd member (both films' art). `dev/verify.html?film=<id>`
 is the interactive verification report.
 
 Keyboard (player focused): `Space`/`K` play-pause · `←`/`→` ±5 s · `Home` restart paused · `End` skip to end · `R` restart · `C` captions · `F` fullscreen.
@@ -60,33 +72,40 @@ Keyboard (player focused): `Space`/`K` play-pause · `←`/`→` ±5 s · `Home`
 npm test          # ~0.3 s. node:test, no browser. Runs against EVERY registered film.
 npm run verify    # ~20 s. Real engine in headless Chrome, for every registered film.
 node dev/verify-headless.mjs that-mines-mine      # one film
+npm run shoot -- rare-or-weld-done /tmp/frames/k s-kick+2100 s-plate+7000   # render stills (see dev/shoot.mjs)
 ```
 
 - `npm test` checks each film's structure (every cue target exists in the markup, every cue starts in its
-  own scene, gradients resolve, deterministic `build()`, scenes captioned, chapters valid), the engine's
-  pure parts (`Track`, `defineFilm`, effects), SSR-safe imports, and that the docs name real files/scripts.
+  own scene, no two cues overlap on one element, gradients resolve, deterministic `build()`, scenes captioned,
+  chapters valid), the engine's pure parts (`Track`, `defineFilm`, effects, `reach`/`aimAlong`, balloons, crowd),
+  SSR-safe imports, that the docs name real files/scripts, that **film one still builds exactly as approved**
+  (`test/film1-approved.test.mjs`) and the locked story points of film two (`test/rare-or-weld-done.test.mjs`).
 - `npm run verify` proves the behaviour that matters: seek determinism (same picture however you arrive
   at a time), one scene/face visible at a time, pause freezes *everything* (including film grain), natural
   end/replay/restart, reduced motion, `load()`/`destroy()` leak nothing, and a 375 px phone-width player.
 - Still manual (see the guide, §9.3): looking at it. Seek every scene, read every card, watch on a phone.
+  `npm run shoot` renders any frame so you can check a gag without a browser session.
 
 ## 4. Project structure
 
 ```
 index.html / script.js / styles.css     demo page (not part of the module)
-dev/   serve.mjs  sheet.html  verify.html  verify.js  verify-headless.mjs      dev tools (not shipped)
-test/  films.test.mjs  engine.test.mjs  docs.test.mjs                           node:test suites
+dev/   serve.mjs  sheet.html  shoot.mjs  verify.html  verify.js  verify-headless.mjs   dev tools (not shipped)
+test/  films.test.mjs engine.test.mjs docs.test.mjs film1-approved.test.mjs rare-or-weld-done.test.mjs
 src/                                    THE MODULE (what ships)
   index.js  index.d.ts                  public entry + types
   engine/   timeline.js film.js         the ONE seekable clock · film definition -> markup + cues
   player/   player.js player.css        DOM shell, controls, captions, keyboard, public API
   acting.js                             Track: records poses and emits cues (move / hop / keys)
-  kit.js                                Camera, blow, popIn, idle, driftClouds, filmHelpers
-  fx/       effects.js effects.css film-look.css   particles, impact words, FX_DEFS · grain/vignette/flicker/weave
-  art/      prospector.js props.js cards.js        character rig · props · title cards
+  kit.js                                Camera, blow, popIn, idle, driftClouds, reach/aimAlong (tool IK), filmHelpers
+  fx/       effects.js effects.css film-look.css   particles, impact words, welding arc, FX_DEFS · grain/vignette/flicker/weave
+  art/      prospector.js props.js cards.js        character rig (pip, rex, thief) · props · title cards
+            weld.js emerald.js balloons.js heist.js crowd.js   welding gear + fence/booth/sign · the gem + gallery furniture ·
+                                                              balloons, bird, BalloonCloud · newspaper, dealer, Credits · tourists
   films/
     index.js                            film registry (FILMS, listFilms, loadFilm)
     that-mines-mine/                    config.js index.js world.js scenes/*.js
+    rare-or-weld-done/                  STORY.md config.js index.js world.js scenes/{setup,heist,getaway,sky,finale,yard}.js
     _template/                          minimal working film to copy for a new one
 ```
 

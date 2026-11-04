@@ -56,50 +56,50 @@ export const TIMING = {
   title: 4200,
 
   // 1. the newspaper
-  read: 5200,
-  paper: 5200,
-  plan: 8200,
-  grab: 3200,
+  read: 4800,
+  paper: 4100,
+  plan: 6900,
+  grab: 2700,
 
   // 2. the great heist
-  night: 3000,
-  wall: 7600,
-  arc: 3200,
-  cut: 9800,
-  squeeze: 3800,
-  vault: 7000,
+  night: 3400,
+  wall: 6400,
+  arc: 2600,
+  cut: 8700,
+  squeeze: 3400,
+  vault: 6200,
 
   // 3. the impossible getaway
-  sack: 7000,
-  kickRun: 4200,
-  kick: 6600,
+  sack: 6300,
+  kickRun: 3800,
+  kick: 5500,
 
   // 4. the balloons
-  balloons: 10800,
-  rise: 6400,
-  pop: 6000,
-  crash: 6600,
+  balloons: 9300,
+  rise: 6200,
+  pop: 5700,
+  crash: 5800,
 
   // 5. a brilliant realization
-  despair: 6400,
-  ifIcant: 4200,
+  despair: 5600,
+  ifIcant: 4600,
   illBring: 5000,
 
   // 6. the construction montage
   posts: 3200,
   iron: 3000,
-  gate: 3200,
+  gate: 2900,
   signUp: 3600,
-  ready: 2600,
+  ready: 2300,
 
   // 7. the perfect crime
   morning: 2200,
-  queue: 7600,
+  queue: 6000,
 
   // 8. the punchline
-  reread: 6200,
-  plate: 8200,
-  end: 3600,
+  reread: 6000,
+  plate: 7400,
+  end: 3300,
 };
 
 /** Alt text for captions (shown when CC is on). */

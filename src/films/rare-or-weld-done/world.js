@@ -86,7 +86,7 @@ function stars(seed, n = 70, x0 = -1200, x1 = 2480, y0 = -1500, y1 = 360) {
 }
 
 export function nightSky(id, { moon = [1040, 130] } = {}) {
-  return `<rect x="-3600" y="-2600" width="7600" height="3400" fill="url(#g-night)"/>${stars(9, 90, -3000, 3400, -2400, 360)}
+  return `<rect x="-3600" y="-2600" width="7600" height="3400" fill="url(#g-night)"/>${stars(9, 45, -3000, 3400, -2400, 360)}
     <circle cx="${moon[0]}" cy="${moon[1]}" r="130" fill="url(#g-glow)" opacity=".5"/><circle cx="${moon[0]}" cy="${moon[1]}" r="52" fill="#f2f2f2" ${S} stroke-width="3" stroke="#bbb"/>
     <path d="M${moon[0] - 20} ${moon[1] - 22} a14 14 0 0 1 20 6 M${moon[0] + 10} ${moon[1] + 12} a10 10 0 0 1 12 -4" fill="none" stroke="#bbb" stroke-width="4"/>
     <g data-t="${id}.ringplanet" opacity=".95"><ellipse cx="120" cy="150" rx="52" ry="52" fill="#aaa" ${S} stroke-width="3" stroke="#666"/><ellipse cx="120" cy="150" rx="92" ry="16" fill="none" stroke="#ddd" stroke-width="6" transform="rotate(-18 120 150)"/></g>`;

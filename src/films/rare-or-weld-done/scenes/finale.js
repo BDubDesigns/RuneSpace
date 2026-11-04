@@ -44,31 +44,31 @@ export function despair(ctx) {
   thief.head.to(at(0), 500, { rot: fwd(thief, 26) }, { ease: 'ease-in-out' });
   thief.torso.keys(at(300), 900, [{ o: 0.5, y: 5, rot: fwd(thief, 3) }, { o: 1, y: 0, rot: 0 }], { ease: 'ease-in-out', reduce: 'skip' });
   // --- looks up and out along the road: the far, dim sign says FENCE
-  thief.head.to(at(1000), 300, { rot: 0 });
-  thief.face(at(1000), 'glance');
-  thief.armF.to(at(1000), 300, { rot: -28 });
-  thief.armB.to(at(1000), 300, { rot: -24 });
-  cam.look(at(1300), 900, { x: 1060, y: 330, s: 2.1 }, 'ease-in-out');
-  cam.look(at(3000), 700, { x: 640, y: 380, s: 1.0 }, 'ease-in-out');
+  thief.head.to(at(800), 300, { rot: 0 });
+  thief.face(at(800), 'glance');
+  thief.armF.to(at(800), 300, { rot: -28 });
+  thief.armB.to(at(800), 300, { rot: -24 });
+  cam.look(at(1100), 900, { x: 1060, y: 330, s: 2.1 }, 'ease-in-out');
+  cam.look(at(2500), 700, { x: 640, y: 380, s: 1.0 }, 'ease-in-out');
   // --- looks at his Emerald
-  thief.face(at(3300), 'normal');
-  cam.look(at(3700), 700, { x: 420, y: 420, s: 1.4 }, 'ease-in-out');
+  thief.face(at(2800), 'normal');
+  cam.look(at(3200), 600, { x: 420, y: 420, s: 1.4 }, 'ease-in-out');
   // --- and then at his welding equipment
-  thief.face(at(4400), 'glance');
-  thief.head.to(at(4400), 300, { rot: fwd(thief, 20) });
-  cam.look(at(4400), 700, { x: 900, y: 520, s: 1.7 }, 'ease-in-out');
+  thief.face(at(3800), 'glance');
+  thief.head.to(at(3800), 300, { rot: fwd(thief, 20) });
+  cam.look(at(3800), 700, { x: 900, y: 520, s: 1.7 }, 'ease-in-out');
   // --- a lightbulb
-  thief.head.to(at(5200), 220, { rot: 0 });
-  thief.face(at(5200), 'plot');
-  thief.torso.keys(at(5200), 700, [{ o: 0.5, y: -6 }, { o: 1, y: 0 }], { ease: 'ease-out', reduce: 'skip' });
-  cam.look(at(5100), 700, { x: 790, y: 420, s: 1.25 }, 'ease-in-out');
+  thief.head.to(at(4600), 220, { rot: 0 });
+  thief.face(at(4600), 'plot');
+  thief.torso.keys(at(4600), 700, [{ o: 0.5, y: -6 }, { o: 1, y: 0 }], { ease: 'ease-out', reduce: 'skip' });
+  cam.look(at(4500), 700, { x: 790, y: 420, s: 1.25 }, 'ease-in-out');
   cues.push({ at: at(0), dur: 160, iterations: ctx.dur / 160, target: `${id}.neon`, easing: 'steps(1, end)', keyframes: [{ opacity: 1 }, { opacity: 1, offset: 0.55 }, { opacity: 0.55, offset: 0.56 }, { opacity: 1 }], reduce: 'skip' });
 
   const fx =
-    puff({ x: 830, y: GY - 190, at: at(600), dur: 1100, r: 30, dy: -40, dx: 30, opacity: 0.8 }) +
-    sparkle({ x: 928, y: GY - 6, at: at(4700), dur: 900, r: 26, n: 3, s: 1.2 }) +
-    sparkle({ x: 300, y: 300, at: at(3900), dur: 900, r: 34, n: 3, s: 1.3 }) +
-    lightbulb({ x: 800, y: GY - 300, at: at(5300), dur: 1800, scale: 1.0 });
+    puff({ x: 830, y: GY - 190, at: at(500), dur: 1100, r: 30, dy: -40, dx: 30, opacity: 0.8 }) +
+    sparkle({ x: 928, y: GY - 6, at: at(4100), dur: 900, r: 26, n: 3, s: 1.2 }) +
+    sparkle({ x: 300, y: 300, at: at(3300), dur: 900, r: 34, n: 3, s: 1.3 }) +
+    lightbulb({ x: 800, y: GY - 300, at: at(4700), dur: 1300, scale: 1.0 });
   return cam.html(`${distantRoad(id)}${craterBack(id, cr)}${gem}${craterFront(id, cr)}${cart.html}${tc.html}${thief.html}${fx}`);
 }
 
@@ -311,7 +311,7 @@ const signMarkup = (id) => {
 /** The proprietor, in his booth window: top hat, bow tie, very pleased with himself. */
 const proprietor = (cues, id, extra = {}) => {
   const B = YARD.booth;
-  return prospector(cues, `${id}.thief`, { kind: 'thief', x: B.x, y: B.y - 24, scale: SC, face: 'smug', dressed: true, ...extra });
+  return prospector(cues, `${id}.thief`, { kind: 'thief', x: B.x, y: B.y - 36, scale: SC, face: 'smug', dressed: true, ...extra });
 };
 
 export function queue(ctx) {
@@ -319,8 +319,8 @@ export function queue(ctx) {
   const B = YARD.booth;
   const QY = YARD.queueY;
   const cam = new Camera(cues, id, { x: 900, y: 520, s: 1.3 });
-  cam.look(at(1500), 1000, { x: 1400, y: 470, s: 0.6 }, 'ease-in-out');
-  cam.look(at(3600), 1100, { x: 1000, y: 500, s: 1.2 }, 'ease-in-out');
+  cam.look(at(1200), 900, { x: 1400, y: 470, s: 0.6 }, 'ease-in-out');
+  cam.look(at(3000), 1000, { x: 1000, y: 500, s: 1.2 }, 'ease-in-out');
   const y = yard(cues, id, { day: true, noLight: true });
   const bm = boothMarkup(id);
   const thief = proprietor(cues, id);
@@ -333,7 +333,7 @@ export function queue(ctx) {
   let fx = '';
 
   for (let k = 0; k < 5; k++) {
-    const t = 500 + 1000 * k;
+    const t = 450 + 800 * k;
     // the coin: out of the tourist's hand, up through the window
     const c = placed(cues, `${id}.coin${k}`, coin(1.3), { x: B.x - 14, y: QY - 120, sx: 0, sy: 0 });
     c.track.set(at(t), { sx: 1, sy: 1 });
@@ -357,8 +357,8 @@ export function queue(ctx) {
     // everyone behind shuffles forward
     for (let j = k + 1; j < N; j++) T[j].walk(at(t + 560), 420, T[j].root.p.x - 96, { step: 420, h: 5 });
   }
-  fx += sparkle({ x: 520, y: 260, at: at(2200), dur: 1000, r: 40, n: 3, s: 1.4 }) + sparkle({ x: 640, y: 420, at: at(3600), dur: 1000, r: 34, n: 3, s: 1.3 });
-  fx += puff({ x: 400, y: GY + 30, at: at(1600), dur: 1000, r: 22, dy: -30, opacity: 0.5 });
+  fx += sparkle({ x: 520, y: 260, at: at(1900), dur: 1000, r: 40, n: 3, s: 1.4 }) + sparkle({ x: 640, y: 420, at: at(3000), dur: 1000, r: 34, n: 3, s: 1.3 });
+  fx += puff({ x: 400, y: GY + 30, at: at(1500), dur: 1000, r: 22, dy: -30, opacity: 0.5 });
 
   return cam.html(`${y.before}${IN.map((i) => i.html).join('')}${y.after}${bm.back}${thief.html}${bm.front}${pile.html}${T.map((t) => t.html).join('')}${fx}`);
 }
@@ -383,8 +383,8 @@ export function reread(ctx) {
   const ins = `<g data-t="${id}.ins" style="opacity:0"><rect width="1280" height="720" fill="#f1efe9"/><rect width="1280" height="720" fill="url(#p-paper)" opacity=".6"/>
       <text x="640" y="170" font-size="54" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Georgia, serif" letter-spacing="3">${TEXT.headline[0]}</text>
       <text x="640" y="270" font-size="100" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Georgia, serif" letter-spacing="3">${TEXT.headline[1]}</text>
-      <g transform="translate(640 470) rotate(-2)"><rect x="-470" y="-80" width="940" height="160" rx="6" fill="${INK}"/><text y="38" font-size="108" font-weight="900" text-anchor="middle" fill="#f4f4f4" font-family="Georgia, serif" letter-spacing="5">${TEXT.weekOnly}</text></g>
-      <path data-t="${id}.ring" d="M150 470 C150 360 480 330 760 340 C1060 350 1150 410 1130 480 C1110 570 760 600 500 590 C260 580 120 560 150 470" pathLength="1" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 1" style="stroke-dashoffset:1"/>
+      <g transform="translate(640 470) rotate(-2)"><rect x="-520" y="-80" width="1040" height="160" rx="6" fill="${INK}"/><text y="32" font-size="92" font-weight="900" text-anchor="middle" fill="#f4f4f4" font-family="Georgia, serif" letter-spacing="5">${TEXT.weekOnly}</text></g>
+      <path data-t="${id}.ring" d="M90 470 C90 350 460 320 760 330 C1090 340 1190 410 1170 490 C1150 590 760 620 480 610 C220 600 60 570 90 470" pathLength="1" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 1" style="stroke-dashoffset:1"/>
     </g>`;
 
   // --- he takes out the original newspaper and unfolds it in front of his face
@@ -395,8 +395,9 @@ export function reread(ctx) {
   show(cues, `${id}.np`, at(640), true);
   thief.armF.to(at(900), 250, { rot: -10 });
   paper.track.keys(at(1200), 700, [{ o: 0.3, rot: 2 }, { o: 0.6, rot: -2 }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
-  paper.track.to(at(1900), 300, { y: B.y - 95 }, { ease: 'ease-in-out' }); // lowers it: eyes over the top
+  paper.track.to(at(1900), 340, { x: B.x + 92, y: B.y - 212, rot: 8, sx: 0.2, sy: 0.2 }, { ease: 'ease-in-out' }); // holds it out to one side: now we can see him read
   thief.face(at(1700), 'normal');
+  paper.track.to(at(4750), 320, { y: B.y - 40 }, { ease: 'ease-in-out' }); // lowered out of sight behind the counter: a clear view of that smile
   // --- the insert: the headline's banner
   cues.push({ at: at(2200), dur: 140, target: `${id}.ins`, easing: 'linear', keyframes: [{ opacity: 0 }, { opacity: 1 }] });
   cues.push({ at: at(2300), dur: 800, target: `${id}.ring`, easing: 'ease-in-out', keyframes: [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }] });
@@ -427,8 +428,6 @@ export function plateScene(ctx) {
   const y = yard(cues, id, { day: true, noLight: true });
   const bm = boothMarkup(id);
   const pile = `<g transform="translate(1130 ${B.y + 4})">${creditPile(7, 360, 200)}</g>`;
-  const proprietorBooth = '';
-  void proprietorBooth;
   const TY = S.y + 10;
   const TACKS = [
     { t: 1700, tip: [S.x - 134, S.y - 290], sx: 110 },
@@ -471,6 +470,5 @@ export function plateScene(ctx) {
   const QY = YARD.queueY;
   const T = Array.from({ length: 6 }, (_, j) => tourist(cues, `${id}.t${j}`, { v: j + 1, x: B.x + 96 * (j + 1) + 20, y: QY, scale: 0.88, flip: -1 }));
   const inside = SPOTS_INSIDE.map((x, k) => tourist(cues, `${id}.i${k}`, { v: k, x, y: GY + 52, scale: 0.8, flip: -1 }));
-  const proprietorT = proprietor(cues, id + '.pr');
-  return cam.html(`${y.before}${inside.map((i) => i.html).join('')}${y.after}${signMarkup(id)}${pl.html}${bm.back}${proprietorT.html}${bm.front}${pile}${T.map((t) => t.html).join('')}${thief.html}${fx}`);
+  return cam.html(`${y.before}${inside.map((i) => i.html).join('')}${y.after}${signMarkup(id)}${pl.html}${bm.back}${bm.front}${pile}${T.map((t) => t.html).join('')}${thief.html}${fx}`);
 }

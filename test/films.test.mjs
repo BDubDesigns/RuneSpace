@@ -13,6 +13,10 @@ const KNOWN_OUT_OF_SCENE = {
   'that-mines-mine': new Set(['s-rival.pip.bob@0', 's-finale.rex.bob@0']),
 };
 
+// Films whose Track cues overlap on one element in places. "That Mines Mine!" is approved as it is, so it is left alone;
+// new films get no exceptions (see MOVIE_AUTHORING_GUIDE.md section 11).
+const OVERLAPS_ALLOWED = new Set(['that-mines-mine']);
+
 const dataTargets = (markup) => new Set([...markup.matchAll(/data-t="([^"]+)"/g)].map((m) => m[1]));
 
 test('registry: ids are unique and non-empty', () => {
@@ -128,6 +132,27 @@ for (const entry of FILMS) {
         }
       }
       assert.deepEqual(stray, [], `cues outside their scene; wrap scene-relative times in ctx.at():\n  ${stray.slice(0, 6).join('\n  ')}`);
+    });
+
+    await t.test('no two cues overlap on the same element property (a Track starts every cue from the previous cue\'s END pose, so an overlap makes the picture jump)', (tt) => {
+      if (OVERLAPS_ALLOWED.has(entry.id)) return tt.skip('approved film: see OVERLAPS_ALLOWED');
+      const by = new Map();
+      built.cues.forEach((c, i) => {
+        if (c.target === 'frame') return;
+        const props = new Set();
+        c.keyframes.forEach((k) => Object.keys(k).forEach((p) => !['offset', 'easing', 'composite'].includes(p) && props.add(p)));
+        for (const p of props) {
+          const key = `${c.target}|${p}`;
+          if (!by.has(key)) by.set(key, []);
+          by.get(key).push({ at: c.at, end: c.at + c.dur * (c.iterations || 1), i });
+        }
+      });
+      const clashes = [];
+      for (const [key, arr] of by) {
+        arr.sort((a, b) => a.at - b.at || a.i - b.i);
+        for (let k = 1; k < arr.length; k++) if (arr[k].at < arr[k - 1].end - 2) clashes.push(`${key} [${arr[k - 1].at}-${arr[k - 1].end}] vs [${arr[k].at}-${arr[k].end}]`);
+      }
+      assert.deepEqual(clashes.slice(0, 6), [], `${clashes.length} overlapping cues on one element property (sequence them, or move one to another Track such as torso / head)`);
     });
 
     await t.test('the shell has the frame transition targets the player provides', () => {
