@@ -238,10 +238,11 @@ export function plate(id, w = 440, h = 280, lines = ['OPEN', 'DAILY'], size = 10
 /** A tiny drawstring "SWAG" sack: far too small for a giant Emerald. Origin = the grip at the neck. */
 export function swagSack() {
   return `<g>
-    <path d="M-5 0 Q-30 4 -34 34 Q-32 56 0 58 Q32 56 34 34 Q30 4 5 0Z" fill="#cfcfcf" ${S} stroke-width="4.6"/>
-    <path d="M-14 -4 Q0 -14 14 -4 L8 6 Q0 2 -8 6Z" fill="#9a9a9a" ${S} stroke-width="3.6"/>
-    <path d="M-20 18 Q-24 36 -12 46" fill="none" stroke="#fff" stroke-width="4" opacity=".7" stroke-linecap="round"/>
-    <text y="40" font-size="14" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${STENCIL}" letter-spacing="1">SWAG</text>
+    <path d="M-10 0 Q-46 6 -50 44 Q-48 80 0 82 Q48 80 50 44 Q46 6 10 0Z" fill="#8c8c8c" ${S} stroke-width="4.8"/>
+    <path d="M-22 -6 Q-30 -26 -12 -22 L-6 -4 M22 -6 Q30 -26 12 -22 L6 -4" fill="#6f6f6f" ${S} stroke-width="4"/>
+    <path d="M-13 3 Q0 11 13 3" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><path d="M-13 3 Q0 11 13 3" fill="none" stroke="#d6d6d6" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-30 24 Q-36 44 -26 62" fill="none" stroke="#fff" stroke-width="4" opacity=".6" stroke-linecap="round"/>
+    <g transform="translate(0 46)"><circle r="22" fill="#ececec" ${S} stroke-width="4"/><circle r="16" fill="none" stroke="#777" stroke-width="2"/><path d="M8 -8 A11 11 0 1 0 8 8" fill="none" stroke="${INK}" stroke-width="4.6" stroke-linecap="round"/><path d="M-10 -10 Q-4 -15 3 -13" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>
   </g>`;
 }
 

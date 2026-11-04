@@ -356,7 +356,7 @@ export function crash(ctx) {
 
   // --- the Emerald plummets into the crater, bounces once, settles tilted
   lg.gem.keys(at(0), IMPACT, [{ o: 1, y: GY + 2 }], { ease: 'cubic-bezier(.5,.05,.9,.6)', reduce: 'snap' }); // it lands on bare ground
-  lg.gem.keys(at(IMPACT), 900, [{ o: 0.25, y: GY + 28, rot: 3 }, { o: 0.55, y: GY + 48, rot: -4 }, { o: 1, y: GY + 38, rot: 4 }], { seg: 'ease-out', ease: 'linear', reduce: 'snap' });
+  lg.gem.keys(at(IMPACT), 900, [{ o: 0.25, y: GY + 44, rot: 3 }, { o: 0.55, y: GY + 76, rot: -4 }, { o: 1, y: GY + 66, rot: 4 }], { seg: 'ease-out', ease: 'linear', reduce: 'snap' });
   cam.shake(at(IMPACT), 1300, 26, 40);
   // crater swells
   ['craterB', 'craterF'].forEach((n) => cues.push({ at: at(IMPACT - 1), dur: 1, target: `${id}.${n}`, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' }));
@@ -378,9 +378,10 @@ export function crash(ctx) {
   const OUT = 3800;
   thief.face(at(OUT - 200), 'sad');
   thief.root.to(at(OUT), 1, { flip: -1 }, { ease: 'linear', reduce: 'snap' });
-  thief.walk(at(OUT), 1500, 1275, { stride: 330, amp: 20, bounce: 3, swing: 0 });
-  thief.torso.to(at(OUT), 300, { rot: fwd(thief, 14), y: 6 }, { ease: 'ease-out' });
-  thief.torso.to(at(OUT + 1500), 400, { rot: 0, y: 0 }, { ease: 'ease-in-out' });
+  // stooped and dusty: the whole body leans (the root pivots at the feet), not just the torso
+  thief.walk(at(OUT), 1500, 1275, { stride: 330, amp: 20, bounce: 3, swing: 0, noRoot: true });
+  thief.root.to(at(OUT + 1), 1499, { x: 1275, rot: fwd(thief, 9) }, { ease: 'linear', reduce: 'snap' });
+  thief.root.to(at(OUT + 1500), 400, { rot: 0 }, { ease: 'ease-in-out', reduce: 'snap' });
   // dusts himself off (a hat shake, two pats), then just stares
   thief.hat.keys(at(OUT + 1700), 400, [{ o: 0.3, rot: fwd(thief, 10) }, { o: 0.6, rot: fwd(thief, -8) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
 

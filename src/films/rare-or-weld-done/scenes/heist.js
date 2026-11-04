@@ -11,19 +11,19 @@ import { torch, gasCart, connectHose, dragCart, TORCH_TIP } from '../../../art/w
 import { emerald, plinth, stanchion, rope, placard } from '../../../art/emerald.js';
 import { placed, INK } from '../../../art/props.js';
 import { arc, dust, puff, sparks, mark, pow, rays, drops, flash, sparkle, chips } from '../../../fx/effects.js';
-import { Camera, fwd, aimAlong, idle } from '../../../kit.js';
-import { tween, show } from '../../../acting.js';
-import { museumFront, wallHole, wallClose, galleryFront, GY, WALL } from '../world.js';
+import { Camera, fwd, aimAlong, idle, gripAt } from '../../../kit.js';
+import { tween, show, Track } from '../../../acting.js';
+import { museumFront, wallHole, wallClose, galleryFront, camHeadArt, camBracket, stone, CAMERA, WRECK, GY, WALL } from '../world.js';
 import { TEXT } from '../config.js';
 
 const SC = 0.95;
 const FLOOR = 590; // where the wall meets the plaza (the cut's bottom edge)
 
 /** Searchlight + camera + LED life shared by the night exterior shots. */
-function nightLife(ctx, { sweep = true } = {}) {
+function nightLife(ctx, { sweep = true, period = 2800 } = {}) {
   const { cues, at, id } = ctx;
   if (sweep) {
-    cues.push({ at: at(0), dur: 2800, iterations: ctx.dur / 2800, direction: 'alternate', target: `${id}.sweep`, easing: 'ease-in-out', keyframes: [{ transform: 'rotate(128deg)' }, { transform: 'rotate(160deg)' }], reduce: 'skip' });
+    cues.push({ at: at(0), dur: period, iterations: ctx.dur / period, direction: 'alternate', target: `${id}.sweep`, easing: 'ease-in-out', keyframes: [{ transform: 'rotate(128deg)' }, { transform: 'rotate(160deg)' }], reduce: 'skip' });
   }
   cues.push({ at: at(0), dur: 3000, iterations: ctx.dur / 3000, direction: 'alternate', target: `${id}.camHead`, easing: 'ease-in-out', keyframes: [{ transform: 'rotate(-14deg)' }, { transform: 'rotate(22deg)' }], reduce: 'skip' });
   cues.push({ at: at(0), dur: 700, iterations: ctx.dur / 700, direction: 'alternate', target: `${id}.led`, easing: 'steps(1, end)', keyframes: [{ opacity: 1 }, { opacity: 0.15 }], reduce: 'skip' });
@@ -31,13 +31,28 @@ function nightLife(ctx, { sweep = true } = {}) {
 
 /* ------------------------------------------------------------------ wall */
 
+/** Where the thief stands when the searchlight has him scared (the next shots start here). */
+const SPOT_X = 560;
+/** Where he stands to pick up the rock, and where he stays afterwards. */
+const ROCK_X = 700;
+const STUDY_X = ROCK_X - 70;
+/** The beam's sweep period in `wall` (two sweeps exactly fill it, so `spot` starts with the beam at its first angle). */
+const SWEEP = 2200;
+
+/** The thief in the night exterior, with the torch hanging in his front hand and the gas cart trailing him. */
+function nightThief(ctx, { x, face = 'normal', rock = false } = {}) {
+  const { cues, at, id } = ctx;
+  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x, y: GY, scale: SC, face, goggles: 'up', props: { F: torch(`${id}.tc`), ...(rock ? { B: `<g transform="translate(2 -12)">${stone(1.5)}</g>` } : {}) }, armF: -35 });
+  thief.propF.set(at(0), { rot: -34 });
+  return thief;
+}
+
 export function wall(ctx) {
   const { cues, at, id } = ctx;
   const cam = new Camera(cues, id, { x: 640, y: 380, s: 1.0 });
-  cam.look(at(3600), 2400, { x: 700, y: 400, s: 1.22 }, 'ease-in-out');
-  nightLife(ctx);
-  const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: -170, y: GY, scale: SC, face: 'normal', goggles: 'up', props: { F: torch(`${id}.tc`) }, armF: -35 });
-  thief.propF.set(at(0), { rot: -34 });
+  cam.look(at(2600), 1800, { x: 700, y: 380, s: 1.0 }, 'ease-in-out');
+  nightLife(ctx, { period: SWEEP });
+  const thief = nightThief(ctx, { x: -170 });
 
   // --- tiptoes in from the left
   thief.walk(at(0), 1250, 120, { stride: 420, amp: 14, bounce: 7, swing: 0 });
@@ -55,33 +70,148 @@ export function wall(ctx) {
   thief.vibrate(at(2100), 700, 2.2);
   thief.armB.to(at(2850), 200, { rot: 0 });
   thief.face(at(2850), 'glance');
-  thief.face(at(3150), 'smug');
-  // --- ducks the camera, then sneaks on to the wall
+  // --- ducks the camera, then sneaks on towards the wall (and the light comes round again)
   thief.bob.keys(at(2900), 380, [{ o: 0.3, sy: 0.82, sx: 1.06 }, { o: 0.7, sy: 0.82, sx: 1.06 }, { o: 1, sy: 1, sx: 1 }], { ease: 'ease-in-out' });
-  thief.walk(at(3300), 900, 560, { stride: 400, amp: 14, bounce: 7, swing: 0 });
-  // --- studies the wall, very seriously
-  thief.face(at(4250), 'normal');
-  thief.armB.to(at(4250), 260, { rot: -150 }, { ease: 'ease-out' });
-  thief.head.keys(at(4350), 1200, [{ o: 0.25, rot: fwd(thief, 9) }, { o: 0.5, rot: fwd(thief, -9) }, { o: 0.75, rot: fwd(thief, 7) }, { o: 1, rot: fwd(thief, 0) }], { seg: 'ease-in-out', ease: 'linear' });
-  thief.face(at(4850), 'glance');
-  thief.armF.to(at(5150), 300, { rot: -110 }, { ease: 'ease-out' });
-  thief.propF.to(at(5150), 300, { rot: -6 }, { ease: 'ease-out' });
-  thief.face(at(5500), 'plot');
-  thief.armB.to(at(5500), 240, { rot: 0 });
-  show(cues, `${id}.tc.pilot`, at(5700));
-  thief.goggles(at(5950), 'down');
-  thief.bob.keys(at(5950), 260, [{ o: 0.4, sy: 0.96 }, { o: 1, sy: 1 }], { ease: 'ease-out', reduce: 'skip' });
+  thief.walk(at(3300), 900, SPOT_X, { stride: 400, amp: 14, bounce: 7, swing: 0 });
+  thief.face(at(4200), 'glance');
 
   const fx =
     dust({ x: 100, y: GY + 4, at: at(1200), n: 3, spread: 30, r: 16, dir: -1, seed: 3, dur: 600 }) +
     mark({ x: 180, y: 360, at: at(1400), text: '?', dur: 900, size: 84 }) +
     mark({ x: 520, y: 300, at: at(2060), dur: 1000, size: 90 }) +
-    drops({ x: 560, y: 410, at: at(2150), n: 3, seed: 5, spread: 70 }) +
-    sparkle({ x: 692, y: 540, at: at(5750), dur: 700, r: 18, n: 2, s: 1.2 });
+    drops({ x: 560, y: 410, at: at(2150), n: 3, seed: 5, spread: 70 });
   const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: -400, y: GY });
   dragCart(cues, cart, `${id}.gc.wheel`, thief, at(0), at(ctx.dur), { dist: 240 });
   const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
   return cam.html(`${museumFront(id)}${cart.html}${hs}${thief.html}${fx}`);
+}
+
+/* ------------------------------------------------------------------ spot */
+
+/** A flight path: x runs linearly, y along a parabola `lift` px above the chord. Returns keyframes (offsets 0..1, from the 2nd on). */
+const lob = (a, b, lift, n = 8) => Array.from({ length: n }, (_, i) => {
+  const u = (i + 1) / n;
+  return { o: u, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u - lift * 4 * u * (1 - u) };
+});
+
+/**
+ * He is scared of the searchlight, so he throws a rock at it. The lamp shatters (the beam dies), the rock bounces off it
+ * onto the security camera right below, snaps it off its bracket, and both fall to the ground.
+ */
+export function spot(ctx) {
+  const { cues, at, id } = ctx;
+  const T = { sight: 900, pick: 1800, wind: 2300, throw: 2650, hit: 3350, camHit: 3650, camDrop: 3800, land: 4400 };
+  const cam = new Camera(cues, id, { x: 700, y: 380, s: 1.0 });
+  const thief = nightThief(ctx, { x: SPOT_X, face: 'glance', rock: true });
+  const ROCK = { x: ROCK_X, y: GY - 12 };
+
+  // --- the beam keeps sweeping until the lamp is hit
+  cues.push({ at: at(0), dur: SWEEP, target: `${id}.sweep`, easing: 'ease-in-out', keyframes: [{ transform: 'rotate(128deg)' }, { transform: 'rotate(160deg)' }] });
+  cues.push({ at: at(SWEEP), dur: T.hit - SWEEP, target: `${id}.sweep`, easing: 'ease-in-out', keyframes: [{ transform: 'rotate(160deg)' }, { transform: 'rotate(146deg)' }] });
+  cues.push({ at: at(0), dur: 700, iterations: T.camHit / 700, target: `${id}.led`, easing: 'steps(1, end)', keyframes: [{ opacity: 1 }, { opacity: 0.15 }], direction: 'alternate', reduce: 'skip' });
+  // --- the lamp dies: glass shatters, beam off, and the head droops on its mount
+  const dead = at(T.hit);
+  cues.push({ at: dead, dur: 1, target: `${id}.beam`, keyframes: [{ opacity: 1 }, { opacity: 0 }], easing: 'linear' });
+  cues.push({ at: dead, dur: 1, target: `${id}.lens`, keyframes: [{ opacity: 1 }, { opacity: 0 }], easing: 'linear' });
+  cues.push({ at: dead, dur: 1, target: `${id}.dead`, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' });
+  cues.push({ at: at(T.hit + 40), dur: 900, target: `${id}.sweep`, easing: 'ease-out', keyframes: [{ transform: 'rotate(146deg)' }, { transform: 'rotate(176deg)', offset: 0.35 }, { transform: 'rotate(166deg)', offset: 0.65 }, { transform: 'rotate(172deg)' }], reduce: 'snap' });
+
+  // --- the thief: scared of the beam, spots a rock, picks it up
+  thief.vibrate(at(100), 800, 2.4);
+  thief.head.to(at(150), 300, { rot: fwd(thief, -12) });
+  thief.face(at(0), 'shock');
+  thief.face(at(T.sight), 'glance');
+  thief.head.to(at(T.sight), 250, { rot: fwd(thief, 10) });
+  thief.face(at(T.sight + 350), 'plot');
+  thief.walk(at(T.sight + 150), 450, STUDY_X, { stride: 300, amp: 14, bounce: 4, swing: 0 });
+  thief.bob.to(at(T.pick - 300), 280, { sy: 0.66, sx: 1.08 }, { ease: 'ease-in-out' });
+  thief.armB.to(at(T.pick - 300), 280, { rot: -18 }, { ease: 'ease-in-out' });
+  show(cues, `${id}.rock0`, at(T.pick), false);
+  show(cues, `${id}.thief.propB`, at(T.pick), true);
+  thief.face(at(T.pick), 'smug');
+  thief.bob.to(at(T.pick), 420, { sy: 1, sx: 1 }, { ease: 'ease-out' });
+  // --- the wind-up: weight back, arm back
+  thief.face(at(T.wind), 'angry');
+  thief.armB.to(at(T.wind), 340, { rot: 80 }, { ease: 'ease-in-out' });
+  thief.head.to(at(T.wind), 300, { rot: fwd(thief, -10) });
+  thief.bob.to(at(T.wind), 340, { sy: 0.96, sx: 1.03 }, { ease: 'ease-in-out' });
+  // --- the throw
+  thief.armB.to(at(T.throw), 150, { rot: -125 }, { ease: 'cubic-bezier(.3,0,.6,1)' });
+  thief.bob.keys(at(T.throw), 300, [{ o: 0.4, sy: 1.04, sx: 0.98, y: -6 }, { o: 1, sy: 1, sx: 1, y: 0 }], { ease: 'ease-out' });
+  show(cues, `${id}.thief.propB`, at(T.throw + 90), false);
+  // he follows it with his eyes, then cheers
+  thief.face(at(T.throw + 250), 'glance');
+  thief.face(at(T.hit + 100), 'shock');
+  thief.face(at(T.land), 'cheer');
+  thief.bob.hop(at(T.land), 320, 26);
+  thief.armB.to(at(T.land), 220, { rot: -165 }, { ease: 'ease-out' });
+  thief.armB.to(at(T.land + 900), 280, { rot: 0 }, { ease: 'ease-in-out' });
+  thief.face(at(T.land + 1000), 'plot');
+
+  // --- the rock: from his hand, to the lamp, bounces onto the camera, falls with it
+  const hand = gripAt(thief, cues, at(T.throw + 90), 'B');
+  const LAMP_HIT = { x: 1148, y: 132 };
+  const CAM_TOP = { x: CAMERA.x + 34, y: CAMERA.y - 6 };
+  const rock = new Track(cues, `${id}.rock`, { x: hand.x, y: hand.y, rot: 0 });
+  show(cues, `${id}.rock`, at(T.throw + 90));
+  rock.keys(at(T.throw + 90), T.hit - T.throw - 90, lob(hand, LAMP_HIT, 190).map((k) => ({ ...k, rot: k.o * 500 })), { ease: 'linear', reduce: 'snap' });
+  rock.keys(at(T.hit), T.camHit - T.hit, lob(LAMP_HIT, CAM_TOP, 70, 6).map((k) => ({ ...k, rot: 500 - k.o * 160 })), { ease: 'linear', reduce: 'snap' });
+  // falls with the camera, bounces on the ground, rolls to rest
+  const RS = { x: WRECK.rock.x, y: WRECK.rock.y };
+  rock.keys(at(T.camDrop), T.land - T.camDrop, [{ o: 0.6, x: CAM_TOP.x + 30, y: CAM_TOP.y + 150, rot: 380, ease: 'ease-in' }, { o: 1, x: CAM_TOP.x + 60, y: GY + 2, rot: 440, ease: 'ease-in' }], { ease: 'ease-in', reduce: 'snap' });
+  rock.keys(at(T.land), 520, [{ o: 0.4, x: CAM_TOP.x + 80, y: GY - 46, rot: 520 }, { o: 0.75, x: RS.x - 14, y: GY + 2, rot: 600 }, { o: 1, x: RS.x, y: RS.y, rot: 640 }], { seg: 'ease-out', ease: 'linear', reduce: 'snap' });
+
+  // --- the camera: knocked off its bracket, it tips, falls, bounces and lands on its side
+  const camT = new Track(cues, `${id}.camFall`, { x: CAMERA.x, y: CAMERA.y, rot: 0 });
+  camT.keys(at(T.camHit), T.camDrop - T.camHit, [{ o: 0.5, x: CAMERA.x + 8, y: CAMERA.y + 4, rot: 14 }, { o: 1, x: CAMERA.x + 14, y: CAMERA.y + 14, rot: 24 }], { ease: 'ease-out', reduce: 'snap' });
+  camT.keys(at(T.camDrop), T.land - T.camDrop, [{ o: 1, x: WRECK.cam.x - 44, y: GY - 22, rot: 70 }], { ease: 'cubic-bezier(.5,.05,.9,.6)', reduce: 'snap' });
+  camT.keys(at(T.land), 560, [{ o: 0.35, x: WRECK.cam.x - 30, y: GY - 62, rot: 84 }, { o: 0.7, x: WRECK.cam.x - 4, y: WRECK.cam.y, rot: 100 }, { o: 1, x: WRECK.cam.x, y: WRECK.cam.y, rot: WRECK.cam.rot }], { seg: 'ease-out', ease: 'linear', reduce: 'snap' });
+  cues.push({ at: at(T.camHit), dur: 1, target: `${id}.led`, keyframes: [{ fill: '#fff' }, { fill: '#444' }], easing: 'linear' });
+  cam.shake(at(T.land), 360, 5, 40);
+
+  const fx =
+    puff({ x: 640, y: GY - 6, at: at(T.sight + 600), dur: 500, r: 16, dy: -12, dx: -20 }) +
+    chips({ x: LAMP_HIT.x, y: LAMP_HIT.y, at: at(T.hit), n: 12, power: 220, seed: 31, fill: '#fff', size: 1.1, dur: 900, angle: Math.PI * 0.5, spread: 3.2 }) +
+    pow({ x: 1120, y: 70, at: at(T.hit + 20), text: 'CRASH!', scale: 0.7, rot: -8, font: 58, dur: 800 }) +
+    sparks({ x: LAMP_HIT.x, y: LAMP_HIT.y, at: at(T.hit + 60), n: 10, power: 150, angle: Math.PI / 2, spread: 3, seed: 32, size: 1, dur: 700 }) +
+    puff({ x: LAMP_HIT.x - 10, y: LAMP_HIT.y - 16, at: at(T.hit + 200), dur: 1500, r: 22, dy: -60, dx: 14, fill: 'url(#g-smoke)' }) +
+    sparks({ x: CAMERA.x, y: CAMERA.y - 4, at: at(T.camHit), n: 12, power: 170, angle: Math.PI / 2, spread: 3, seed: 33, size: 1.1, dur: 700 }) +
+    pow({ x: 1090, y: 330, at: at(T.land + 20), text: 'CLUNK!', scale: 0.62, rot: 7, font: 54, dur: 800 }) +
+    dust({ x: WRECK.cam.x, y: GY + 4, at: at(T.land), n: 5, spread: 70, r: 20, dir: 0, seed: 34, dur: 800 }) +
+    mark({ x: SPOT_X, y: 330, at: at(60), dur: 700, size: 78 });
+
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: SPOT_X - 240, y: GY });
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  const camFall = `<g data-t="${id}.camFall" style="${camT.css}">${camHeadArt(`${id}.led`)}</g>`;
+  const rockHtml = `<g data-t="${id}.rock0" transform="translate(${ROCK.x} ${ROCK.y})">${stone(1)}</g><g data-t="${id}.rock" style="${rock.css};opacity:0">${stone(1)}</g>`;
+  // the lamp and beam come with the wall; the camera's bracket stays, its body (camFall) is separate so it can drop off
+  const mount = `<g transform="translate(${CAMERA.x} ${CAMERA.y})">${camBracket()}</g>`;
+  return `${cam.html(`${museumFront(id, { cam: false })}${mount}${camFall}${cart.html}${hs}${rockHtml}${thief.html}${fx}`)}${flash({ at: at(T.hit), dur: 160, peak: 0.5 })}`;
+}
+
+/* ------------------------------------------------------------------ study */
+
+/** After the gag: he studies the wall, very seriously, and pulls the goggles down. */
+export function study(ctx) {
+  const { cues, at, id } = ctx;
+  const cam = new Camera(cues, id, { x: 700, y: 380, s: 1.0 });
+  cam.look(at(1000), 1300, { x: 700, y: 400, s: 1.22 }, 'ease-in-out');
+  const thief = nightThief(ctx, { x: STUDY_X, face: 'plot' });
+  thief.face(at(200), 'normal');
+  thief.armB.to(at(350), 260, { rot: -150 }, { ease: 'ease-out' });
+  thief.head.keys(at(450), 1100, [{ o: 0.25, rot: fwd(thief, 9) }, { o: 0.5, rot: fwd(thief, -9) }, { o: 0.75, rot: fwd(thief, 7) }, { o: 1, rot: fwd(thief, 0) }], { seg: 'ease-in-out', ease: 'linear' });
+  thief.face(at(950), 'glance');
+  thief.armF.to(at(1250), 300, { rot: -110 }, { ease: 'ease-out' });
+  thief.propF.to(at(1250), 300, { rot: -6 }, { ease: 'ease-out' });
+  thief.face(at(1600), 'plot');
+  thief.armB.to(at(1600), 240, { rot: 0 });
+  show(cues, `${id}.tc.pilot`, at(1800));
+  thief.goggles(at(2050), 'down');
+  thief.bob.keys(at(2050), 260, [{ o: 0.4, sy: 0.96 }, { o: 1, sy: 1 }], { ease: 'ease-out', reduce: 'skip' });
+  const fx = sparkle({ x: 692, y: 540, at: at(1850), dur: 700, r: 18, n: 2, s: 1.2 });
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: STUDY_X - 240, y: GY });
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  return cam.html(`${museumFront(id, { light: 'broken', cam: 'broken' })}${cart.html}${hs}${thief.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ arc */
@@ -290,7 +420,7 @@ export function cut(ctx) {
 
   const hs = connectHose(cues, `${id}.hose`, { thief, tank: tank.track, t0: at(0), t1: at(ctx.dur), len: 400 });
   cues.push({ at: at(PUSH - 40), dur: 1, target: `${id}.hole`, keyframes: [{ opacity: 0 }, { opacity: 1 }], easing: 'linear' });
-  return `${cam.html(`${museumFront(id)}<g data-t="${id}.hole">${wallHole()}</g>${slab.html}<g>${line}</g>${tank.html}${hs}${bootSeam}${thief.html}${fx}`)}${flash({ at: at(FALL), dur: 160, peak: 0.45 })}`;
+  return `${cam.html(`${museumFront(id, { light: 'broken', cam: 'broken' })}<g data-t="${id}.hole">${wallHole()}</g>${slab.html}<g>${line}</g>${tank.html}${hs}${bootSeam}${thief.html}${fx}`)}${flash({ at: at(FALL), dur: 160, peak: 0.45 })}`;
 }
 
 /* ------------------------------------------------------------------ squeeze */
@@ -330,7 +460,7 @@ export function squeeze(ctx) {
     puff({ x: 740, y: FLOOR - 6, at: at(2730), dur: 1000, r: 32, dy: -40, dx: 30 }) +
     dust({ x: 700, y: GY + 4, at: at(1500), n: 3, spread: 30, r: 16, dir: -1, seed: 8, dur: 500 });
   const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
-  return cam.html(`${museumFront(id, { hole: true })}${cart.html}${hs}${thief.html}${dark.html}${fx}`);
+  return cam.html(`${museumFront(id, { hole: true, light: 'broken', cam: 'broken' })}${cart.html}${hs}${thief.html}${dark.html}${fx}`);
 }
 
 /* ------------------------------------------------------------------ vault */

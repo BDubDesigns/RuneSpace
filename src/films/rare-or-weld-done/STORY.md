@@ -39,7 +39,8 @@ locked title-card wording without asking. (Implementation notes at the bottom.)
    outside, still far too heavy to take to his fence.
 5. **A brilliant realization.** He sits in despair beside the Emerald. Looks toward the distant route to the fence.
    Looks at the Emerald. Looks at his welding equipment. A lightbulb. Cards (wording locked):
-   `"IF I CAN'T BRING THE EMERALD TO A FENCE..."` then `"I'LL BRING THE FENCE TO THE EMERALD!"` with room to land.
+   `"IF I CAN'T BRING THE EMERALD TO A FENCE..."` then `"I'LL BRING A FENCE TO THE EMERALD!"` with room to land.
+   (Owner review change: the second card originally read "I'LL BRING THE FENCE ..."; it now reads "A FENCE".)
 6. **The construction montage.** Over-the-top welding: fence panels, decorative ironwork, a gate, a ticket booth, a large
    admission sign. He is a much better welder than thief.
 7. **The perfect crime.** Morning. A long line of tourists. The thief, in a ridiculous top hat and crooked bow tie,

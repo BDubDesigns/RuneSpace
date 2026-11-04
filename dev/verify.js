@@ -201,6 +201,38 @@ export async function runChecks(filmId, { onProgress = () => {} } = {}) {
     return `${dt.toFixed(0)} ms film / ${wall.toFixed(0)} ms wall`;
   });
 
+  await check('no effect is lost after real playback mixed with scrubbing, chapter jumps, skip and replay (needs a visible page)', async () => {
+    if (!live) return 'skipped: page hidden';
+    // The iris / fade `frame` cues, the film-look overlays and the CSS effects must come back after any sequence of controls.
+    // Watch a little, jump around WHILE playing, skip to the end, replay, then every sample frame must equal its first viewing.
+    player.seek(0);
+    player.play();
+    await sleep(500);
+    for (const f of [0.55, 0.2, 0.8, 0.1]) {
+      player.seek(player.duration * f);
+      await sleep(180);
+    }
+    for (const c of player.chapters) {
+      player.seek(c.at);
+      await sleep(40);
+    }
+    player.skip();
+    await sleep(100);
+    player.restart();
+    await sleep(400);
+    player.pause();
+    const bad = times.filter((t) => fpAt(t) !== forward.get(t));
+    assert(bad.length === 0, `picture differs from the first viewing at: ${bad.slice(0, 6).join(', ')} ms`);
+    const look = [...stage.querySelectorAll('.mm-look *')].flatMap((e) => e.getAnimations());
+    assert(look.length > 0, 'the film-look overlay animations are gone');
+    player.play();
+    await sleep(150);
+    const lookRunning = look.filter((a) => a.playState === 'running').length;
+    player.pause();
+    assert(lookRunning === look.length, `only ${lookRunning} of ${look.length} film-look animations run after the controls were used`);
+    return `${times.length} frames match; ${look.length} overlay animations alive`;
+  });
+
   await check('natural end, replay, and restart return to identical frames (needs a visible page)', async () => {
     if (!live) return 'skipped: page hidden';
     const ref = fpAt(Math.min(10000, player.duration / 2));

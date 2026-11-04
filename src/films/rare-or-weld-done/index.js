@@ -47,6 +47,8 @@ export default defineFilm({
     // --- 2. the great heist
     titleCard('night', TEXT.night),
     shot('wall', heist.wall, { in: 'iris', irisIn: [10, 70] }),
+    shot('spot', heist.spot),
+    shot('study', heist.study),
     shot('arc', heist.arcShot),
     shot('cut', heist.cut),
     shot('squeeze', heist.squeeze),

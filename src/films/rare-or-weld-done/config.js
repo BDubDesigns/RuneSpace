@@ -29,9 +29,9 @@ export const TEXT = {
   title: ['RARE OR', 'WELD DONE?'],
   subtitle: 'A HEIST IN ONE REEL',
   night: ['THAT NIGHT, AT THE', NAMES.museum + '...'],
-  // locked wording: do not edit without the project owner
+  // locked wording: do not edit without the project owner (the owner changed THE FENCE to A FENCE in review)
   ifIcant: ["IF I CAN'T BRING THE EMERALD", 'TO A FENCE...'],
-  illBring: ["I'LL BRING THE FENCE", 'TO THE EMERALD!'],
+  illBring: ["I'LL BRING A FENCE", 'TO THE EMERALD!'],
   morning: ['THE NEXT MORNING...'],
   end: ['THE END'],
 
@@ -42,6 +42,9 @@ export const TEXT = {
   weekOnly: 'ONE WEEK ONLY!',
   fence: 'FENCE',
   museumSign: NAMES.museum,
+  wanted: 'WANTED',
+  reward: ['500 CREDITS', 'REWARD'],
+  rewardFor: 'FOR CAPTURE',
   placard: [nameTop, nameLast],
   /** the admission sign, top to bottom */
   sign: [nameTop, nameLast, ...priceLines],
@@ -63,14 +66,16 @@ export const TIMING = {
 
   // 2. the great heist
   night: 3400,
-  wall: 6400,
+  wall: 4400,
+  spot: 5700,
+  study: 2300,
   arc: 2600,
   cut: 8700,
   squeeze: 3400,
   vault: 6200,
 
   // 3. the impossible getaway
-  sack: 3900,
+  sack: 6300,
   push: 3700,
   shoulder: 3200,
   ropeTry: 4100,
@@ -114,12 +119,14 @@ export const CAPTION = {
   plan: 'He gets an idea. In a thought bubble a shady dealer labelled FENCE trades a mountain of Credits for the Emerald.',
   grab: 'He grins, grabs his welding gear and rushes out.',
   night: `That night, at the ${NAMES.museum}...`,
-  wall: 'At night the thief studies the museum wall and its searchlight and security camera. He ignores the ordinary door.',
+  wall: 'At night the thief sneaks past the ordinary door, ducks a searchlight and a security camera, and creeps on towards the wall.',
+  spot: 'Scared of the searchlight, he throws a rock at it. The lamp shatters, the rock bounces onto the security camera below and knocks it off its bracket; both crash to the ground.',
+  study: 'He studies the wall very seriously, then lowers his goggles.',
   arc: '[Close-up: goggles down. The torch ignites. Blinding arc.]',
   cut: 'He cuts a doorway through the wall: sparks, smoke, a heavy gas tank that bumps him, and an accidental boot-to-floor weld. The cut-out slab drops.',
   squeeze: 'He sucks in his gut, turns sideways and squeezes through the hole.',
   vault: 'He squeezes through and finds the Emerald, far bigger than he expected.',
-  sack: 'Attempt one: a tiny sack, obviously too small for the Emerald.',
+  sack: 'Attempt one: a bank bag. He stretches it to double its size trying to stuff the Emerald in, but it will not fit and snaps back.',
   push: 'Attempt two: he puts both hands on it and pushes. It does not move.',
   shoulder: 'Attempt three: a running shoulder charge. The Emerald does not budge.',
   ropeTry: 'Attempt four: a rope. He heaves, the rope snaps, and he lands in a heap.',
@@ -131,7 +138,7 @@ export const CAPTION = {
   crash: 'The Emerald plummets into a crater. The dusty thief crawls out. It is outside, but still far too heavy.',
   despair: 'In despair he looks down the long road to the fence, at the Emerald, at his torch. A lightbulb.',
   ifIcant: "If I can't bring the Emerald to a fence...",
-  illBring: "I'll bring the fence to the Emerald!",
+  illBring: "I'll bring a fence to the Emerald!",
   posts: 'A welding montage: fence posts and rails go up in a shower of sparks.',
   iron: '[Close-up: decorative ironwork scrolls into being.]',
   gate: 'A gate and a ticket booth are welded together.',
@@ -140,6 +147,6 @@ export const CAPTION = {
   morning: 'The next morning...',
   queue: `A long line of tourists pays to see the Emerald. The thief, in a top hat and bow tie, collects a growing pile of Credits.`,
   reread: 'He rereads the newspaper: ONE WEEK ONLY! He looks at the paper, his attraction and his sign, and smiles.',
-  plate: 'He carefully welds a new plate over the sign. It now reads: OPEN DAILY.',
+  plate: 'He carefully welds a new plate onto the right-hand side of the sign. It reads: OPEN DAILY.',
   end: 'The End.',
 };

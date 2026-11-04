@@ -18,7 +18,7 @@ Last updated at the end of the "build film two" session (git: see `git log`).
 - **Film 1, "That Mines Mine!": complete and approved.** 1:43. Git tag `film1-approved`. Its `build()` output is pinned
   by `test/film1-approved.test.mjs` (hashes recorded from that tag), so a change to shared code that alters it fails `npm test`.
 - **Film 2, "Rare or Weld Done?": built, tested and reviewed frame by frame; awaiting the owner's approval.**
-  about 2:46 (166 s), 35 scenes (28 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
+  about 2:55 (175 s), 37 scenes (30 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
   tag yet: create it only after the owner approves** (`git tag film2-approved`). Nothing has been pushed anywhere; there is no remote.
 - Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, hidden `template`. Demo page: `?film=<id>`.
 
@@ -45,6 +45,8 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 
 1. Hoses (valve to hand via `connectHose` / `dragCart`), real contact in the attempts (four iris-cut shots `sack`, `push`, `shoulder`, `ropeTry`), crater and wall hole only after their cause, slower beats.
 2. The `rise` scene: palms stay on the Emerald's face for the whole push (thief x = Emerald x minus a gap derived with `gripAt`; the lean is a whole-body root rotation, not torso-only). The museum's wall slab now ends at the roof instead of towering over the bird, and the roof lip runs the full width of the gallery.
+3. Owner review round three: wanted poster (his photo, 500 CREDITS REWARD FOR CAPTURE) and the gear on a shelf; a new `spot` shot (rock breaks the searchlight, bounces onto the camera, both fall) between `wall` and the new `study` shot, with `museumFront`'s `light`/`cam` accepting `'broken'` for every later night shot and the yard; sparse, varied gallery pictures (planets, ships, galaxies); a bank bag with the Credits mark that the thief stretches to 2x and cannot stuff the Emerald into; the Emerald sunk deeper into the crater (crash, despair, yard); a whole-body stoop instead of the torso-only one in `crash`; standing in `despair`; card 2 now reads "I'LL BRING A FENCE" (the owner changed the locked wording); `iron` is just the torch running along the rail with sparks (nothing drawn); the paper's back faces the camera in `reread`; the OPEN DAILY plate is welded on the right-hand side of the sign, not over all of it. `gripAt(c, cues, t, 'B')` gives the back hand.
+4. "Effects vanish after using the controls" was reported once and did not reproduce; `npm run verify` now has a check for it and the guide (3.4) says how to investigate.
 
 ## 2. What was verified (and how)
 
@@ -94,7 +96,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
   where `at(0)` was meant. `test/films.test.mjs` allow-lists exactly those two cues; delete the entry if you fix them (that
   changes film 1's picture subtly: it needs re-approval and new hashes in `test/film1-approved.test.mjs`). Film 1 also has
   43 overlapping Track cues; `OVERLAPS_ALLOWED` in `films.test.mjs` exempts it. New films get no exceptions.
-- **Film 2 runtime is about 2:46** after the continuity pass (the owner found the action too fast in places, so the squeeze, lift-off, posts, thought bubble and the failed-attempts montage were slowed; the text cards were left alone), past the "about 2 minutes, up to roughly 2:30" target. Card timings follow the
+- **Film 2 runtime is about 2:55** after the second review round (the owner asked for a new scene and a longer bag gag; 2:46 before that) and the continuity pass (the owner found the action too fast in places, so the squeeze, lift-off, posts, thought bubble and the failed-attempts montage were slowed; the text cards were left alone), past the "about 2 minutes, up to roughly 2:30" target. Card timings follow the
   ~1 s + 0.4 s/word rule (film 1's lesson) and were not shortened; the trims were all in holds and in the long walks. The
   places to cut more, if the owner wants it, are non-text holds (`balloons`, `cut`, `vault`), not the slowed actions.
 - **Performance.** Film 2 keeps ~2,400 Web Animations alive (film 1: ~1,340). In headless Chrome with *software* rendering

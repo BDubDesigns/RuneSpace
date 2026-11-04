@@ -193,6 +193,23 @@ removed animation can never be seeked back to, which made eyes and a whole chara
 seek. `compile()` calls `a.persist()` on every cue animation to prevent that. **Do not persist the
 adopted CSS animations** (it broke the reduced-motion rebuild).
 
+#### If effects (the iris, the overlays, grain, an effect or two) seem to vanish after seeking, replaying or skipping
+
+Reported once by the owner while reviewing film two ("effects disappear after I use the controls"); it did **not** reproduce
+afterwards (headless Chrome and the desktop app's browser, a full real-time watch followed by scrubbing, chapter jumps, skip
+and replay all gave frame-for-frame identical pictures), so treat it as a transient (most likely a stale page left open while
+files were being edited: reload first). If you ever see it again, do not guess, measure:
+
+1. Reload the page and retry. A page that loaded while a module was mid-edit can be half old, half new.
+2. `npm run verify` has a check named *"no effect is lost after real playback mixed with scrubbing, chapter jumps, skip and
+   replay"*: it must pass. If it fails it names the sample times whose picture differs.
+3. Compare computed styles of every element in `.mm-stage` before and after the controls (that is all the check does). The
+   known mechanisms that cause exactly this symptom are the two traps in 3.3 and 3.4: an animation that was **removed** by
+   the browser (do not remove `persist()`), and a CSS effect that is **not on the clock** (a visible 0% keyframe needs
+   `.fx-late`, see `fx-late` in `effects.css`).
+4. `getAnimations()` omits finished animations that have no fill, so a lower count after skipping to the end is normal;
+   compare computed styles, not counts.
+
 ### 3.4 Effects on the same clock
 
 `.fx` elements (`effects.css`) set `animation-delay: calc(var(--at) * 1ms)`,
@@ -279,7 +296,7 @@ return cam.html(`${back}${actors}${fx}`) // everything inside moves with the cam
 | `blow(c, t, up, dn)` | overhead mallet blow; returns the impact time. Character must hold a mallet in `propF`/front hand |
 | `popIn(sign, at, x, y)` | a placed prop pops into existence with overshoot |
 | `reach(c, x, y, toolLen, prefer?, pose?)` | two-link IK: `{ arm, prop }` rotations for `c.armF` / `c.propF` that put a hand-held tool's tip on world point (x, y). `pose` overrides the root (e.g. `{ x }`) to solve for where it WILL stand |
-| `poseAt(cues, target, t, initial)` / `gripAt(c, cues, t)` | replay a Track's cues to recover its pose (or a character's front-hand position) at film time `t`: use them to anchor a hose, rope or contact point to a moving hand instead of guessing numbers |
+| `poseAt(cues, target, t, initial)` / `gripAt(c, cues, t, hand = 'F')` | replay a Track's cues to recover its pose (or a character's front- (`'F'`) or back-hand (`'B'`) position) at film time `t`: use them to anchor a hose, rope or contact point to a moving hand instead of guessing numbers |
 | `aimAlong(c, at, dur, path, { toolLen, stand?, step?, prefer?, lead? })` | sweeps the tool tip along `path(s) -> {x, y}` (s in 0..1): emits chained arm/tool (and `root.x` via `stand(s)`) cues; returns the tip samples `[{ t, x, y }]` to hang sparks, smoke and flares on |
 | `filmHelpers({TIMING, CAPTION})` | returns `{ titleCard, shot, fit }` |
 

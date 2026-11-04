@@ -227,14 +227,15 @@ export function poseAt(cues, target, t, initial = null) {
   return pose;
 }
 
-/** World position of a prospector character's front hand (where a held tool's grip sits) at film time `t`. */
-export function gripAt(c, cues, t) {
+/** World position of a prospector character's front hand (`hand` 'F', where a held tool's grip sits) or back hand ('B') at film time `t`. */
+export function gripAt(c, cues, t, hand = 'F') {
   const k = c.dims;
+  const track = hand === 'B' ? c.armB : c.armF;
   const root = poseAt(cues, c.root.target, t, c.root.p0);
   const bob = poseAt(cues, c.bob.target, t, c.bob.p0) || { y: 0 };
-  const arm = poseAt(cues, c.armF.target, t, c.armF.p0);
+  const arm = poseAt(cues, track.target, t, track.p0);
   const a = (arm.rot * Math.PI) / 180;
-  const lx = k.sh - k.armL * Math.sin(a);
+  const lx = (hand === 'B' ? -k.sh : k.sh) - k.armL * Math.sin(a);
   const ly = -k.L - k.T + k.shY + bob.y + k.armL * Math.cos(a);
   const th = (root.rot * Math.PI) / 180;
   const sx = lx * root.sx;

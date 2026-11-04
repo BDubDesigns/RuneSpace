@@ -48,7 +48,7 @@ export function yard(cues, id, st = {}) {
   const gem = `<g transform="translate(${em.x} ${em.y}) rotate(${em.tilt}) scale(${em.s})">${emerald(`${id}.em`, { w: 300, h: 360 })}</g>`;
   const cr = { x: YARD.crater.x, y: YARD.crater.y, rx: YARD.crater.rx, ry: YARD.crater.ry, day };
 
-  const wall = museumFront(id, { hole: true, day, light: !st.noLight, cam: true });
+  const wall = museumFront(id, { hole: true, day, light: st.noLight ? false : 'broken', cam: 'broken' });
   const before = `${wall}${runs.bk.html}${BACK_POSTS.map((i) => posts[i].html).join('')}${craterBack(id, cr)}${gem}${craterFront(id, cr)}${runs.lw.html}${runs.rw.html}${WING_POSTS.map((i) => posts[i].html).join('')}`;
   const after = `${runs.fl.html}${runs.fr.html}${FRONT_POSTS.map((i) => posts[i].html).join('')}${gateHtml}`;
 

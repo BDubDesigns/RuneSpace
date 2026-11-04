@@ -48,7 +48,7 @@ export const YARD = {
     bk: { a: [320, GY - 12], b: [720, GY - 12], ha: 170, n: 10 },
   },
   crater: { x: 520, y: GY + 6, rx: 250, ry: 44 },
-  gem: { x: 520, y: GY + 34, s: 1.4, tilt: 4 },
+  gem: { x: 520, y: GY + 64, s: 1.4, tilt: 4 },
   booth: { x: 930, y: GY + 112, s: 1.25 },
   sign: { x: 190, y: GY + 140, w: 360, h: 330 },
   queueY: GY + 132,
@@ -151,21 +151,51 @@ function rivets(x0, y, x1, step = 46) {
 }
 
 /** Security camera on a bracket. Head rotates about its mount: target `${id}.camHead`; LED `${id}.led`. */
-export function securityCam(id, x, y) {
-  return `<g transform="translate(${x} ${y})">
-    <path d="M0 -36 L0 0 L-34 0" fill="none" ${S} stroke-width="12"/><path d="M0 -36 L0 0 L-34 0" fill="none" stroke="#999" stroke-width="5"/>
-    <g data-t="${id}.camHead"><g transform="translate(-6 0)">
+export const camBracket = () => `<path d="M0 -36 L0 0 L-34 0" fill="none" ${S} stroke-width="12"/><path d="M0 -36 L0 0 L-34 0" fill="none" stroke="#999" stroke-width="5"/>`;
+
+/** The camera body (origin = its mount point). `led` = the blinking light's data-t, or none. */
+export function camHeadArt(led, { smashed = false } = {}) {
+  return `<g transform="translate(-6 0)">
       <rect x="-14" y="-4" width="74" height="40" rx="8" fill="#cfcfcf" ${S} stroke-width="5"/>
-      <rect x="52" y="2" width="18" height="28" rx="3" fill="#2a2a2a" ${S} stroke-width="4"/><circle cx="62" cy="16" r="8" fill="#555" ${S} stroke-width="3"/><circle cx="60" cy="13" r="2.6" fill="#fff"/>
-      <circle data-t="${id}.led" cx="2" cy="8" r="5" fill="#fff" ${S} stroke-width="2.4"/>
-    </g></g>
+      <rect x="52" y="2" width="18" height="28" rx="3" fill="#2a2a2a" ${S} stroke-width="4"/><circle cx="62" cy="16" r="8" fill="#555" ${S} stroke-width="3"/>${smashed ? `<path d="M56 6 L66 18 L58 28 M66 18 L72 16" fill="none" stroke="#fff" stroke-width="2.4"/>` : `<circle cx="60" cy="13" r="2.6" fill="#fff"/>`}
+      <circle ${led ? `data-t="${led}"` : ''} cx="2" cy="8" r="5" fill="${smashed ? '#444' : '#fff'}" ${S} stroke-width="2.4"/>
+    </g>`;
+}
+
+export function securityCam(id, x, y) {
+  return `<g transform="translate(${x} ${y})">${camBracket()}
+    <g data-t="${id}.camHead">${camHeadArt(`${id}.led`)}</g>
   </g>`;
 }
 
+/** A small rock. Origin = its centre. */
+export const stone = (s = 1) => `<g transform="scale(${s})"><path d="M-17 7 Q-20 -8 -6 -14 Q8 -18 16 -8 Q21 4 12 11 Q-4 15 -17 7Z" fill="#8a8a8a" ${S} stroke-width="4.2"/><path d="M-8 -7 Q0 -12 8 -8" fill="none" stroke="#d0d0d0" stroke-width="3" stroke-linecap="round"/><path d="M4 0 l5 5" stroke="${INK}" stroke-width="2.4"/></g>`;
+
+/** Where the searchlight and its camera hang on the wall (the camera is right below the lamp). */
+export const LAMP = { x: 1180, y: 110 };
+export const CAMERA = { x: 1180, y: 214 };
+/** Where the smashed camera and the rock end up on the ground after the rock gag. */
+export const WRECK = { cam: { x: 1236, y: GY + 4, rot: 96 }, rock: { x: 1292, y: GY + 2 } };
+
+/** The aftermath on the wall: a snapped bracket and a dead, drooping lamp. */
+function brokenCam() {
+  return `<g transform="translate(${CAMERA.x} ${CAMERA.y})">${camBracket()}<path d="M-4 -2 l10 8 l-4 6 l8 6" fill="none" stroke="${INK}" stroke-width="3.6"/><path d="M0 0 Q18 22 6 50 Q0 66 12 80" fill="none" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/></g>`;
+}
+function brokenLamp() {
+  return `<g transform="translate(${LAMP.x} ${LAMP.y})"><g style="transform:rotate(172deg)">${lampBody()}${lampDead()}</g></g>`;
+}
+function wreck() {
+  const { cam, rock } = WRECK;
+  return `<g transform="translate(${cam.x} ${cam.y}) rotate(${cam.rot})">${camHeadArt(null, { smashed: true })}</g><g transform="translate(${rock.x} ${rock.y})">${stone(1)}</g>`;
+}
+
 /** The searchlight cone; origin = lamp. Rotate `${id}.beam` to sweep. Points toward +x, widening. */
+const lampBody = () => `<path d="M-30 -22 L40 -28 L40 28 L-30 22Z" fill="#555" ${S} stroke-width="5"/>`;
+/** The lamp's smashed lens (origin = lamp). */
+const lampDead = (id) => `<g ${id ? `data-t="${id}.dead" style="opacity:0"` : ''}><circle cx="40" cy="0" r="30" fill="#2e2e2e" ${S} stroke-width="5"/><path d="M40 -28 L34 -8 L46 0 L36 14 L42 28 M34 -8 L16 -12 M46 0 L68 -6 M36 14 L18 20" fill="none" stroke="#9a9a9a" stroke-width="2.6"/></g>`;
 export function searchlight(id, len = 1300) {
-  return `<g transform="translate(0 0)">
-    <path d="M-30 -22 L40 -28 L40 28 L-30 22Z" fill="#555" ${S} stroke-width="5"/><circle cx="40" cy="0" r="30" fill="#fff" ${S} stroke-width="5"/><circle cx="40" cy="0" r="16" fill="#f4f4f4"/>
+  return `<g transform="translate(0 0)">${lampBody()}
+    <g data-t="${id}.lens"><circle cx="40" cy="0" r="30" fill="#fff" ${S} stroke-width="5"/><circle cx="40" cy="0" r="16" fill="#f4f4f4"/></g>${lampDead(id)}
     <g data-t="${id}.beam"><path d="M44 -26 L${len} -330 L${len} 330 L44 26Z" fill="url(#g-beam)" opacity=".5"/></g>
   </g>`;
 }
@@ -220,8 +250,9 @@ export function museumFront(id, { hole = false, day = false, door = true, cam = 
     <rect x="-1200" y="${GY - 38}" width="3680" height="38" fill="url(#p-hazard)" ${S} stroke-width="5"/>
     ${holeSvg}
     ${door ? plainDoor(id, 250) : ''}
-    ${cam ? securityCam(id, 1040, 214) : ''}
-    ${light ? `<g transform="translate(1180 110)"><g data-t="${id}.sweep" style="transform:rotate(128deg)">${searchlight(id)}</g></g>` : ''}
+    ${cam === 'broken' ? brokenCam() : cam ? securityCam(id, CAMERA.x, CAMERA.y) : ''}
+    ${light === 'broken' ? brokenLamp() : light ? `<g transform="translate(${LAMP.x} ${LAMP.y})"><g data-t="${id}.sweep" style="transform:rotate(128deg)">${searchlight(id)}</g></g>` : ''}
+    ${cam === 'broken' ? wreck() : ''}
     ${plaza({ day })}`;
 }
 
@@ -239,17 +270,35 @@ export function wallClose(id) {
 /** x of the slab (the wall's cross-section) and the gap through it, in SECTION view. */
 export const SEC = { slabX: 1020, slabW: 150, gapTop: GY - 256, ceil: -140 };
 
-function paintings(seed, x0, x1, y0 = 190, k = 1) {
+/** Gallery pictures: planets, spaceships and galaxies (each drawn inside a w x h canvas, origin = its centre). */
+const ART = [
+  (w, h) => `<circle cx="${-w * 0.18}" cy="${-h * 0.1}" r="${w * 0.2}" fill="#d8d8d8"/><path d="M${-w * 0.18 - w * 0.2} ${-h * 0.1 - 6} q${w * 0.2} -${h * 0.1} ${w * 0.4} 0" stroke="#444" stroke-width="3" fill="none"/><ellipse cx="${-w * 0.18}" cy="${-h * 0.1}" rx="${w * 0.36}" ry="${h * 0.07}" fill="none" stroke="#fff" stroke-width="5" transform="rotate(-18 ${-w * 0.18} ${-h * 0.1})"/><circle cx="${w * 0.26}" cy="${h * 0.2}" r="${w * 0.07}" fill="#9a9a9a"/>`, // ringed planet
+  (w, h) => `<path d="M${-w * 0.3} ${h * 0.12} Q${-w * 0.2} ${-h * 0.2} ${w * 0.02} ${-h * 0.25} Q${w * 0.24} ${-h * 0.2} ${w * 0.32} ${h * 0.12} Z" fill="#e8e8e8" stroke="#222" stroke-width="3"/><circle cx="${w * 0.02}" cy="${-h * 0.06}" r="${w * 0.07}" fill="#555"/><path d="M${-w * 0.3} ${h * 0.12} L${-w * 0.4} ${h * 0.26} M${w * 0.32} ${h * 0.12} L${w * 0.42} ${h * 0.26} M${-w * 0.08} ${h * 0.14} L${-w * 0.1} ${h * 0.3} M${w * 0.12} ${h * 0.14} L${w * 0.14} ${h * 0.3}" stroke="#222" stroke-width="4" fill="none"/>`, // rocket / lander
+  (w, h) => `<path d="M0 0 C${w * 0.06} ${-h * 0.14} ${w * 0.26} ${-h * 0.12} ${w * 0.3} 0 M0 0 C${-w * 0.06} ${h * 0.14} ${-w * 0.26} ${h * 0.12} ${-w * 0.3} 0 M0 0 C${w * 0.02} ${-h * 0.26} ${w * 0.38} ${-h * 0.22} ${w * 0.4} ${h * 0.04} M0 0 C${-w * 0.02} ${h * 0.26} ${-w * 0.38} ${h * 0.22} ${-w * 0.4} ${-h * 0.04}" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle r="${w * 0.05}" fill="#fff"/>`, // spiral galaxy
+  (w, h) => `<ellipse cx="0" cy="${h * 0.02}" rx="${w * 0.32}" ry="${h * 0.09}" fill="#cfcfcf" stroke="#222" stroke-width="3"/><path d="M${-w * 0.14} ${h * 0.0} Q0 ${-h * 0.22} ${w * 0.14} ${h * 0.0}" fill="#f2f2f2" stroke="#222" stroke-width="3"/><path d="M${-w * 0.12} ${h * 0.12} L${-w * 0.2} ${h * 0.34} M${w * 0.12} ${h * 0.12} L${w * 0.2} ${h * 0.34} M0 ${h * 0.12} L0 ${h * 0.36}" stroke="#fff" stroke-width="3" opacity=".7"/>`, // flying saucer with beam
+  (w, h) => `<circle cx="${w * 0.14}" cy="${-h * 0.14}" r="${w * 0.22}" fill="#bdbdbd"/><circle cx="${w * 0.07}" cy="${-h * 0.2}" r="${w * 0.05}" fill="#8a8a8a"/><circle cx="${w * 0.22}" cy="${-h * 0.08}" r="${w * 0.035}" fill="#8a8a8a"/><path d="M${-w * 0.4} ${h * 0.3} Q${-w * 0.1} ${h * 0.05} ${w * 0.4} ${h * 0.26} L${w * 0.4} ${h * 0.4} L${-w * 0.4} ${h * 0.4}Z" fill="#555"/>`, // moon over a horizon
+  (w, h) => `<path d="M${w * 0.3} ${-h * 0.25} L${-w * 0.15} ${h * 0.05}" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity=".5"/><path d="M${w * 0.3} ${-h * 0.25} L${-w * 0.05} ${h * 0.0}" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="${-w * 0.18}" cy="${h * 0.08}" r="${w * 0.08}" fill="#fff"/><circle cx="${-w * 0.28}" cy="${h * 0.26}" r="${w * 0.12}" fill="#777"/>`, // comet and a planet
+];
+const BACKDROPS = ['#1c1c1c', '#2e2e2e', '#444', '#1c1c1c'];
+const STARS = (rand, w, h) => Array.from({ length: 7 }, () => `<circle cx="${((rand() - 0.5) * (w - 30)).toFixed(0)}" cy="${((rand() - 0.5) * (h - 30)).toFixed(0)}" r="${(1.4 + rand() * 1.4).toFixed(1)}" fill="#fff"/>`).join('');
+
+/** Sparse gallery pictures along the wall: a different subject, frame and size each, never two in a row alike. */
+function paintings(seed, x0, x1, y0 = 190, k = 1, gap = 620) {
   const rand = rng(seed);
   let s = '';
-  for (let x = x0; x < x1; x += 330) {
-    const w = (120 + rand() * 90) * k;
-    const h = (130 + rand() * 90) * k;
+  let n = seed % ART.length;
+  let x = x0 + rand() * 200;
+  while (x < x1) {
+    const kind = (n++ * 5) % ART.length; // 5 is coprime with 6: every subject once before any repeats
+    const tall = rand() > 0.6;
+    const w = (tall ? 120 + rand() * 40 : 150 + rand() * 90) * k;
+    const h = (tall ? 190 + rand() * 50 : 120 + rand() * 60) * k;
     const y = y0 + rand() * 40;
-    s += `<g transform="translate(${x + rand() * 80} ${y})"><rect x="${-w / 2}" y="0" width="${w}" height="${h}" fill="#e2e2e2" ${S} stroke-width="8"/>
-      <rect x="${-w / 2 + 12}" y="12" width="${w - 24}" height="${h - 24}" fill="#${rand() > 0.5 ? '8f8f8f' : 'bcbcbc'}" stroke="${INK}" stroke-width="3"/>
-      <path d="M${-w / 2 + 12} ${h - 12} L${-w * 0.1} ${h * 0.4} L${w * 0.1} ${h * 0.7} L${w / 2 - 12} ${h * 0.3} L${w / 2 - 12} ${h - 12}Z" fill="#444"/>
-      <circle cx="${-w * 0.22}" cy="${h * 0.3}" r="${w * 0.08}" fill="#fff"/></g>`;
+    const frame = ['#e2e2e2', '#bdbdbd', '#f4f4f4'][Math.floor(rand() * 3)];
+    s += `<g transform="translate(${x.toFixed(0)} ${y.toFixed(0)})"><rect x="${-w / 2}" y="0" width="${w}" height="${h}" fill="${frame}" ${S} stroke-width="8"/>
+      <rect x="${-w / 2 + 12}" y="12" width="${w - 24}" height="${h - 24}" fill="${BACKDROPS[Math.floor(rand() * BACKDROPS.length)]}" stroke="${INK}" stroke-width="3"/>
+      <g transform="translate(0 ${h / 2})">${STARS(rand, w - 24, h - 24)}${ART[kind](w - 24, h - 24)}</g></g>`;
+    x += gap * (0.8 + rand() * 0.6);
   }
   return s;
 }
@@ -266,7 +315,7 @@ export function sectionBack(id) {
     <rect x="-3000" y="${ceil}" width="${slabX + 3000}" height="${GY - ceil}" fill="url(#p-paper)"/>
     <rect x="-3000" y="${GY - 90}" width="${slabX + 3000}" height="16" fill="#6d6d6d" ${S} stroke-width="4"/>
     <rect x="-3000" y="${ceil}" width="${slabX + 3000}" height="26" fill="#dedede" ${S} stroke-width="4"/>
-    ${paintings(14, -2800, slabX - 200)}${paintings(21, -2700, slabX - 200, -70, 1.25)}
+    ${paintings(14, -2800, slabX - 200)}${paintings(21, -2500, slabX - 200, -70, 1.1, 1100)}
     ${[-2500, -1900, -1300, -700, -100, 420].map((x) => `<g transform="translate(${x} ${ceil + 26})"><rect x="-26" y="0" width="52" height="${GY - ceil - 26}" fill="#cacaca" ${S} stroke-width="5"/><rect x="-36" y="0" width="72" height="18" fill="#e8e8e8" ${S} stroke-width="4"/><rect x="-36" y="${GY - ceil - 44}" width="72" height="18" fill="#e8e8e8" ${S} stroke-width="4"/><path d="M-10 20 L-10 ${GY - ceil - 46} M10 20 L10 ${GY - ceil - 46}" stroke="#8a8a8a" stroke-width="3"/></g>`).join('')}
     ${[-2400, -1800, -1200, -600, 0, 560].map((x) => `<g transform="translate(${x} ${ceil + 26})"><path d="M0 0 L0 22" stroke="${INK}" stroke-width="4"/><path d="M-30 22 L30 22 L20 40 L-20 40Z" fill="#fff" ${S} stroke-width="4"/></g>`).join('')}
     ${plaza({ top: GY })}
@@ -304,7 +353,7 @@ export function galleryFront(id) {
   return `<rect x="-1400" y="-100" width="3500" height="900" fill="url(#g-hall)"/>
     <rect x="-1400" y="520" width="3500" height="300" fill="#2a2a2a"/>${floor}
     ${[-120, 1400].map((x) => `<g transform="translate(${x} 0)"><rect x="-90" y="-100" width="180" height="640" fill="#4a4a4a" ${S} stroke-width="7"/><path d="M-50 -100 L-50 540 M50 -100 L50 540" stroke="#222" stroke-width="5"/><rect x="-110" y="500" width="220" height="40" fill="#6a6a6a" ${S} stroke-width="6"/></g>`).join('')}
-    ${[200, 1080].map((x) => `<g transform="translate(${x} 150)"><rect x="-90" y="0" width="180" height="150" fill="#5c5c5c" ${S} stroke-width="7"/><rect x="-74" y="14" width="148" height="122" fill="#2e2e2e"/><path d="M-60 120 L-20 50 L10 90 L40 40 L60 120Z" fill="#7a7a7a"/></g>`).join('')}
+    ${[[200, 0], [1080, 2]].map(([x, k]) => `<g transform="translate(${x} 150)"><rect x="-90" y="0" width="180" height="150" fill="#5c5c5c" ${S} stroke-width="7"/><rect x="-74" y="14" width="148" height="122" fill="#2e2e2e"/><g transform="translate(0 75)">${ART[k](148, 122)}</g></g>`).join('')}
     <path d="M300 -20 L980 -20 L1180 560 L100 560Z" fill="url(#g-spot)"/>
     ${[640].map((x) => `<g transform="translate(${x} 0)"><rect x="-26" y="-20" width="52" height="46" fill="#bbb" ${S} stroke-width="5"/><path d="M-30 26 L30 26 L18 40 L-18 40Z" fill="#fff" ${S} stroke-width="4"/></g>`).join('')}`;
 }
@@ -328,6 +377,24 @@ export function distantRoad(id) {
 
 /* ---------------------------------------------------------------- the apartment */
 
+/** His wanted poster: his own photo, and a reward. Origin = top centre of the sheet. */
+function wantedPoster(x, y) {
+  const [r1, r2] = TEXT.reward;
+  return `<g transform="translate(${x} ${y}) rotate(-2)">
+    <rect x="-82" y="0" width="164" height="236" fill="#e6e6e6" ${S} stroke-width="7"/><rect x="-72" y="10" width="144" height="216" fill="none" stroke="#777" stroke-width="2.4"/>
+    <text y="46" font-size="40" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Impact, sans-serif" letter-spacing="4">${TEXT.wanted}</text>
+    <rect x="-52" y="58" width="104" height="92" fill="#bdbdbd" ${S} stroke-width="5"/>
+    <g transform="translate(0 146)"><path d="M-40 4 Q-36 -20 0 -22 Q36 -20 40 4Z" fill="#f2f2f2" ${S} stroke-width="3"/><path d="M-40 4 L40 4 M-36 -6 L36 -6 M-30 -14 L30 -14" stroke="#444" stroke-width="2.6"/>
+      <ellipse cx="0" cy="-48" rx="24" ry="27" fill="#fff" ${S} stroke-width="3.6"/>
+      <path d="M-27 -54 Q-26 -80 0 -80 Q26 -80 27 -54 Q10 -62 -27 -54Z" fill="#5a5a5a" ${S} stroke-width="3.4"/><path d="M-31 -56 L-12 -56" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="-9" cy="-48" r="3.4" fill="${INK}"/><circle cx="9" cy="-48" r="3.4" fill="${INK}"/><path d="M-1 -46 Q5 -40 -1 -37" fill="none" stroke="${INK}" stroke-width="2.4"/><path d="M-8 -30 Q0 -26 8 -30" fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M-18 -34 l2 2 M-10 -30 l2 2 M2 -29 l2 2 M11 -31 l2 2 M18 -35 l2 2" stroke="#666" stroke-width="2.2"/></g>
+    <text y="178" font-size="16" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Impact, sans-serif" letter-spacing="1">${r1}</text>
+    <text y="200" font-size="22" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Impact, sans-serif" letter-spacing="2">${r2}</text>
+    <path d="M-52 208 L52 208" stroke="#777" stroke-width="2.4"/><text y="222" font-size="11" font-weight="900" text-anchor="middle" fill="#555" font-family="Impact, sans-serif" letter-spacing="1">${TEXT.rewardFor}</text>
+  </g>`;
+}
+
 export function apartment(id) {
   const rand = rng(41);
   let stains = '';
@@ -343,9 +410,8 @@ export function apartment(id) {
       <g data-t="${id}.stars">${[[-70, 60], [30, 100], [80, 50], [-30, 170], [60, 200], [-84, 230], [90, 150]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.4" fill="#fff"/>`).join('')}<circle cx="-30" cy="50" r="22" fill="#eee"/></g>
       <path d="M0 12 L0 278 M-118 145 L118 145" stroke="#bbb" stroke-width="9"/><rect x="-142" y="262" width="284" height="20" fill="#a8a8a8" ${S} stroke-width="5"/>
       <path d="M-118 12 L-60 12 L-118 90Z M118 12 L60 12 L118 90Z" fill="#cfcfcf" ${S} stroke-width="3"/></g>
-    <g transform="translate(980 150) rotate(-4)"><rect x="-70" y="-8" width="140" height="96" fill="#e0e0e0" ${S} stroke-width="8"/><rect x="-58" y="4" width="116" height="72" fill="#bdbdbd" stroke="${INK}" stroke-width="3"/>
-      <path d="M-50 70 L-20 30 L0 54 L22 22 L50 70Z" fill="#555"/><path d="M-56 -8 L56 -8" stroke="#777" stroke-width="3"/>
-      <rect x="-66" y="108" width="132" height="64" rx="6" fill="#d8d8d8" ${S} stroke-width="5" transform="rotate(5 0 140)"/><text x="0" y="148" font-size="15" font-weight="900" text-anchor="middle" fill="${INK}" font-family="Impact, sans-serif" transform="rotate(5 0 140)" letter-spacing="1">WANTED</text></g>
+    ${wantedPoster(740, 120)}
+    <g transform="translate(900 440)"><path d="M-84 0 L84 0" stroke="${INK}" stroke-width="14" stroke-linecap="round"/><path d="M-84 -3 L84 -3" stroke="#a8a8a8" stroke-width="7" stroke-linecap="round"/><path d="M-62 4 L-62 34 L-30 4 M62 4 L62 34 L30 4" fill="none" ${S} stroke-width="7"/></g>
     <g transform="translate(1090 ${GY - 62})"><path d="M-22 0 L-18 -64 L18 -64 L22 0Z" fill="#8a8a8a" ${S} stroke-width="5"/><ellipse cx="0" cy="-64" rx="18" ry="6" fill="#222"/><path d="M-26 -40 L26 -40" stroke="#555" stroke-width="3"/><path d="M-6 -30 L6 -30" stroke="#fff" stroke-width="2"/></g>
     <g transform="translate(520 ${GY - 70})"><g data-t="${id}.drip"><path d="M0 -330 Q-6 -300 0 -292 Q6 -300 0 -330Z" fill="#fff" ${S} stroke-width="3"/></g></g>
     <g transform="translate(500 ${GY - 70})"><path d="M-40 0 L-34 -52 L34 -52 L40 0Z" fill="#8a8a8a" ${S} stroke-width="5"/><ellipse cx="0" cy="-52" rx="34" ry="9" fill="#222" ${S} stroke-width="4"/><path d="M-30 -30 L30 -30" stroke="#555" stroke-width="3"/></g>`;

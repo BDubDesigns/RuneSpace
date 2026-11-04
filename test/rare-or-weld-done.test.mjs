@@ -14,7 +14,7 @@ const sceneId = (id) => built.scenes.find((s) => s.id === id);
 
 test('the locked punchline cards keep the approved wording, one after the other', () => {
   assert.deepEqual(TEXT.ifIcant, ["IF I CAN'T BRING THE EMERALD", 'TO A FENCE...']);
-  assert.deepEqual(TEXT.illBring, ["I'LL BRING THE FENCE", 'TO THE EMERALD!']);
+  assert.deepEqual(TEXT.illBring, ["I'LL BRING A FENCE", 'TO THE EMERALD!']);
   const a = sceneId('c-ifIcant');
   const b = sceneId('c-illBring');
   assert.equal(a.end, b.start, 'the second card follows the first without a cut-away');
@@ -65,7 +65,7 @@ test('placeholder lore lives in config.js only: no scene hard-codes the Emerald\
 });
 
 test('runtime is on target: about 2 to 3 minutes, every scene has a duration and a caption', () => {
-  assert.ok(built.duration >= 120000 && built.duration <= 175000, `runtime ${built.duration} ms`);
+  assert.ok(built.duration >= 120000 && built.duration <= 180000, `runtime ${built.duration} ms`);
   for (const s of built.scenes) assert.ok(s.caption.trim().length > 4, `${s.id} caption`);
   assert.ok(Object.values(TIMING).every((n) => n >= 1500));
 });

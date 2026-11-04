@@ -18,6 +18,9 @@ import { TEXT } from '../config.js';
 
 const SC = 0.95;
 
+/** The welding goggles lying on the shelf. */
+const goggles = () => `<circle cx="-16" r="14" fill="#2b2b2b" stroke="#0d0d0d" stroke-width="5"/><circle cx="14" r="14" fill="#2b2b2b" stroke="#0d0d0d" stroke-width="5"/><path d="M-30 0 Q0 -10 30 0" fill="none" stroke="#0d0d0d" stroke-width="5"/>`;
+
 export function read(ctx) {
   const { cues, at, id } = ctx;
   const cam = new Camera(cues, id, { x: 640, y: 420, s: 1.5 });
@@ -53,8 +56,10 @@ export function read(ctx) {
   // --- room life: the leaky ceiling drips into a bucket
   cues.push({ at: at(0), dur: 1400, iterations: 3.5, target: `${id}.drip`, easing: 'cubic-bezier(.5,0,1,.6)', keyframes: [{ transform: 'translateY(0px)', opacity: 1 }, { transform: 'translateY(260px)', opacity: 1, offset: 0.9 }, { transform: 'translateY(262px)', opacity: 0 }], reduce: 'skip' });
 
+  // the welding gear waits on the shelf
+  const gear = `<g transform="translate(880 434) scale(.9)">${torch(`${id}.rt`)}</g><g transform="translate(828 426)">${goggles()}</g>`;
   const fx = mark({ x: 700, y: 330, at: at(3900), dur: 1100, size: 100 }) + dust({ x: 590, y: GY + 4, at: at(3900), n: 3, spread: 40, r: 18, dir: -1, seed: 5, dur: 600 });
-  return cam.html(`${apartment(id)}<g transform="translate(640 ${GY})">${armchairBack()}</g><g transform="translate(790 ${GY})">${footstool()}</g>${thief.html}<g transform="translate(640 ${GY})">${armchairFront()}</g>${paper.html}${fx}`);
+  return cam.html(`${apartment(id)}<g transform="translate(640 ${GY})">${armchairBack()}</g><g transform="translate(790 ${GY})">${footstool()}</g>${gear}${thief.html}<g transform="translate(640 ${GY})">${armchairFront()}</g>${paper.html}${fx}`);
 }
 
 export function paper(ctx) {
@@ -141,10 +146,10 @@ export function grab(ctx) {
   const cam = new Camera(cues, id, { x: 640, y: 400, s: 1.02 });
   cam.look(at(500), 1400, { x: 800, y: 410, s: 1.12 }, 'ease-in-out');
   const thief = prospector(cues, `${id}.thief`, { kind: 'thief', x: 640, y: GY, scale: SC, face: 'plot', armF: -30, armB: -30, legF: -90, legB: -90, props: { F: torch(`${id}.tc`) } });
-  const rack = placed(cues, `${id}.rack`, `<g transform="scale(.9)">${torch(`${id}.rt`)}</g>`, { x: 1040, y: 380, rot: 20 });
+  const rack = placed(cues, `${id}.rack`, `<g transform="scale(.9)">${torch(`${id}.rt`)}</g>`, { x: 880, y: 434, rot: 0 });
   const cart = gasCart(`${id}.gc`);
   const cartP = placed(cues, `${id}.cart`, cart, { x: 1120, y: GY });
-  const goggP = placed(cues, `${id}.gg`, `<circle cx="-16" r="14" fill="#2b2b2b" stroke="#0d0d0d" stroke-width="5"/><circle cx="14" r="14" fill="#2b2b2b" stroke="#0d0d0d" stroke-width="5"/><path d="M-30 0 Q0 -10 30 0" fill="none" stroke="#0d0d0d" stroke-width="5"/>`, { x: 1000, y: 340 });
+  const goggP = placed(cues, `${id}.gg`, goggles(), { x: 828, y: 426 });
   // leap out of the chair (the legs come down), then run to the rack
   thief.bob.keys(at(300), 360, [{ o: 0.4, y: -70, sy: 1.04 }, { o: 1, y: 0 }], { ease: 'ease-out' });
   thief.legF.to(at(300), 260, { rot: 0 }, { ease: 'ease-out' });
@@ -152,11 +157,11 @@ export function grab(ctx) {
   thief.armF.to(at(300), 260, { rot: -150 }, { ease: 'ease-out' });
   thief.armB.to(at(300), 260, { rot: -150 }, { ease: 'ease-out' });
   thief.root.to(at(300), 360, { x: 700 }, { ease: 'ease-out' });
-  thief.walk(at(700), 1050, 950, { stride: 240, amp: 40, bounce: 8, swing: 24 });
+  thief.walk(at(700), 900, 800, { stride: 240, amp: 40, bounce: 8, swing: 24 });
   // snatches the torch, pulls the goggles on, grins to camera
   show(cues, `${id}.rack`, at(1800), false);
   show(cues, `${id}.thief.propF`, at(1800), true);
-  thief.armF.to(at(1750), 160, { rot: -80 }, { ease: 'ease-out' });
+  thief.armF.to(at(1600), 200, { rot: -130 }, { ease: 'ease-out' });
   thief.propF.to(at(1850), 160, { rot: -20 });
   show(cues, `${id}.gg`, at(2000), false);
   thief.goggles(at(2000), 'up');
