@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 // Job ids from .github/workflows/ci.yml. canonical-e2e is the three-shard
 // matrix; GitHub reports one aggregate result that succeeds only if all do.
-export const REQUIRED_JOBS = ["fast-checks", "integration", "canonical-e2e"];
+export const REQUIRED_JOBS = ["fast-checks", "integration", "holo-film-studio", "canonical-e2e"];
 
 // Opt-in through the `e2e-screenshots` label. The job has no dependencies, so it
 // is skipped only when not requested; once it runs, it must succeed.

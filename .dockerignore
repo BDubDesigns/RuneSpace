@@ -15,3 +15,6 @@ test-results
 # the Docker build context keeps builder payloads small. Rejected/unreferenced
 # master copies must never be re-added here.
 assets
+# Holo Film Studio is a development tool (issue #489): the production image never
+# needs its films, art, tests or docs, and nothing in the app imports it.
+tools/holo-film-studio

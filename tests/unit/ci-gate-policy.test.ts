@@ -41,6 +41,7 @@ function needsWith(results: Record<string, string>) {
 const ALL_GREEN = {
   "fast-checks": "success",
   integration: "success",
+  "holo-film-studio": "success",
   "canonical-e2e": "success",
   "canonical-screenshots": "skipped",
 };
@@ -66,11 +67,14 @@ describe("merge gate verdict", () => {
     },
   );
 
-  it.each(["integration", "canonical-e2e"])("fails when %s did not succeed", (job) => {
-    for (const result of ["failure", "skipped", "cancelled"]) {
-      expect(evaluateMergeGate(needsWith({ ...ALL_GREEN, [job]: result })).passed).toBe(false);
-    }
-  });
+  it.each(["integration", "holo-film-studio", "canonical-e2e"])(
+    "fails when %s did not succeed",
+    (job) => {
+      for (const result of ["failure", "skipped", "cancelled"]) {
+        expect(evaluateMergeGate(needsWith({ ...ALL_GREEN, [job]: result })).passed).toBe(false);
+      }
+    },
+  );
 
   it("fails when a required lane is missing from the gate's needs", () => {
     const { "fast-checks": _omitted, ...withoutFast } = ALL_GREEN;

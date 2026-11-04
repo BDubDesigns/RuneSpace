@@ -129,6 +129,39 @@ jobs:
       - name: Issue #126 PostgreSQL maintenance integration tests
         run: pnpm test:integration:issue-126
 
+  holo-film-studio:
+    name: Holo Film Studio (test, verify, pack)
+    # Development tool under tools/holo-film-studio/: dependency-free Node and a
+    # headless browser, no pnpm install and no PostgreSQL. It is deliberately not
+    # part of the canonical gameplay E2E. See docs/holo-film-studio.md.
+    runs-on: ubuntu-latest
+    env:
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+      # Chrome's sandbox needs unprivileged user namespaces, which GitHub's
+      # Ubuntu runners may restrict; this is a throwaway headless profile.
+      VERIFY_NO_SANDBOX: "1"
+    defaults:
+      run:
+        working-directory: tools/holo-film-studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit and structure tests (includes the film-one pin)
+        run: npm test
+
+      - name: Real-browser verification of every film
+        run: npm run verify
+
+      - name: Package contents
+        run: npm run pack:check
+
   canonical-e2e:
     name: Canonical E2E shard ${{ matrix.shard }}/3
     # Pinned: Playwright 1.51.1 does not support chromium on ubuntu-26.04 (ubuntu-latest).
@@ -249,7 +282,7 @@ jobs:
     # always(): the gate must run and fail when a lane failed, was skipped, or
     # was canceled. A gate that is itself skipped reads as passing on GitHub.
     if: ${{ always() }}
-    needs: [fast-checks, integration, canonical-e2e, canonical-screenshots]
+    needs: [fast-checks, integration, holo-film-studio, canonical-e2e, canonical-screenshots]
     runs-on: ubuntu-latest
     env:
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}

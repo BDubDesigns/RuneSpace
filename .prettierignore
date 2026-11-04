@@ -17,3 +17,6 @@ test-results.bak
 playwright-report
 playwright-report.bak
 .claude/settings.local.json
+# Holo Film Studio: standalone, dependency-free tool whose source is kept exactly
+# as authored (and approved); see docs/holo-film-studio.md.
+tools/holo-film-studio
