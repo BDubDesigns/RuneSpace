@@ -89,7 +89,7 @@ export const TIMING = {
   crash: 5800,
 
   // 5. a brilliant realization
-  despair: 5600,
+  despair: 8600,
   ifIcant: 4600,
   illBring: 5000,
 
@@ -105,7 +105,7 @@ export const TIMING = {
   queue: 6000,
 
   // 8. the punchline
-  reread: 6000,
+  reread: 9600,
   plate: 7400,
   end: 3300,
 };
@@ -147,6 +147,6 @@ export const CAPTION = {
   morning: 'The next morning...',
   queue: `A long line of tourists pays to see the Emerald. The thief, in a top hat and bow tie, collects a growing pile of Credits.`,
   reread: 'He rereads the newspaper: ONE WEEK ONLY! He looks at the paper, his attraction and his sign, and smiles.',
-  plate: 'He carefully welds a new plate onto the right-hand side of the sign. It reads: OPEN DAILY.',
+  plate: 'He carefully welds a new plate to the right-hand edge of the sign, leaving its text clear. It reads: OPEN DAILY.',
   end: 'The End.',
 };

@@ -50,32 +50,32 @@ export function despair(ctx) {
   // --- slumped in despair (standing, shoulders sagging)
   thief.head.to(at(0), 500, { rot: fwd(thief, 26) }, { ease: 'ease-in-out' });
   thief.torso.keys(at(300), 900, [{ o: 0.5, y: 5, rot: fwd(thief, 3) }, { o: 1, y: 0, rot: 0 }], { ease: 'ease-in-out', reduce: 'skip' });
+  // Each focal point gets a slow move in and a beat to hold before the camera goes on: the FENCE sign, the Emerald, the torch, the bulb.
   // --- looks up and out along the road: the far, dim sign says FENCE
   thief.head.to(at(800), 300, { rot: 0 });
   thief.face(at(800), 'glance');
   thief.armF.to(at(800), 300, { rot: -28 });
   thief.armB.to(at(800), 300, { rot: -24 });
-  cam.look(at(1100), 900, { x: 1060, y: 330, s: 2.1 }, 'ease-in-out');
-  cam.look(at(2500), 700, { x: 640, y: 380, s: 1.0 }, 'ease-in-out');
+  cam.look(at(900), 1100, { x: 1060, y: 330, s: 2.1 }, 'ease-in-out'); // holds on the sign until 3000
   // --- looks at his Emerald
-  thief.face(at(2800), 'normal');
-  cam.look(at(3200), 600, { x: 420, y: 420, s: 1.4 }, 'ease-in-out');
+  thief.face(at(3000), 'normal');
+  cam.look(at(3000), 1000, { x: 420, y: 420, s: 1.4 }, 'ease-in-out'); // holds on the gem until 5200
   // --- and then at his welding equipment
-  thief.face(at(3800), 'glance');
-  thief.head.to(at(3800), 300, { rot: fwd(thief, 20) });
-  cam.look(at(3800), 700, { x: 900, y: 520, s: 1.7 }, 'ease-in-out');
+  thief.face(at(5200), 'glance');
+  thief.head.to(at(5200), 300, { rot: fwd(thief, 20) });
+  cam.look(at(5200), 1000, { x: 900, y: 520, s: 1.7 }, 'ease-in-out'); // holds on the torch until 7000
   // --- a lightbulb
-  thief.head.to(at(4600), 220, { rot: 0 });
-  thief.face(at(4600), 'plot');
-  thief.torso.keys(at(4600), 700, [{ o: 0.5, y: -6 }, { o: 1, y: 0 }], { ease: 'ease-out', reduce: 'skip' });
-  cam.look(at(4500), 700, { x: 790, y: 420, s: 1.25 }, 'ease-in-out');
+  thief.head.to(at(7000), 220, { rot: 0 });
+  thief.face(at(7000), 'plot');
+  thief.torso.keys(at(7000), 700, [{ o: 0.5, y: -6 }, { o: 1, y: 0 }], { ease: 'ease-out', reduce: 'skip' });
+  cam.look(at(6900), 900, { x: 790, y: 420, s: 1.25 }, 'ease-in-out');
   cues.push({ at: at(0), dur: 160, iterations: ctx.dur / 160, target: `${id}.neon`, easing: 'steps(1, end)', keyframes: [{ opacity: 1 }, { opacity: 1, offset: 0.55 }, { opacity: 0.55, offset: 0.56 }, { opacity: 1 }], reduce: 'skip' });
 
   const fx =
     puff({ x: 830, y: GY - 190, at: at(500), dur: 1100, r: 30, dy: -40, dx: 30, opacity: 0.8 }) +
-    sparkle({ x: 928, y: GY - 6, at: at(4100), dur: 900, r: 26, n: 3, s: 1.2 }) +
-    sparkle({ x: 300, y: 300, at: at(3300), dur: 900, r: 34, n: 3, s: 1.3 }) +
-    lightbulb({ x: 800, y: GY - 300, at: at(4700), dur: 1300, scale: 1.0 });
+    sparkle({ x: 928, y: GY - 6, at: at(6200), dur: 900, r: 26, n: 3, s: 1.2 }) +
+    sparkle({ x: 300, y: 300, at: at(4000), dur: 900, r: 34, n: 3, s: 1.3 }) +
+    lightbulb({ x: 800, y: GY - 300, at: at(7100), dur: 1300, scale: 1.0 });
   return cam.html(`${distantRoad(id)}${craterBack(id, cr)}${gem}${craterFront(id, cr)}${cart.html}${connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(800), t1: at(ctx.dur), len: 420 })}${thief.html}${fx}`);
 }
 
@@ -364,9 +364,10 @@ export function reread(ctx) {
   const { cues, at, id } = ctx;
   const B = YARD.booth;
   const cam = new Camera(cues, id, { x: B.x, y: B.y - 190, s: 1.9 });
-  cam.look(at(3500), 700, { x: 1150, y: 520, s: 0.95 }, 'ease-in-out'); // the line of tourists
-  cam.look(at(4250), 700, { x: 330, y: 560, s: 1.35 }, 'ease-in-out'); // the sign
-  cam.look(at(5000), 800, { x: B.x, y: B.y - 190, s: 1.9 }, 'ease-in-out'); // and back to the proprietor
+  // each focal point gets a slow move and a beat to hold: the line of tourists, the sign, and back to the proprietor
+  cam.look(at(3500), 1000, { x: 1150, y: 520, s: 0.95 }, 'ease-in-out'); // tourists: holds until 5500
+  cam.look(at(5500), 1000, { x: 330, y: 560, s: 1.35 }, 'ease-in-out'); // the sign: holds until 7600
+  cam.look(at(7600), 1000, { x: B.x, y: B.y - 190, s: 1.9 }, 'ease-in-out'); // back to the proprietor: holds on his smile
   const y = yard(cues, id, { day: true, noLight: true });
   const bm = boothMarkup(id);
   const thief = proprietor(cues, id);
@@ -394,20 +395,20 @@ export function reread(ctx) {
   paper.track.keys(at(1200), 700, [{ o: 0.3, rot: 2 }, { o: 0.6, rot: -2 }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
   paper.track.to(at(1900), 340, { x: B.x + 92, y: B.y - 212, rot: 8, sx: 0.2, sy: 0.2 }, { ease: 'ease-in-out' }); // holds it out to one side: now we can see him read
   thief.face(at(1700), 'normal');
-  paper.track.to(at(4750), 320, { y: B.y - 40 }, { ease: 'ease-in-out' }); // lowered out of sight behind the counter: a clear view of that smile
+  paper.track.to(at(7400), 320, { y: B.y - 40 }, { ease: 'ease-in-out' }); // lowered out of sight behind the counter: a clear view of that smile
   // --- the insert: the headline's banner
   cues.push({ at: at(2200), dur: 140, target: `${id}.ins`, easing: 'linear', keyframes: [{ opacity: 0 }, { opacity: 1 }] });
   cues.push({ at: at(2300), dur: 800, target: `${id}.ring`, easing: 'ease-in-out', keyframes: [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }] });
   cues.push({ at: at(3400), dur: 120, target: `${id}.ins`, easing: 'linear', keyframes: [{ opacity: 1 }, { opacity: 0 }] });
   // --- looks at the paper, then at his profitable attraction, then at his sign... and smiles
   thief.face(at(3500), 'glance');
-  thief.face(at(4300), 'normal');
-  thief.face(at(5000), 'smug');
-  thief.face(at(5500), 'cheer');
-  thief.bob.keys(at(5500), 400, [{ o: 0.5, sy: 1.03 }, { o: 1, sy: 1 }], { ease: 'ease-out', reduce: 'skip' });
-  thief.head.keys(at(3500), 1400, [{ o: 0.3, rot: fwd(thief, 10) }, { o: 0.6, rot: fwd(thief, 4) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.head.keys(at(3500), 1800, [{ o: 0.3, rot: fwd(thief, 10) }, { o: 0.6, rot: fwd(thief, 4) }, { o: 1, rot: 0 }], { seg: 'ease-in-out', ease: 'linear', reduce: 'skip' });
+  thief.face(at(5500), 'normal');
+  thief.face(at(7600), 'smug');
+  thief.face(at(8300), 'cheer');
+  thief.bob.keys(at(8300), 400, [{ o: 0.5, sy: 1.03 }, { o: 1, sy: 1 }], { ease: 'ease-out', reduce: 'skip' });
 
-  const fx = sparkle({ x: 330, y: 560, at: at(4500), dur: 900, r: 30, n: 2, s: 1.2 }) + sparkle({ x: 520, y: 300, at: at(3900), dur: 900, r: 34, n: 2, s: 1.2 });
+  const fx = sparkle({ x: 330, y: 560, at: at(6500), dur: 900, r: 30, n: 2, s: 1.2 }) + sparkle({ x: 520, y: 300, at: at(6000), dur: 900, r: 34, n: 2, s: 1.2 });
   const stat = `${signMarkup(id)}`;
   return `${cam.html(`${y.before}${inside.map((i) => i.html).join('')}${y.after}${stat}${bm.back}${thief.html}${paper.html}${bm.front}${pile}${T.map((t) => t.html).join('')}${fx}`)}${ins}`;
 }
@@ -420,7 +421,7 @@ export function plateScene(ctx) {
   const S = YARD.sign;
   const B = YARD.booth;
   const cam = new Camera(cues, id, { x: 520, y: 540, s: 1.1 });
-  cam.look(at(1300), 600, { x: 260, y: 510, s: 1.5 }, 'ease-in-out');
+  cam.look(at(700), 1000, { x: 340, y: 520, s: 1.4 }, 'ease-in-out'); // in on the sign and its new neighbour, settled before the first weld
   cam.look(at(4300), 1100, { x: 430, y: 500, s: 1.1 }, 'ease-in-out');
   const y = yard(cues, id, { day: true, noLight: true });
   const bm = boothMarkup(id);
@@ -429,7 +430,7 @@ export function plateScene(ctx) {
   // the plate is welded onto the right-hand side of the old sign (it does not cover the whole board)
   const PW = 200;
   const PH = 230;
-  const PX = S.x + S.w / 2 - PW / 2 + 30; // overhangs the board's right edge a little, like an add-on panel
+  const PX = S.x + S.w / 2 + PW / 2 - 8; // welded to the sign's right-hand edge (a narrow flange overlap), covering none of its text
   const PY = S.y - 175;
   const TACKS = [
     { t: 1700, tip: [PX - PW / 2 + 12, PY - PH / 2 + 12], sx: PX - PW / 2 + 70 },

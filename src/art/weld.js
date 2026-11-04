@@ -235,14 +235,17 @@ export function plate(id, w = 440, h = 280, lines = ['OPEN', 'DAILY'], size = 10
   </g>`;
 }
 
-/** A tiny drawstring "SWAG" sack: far too small for a giant Emerald. Origin = the grip at the neck. */
+/**
+ * A bank bag with the Credits mark, standing open: the mouth is at the top and you can see into it. Origin = the grip
+ * under its belly (so scaling the prop stretches the bag up and out from his hand).
+ */
 export function swagSack() {
   return `<g>
-    <path d="M-10 0 Q-46 6 -50 44 Q-48 80 0 82 Q48 80 50 44 Q46 6 10 0Z" fill="#8c8c8c" ${S} stroke-width="4.8"/>
-    <path d="M-22 -6 Q-30 -26 -12 -22 L-6 -4 M22 -6 Q30 -26 12 -22 L6 -4" fill="#6f6f6f" ${S} stroke-width="4"/>
-    <path d="M-13 3 Q0 11 13 3" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><path d="M-13 3 Q0 11 13 3" fill="none" stroke="#d6d6d6" stroke-width="2" stroke-linecap="round"/>
-    <path d="M-30 24 Q-36 44 -26 62" fill="none" stroke="#fff" stroke-width="4" opacity=".6" stroke-linecap="round"/>
-    <g transform="translate(0 46)"><circle r="22" fill="#ececec" ${S} stroke-width="4"/><circle r="16" fill="none" stroke="#777" stroke-width="2"/><path d="M8 -8 A11 11 0 1 0 8 8" fill="none" stroke="${INK}" stroke-width="4.6" stroke-linecap="round"/><path d="M-10 -10 Q-4 -15 3 -13" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>
+    <path d="M-20 -84 Q-30 -64 -42 -50 Q-52 -30 -48 -10 Q-44 8 0 10 Q44 8 48 -10 Q52 -30 42 -50 Q30 -64 20 -84Z" fill="#8c8c8c" ${S} stroke-width="4.8"/>
+    <path d="M-30 -80 Q-44 -92 -36 -100 M30 -80 Q44 -92 36 -100" fill="none" ${S} stroke-width="5"/>
+    <ellipse cx="0" cy="-84" rx="29" ry="10" fill="#1b1b1b" ${S} stroke-width="4.6"/><path d="M-22 -86 Q0 -80 22 -86" fill="none" stroke="#666" stroke-width="2.4"/>
+    <path d="M-36 -60 Q-44 -34 -36 -12" fill="none" stroke="#fff" stroke-width="4" opacity=".6" stroke-linecap="round"/>
+    <g transform="translate(0 -34)"><circle r="22" fill="#ececec" ${S} stroke-width="4"/><circle r="16" fill="none" stroke="#777" stroke-width="2"/><path d="M8 -8 A11 11 0 1 0 8 8" fill="none" stroke="${INK}" stroke-width="4.6" stroke-linecap="round"/><path d="M-10 -10 Q-4 -15 3 -13" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>
   </g>`;
 }
 
