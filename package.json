@@ -1,0 +1,12 @@
+{
+  "name": "runespace-movies",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone silent-film module for the RuneSpace holo-drive-in. No dependencies, no build step.",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "dev": "node dev/serve.mjs 5173"
+  }
+}

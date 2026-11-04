@@ -1,0 +1,96 @@
+/* Old-film look: grain, vignette, projector flicker, scratches, dust specks, gate weave.
+ *
+ * Every layer is a plain CSS keyframe animation with no start delay, so the
+ * timeline controller (getAnimations) pauses and seeks it with the movie:
+ * at time t the grain is always in the same place. Looping animations are
+ * deterministic, which also makes frame export reproducible.
+ *
+ * Techniques borrowed from RuneSpace's cinematic CSS: stepped opacity for
+ * static (`steps()`), radial-gradient lighting, and flicker that only dims and
+ * brightens - it never switches the picture fully off.
+ */
+
+.mm-look { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.mm-look > * { position: absolute; }
+
+/* grain: a tiled SVG noise texture jumped around at ~12 fps */
+.mm-grain {
+  inset: -60px;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n' x='0' y='0'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7' stitchTiles='stitch'/><feColorMatrix values='1.9 0 0 0 -.45  1.9 0 0 0 -.45  1.9 0 0 0 -.45  0 0 0 0 1'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+  animation: mm-grain 0.6s steps(1) infinite;
+}
+@keyframes mm-grain {
+  0%   { transform: translate(0, 0); }
+  17%  { transform: translate(-37px, 21px); }
+  33%  { transform: translate(24px, -43px); }
+  50%  { transform: translate(-12px, -18px); }
+  67%  { transform: translate(41px, 30px); }
+  83%  { transform: translate(-28px, 9px); }
+}
+
+/* darkened corners */
+.mm-vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 80% 78% at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.5) 82%, rgba(0, 0, 0, 0.88) 100%);
+  animation: mm-breathe 3.7s ease-in-out infinite alternate;
+}
+@keyframes mm-breathe { from { opacity: 0.82; } to { opacity: 1; } }
+
+/* projector flicker: brightness only dims and returns, never blacks out */
+.mm-flicker {
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  animation: mm-flicker 1.7s steps(1) infinite;
+}
+@keyframes mm-flicker {
+  0% { opacity: 0.02; } 6% { opacity: 0.1; } 9% { opacity: 0.03; } 22% { opacity: 0.06; }
+  31% { opacity: 0.0; } 44% { opacity: 0.12; } 47% { opacity: 0.02; } 63% { opacity: 0.07; }
+  71% { opacity: 0.01; } 82% { opacity: 0.09; } 90% { opacity: 0.03; }
+}
+
+/* film-gate light pulses (very faint white lift) */
+.mm-pulse {
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  animation: mm-pulse 2.9s steps(1) infinite;
+}
+@keyframes mm-pulse { 0% { opacity: 0; } 12% { opacity: 0.07; } 14% { opacity: 0; } 58% { opacity: 0.05; } 60% { opacity: 0; } }
+
+/* vertical scratches: thin lines that appear for a couple of frames */
+.mm-scratch {
+  top: 0; bottom: 0; width: 1.5px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.75) 12%, rgba(255, 255, 255, 0.55) 88%, transparent);
+  opacity: 0;
+}
+.mm-scratch.a { animation: mm-scratch-a 3.1s steps(1) infinite; }
+.mm-scratch.b { animation: mm-scratch-b 4.3s steps(1) infinite; width: 1px; }
+.mm-scratch.c { animation: mm-scratch-c 2.3s steps(1) infinite; background: linear-gradient(to bottom, transparent, rgba(0,0,0,.6) 20%, rgba(0,0,0,.6) 80%, transparent); }
+@keyframes mm-scratch-a { 0% { opacity: 0; } 20% { left: 22%; opacity: 1; } 23% { left: 22.4%; opacity: 1; } 26% { opacity: 0; } 71% { left: 71%; opacity: 1; } 74% { opacity: 0; } }
+@keyframes mm-scratch-b { 0% { opacity: 0; } 41% { left: 54%; opacity: 1; } 44% { left: 54.3%; opacity: 1; } 47% { opacity: 0; } 88% { left: 12%; opacity: 1; } 90% { opacity: 0; } }
+@keyframes mm-scratch-c { 0% { opacity: 0; } 55% { left: 83%; opacity: 1; } 59% { opacity: 0; } }
+
+/* dust specks and hair on the gate */
+.mm-speck { width: 7px; height: 7px; border-radius: 50%; background: #000; opacity: 0; }
+.mm-speck.a { top: 28%; left: 61%; animation: mm-speck-a 2.6s steps(1) infinite; }
+.mm-speck.b { top: 66%; left: 18%; width: 4px; height: 4px; background: #fff; animation: mm-speck-b 3.4s steps(1) infinite; }
+.mm-hair { top: 12%; left: 34%; width: 28px; height: 10px; border-top: 2px solid rgba(0,0,0,.8); border-radius: 50%; transform: rotate(-24deg); opacity: 0; animation: mm-speck-c 5.2s steps(1) infinite; }
+@keyframes mm-speck-a { 0% { opacity: 0; } 37% { opacity: 0.85; } 40% { opacity: 0; } 83% { opacity: 0.7; } 85% { opacity: 0; } }
+@keyframes mm-speck-b { 0% { opacity: 0; } 18% { opacity: 0.9; } 20% { opacity: 0; } 64% { opacity: 0.9; } 67% { opacity: 0; } }
+@keyframes mm-speck-c { 0% { opacity: 0; } 30% { opacity: 1; } 38% { opacity: 0; } }
+
+/* gate weave: the picture jitters a pixel or two */
+.mm-svg { animation: mm-weave 0.9s steps(1) infinite; }
+@keyframes mm-weave {
+  0% { transform: translate(0, 0); } 20% { transform: translate(0.25%, -0.2%); }
+  40% { transform: translate(-0.2%, 0.15%); } 60% { transform: translate(0.1%, 0.25%); }
+  80% { transform: translate(-0.25%, -0.1%); }
+}
+
+/* reduced motion: still picture, static vignette, no flashing layers */
+.is-reduced .mm-grain, .is-reduced .mm-flicker, .is-reduced .mm-pulse, .is-reduced .mm-scratch,
+.is-reduced .mm-speck, .is-reduced .mm-hair { display: none; }
+.is-reduced .mm-vignette, .is-reduced .mm-svg { animation: none; }

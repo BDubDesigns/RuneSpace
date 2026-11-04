@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Art sheet (dev)</title>
+<body style="margin:0;background:#888">
+<svg id="s" viewBox="0 0 1600 900" style="width:100%;display:block;background:#bbb"></svg>
+<script type="module">
+import { prospector, FACES } from '../src/art/prospector.js';
+import { cutter, mallet, sign, cart, ore, orePile, boulder } from '../src/art/props.js';
+const cues = [];
+let h = '';
+const pip = prospector(cues, 'pip', { kind:'pip', x:150, y:420, pack:true, props:{F: cutter('pip.c')}, face:'normal' });
+const rex = prospector(cues, 'rex', { kind:'rex', x:420, y:480, props:{F: mallet()}, face:'normal', flip:-1 });
+h += pip.html + rex.html;
+// face strips
+FACES.forEach((f,i)=>{
+  const a = prospector(cues, 'pf'+i, { kind:'pip', x:80+i*130, y:760, scale:.55, face:f });
+  h += a.html;
+  const b = prospector(cues, 'rf'+i, { kind:'rex', x:80+i*130, y:880, scale:.42, face:f });
+  h += b.html;
+});
+h += `<g transform="translate(700 200)">${sign('pip')}</g><g transform="translate(900 200)">${sign('rex')}</g>`;
+h += `<g transform="translate(560 470)">${cutter('x')}</g><g transform="translate(700 470) scale(1)">${mallet()}</g>`;
+h += `<g transform="translate(1000 420)">${cart('c1',{loaded:28})}</g>`;
+h += `<g transform="translate(1350 420)">${orePile()}</g>`;
+h += `<g transform="translate(1100 700)">${boulder()}</g>`;
+[0,1,2].forEach(i=>h+=`<g transform="translate(${700+i*60} 620)">${ore(i,1.5)}</g>`);
+document.getElementById('s').innerHTML = h;
+</script>
