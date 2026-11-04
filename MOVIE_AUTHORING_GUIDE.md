@@ -435,8 +435,9 @@ Use `prospector(cues, id, { kind: 'pip' | 'rex' })` as-is, changing `props`, `sc
 
 1. Different props/hat/face with the existing two bodies (cheapest, always consistent).
 2. A new `kind`: add a `KINDS` entry (proportions, face anchor) **and** the body-art functions
-   (torso/head/hat) in `src/art/prospector.js`. Be aware that the body assembly there currently
-   branches `kind === 'pip' ? … : …`, so a third kind means extending that branch.
+   (torso/head/hat) in `src/art/prospector.js`. The body assembly there branches by `kind`
+   (`thief` was added as a third body this way: its own leg/torso/head/hat art plus extra opacity-swapped layers); a fourth kind
+   means one more branch and its art functions. After touching the rig, film one's `npm test` hash check must stay green.
 3. A new rig file `src/art/<name>.js` modelled on `prospector()`. Keep the returned interface (`id`, `html`,
    `root`, `bob`, `head`, `hat`, `armF`, `armB`, `legF`, `legB`, `propF`, `propB`, `face()`, `walk()`, …)
    so `kit.js` helpers (`blow`, `idle`, `fwd`) keep working.
@@ -625,7 +626,7 @@ frozen. In the Claude desktop app, bring the preview pane forward before judging
 
 ## 10. Packaging for RuneSpace
 
-The deliverable is the `src/` folder (about 200 KB of source, about 60 KB packed). It has **no dependencies, no build
+The deliverable is the `src/` folder (about 480 KB of source for the two films, about 145 KB packed). It has **no dependencies, no build
 step, no network, no storage, no audio, no globals**.
 
 ### 10.1 Two ways in

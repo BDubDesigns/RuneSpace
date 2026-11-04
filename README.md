@@ -178,7 +178,7 @@ ore appear as normal so the story still reads. Per-cue control is the `reduce: '
 
 ## 8. Packaging and embedding in RuneSpace
 
-The shippable unit is `src/`: about 200 KB of source (≈ 60 KB packed), no dependencies, no network, storage,
+The shippable unit is `src/`: about 480 KB of source for the two films (≈ 145 KB packed), no dependencies, no network, storage,
 audio or globals.
 
 ```bash
