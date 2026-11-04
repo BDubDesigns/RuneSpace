@@ -841,6 +841,11 @@ the content that already owns each way of getting an item.
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.
 
+## Development tools outside the game
+
+- `tools/qc-studio/` is the dialogue authoring environment served by the app at the flagged `/qc-studio` route (`docs/qc-studio.md`).
+- `tools/holo-film-studio/` (#489) is a standalone, dependency-free silent-film authoring and QA system for the Holo Drive-In (`docs/holo-film-studio.md`). It is not part of the Next.js app: no route, component, or server code imports it, it is excluded from the production image's build context, and it has its own `node:test` and headless-browser checks and CI lane. A future Theatre feature would consume only its public player API from a client component; that integration does not exist yet.
+
 ## Strict TypeScript & SSOT
 
 - Strict TypeScript is enabled project-wide (`tsconfig.json`, `strict: true`, plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`). The one `tsconfig.json` covers every committed `.ts`/`.tsx` file, including `tests/unit/`, `tests/integration/`, and the Playwright sources under `tests/e2e/`, so `pnpm typecheck` is the single strict-typing boundary.

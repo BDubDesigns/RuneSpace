@@ -1,4 +1,9 @@
-# RuneSpace Movies
+# RuneSpace Movies (Holo Film Studio)
+
+> **Location.** This project lives in the RuneSpace repository at `tools/holo-film-studio/` (adopted in issue #489). It is an independently
+> operated development tool, like QC Studio: run every command below from that directory. It has no dependencies, needs no `pnpm install`, no
+> PostgreSQL and no Next.js, and nothing in the game imports it. RuneSpace-side rules (CI lane, build boundaries, provenance) are in
+> `docs/holo-film-studio.md` at the repository root. Agents must also follow the root `AGENTS.md`.
 
 A standalone, dependency-free silent-film engine and player for the Skatboll holo-drive-in, plus the
 films made with it. No framework, no build step, no backend, no third-party animation library: plain
@@ -7,7 +12,7 @@ panel (or any webview) without rewriting anything.
 
 | Film | Runtime | Status |
 |---|---|---|
-| **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (git tag `film1-approved`) |
+| **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (reference commit `e90a091`, formerly git tag `film1-approved`) |
 | **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, **awaiting owner approval** (no `film2-approved` tag yet) |
 
 **Watching the films** (after `npm run dev`):
@@ -37,7 +42,7 @@ Chrome/Chromium (`CHROME_BIN=/path/to/chrome` if it isn't on `PATH`). There is n
 the project has **no dependencies** (no `npm install` needed).
 
 ```bash
-git clone <this repo> && cd runespace-movies
+cd tools/holo-film-studio    # from the RuneSpace repository root
 npm test          # fast structural + unit tests (Node only)
 npm run dev       # http://127.0.0.1:5173/
 ```
@@ -244,6 +249,12 @@ for (let t = 0; t <= duration; t += 1000 / 30) {
 
 ## 10. Version control
 
-This directory is a git repository (`main`). `film1-approved` tags the approved first film.
-`.gitignore` excludes `node_modules/`, `dist/`, `*.tgz` and `frames/`: no generated or temporary artifacts
-are tracked. `npm test && npm run verify` should be green before every commit.
+This directory is part of the RuneSpace repository (it was a standalone repository until it was imported with `git subtree add`, so its
+original commits, with their original SHAs, are in RuneSpace's history). Work on it follows the root `AGENTS.md` (issue, branch, PR, no merge
+without the owner). `.gitignore` here excludes `node_modules/`, `dist/`, `*.tgz` and `frames/`: no generated or temporary artifacts are tracked.
+`npm test && npm run verify && npm run pack:check` should be green before every commit, and CI runs them as the `Holo Film Studio` lane.
+
+**Approval reference for film one:** the approved first film is the standalone repository's commit `e90a091c8f8460e1fad4b5acb3c4fd1b8b9d14e3` (the baseline commit "Baseline:
+That Mines Mine! as approved", formerly tagged `film1-approved`). `test/film1-approved.test.mjs` pins the film's build output to hashes recorded
+from that commit; `git show e90a091` and `git log --follow -- tools/holo-film-studio` work from the RuneSpace root while that commit
+remains in RuneSpace's history (merge, never squash, the import). Details and the verification recipe are in `docs/holo-film-studio.md`.

@@ -672,7 +672,7 @@ but it still fails `Merge gate`.
 
 `Merge gate` (`scripts/ci-merge-gate.mjs`, covered by
 `tests/unit/ci-gate-policy.test.ts`) needs every lane and passes only when the
-fast job, integration, and all three shards succeeded; a failed, skipped,
+fast job, integration, the Holo Film Studio lane, and all three shards succeeded; a failed, skipped,
 canceled, or missing required lane fails it. The screenshot lane counts only
 when requested, and then it must succeed. Any label event reruns the full
 validation rather than skipping it, because GitHub reports a skipped job as
@@ -680,6 +680,12 @@ passing and a skipped `Merge gate` would otherwise mask the head's real result.
 PR runs use a per-PR concurrency group so obsolete work is canceled only for that
 PR; main and manual runs use unique groups. Branch protection state is recorded
 in `docs/development-workflow.md` (§CI and the merge gate).
+
+The Holo Film Studio lane runs that tool's own `node:test` suites and
+headless-browser verification (`docs/holo-film-studio.md`); they stay outside
+Vitest, Playwright, and the canonical E2E selection, and
+`tests/unit/holo-film-studio-boundary.test.ts` guards the boundary from this
+side.
 
 CI retains a separate PostgreSQL integration job, a three-shard canonical E2E
 matrix, and an opt-in unsharded screenshot lane. The canonical runner is the

@@ -40,6 +40,7 @@ boundary.** This file is the repository's normative agent-behavior contract;
   - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
   - Database and deployment operations: `docs/deployment-database.md`.
   - QC Studio exports: `docs/qc-studio.md`.
+  - Holo Film Studio (`tools/holo-film-studio/`, silent films): `docs/holo-film-studio.md`.
 - Inspect existing components, rules, schemas, helpers, tests, scripts, and CI
   before creating anything new.
 

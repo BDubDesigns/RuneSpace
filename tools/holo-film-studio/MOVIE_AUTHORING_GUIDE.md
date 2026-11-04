@@ -5,6 +5,9 @@ exists today (file names, function names and argument lists are real). If the co
 ever disagree, the code wins: fix the guide, and `test/docs.test.mjs` will tell you when a path in
 it goes stale.
 
+This project lives at `tools/holo-film-studio/` inside the RuneSpace repository; paths in this guide are relative to that directory, and RuneSpace's
+root `AGENTS.md` governs how changes are made, reviewed and merged.
+
 Read this once top to bottom, then keep sections 5, 6 and 10 open while working. Before you start a film, skim section 13
 (lessons from film two); before you call one finished, run the visual review in section 9.5.
 
@@ -23,7 +26,7 @@ Read this once top to bottom, then keep sections 5, 6 and 10 open while working.
 6. **Every cue should say what reduced motion does** (`reduce: 'skip' | 'snap'`) unless the motion is
    essential. No flag = it plays in full even for users who asked for less motion.
 7. **Don't import from another film's folder.** Shared things live in `src/` (engine, `kit.js`, `art/`, `fx/`).
-8. **Don't edit "That Mines Mine!"** unless asked. It is approved. Tests and `film1-approved` (git tag) protect it.
+8. **Don't edit "That Mines Mine!"** unless asked. It is approved. Tests and the approval reference (commit `e90a091`, formerly tag `film1-approved`) protect it.
 9. **Run `npm test` and `npm run verify` before calling anything done** (section 9).
 10. **Look at it.** Seek to every scene in a real browser, including a phone-width one. Green tests do not mean funny.
     (`npm run shoot -- <film> <prefix> <scene+ms> ...` renders stills headlessly; `... every:1000` renders the whole film
@@ -596,7 +599,7 @@ deterministic; scenes are contiguous and captioned; chapters resolve; every cue 
 film; **every cue target exists in the markup** (a typo is otherwise silent); every `url(#id)` resolves
 (forgot `FX_DEFS`); no `data-t` name is shared between scenes; **every cue starts inside the scene that
 owns its target** (forgot `at()`); **no two cues overlap on the same element property** (rule 11; the approved
-film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the `film1-approved` tag's
+film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the approved commit's (`e90a091`)
 hashes, so a shared-library change that alters the approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
 regression), `defineFilm`, effects and the SSR-safe import. `test/docs.test.mjs` checks that file paths
 and `npm run` commands named in the docs exist.
@@ -860,7 +863,7 @@ Notes:
     scene needs hundreds more (confetti), prefer CSS `.fx` effects over cues, and measure on a mid-range phone.
 17. **Fonts differ by OS.** Re-check the longest card line and `pow()` words on a non-Mac/Windows system.
 18. **Hidden page = frozen clock** (9.4).
-19. **Don't import across films; don't edit film 1.** `git tag film1-approved` is the reference; the tests plus
+19. **Don't import across films; don't edit film 1.** Commit `e90a091` (formerly tag `film1-approved`) is the reference; the tests plus
     `npm run verify` must stay green for it after any engine change.
 20. **Keep it dependency-free.** No GSAP, no framework, no build step. Anything that needs one belongs in the host.
 21. **Don't overlap cues on a Track** (rule 11). It is the easiest bug to write: `walk()` plus a `bob.to()` in the same

@@ -1,29 +1,32 @@
 # Next Film Handoff
 
 For a fresh agent with no memory of earlier sessions. Everything you need is in this repository.
-Last updated at the end of the film-two review rounds and the lessons-learned documentation pass (git: see `git log`).
+Last updated when the project was imported into RuneSpace (issue #489); film two's content is unchanged since the last review round (see `git log -- tools/holo-film-studio`).
+**This project lives in the RuneSpace repository at `tools/holo-film-studio/`.** Run every `npm` command here from that directory; the RuneSpace-wide rules
+(root `AGENTS.md`, issue/branch/PR workflow, CI) apply to any change, and `docs/holo-film-studio.md` explains the boundaries.
 
 ## Paste this to start the next session
 
-> Read `NEXT_FILM_HANDOFF.md`, then `MOVIE_AUTHORING_GUIDE.md`, in `/home/brandon/claude/runespace-movies`.
+> Read RuneSpace's `AGENTS.md` and `docs/holo-film-studio.md`, then `tools/holo-film-studio/NEXT_FILM_HANDOFF.md`, then `tools/holo-film-studio/MOVIE_AUTHORING_GUIDE.md`,
+> in the RuneSpace repository (work from `tools/holo-film-studio/`; the old standalone `/home/brandon/claude/runespace-movies` is an archive, do not edit it).
 > Read guide section 9.5 (visual QA) and section 13 (lessons from film two) before touching a scene.
 > Run `npm test` and `npm run verify` to confirm the baseline is green. Then <do what the owner asked: apply
 > review feedback to "Rare or Weld Done?", or build the next film or advertisement>. Do not copy or fork the engine, do not modify
-> "That Mines Mine!", and do not touch the RuneSpace game repository or implement any theatre gameplay. Get the
+> "That Mines Mine!", and do not touch the RuneSpace game code outside `tools/holo-film-studio/` (and the CI/docs that describe it) or implement any theatre gameplay. Get the
 > screenplay (beats, cast, tone, runtime) from the owner before writing a scene, and record it in
 > `src/films/<id>/STORY.md`.
 
 ## 1. Project status
 
 - **Engine, player, effects, rig, props, cards: done and shared.** Film-agnostic; see guide §1.
-- **Film 1, "That Mines Mine!": complete and approved.** 1:43. Git tag `film1-approved`. Its `build()` output is pinned
-  by `test/film1-approved.test.mjs` (hashes recorded from that tag), so a change to shared code that alters it fails `npm test`.
-  Its folder has not changed since the multi-film refactor commit `cfa2acc` (`git diff cfa2acc -- src/films/that-mines-mine` is empty; that refactor only moved
+- **Film 1, "That Mines Mine!": complete and approved.** 1:43. Approval reference: standalone commit `e90a091` (formerly tag `film1-approved`; see README §10). Its `build()` output is pinned
+  by `test/film1-approved.test.mjs` (hashes recorded from that commit), so a change to shared code that alters it fails `npm test`.
+  Its folder has not changed since the multi-film refactor commit `cfa2acc` (original standalone history, still reachable in RuneSpace) (`git diff cfa2acc -- src/films/that-mines-mine` is empty; that refactor only moved
   shared helpers into `src/` and the pin test proves the output is identical to the approved tag), so none of the film-two work touched it.
 - **Film 2, "Rare or Weld Done?": built, tested and through several owner review rounds; AWAITING THE OWNER'S APPROVAL.**
   about 3:01 (181 s), 37 scenes (30 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
-  tag: create it only after the owner explicitly approves** (`git tag film2-approved`). Nothing has been pushed anywhere; there is no remote
-  and none may be created without asking.
+  tag or other approval record: create one only after the owner explicitly approves**, and ask the owner how to record it in RuneSpace (the film-one precedent is a
+  reference commit plus a hash-pin test; a tag in the shared RuneSpace repository is the owner's call). The import into RuneSpace did not change film two.
 - Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, hidden `template`. Demo page: `?film=<id>`.
 
 ### Film 2 at a glance
@@ -67,7 +70,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 | Claim | Evidence |
 |---|---|
 | Whole suite | `npm test`: 76 tests, 75 pass, 1 skipped by design (the no-overlap check is not applied to approved film one), 0 fail (re-run at the end of this documentation pass) |
-| Film 1 unchanged | `test/film1-approved.test.mjs`: markup / cues / chapters hashes and duration match the `film1-approved` tag; shared-library changes did not touch its output |
+| Film 1 unchanged | `test/film1-approved.test.mjs`: markup / cues / chapters hashes and duration match the approved commit `e90a091` (formerly tag `film1-approved`); shared-library changes did not touch its output |
 | Structure of every film | `films.test.mjs`: cue targets resolve, cues start in their own scene, **no two cues overlap on one element property**, gradients resolve, deterministic build, captions, chapters |
 | Film 2 story points | `rare-or-weld-done.test.mjs`: locked card wording, chapter list, ending scenes, FENCE planted twice, no police officer, names only in `config.js`, runtime window 2:00-3:10 (a ceiling that was raised with each review round; see guide 13.6) |
 | Real-browser behaviour | `npm run verify`: all films PASS in headless Chrome (seek determinism over 186 sample times for film 2, one scene + one face at a time, pause freezes everything, replay/restart/skip, **no effect lost after playback + scrubbing + skip + replay**, reduced motion, load/destroy leak nothing, 375 px player). It does not cover whether a gag is funny or readable. |
@@ -84,7 +87,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 
 ## 4. Exact steps for the next film (or for review feedback on film 2)
 
-1. `git status` (must be clean), `npm test`, `npm run verify`: green baseline.
+1. `git status` (must be clean; branch from fresh `origin/main` per the root `AGENTS.md`), `npm test`, `npm run verify`: green baseline.
 2. **Get the spec from the owner.** Write the approved beats to `src/films/<id>/STORY.md`.
 3. `cp -r src/films/_template src/films/<id>`, set `id`/`title`, add one registry line. (Guide §5.)
 4. `config.js` first (names, TEXT, TIMING, CAPTION), then `world.js` (include `${FX_DEFS}`), then scenes one at a time.
@@ -94,7 +97,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
    film-specific things under `src/films/<id>/`.
 6. `npm test`, `npm run verify`, the manual checklist (guide §9.3), then **the visual QA review** (§ below / guide 9.5), fix confirmed findings, repeat.
 7. Update README's film table and this file. Check `git show --stat` actually contains the doc changes your commit message claims.
-8. Tag `film<N>-approved` only after the owner approves.
+8. Record film approval (reference commit + hash-pin test, and a tag only if the owner wants one) only after the owner approves.
 
 ## 5. How to avoid duplicating the engine
 
@@ -139,7 +142,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 4. Compute contact and attachment (13.1), lean with the root (13.2), make effects follow causes (13.4), keep the world's state across shots (13.5), give camera moves a hold (13.6).
 5. When the first full cut exists, run the visual QA process (5.2) *before* showing the owner, and again after each owner round that changes timing.
 6. Keep an eye on the cue overlap test, the scene table (timestamps move), and the runtime ceiling in the film's test.
-7. Write the interpretation of any ambiguous note in your reply, and never tag, push or create a remote without being asked.
+7. Write the interpretation of any ambiguous note in your reply. Follow the RuneSpace issue/PR workflow; never merge, tag or push a tag without being asked.
 
 ## 6. Known limitations and known issues
 
@@ -195,5 +198,5 @@ npm test             # structure + unit + docs + film-one pin + film-two story t
 npm run verify       # real-browser checks for every film, ~70 s
 npm run shoot -- <film> <out-prefix> <ms | scene+ms | every:ms> ...   # stills + contact sheet(s) (COLS= W= H= UI=1 REDUCED=1 STAMP=1 SHEETS=n SETTLE=ms)
 npm run pack:check   # what would ship
-git tag -l; git log --oneline
+git log --oneline -- tools/holo-film-studio   # from the RuneSpace root; includes the original standalone history
 ```

@@ -103,6 +103,7 @@ Read these before contributing:
 - [`docs/art-cookbook.md`](./docs/art-cookbook.md) — art direction, generation workflow, asset preparation, and visual QA.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.
 - [`docs/development-workflow.md`](./docs/development-workflow.md) — one issue/branch/PR workflow and CI.
+- [`docs/holo-film-studio.md`](./docs/holo-film-studio.md) — the standalone Holo Film Studio (`tools/holo-film-studio/`): silent-film engine, films, preview, QA, CI lane, and provenance (issue #489).
 - [`docs/analytics.md`](./docs/analytics.md) — PostHog product analytics: event contract, privacy gates, Coolify configuration, and dashboard setup (issue #413).
 - [`docs/admin-console.md`](./docs/admin-console.md) — admin/operator console authorization, commands, and audit (issue #113).
 
