@@ -13,7 +13,7 @@ panel (or any webview) without rewriting anything.
 | Film | Runtime | Status |
 |---|---|---|
 | **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (reference commit `e90a091`, formerly git tag `film1-approved`) |
-| **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, **awaiting owner approval** (no `film2-approved` tag yet) |
+| **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, **awaiting owner approval** (no approval record yet) |
 
 **Watching the films** (after `npm run dev`):
 

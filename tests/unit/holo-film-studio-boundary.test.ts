@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -73,7 +73,7 @@ describe("Holo Film Studio boundary", () => {
           offenders.push(`${file}: ${target}`);
           continue;
         }
-        if (!resolve(dirname(file), target).startsWith(STUDIO))
+        if (!resolve(dirname(file), target).startsWith(STUDIO + sep))
           offenders.push(`${file}: ${target}`);
       }
     }

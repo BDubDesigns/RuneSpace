@@ -173,8 +173,8 @@ Grep for these before re-deriving them from scratch.
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
    explicit product-owner instruction.
-8. Every PR push runs full CI: fast checks, PostgreSQL integration, and three
-   canonical E2E shards start together, and `Merge gate` passes only when all
+8. Every PR push runs full CI: fast checks, PostgreSQL integration, the Holo Film
+   Studio lane, and three canonical E2E shards start together, and `Merge gate` passes only when all
    succeed. Follow the run to a terminal state; inspect failed logs, repair on
    the same branch, push, and follow the replacement run. The handoff ends at
    the PR, its observed checks, and owner review.

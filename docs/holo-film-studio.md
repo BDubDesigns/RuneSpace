@@ -2,8 +2,8 @@
 
 The Holo Film Studio is the silent-film authoring, animation, preview, and
 visual-QA system for the Holo Drive-In. It lives at `tools/holo-film-studio/`
-and is an **independently operated development tool**, like QC Studio, but it is
-not part of the Next.js app: it has no routes, no React, no database, and no
+and is an **independently operated development tool**. Unlike QC Studio, which
+the app serves at `/qc-studio`, it is not part of the Next.js app: it has no routes, no React, no database, and no
 dependencies. Adopted in issue #489; before that it was a standalone project at
 `/home/brandon/claude/runespace-movies`.
 

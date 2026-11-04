@@ -22,7 +22,7 @@ Last updated when the project was imported into RuneSpace (issue #489); film two
 - **Film 1, "That Mines Mine!": complete and approved.** 1:43. Approval reference: standalone commit `e90a091` (formerly tag `film1-approved`; see README §10). Its `build()` output is pinned
   by `test/film1-approved.test.mjs` (hashes recorded from that commit), so a change to shared code that alters it fails `npm test`.
   Its folder has not changed since the multi-film refactor commit `cfa2acc` (original standalone history, still reachable in RuneSpace) (`git diff cfa2acc -- src/films/that-mines-mine` is empty; that refactor only moved
-  shared helpers into `src/` and the pin test proves the output is identical to the approved tag), so none of the film-two work touched it.
+  shared helpers into `src/` and the pin test proves the output is identical to the approved commit `e90a091`), so none of the film-two work touched it.
 - **Film 2, "Rare or Weld Done?": built, tested and through several owner review rounds; AWAITING THE OWNER'S APPROVAL.**
   about 3:01 (181 s), 37 scenes (30 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
   tag or other approval record: create one only after the owner explicitly approves**, and ask the owner how to record it in RuneSpace (the film-one precedent is a
@@ -175,7 +175,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 
 ## 7. Open decisions (ask the owner, or decide and write it down here)
 
-1. **Approval of film 2** and the `film2-approved` tag. Note any feedback in this file.
+1. **Approval of film 2** (record it as §1 describes; no tag until the owner asks). Note any feedback in this file.
 2. **Lore:** the Emerald's real name and the third planet's name are undecided; change `NAMES` in film 2's `config.js`
    (and re-check the museum sign and sign lettering fit, see `signboard()` font fitting).
 3. **Runtime budget** for film 2 (now about 3:01, never explicitly accepted) and later films (see §6, guide 13.6).
@@ -195,7 +195,7 @@ commercials, and a third film. "5 CREDITS ADMISSION" in film 2 is a gag price in
 ```bash
 npm run dev          # http://127.0.0.1:5173/?film=<id>   (&t=ms &cc=1 &reduced=1 &ui=0 &bare=1)
 npm test             # structure + unit + docs + film-one pin + film-two story tests, ~0.4 s
-npm run verify       # real-browser checks for every film, ~70 s
+npm run verify       # real-browser checks for every film, ~100 s
 npm run shoot -- <film> <out-prefix> <ms | scene+ms | every:ms> ...   # stills + contact sheet(s) (COLS= W= H= UI=1 REDUCED=1 STAMP=1 SHEETS=n SETTLE=ms)
 npm run pack:check   # what would ship
 git log --oneline -- tools/holo-film-studio   # from the RuneSpace root; includes the original standalone history

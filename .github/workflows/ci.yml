@@ -134,7 +134,9 @@ jobs:
     # Development tool under tools/holo-film-studio/: dependency-free Node and a
     # headless browser, no pnpm install and no PostgreSQL. It is deliberately not
     # part of the canonical gameplay E2E. See docs/holo-film-studio.md.
-    runs-on: ubuntu-latest
+    # Pinned like the other browser lanes; `npm run verify` drives the runner's
+    # preinstalled Google Chrome.
+    runs-on: ubuntu-24.04
     env:
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
       # Chrome's sandbox needs unprivileged user namespaces, which GitHub's
@@ -152,6 +154,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Browser available
+        run: google-chrome --version
 
       - name: Unit and structure tests (includes the film-one pin)
         run: npm test
