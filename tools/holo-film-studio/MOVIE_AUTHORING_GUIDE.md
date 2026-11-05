@@ -1,0 +1,1048 @@
+# Movie Authoring Guide
+
+How to make a new silent film with this project's engine. Everything here describes the code as it
+exists today (file names, function names and argument lists are real). If the code and this guide
+ever disagree, the code wins: fix the guide, and `test/docs.test.mjs` will tell you when a path in
+it goes stale.
+
+This project lives at `tools/holo-film-studio/` inside the RuneSpace repository; paths in this guide are relative to that directory, and RuneSpace's
+root `AGENTS.md` governs how changes are made, reviewed and merged.
+
+Read this once top to bottom, then keep sections 5, 6 and 10 open while working. Before you start a film, skim section 13
+(lessons from film two); before you call one finished, run the visual review in section 9.5.
+
+---
+
+## 0. The eleven rules (read these even if you read nothing else)
+
+1. **Films are data.** A film is a `defineFilm({...})` object: scene builders return SVG strings and
+   push *cues* (timed animations) into one shared list. The engine turns that into one seekable clock.
+2. **Wrap every scene-relative time in `at()`.** `ctx.at(1500)` = "1.5 s into this scene" as absolute
+   film time. Forgetting it puts the action in the wrong scene and nothing crashes. (`npm test` catches it.)
+3. **Prefix every `data-t` name with `ctx.id`** (`${id}.pip`). Names must be unique across the whole film.
+4. **Never use `setTimeout`, `requestAnimationFrame`, JS-driven animation or `style.transition`.**
+   Only cues and `--at/--dur` CSS effects live on the master clock, so only they pause and seek.
+5. **Include `FX_DEFS` in your film's `defs`.** Dust and smoke paint with gradients defined there.
+6. **Every cue should say what reduced motion does** (`reduce: 'skip' | 'snap'`) unless the motion is
+   essential. No flag = it plays in full even for users who asked for less motion.
+7. **Don't import from another film's folder.** Shared things live in `src/` (engine, `kit.js`, `art/`, `fx/`).
+8. **Don't edit "That Mines Mine!"** unless asked. It is approved. Tests and the approval reference (commit `e90a091`, formerly tag `film1-approved`) protect it.
+9. **Run `npm test` and `npm run verify` before calling anything done** (section 9).
+10. **Look at it.** Seek to every scene in a real browser, including a phone-width one. Green tests do not mean funny.
+    (`npm run shoot -- <film> <prefix> <scene+ms> ...` renders stills headlessly; `... every:1000` renders the whole film
+    for the contact-sheet review in 9.5.)
+11. **Sequence the cues on a Track; never overlap them.** Every `Track` cue starts from the *end pose* of the previous
+    one, so two cues running at once make the picture jump to the first one's end pose. While `walk()` / `aimAlong()` /
+    `hop()` runs on a character, do not touch the same body part (`root`, `bob`, `legF`, `armF` ...) in that window; use
+    another Track (`torso` for a lean or a jolt, `head`, `hat`, `propF`) or start the next cue when the last one ends.
+    `npm test` fails with the offending cues for any new film.
+
+---
+
+## 1. Architecture
+
+```
+ ┌───────────────────────── host page / RuneSpace React panel ─────────────────────────┐
+ │  createMoviePlayer(container, { film })        ← src/player/  (DOM, controls, a11y) │
+ │        │ film.build() → { markup, cues, duration, scenes, chapters }                │
+ │        │                       ▲                                                    │
+ │        │            defineFilm({ scenes: [...] })   ← src/engine/film.js            │
+ │        │                       ▲                                                    │
+ │        │      scene builders (ctx) => svg string    ← src/films/<film>/scenes/*.js  │
+ │        ▼                       │ use                                                │
+ │  createTimeline(stage, { duration, cues })   ← src/engine/timeline.js               │
+ │   ONE master clock; drives cue animations + CSS effect animations together          │
+ │                                                                                     │
+ │  helpers a scene uses:  Track/tween/show (src/acting.js)   Camera/blow/popIn/…      │
+ │  (src/kit.js)   prospector rig, props, title cards (src/art/)   particles (src/fx/)│
+ └─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Data flow at load: `player.load(film)` → `film.build()` (pure, deterministic, no DOM) → the SVG
+markup is injected into `.mm-svg` → `createTimeline()` finds every `[data-t]` element and compiles
+the cue list into paused Web Animations → everything is driven from one master animation's
+`currentTime`.
+
+### 1.1 Directory structure and who owns what
+
+```
+index.html  script.js  styles.css        demo page (not part of the shipped module)
+dev/                                      development tools (not shipped)
+  serve.mjs                                 zero-dep no-cache static server (+ startServer() export)
+  sheet.html                                art sheet: every face, prop, character on one page
+  verify.html  verify.js                    in-browser checks for one film (?film=<id>)
+  verify-headless.mjs                       runs verify.html for all films in headless Chrome
+test/                                     node:test suites (no browser needed)
+src/                                      THE MODULE (what gets shipped / copied into RuneSpace)
+  index.js  index.d.ts                      public entry + hand-written types
+  ── ENGINE (film-agnostic; shared by every film) ──────────────────────────────────────
+  engine/timeline.js                        the seekable master clock (WAAPI)
+  engine/film.js                            defineFilm(): scenes → markup + cues, iris/fade transitions
+  player/player.js  player.css              mount point, controls, captions, keyboard, public API
+  acting.js                                 Track (pose-recording cue emitter), tween(), show()
+  kit.js                                    Camera, driftClouds, idle, fwd, blow, popIn, filmHelpers
+  ── REUSABLE ART + EFFECTS (film-agnostic building blocks) ────────────────────────────
+  fx/effects.js  fx/effects.css             particles/impact words as SVG + CSS keyframes; FX_DEFS
+  fx/film-look.css                          grain, vignette, flicker, scratches, gate weave
+  art/prospector.js                         parametric cartoon character rig (cast: pip, rex, thief)
+  art/props.js                              ore, cutter, mallet, sign, mine cart, ore pile, boulder
+  art/cards.js                              silent-film title cards
+  art/weld.js                               torch, gas cart, fence runs/posts, gate, ticket booth, admission sign, plate, scroll
+  art/emerald.js                            the giant gem, plinth, stanchions, rope, placard
+  art/balloons.js                           balloon, bird, scrap, BalloonCloud (tie on / stretch / pop)
+  art/heist.js                              newspaper, thought bubble, the FENCE dealer, Credits (coin, pile, bag)
+  art/crowd.js                              tourist(): seven cheap background people
+  ── FILMS (everything specific to one movie) ──────────────────────────────────────────
+  films/index.js                            registry: FILMS, listFilms(), loadFilm(id)
+  films/rare-or-weld-done/                  film two (STORY.md = the approved screenplay; scenes/yard.js = the fence set)
+  films/that-mines-mine/                    the approved first film
+    config.js                                 TEXT (cards), TIMING (scene ms), CAPTION (CC text)
+    index.js                                  scene order, transitions, chapters
+    world.js                                  its locations + WORLD_DEFS (gradients/patterns)
+    scenes/discovery|rival|bonk|mining|payoff.js   the action, one function per scene
+  films/_template/                          minimal working film to copy (hidden in the demo list)
+```
+
+**The rule of thumb:** if a file lives under `src/films/<id>/`, it belongs to that film alone.
+Everything else in `src/` must stay film-agnostic.
+
+### 1.2 What is "the engine" (reusable, don't fork per film)
+
+| File | Role |
+|---|---|
+| `src/engine/timeline.js` | Master clock; compiles cues; play/pause/seek/restart/skip/reduced-motion/destroy. |
+| `src/engine/film.js` | `defineFilm()`; scene start times; shot visibility; iris/fade; chapters. |
+| `src/player/player.js`, `player.css` | DOM shell, controls, captions, keyboard, poster frame, the public API. |
+| `src/acting.js` | `Track`, `tween`, `show`. |
+| `src/kit.js` | `Camera`, `driftClouds`, `idle`, `fwd`, `blow`, `popIn`, `filmHelpers`. |
+| `src/fx/*` | Effects + film-look CSS. |
+| `src/art/*` | Rig, props, cards. These are *content libraries*: new films add to them. |
+| `src/films/index.js` | Registry. One line per film. |
+
+### 1.3 What is "a movie" (film-specific)
+
+Everything under `src/films/<id>/`: scenes and their timelines (`scenes/*.js`), locations
+(`world.js`), title-card text and scene durations (`config.js`), the scene order/transitions
+(`index.js`). Characters and props are *shared libraries* in `src/art/`; a film that needs a new one
+adds it there (or, if it truly is single-use, in its own folder).
+
+---
+
+## 2. Core concepts
+
+**Film** – `defineFilm({ id, title, width, height, posterAt, defs, chapters, scenes })`
+(`src/engine/film.js`). `width`/`height` default 1280×720; all art is authored in that coordinate space.
+
+**Scene** – `{ id, label, duration, caption, in, out, inMs, outMs, irisIn, irisOut, build(ctx) }`.
+`build` returns an SVG string and pushes cues. Scene start times are the running sum of durations,
+in array order. Two helpers (from `filmHelpers`) make scenes: `titleCard(id, lines, opts, extra)`
+(id becomes `c-<id>`) and `shot(id, buildFn, extra)` (id becomes `s-<id>`); both read `duration` and
+`caption` from `TIMING[id]` / `CAPTION[id]`.
+
+**ctx** (passed to `build`) – `{ id, t0, dur, width, height, cues, at(rel) }`.
+
+**Cue** – a plain object (`src/engine/timeline.js`):
+
+| field | meaning |
+|---|---|
+| `at` | start, **absolute film ms** (use `ctx.at(rel)`) |
+| `dur` | duration of ONE iteration, ms (> 0) |
+| `target` | a `data-t` name in the markup, or an `Element`. (`'frame'` is the player's picture frame.) |
+| `keyframes` | `[{ transform, opacity, visibility, clipPath, ..., offset?, easing? }, ...]` (≥ 2) |
+| `easing`, `iterations`, `direction` | as in WAAPI (`iterations` finite) |
+| `fill` | default is automatic (see 3.2); `'none'` / `'forwards'` override |
+| `reduce` | `'skip'` drops the cue in reduced motion; `'snap'` jumps to its end state; absent = plays normally |
+
+**Target** – any element with `data-t="name"`. A cue animating several CSS properties is split into
+one animation per property so chains of cues on the same property don't fight.
+
+**Track** (`src/acting.js`) – remembers an SVG group's pose `{x, y, rot, sx, sy, flip}` and emits
+transform cues, filling in the "from" keyframe for you. Poses are absolute and cumulative. A tracked
+group animates around its **local origin (0,0)**; art is drawn so the origin is the pivot.
+
+**Effect** – an SVG snippet with a CSS class and `--at` / `--dur` custom properties (`src/fx/effects.js`
++ `effects.css`). Picked up by the timeline through `getAnimations()`, so it shares the clock.
+
+---
+
+## 3. The timeline: timing, effects, playback, pause, seek, replay, reduced motion
+
+Source: `src/engine/timeline.js` (read it; it is ~270 lines with a thorough header comment).
+
+### 3.1 One clock
+
+`createTimeline(root, { duration, cues, reducedMotion })` creates a hidden `<i class="mm-clock">`
+and one **master animation** on it with `fill: 'both'`; its `currentTime` *is* the film time.
+Every cue is compiled to `element.animate()` and paused; every CSS effect animation found under
+`root` is adopted and paused. Playback = `play()` on all of them together; pause = `pause()` on all
+of them then re-assert the exact time (pause commits asynchronously and would otherwise drift a frame);
+seek = set `currentTime` on all of them. Because everything is a function of the one clock, **the
+whole picture is a pure function of time**: seeking forward, backward or by jumping gives
+byte-identical frames (this is what `dev/verify.js` fingerprints).
+
+### 3.2 Fill rules (why seeking restores the exact pose)
+
+For each *(element, CSS property)* the earliest cue fills `both` (so it also holds the pose *before*
+it starts), later cues fill `forwards`. Result: at any time `t`, every property has exactly the
+value the latest finished/running cue gave it. Therefore:
+
+- A Track's first cue should start from the pose you constructed it with; `prospector(...)` and
+  `placed(...)` already render that initial pose into the markup.
+- If you animate the same element with cues that don't chain through a `Track` (raw cues), keep
+  them in time order and non-overlapping per property.
+
+### 3.3 The replaceable-animation trap (already handled, don't undo it)
+
+Browsers silently *remove* a finished animation once a later one overrides the same property. A
+removed animation can never be seeked back to, which made eyes and a whole character vanish after a
+seek. `compile()` calls `a.persist()` on every cue animation to prevent that. **Do not persist the
+adopted CSS animations** (it broke the reduced-motion rebuild).
+
+#### If effects (the iris, the overlays, grain, an effect or two) seem to vanish after seeking, replaying or skipping
+
+Reported once by the owner while reviewing film two ("effects disappear after I use the controls"); it did **not** reproduce
+afterwards (headless Chrome and the desktop app's browser, a full real-time watch followed by scrubbing, chapter jumps, skip
+and replay all gave frame-for-frame identical pictures), so treat it as a transient (most likely a stale page left open while
+files were being edited: reload first). If you ever see it again, do not guess, measure:
+
+1. Reload the page and retry. A page that loaded while a module was mid-edit can be half old, half new.
+2. `npm run verify` has a check named *"no effect is lost after real playback mixed with scrubbing, chapter jumps, skip and
+   replay"*: it must pass. If it fails it names the sample times whose picture differs.
+3. Compare computed styles of every element in `.mm-stage` before and after the controls (that is all the check does). The
+   known mechanisms that cause exactly this symptom are the two traps in 3.3 and 3.4: an animation that was **removed** by
+   the browser (do not remove `persist()`), and a CSS effect that is **not on the clock** (a visible 0% keyframe needs
+   `.fx-late`, see `fx-late` in `effects.css`).
+4. `getAnimations()` omits finished animations that have no fill, so a lower count after skipping to the end is normal;
+   compare computed styles, not counts.
+
+### 3.4 Effects on the same clock
+
+`.fx` elements (`effects.css`) set `animation-delay: calc(var(--at) * 1ms)`,
+`animation-duration: calc(var(--dur) * 1ms)`, `animation-fill-mode: both`. Since `--at` is absolute
+film time, an effect appears at the right moment and, when you seek past it, shows its finished
+state (invisible), when you seek before it, nothing. The film-look layers in `film-look.css`
+(grain, flicker, scratches, specks, gate weave) are looping CSS animations with no delay; they are
+adopted the same way, so pausing the movie also freezes the grain, and frame N is always the same
+frame N.
+
+### 3.5 Playback state machine
+
+`timeline.state`: `idle → playing ⇄ paused → ended`. `play()` from `ended` rewinds to 0. `seek(t)`
+keeps the current state (idle stays idle; ended → paused; seeking to `duration` → ended).
+`restart()` = `seek(0)` + `play()`. `skipToEnd()` = `seek(duration)`. Events: `state`, `time`
+(every frame while playing, and after seeks), `reducedmotion`.
+
+`play()` only calls `a.play()` on animations whose end is still ahead of the playhead; calling
+`play()` on a finished animation rewinds it (that bug existed once).
+
+The **player** adds an `idle` poster frame (the film shows `film.posterAt` ms until first play),
+captions, scrub bar (pauses while dragging, resumes after), keyboard (`Space/K`, `←/→` ±5 s,
+`Home`, `End`, `R`, `C`, `F`) and the public API (`load, play, pause, toggle, seek, restart, skip,
+setCaptions, setReducedMotion, on/off, destroy`). Types: `src/index.d.ts`.
+
+### 3.6 Reduced motion
+
+On by default when `prefers-reduced-motion: reduce` (`reducedMotion: 'auto'`), or via the wave
+button, `player.setReducedMotion(bool)`, or `?reduced=1` on the demo page. Toggling **rebuilds the
+timeline in place**, keeping the time and play state.
+
+| thing | reduced behaviour |
+|---|---|
+| cue with `reduce: 'skip'` | dropped (walk cycles, bobs, shakes, idle sway) |
+| cue with `reduce: 'snap'` | replaced by an instant jump to its end state (travel, camera moves, transitions) |
+| cue with no `reduce` | **plays normally** (right for story-essential things: face swaps, sign pop-ins, ore pops). Title-card text reveals use `snap`: the words appear at once |
+| `.fx` particles | hidden (`display:none`) |
+| `.fx.fx-keep` (`pow` words, `mark` !/?, `zzz`, `dizzy`, `badIdea`) | kept, but as a plain fade in/out in place (`fx-simple`) |
+| film-look (grain, flicker, scratches, weave) | removed; vignette static |
+
+Mechanics worth knowing: the **timeline owns the `is-reduced` class** on the stage and re-collects
+the CSS animations right after changing it. Never toggle that class from anywhere else (the player
+used to; it spawned effect animations outside the master clock).
+
+---
+
+## 4. Reference: the pieces you build with
+
+### 4.1 `Track` (`src/acting.js`)
+
+```js
+const t = new Track(cues, 'name', { x, y, rot, sx, sy, flip });   // pose defaults: 0,0,0,1,1,1
+t.to(at, dur, { x: 600 }, { ease, reduce })        // move to a new absolute pose over dur
+t.set(at, { y: 540 })                               // instant (1 ms)
+t.keys(at, dur, [{ o: .5, y: -40, ease }, { o: 1, y: 0 }], { seg, ease, iterations, reduce })
+t.pattern(at, dur, [{ rot: 4 }, { rot: -4 }, { rot: 0 }], opts)   // evenly spaced
+t.hop(at, dur, h, { x, y }, opts)                   // arc up by h, land at x/y (default: where it started)
+t.p                                                  // the current pose; t.css = inline style for the markup
+```
+
+- `o` is the keyframe offset 0..1, the last frame must be `1`. Patches are cumulative.
+- A frame's `ease` shapes the segment that leads **into** that frame; `opts.seg` is the default for all segments.
+  Default whole-cue easing is `ease-in-out` (or `linear` when you gave `seg`/per-frame eases).
+- `flip: -1` mirrors the group horizontally (scale X). Use it for facing left.
+- Emit tracks in time order; each cue starts from where the previous cue left the pose.
+
+Also `tween(cues, target, at, dur, from, to, { ease, reduce, iterations })` (any CSS props, e.g. opacity)
+and `show(cues, target, at, on = true)` (instant appear/vanish).
+
+### 4.2 Camera and helpers (`src/kit.js`)
+
+```js
+const cam = new Camera(cues, id, { x: 640, y: 360, s: 1 });  // wraps the shot; target `${id}.cam`
+cam.look(at, dur, { x, y, s }, ease)     // focus point + zoom; reduce:'snap'
+cam.shake(at, dur, px, rate)             // decaying shake; reduce:'skip'
+return cam.html(`${back}${actors}${fx}`) // everything inside moves with the camera, back-to-front
+```
+
+| helper | what |
+|---|---|
+| `driftClouds(ctx, id)` | drifts `${id}.cloudA/B/C` (the clouds a film's `sky(id)` draws) for the scene |
+| `idle(c, from, to, rate)` | breathing sway on a character's `bob`. **`from`/`to` are ABSOLUTE ms: pass `at(0), at(3000)`.** |
+| `fwd(c, deg)` | a lean in degrees that respects the character's `flip` (positive = the way it faces) |
+| `blow(c, t, up, dn)` | overhead mallet blow; returns the impact time. Character must hold a mallet in `propF`/front hand |
+| `popIn(sign, at, x, y)` | a placed prop pops into existence with overshoot |
+| `reach(c, x, y, toolLen, prefer?, pose?)` | two-link IK: `{ arm, prop }` rotations for `c.armF` / `c.propF` that put a hand-held tool's tip on world point (x, y). `pose` overrides the root (e.g. `{ x }`) to solve for where it WILL stand |
+| `poseAt(cues, target, t, initial)` / `gripAt(c, cues, t, hand = 'F')` | replay a Track's cues to recover its pose (or a character's front- (`'F'`) or back-hand (`'B'`) position) at film time `t`: use them to anchor a hose, rope or contact point to a moving hand instead of guessing numbers |
+| `aimAlong(c, at, dur, path, { toolLen, stand?, step?, prefer?, lead? })` | sweeps the tool tip along `path(s) -> {x, y}` (s in 0..1): emits chained arm/tool (and `root.x` via `stand(s)`) cues; returns the tip samples `[{ t, x, y }]` to hang sparks, smoke and flares on |
+| `filmHelpers({TIMING, CAPTION})` | returns `{ titleCard, shot, fit }` |
+
+### 4.3 Character rig (`src/art/prospector.js`)
+
+```js
+const pip = prospector(cues, `${id}.pip`, {
+  kind: 'pip' | 'rex', x, y, scale, flip, rot, face: 'normal', pack: true,
+  props: { F: cutter(`${id}.cut`), B: undefined }, armF: -14, armB: 0, hatY: 0,
+});
+// y is the ground line: the root origin sits between the feet.
+return cam.html(`${...}${pip.html}${...}`);
+```
+
+Tracks on the returned object (each animates around its natural pivot): `root` (whole body),
+`bob` (breathing/hop; use this, not `root`, for hops), `torso`, `head`, `hat`, `armF`, `armB`,
+`legF`, `legB`, `shadow`, `propF`, `propB` (the thing in the hand). Actions: `face(at, name)`,
+`yap(at, total, rate)` (needs the `'angry'` face), `walk(at, dur, toX, {stride, amp, swing, bounce, ease, toY, noRoot})`,
+`squash(at, dur, sy, sx)`, `shake`(head), `vibrate`(body), `fold(at, on)` (arms crossed), `rest(at, dur)`.
+
+Faces (`FACES`): `normal glance shock greed angry plot ko sleep smug cheer sad`; each is a layer and
+`face()` swaps opacity instantly, so exactly one is visible at any time (verified).
+
+`walk()` slides `root` to `toX` while swinging limbs and bobbing; limbs return to rest at the end.
+`noRoot: true` swings limbs without moving the root (for a walk-in-place or when you move root yourself).
+
+Characters shipped: **pip** (short, round, bearded, scruffy), **rex** (tall, thin, moustache, top hat) and **thief**
+(lanky, striped shirt, stubble, flat cap; `kind: 'thief'`). The thief also has `goggles: 'up' | 'down'` (welding goggles
+on the cap / over the eyes; swap with `c.goggles(at, 'up' | 'down' | 'off')`) and a `dressed` look, a ridiculous top hat
+and a crooked bow tie (`dressed: true`, or `c.dressUp(at, true)`).
+Look at them all on `dev/sheet.html`.
+
+### 4.4 Props (`src/art/props.js`)
+
+`ore(variant, s, tone)`, `cutter(id)` (grip at origin, nose +x; its disc is `${id}.disc`),
+`mallet()` (grip at origin, head toward +y), `sign(variant 'pip'|'rex', text)` (origin = stake tip),
+`cart(id, {loaded})` (+ `cartSpot(i)`, `CART_LOAD_COUNT`, `CART_TOP`; chunk `i` is `${id}.ch${i}`,
+wheels `${id}.whB/whF`, body `${id}.body`), `orePile(seed)`, `boulder(w, h)`, `INK` (outline colour),
+and `placed(cues, id, markup, pose)` → `{ track, html }`: wraps any markup in a posed, trackable group.
+
+### 4.5 Effects (`src/fx/effects.js`) and title cards (`src/art/cards.js`)
+
+All take **absolute** `at`. Catalogue:
+
+| function | looks like | reduced motion |
+|---|---|---|
+| `puff({x,y,at,dur,r,dx,dy,opacity,fill})`, `dust({x,y,at,n,spread,r,dur,dir,seed,fill})` | soft drifting puff / cloud of them | hidden |
+| `sparks({x,y,at,n,power,dur,angle,spread,seed,size})` | 4-point sparks with gravity | hidden |
+| `chips({..., fill})` | dark rock chips (or any colour) | hidden |
+| `drops({x,y,at,n,dur,seed,spread})` | flying sweat drops | hidden |
+| `rays({x,y,at,n,r0,r1,dur,stroke,width})` | expanding impact rays | hidden |
+| `speedLines({x,y,at,dur,total,n,len,dir,spreadY,seed})` | streaks; place INSIDE a moving actor | hidden |
+| `sparkle({x,y,at,dur,r,n,s})` | repeating glint (`n` repeats) | hidden |
+| `pow({x,y,at,text,dur,rot,scale,font})` | comic word on a starburst: "BONK!" | fades in place |
+| `mark({x,y,at,text,dur,size})` | "!" or "?" popping over a head | fades in place |
+| `zzz({x,y,at,dur})` | snore Zs | fades in place |
+| `dizzy({x,y,at,dur,rx,ry,count})` | orbiting stars | fades in place |
+| `badIdea({x,y,at,dur,scale})` | the horned lightbulb | fades in place |
+| `flash({at,dur,peak})`, `dim({at,dur,peak})` | full-frame white flash / dark dip. **Put them outside the camera group** or a zoomed/panned camera leaves an edge | hidden |
+| `arc({x,y,at,dur,n,r})` | hard strobing welding flare (`n` flickers). Pass it as `torch(id, extra)` and it rides the torch tip | hidden |
+| `popBurst({x,y,at,dur,s})` | jagged balloon-pop burst | hidden |
+| `lightbulb({x,y,at,dur,scale})` | the *good* idea bulb (no horns) | fades in place |
+| `rings({x,y,at,n,gap,dur,r})` | expanding sound rings (a struck bell) | hidden |
+| `rng(seed)` | seeded random for deterministic scatter | – |
+
+`FX_DEFS` is the `<defs>` they paint with (`#g-dust`, `#g-smoke`). Put it in your film's `defs`.
+
+### 4.6 Other shared art (film two)
+
+All grayscale, ink-outlined, drawn around a documented origin; each is on `dev/sheet.html`.
+
+| module | what |
+|---|---|
+| `art/weld.js` | `torch(id, extra)` (grip at origin, `TORCH_TIP`), `gasCart`, `post`, `fenceRun({a,b,ha,hb,n})` (a run along a world line: wrap it in one `<g data-t>` and clip-reveal it), `gate`, `booth(id)` -> `{ back, front }`, `signboard(id, lines)`, `plate(id, w, h, lines)`, `scroll(id)` + `scrollPoint(s)` (a drawable flourish and a point on it by arc length), `swagSack` (a bank bag with the Credits mark and an open mouth; origin = the centre of the mouth, which faces up, so scaling it stretches it out from the rim), `cartValve`, `hose` / `connectHose(cues, id, { thief, tank \| anchor, t0, t1, len })` (a hose that runs from a valve or fixed anchor to the character's hand and sags or stretches with it; `rope: true` for a rope), `dragCart(cues, cart, wheelId, thief, t0, t1)` (the cart trails the character by the hose length, wheels rolling) |
+| `art/emerald.js` | `emerald(id, {w,h})` (origin bottom centre; the facets alternate near-white / near-black so it reads as a gem without colour), `plinth`, `stanchion`, `rope`, `placard` |
+| `art/balloons.js` | `balloon(tone, s)`, `bird(id)`, `BalloonCloud` (a cloud of balloons tied to a hub in *its carrier's* frame: `releaseRange`, `stretch`, `pop`, `html`) |
+| `art/heist.js` | `newspaper`, `bubble`, `dealer`, `coin`, `creditPile`, `creditBag` |
+| `art/crowd.js` | `tourist(cues, id, { v, x, y, scale, flip })` -> `{ html, root, bob, head, walk(), awe() }`: one tracked group each, so a queue of 14 stays cheap |
+
+Patterns worth reusing: **reveal** a welded part with a `clipPath: 'inset(0 100% 0 0)' -> 'inset(0 0% 0 0)'` cue on its `<g>` (works on SVG
+groups, deterministic, snaps in reduced motion) or draw a path on with `strokeDashoffset 1 -> 0` (give the path `pathLength="1"` and
+`stroke-dasharray="1 1"`); **follow a path with a tool** with `aimAlong()` and put the arc, sparks and smoke on the returned samples;
+**rig a thing that carries things** (the Emerald with its balloons, rope tail and sling) as one `Track` group so it can rise, squash and fall together.
+
+`card(ctx, lines, opts)` (usually via `titleCard`) draws the black card with a double-rule border and
+reveals each line with a staggered fade/rise (`at(120 + i*380)`). `opts.kind`: `'studio'` (reel emblem),
+`'title'` (rules + `sub` subtitle), `'end'`, or plain. Line items: a string or `{ t, size, spacing }`.
+
+---
+
+## 5. Creating a new film (step by step)
+
+The shipped `src/films/_template/` is a tiny, working, tested film. Copy it.
+
+```bash
+cp -r src/films/_template src/films/rare-or-weld-done
+```
+
+1. **Rename identity.** In the copied `index.js`: `id: 'rare-or-weld-done'`,
+   `title: 'Rare or Weld Done?'`. Folder name, film `id` and registry id must all match.
+2. **Register it** in `src/films/index.js` (one line; the tests fail if `id`/`title` disagree):
+   ```js
+   { id: 'rare-or-weld-done', title: 'Rare or Weld Done?', load: () => import('./rare-or-weld-done/index.js') },
+   ```
+3. **Write `config.js`.** `TEXT` (all card strings), `TIMING` (a ms duration for every scene id),
+   `CAPTION` (CC text for every scene id; the tests require one per scene).
+4. **Write `world.js`.** Export `WORLD_DEFS` = your gradients/patterns **plus `${FX_DEFS}`**, and
+   functions returning background SVG. Extend sky/ground *past* the 1280×720 frame if the camera pans
+   or zooms (film 1 uses −1200…2480) so you never reveal an edge.
+5. **Write scenes** in `scenes/*.js`, one exported function per scene: `(ctx) => svgString`.
+   Pattern (from `src/films/that-mines-mine/scenes/discovery.js`):
+   ```js
+   export function trudge(ctx) {
+     const { cues, at, id } = ctx;
+     const cam = new Camera(cues, id);
+     const pip = prospector(cues, `${id}.pip`, { kind: 'pip', x: -160, y: GY, scale: 0.92, pack: true, props: { F: cutter(`${id}.cut`) } });
+     pip.walk(at(150), 2350, 440, { stride: 660, amp: 20, bounce: 5, swing: 9 });
+     pip.face(at(3500), 'shock');
+     const fx = dust({ x: 420, y: GY + 8, at: at(2500), n: 5, spread: 40, r: 26, dir: -1, seed: 4 });
+     return cam.html(`${frontBack(id)}${pip.html}${frontFore()}${fx}`);
+   }
+   ```
+6. **Assemble in `index.js`**: `filmHelpers({ TIMING, CAPTION })`, then `scenes: [ titleCard(...), shot(...), ... ]`,
+   `chapters: [{ id, label, scene: 's-trudge' }]` (the scene id including its `c-`/`s-` prefix),
+   `posterAt` (ms where the idle poster shows a fully revealed title card).
+7. **Iterate in the browser:** `npm run dev`, open `http://127.0.0.1:5173/?film=rare-or-weld-done`.
+   Useful params: `?t=41000` (paused at 41 s), `?cc=1`, `?reduced=1`, `?ui=0&bare=1` (just the picture).
+8. **Verify:** `npm test` then `npm run verify`.
+
+Rules for scene `duration` (in `TIMING`): scene builders schedule inside `0 … duration`. Shortening a
+scene trims its tail; lengthening leaves the last pose held. Keep every cue's start inside its scene
+(the test enforces it) and end the scene on a held, readable pose.
+
+### 5.1 Scene transitions
+
+`in` / `out`: `'cut'` (default), `'iris'` (circle clip-path from/to `irisIn`/`irisOut` centre, in % of
+the frame, e.g. `[50, 62]`), `'fade'` (through black). `inMs` / `outMs` default 520. Title cards fade
+(300 ms) unless `{ dialogue: true }`, which cuts in and out like a spoken line. The last scene stays on
+screen at `t = duration`. Closing iris-out: see `finale` in `src/films/that-mines-mine/index.js`.
+
+### 5.2 Chapters
+
+`chapters` become `player.chapters` (`[{ id, label, at }]`) and the demo page's jump buttons. Use them
+for the story beats. `scene` must be an existing scene id (tests check).
+
+---
+
+## 6. Reusing characters, props, backgrounds, effects
+
+### 6.1 Characters
+
+Use `prospector(cues, id, { kind: 'pip' | 'rex' })` as-is, changing `props`, `scale`, `flip`, `face`,
+`pack`, `hatY`. For a **new look**, the options are, smallest first:
+
+1. Different props/hat/face with the existing two bodies (cheapest, always consistent).
+2. A new `kind`: add a `KINDS` entry (proportions, face anchor) **and** the body-art functions
+   (torso/head/hat) in `src/art/prospector.js`. The body assembly there branches by `kind`
+   (`thief` was added as a third body this way: its own leg/torso/head/hat art plus extra opacity-swapped layers); a fourth kind
+   means one more branch and its art functions. After touching the rig, film one's `npm test` hash check must stay green.
+3. A new rig file `src/art/<name>.js` modelled on `prospector()`. Keep the returned interface (`id`, `html`,
+   `root`, `bob`, `head`, `hat`, `armF`, `armB`, `legF`, `legB`, `propF`, `propB`, `face()`, `walk()`, …)
+   so `kit.js` helpers (`blow`, `idle`, `fwd`) keep working.
+
+Add every new art asset to `dev/sheet.html` so it can be eyeballed alone.
+
+### 6.2 Props
+
+New props go in `src/art/props.js` as functions returning SVG strings drawn around a meaningful origin
+(grip, stake tip, rail …; document it in the header comment). Animate them by wrapping with
+`placed(cues, id, markup, pose)` or by putting them into a character's `propF` / `propB` slot
+(`props: { F: cutter(id) }`), then animate with `pip.propF.to(...)`. A welding torch, for example: a handheld
+prop like `cutter()`, with `sparks()` + `sparkle()` at its tip.
+
+### 6.3 Backgrounds and shared world art
+
+`src/films/that-mines-mine/world.js` holds film 1's locations (`frontBack`, `backWorld`, `caveWall`,
+`sunburst`, `cactus`, …). They are **film-1 code**: do not import them from another film. If film 2
+really wants one (a desert ground, the comic `sunburst` for reaction close-ups), **promote it** to
+`src/art/` (move the function, move any gradient/pattern it uses into a shared defs string, fix film 1's
+imports, run the tests: film 1's `build()` output must not change) and import from there.
+
+### 6.4 Smoke, dust, sparks, lighting
+
+- **Dust:** `dust({ x, y, at, n, spread, r, dur, dir, seed })` at a character's feet when they start/stop/land.
+  `dir` biases drift (−1 left, +1 right).
+- **Smoke / fumes / steam:** there is no separate `smoke()`; use `puff` or `dust` with the dark gradient:
+  `puff({ x, y, at, dur: 1400, r: 46, dy: -90, fill: 'url(#g-smoke)' })` (this is what the template does). Use
+  light puffs (`#g-dust`, the default) for steam. Stagger several puffs (see the head-steam in
+  `rival` in `scenes/rival.js`: four puffs 150 ms apart).
+- **Sparks:** `sparks({ x, y, at, n, power, angle, spread, seed, size })`; `angle` is radians (`-Math.PI/2` = up);
+  pair with `chips` for debris and `sparkle` for a lingering glint (the mine mouth in `glints()` in `discovery.js`).
+- **Lighting:** there is **no lighting system**. The vocabulary is: a soft glow (an ellipse filled with
+  `url(#g-glow)` whose opacity you `tween`, see `glitter` in `discovery.js`; film 1 defines `#g-glow` in its
+  `WORLD_DEFS`, so add it to yours), `flash()` (impact frame) and `dim()` (dramatic dip), `sparkle()`
+  glints, and the CSS vignette/flicker. A welder's arc would be a `#g-glow` ellipse + `flash` + `sparks`.
+- **`flash`/`dim`** are full-frame rects. Film 1 puts them inside `cam.html()`, which works while the camera
+  is zoomed in (≥ 1) near the middle; for exactness put them *outside* the camera group:
+  `return `${cam.html(...)}${flash({...})}``.
+
+---
+
+## 7. New scenes and coordinating several animated characters
+
+Study `src/films/that-mines-mine/scenes/rival.js` (the sign-swapping routine) and `bonk.js`. The
+technique, in order:
+
+1. **Fix the staging numbers first** as constants (`GY = 604` ground line, `SIGN_Y`, x positions). Every
+   character's `y` is its ground line; stand characters on the same one.
+2. **Create everything up front** (`prospector`, `placed`, `Camera`), each with a unique `${id}.name`.
+3. **Write the action as a timeline of comments**, `at(ms)` ascending, one block per beat. All characters
+   share the one `cues` list, so "Rex reacts at 1400 ms" and "Pip wakes at 3300 ms" are just numbers on the
+   same axis. Sync an effect to an action by *using the returned time*: `const hit1 = blow(rex, at(2700));`
+   → `R1.track.to(hit1, 90, { y: 578 })` and `pow({ at: hit1 + 20 })`. Never duplicate a number you can derive.
+4. **Overlap, don't sequence**: while one character winds up, another can idle or react. A single call per
+   body part per moment; later cues on the same Track continue from the previous pose.
+5. **Props are actors too.** Signs are `placed()` Tracks: pop in with `popIn`, sink with `.to(..., { y })` on
+   each blow, get yanked with `.keys(..., { rot })` and flung off-screen with a two-segment arc.
+6. **Z-order is the order in the returned string**: background → set dressing → props → characters →
+   foreground that overlaps feet (`frontFore()`) → effects. Effects go last so they're never hidden.
+7. **Direct attention with the camera, not by moving characters:** `cam.look(at, dur, { x, y, s })`.
+   The argument scenes zoom toward the speaker in small steps (`punch(t, f)` in `argue1`/`argue2`); an
+   earlier version made characters hop upward and they ended up floating. Zoom instead.
+8. **Hold the last pose.** Leave a beat after the last action so the gag lands (1:09 in film 1 felt rushed
+   until its tail was extended). People need ~1 s to read a new picture.
+9. **Close-ups**: scale the character (`scale: 2.7` in `idea`) on a backdrop (`sunburst`) rather than zooming
+   a wide set; fewer elements, cleaner read.
+
+Multi-scene continuity: a character in scene B is a *new* `prospector(...)` call. Put it in the pose the
+previous scene ended in (same `x`, `face`, `props`), and use a transition (iris/fade/title card) so the
+cut hides the join.
+
+---
+
+## 8. Title cards, dialogue and visual gags
+
+### 8.1 Title cards
+
+```js
+// config.js
+TEXT.work = ['NOTHING BEATS A DAY', 'OF HONEST WORK!'];   TIMING.work = 3200;   CAPTION.work = '...';
+// index.js
+titleCard('work', TEXT.work),                               // fades through black
+titleCard('thatMine', TEXT.thatMine, { dialogue: true }),   // cuts in/out: a spoken line
+titleCard('end', TEXT.end, { kind: 'end', size: 120 }, { inMs: 700, outMs: 0, out: 'cut' }),
+```
+
+- Auto size (`fit()` in `kit.js`) = the largest serif that keeps the longest line inside the border,
+  capped at 96, min 40. It assumes ~0.66 em per character of a heavy serif; with a different font, re-check
+  long lines at small widths.
+- **Duration rule that survived feedback:** about **1 s plus 0.4 s per word**. Film 1 shipped with cards
+  that were too short and was lengthened; the cards fade in line by line (`120 + i*380` ms) and out (300 ms),
+  so the fully-readable window is a bit shorter than the scene. Test by reading it once, slowly.
+- Keep it to ≤ 2 lines, ≤ ~28 characters a line. Studio card / title card use per-line `{ t, size, spacing }`
+  items and a `kind` (see `index.js` in film 1).
+- A new card *style* (different border, a vignette, an iris-shaped inset) is a new `kind` branch in
+  `src/art/cards.js`.
+
+### 8.2 Gags (anatomy and recipes)
+
+A visual gag needs **setup → tell → payoff → hold**, in separate beats, and each should read with the
+sound off. Film 1's reusable devices:
+
+| gag | how it is built |
+|---|---|
+| double-take | `face('glance')` → look away → `face('shock')` + `head` snap + `bob.hop` + `mark('!')` + `drops()` |
+| impact | `flash` (200 ms) + `pow('BONK!')` + `rays` + `sparks` + `chips` + `dizzy` + `cam.shake`, all keyed to one impact time |
+| "very bad idea" | close-up on a sunburst, eyes `glance` at the tool, `badIdea()` bulb, `plot` face, `vibrate()` |
+| escalating load | cart with 28+ ore chunks `popped` in `FILL_ORDER` at 52 ms apart (`cartFull` in `mining.js`) |
+| runaway object | the prop's `Track` eases in (`cubic-bezier(.55,.05,1,.7)`), wheels spin by the distance travelled, debris `flyer()`s shed behind it |
+| foreshadow | the cutter that Pip hammers a sign with in `rival` (butt end) is the thing that bonks later |
+| sign war | `placed()` signs that pop/sink/fly; same object three times with different outcomes |
+| punchline picture | final wide shot that restates the joke visually (rival on the ore pile with the MINE! flag), then the card |
+| hat reunion | a `hat` Track dropped from off-screen (`hatY: -1500`) lands on a head that doesn't notice |
+| jump-kick that changes nothing (film 2) | crouch (hold it) -> accelerating run (`cubic-bezier(.65,0,.9,.5)`, legs/arms keyed fast) -> one `root` cue arcing to `rot: -84` with `y` raised (feet at the origin = the pivot) -> 1-frame `flash` + `rings` + `pow` while the target shudders (`x` +/- decaying, `sx`) -> a spinning rebound whose `rot` runs a full extra turn, then `set` it back to the equivalent angle before the recovery |
+| escalating load + cascade (film 2) | `BalloonCloud`: tie on 1, 3, 8, 18; `stretch` them, then `pop` in a shuffled order with the gap shrinking (`gap *= .78`, floor 22 ms); the carrier falls on one accelerating `keys` cue |
+| a tool that welds a path (film 2) | `aimAlong()` + a `strokeDashoffset` cue on the kerf over the same duration + `arc` windows inside the torch + sparks/smoke on the returned samples |
+| the squeeze (film 2) | squash the whole load group (`sy: .3`) into the opening, ooze it through, then a `boing`: `sy 1.34 / sx .84 -> .9 / 1.08 -> 1` |
+
+When you need a **new animated device**, build it from `Track` + existing effects first. If it needs a
+new particle or symbol, add a generator in `effects.js` and a `@keyframes` + class in `effects.css`:
+use `.fx` (it already wires `--at`, `--dur`, `--n`, fill-mode), pass extra `--vars` through the style
+string, decide whether it's `fx-keep` (story symbol) or decoration, and add a unit test in
+`test/engine.test.mjs`.
+
+---
+
+## 9. Testing a new film
+
+Layers, cheapest first. All of them must pass; the last one is you.
+
+### 9.1 `npm test` (≈ 0.2 s, Node only, no browser)
+
+`test/films.test.mjs` runs against **every registered film**: metadata equals the registry; `build()` is
+deterministic; scenes are contiguous and captioned; chapters resolve; every cue is finite and inside the
+film; **every cue target exists in the markup** (a typo is otherwise silent); every `url(#id)` resolves
+(forgot `FX_DEFS`); no `data-t` name is shared between scenes; **every cue starts inside the scene that
+owns its target** (forgot `at()`); **no two cues overlap on the same element property** (rule 11; the approved
+film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the approved commit's (`e90a091`)
+hashes, so a shared-library change that alters the approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
+regression), `defineFilm`, effects and the SSR-safe import. `test/docs.test.mjs` checks that file paths
+and `npm run` commands named in the docs exist.
+
+### 9.2 `npm run verify` (≈ 15 s for the 100-second film, headless Chrome, zero dependencies)
+
+Runs `dev/verify.html` for each film in the registry (or `node dev/verify-headless.mjs <id>`). Needs
+Node ≥ 22 and Chrome/Chromium (`CHROME_BIN=…` to point at one). Checks, in the real engine:
+
+- no "cue target not found" warnings; poster frame state
+- **seek determinism**: the whole picture's fingerprint at ~130 sample times (every scene boundary ±1 ms,
+  midpoints) is identical arriving forward, backward and by shuffled jumps
+- exactly **one scene visible** at every boundary; exactly **one face** visible per character
+- API semantics: seek keeps paused/playing; idle → paused; `skip()` equals `seek(duration)`
+- **pause freezes every animation** (none `running`, picture unchanged); playback tracks wall-clock
+- natural end, replay, `restart()` give identical frames; **no effect is lost** after real playback mixed with scrubbing,
+  chapter jumps, skip and replay (every sample frame must still equal its first viewing and the film-look overlays still run)
+- **reduced motion**: rebuilds in place, hides decoration, seek is order independent, toggling back
+  restores the identical picture
+- `load()` twice leaks no animations and keeps the film-look layers alive; `destroy()` cancels everything
+- **mobile (375 px wide player)**: 16:9, controls fit, no horizontal overflow
+
+Open it by hand for a visual report: `npm run dev` → `http://127.0.0.1:5173/dev/verify.html?film=<id>`.
+When a fingerprint differs, bisect in the browser console: take `getComputedStyle` of every `[data-t], .fx`
+at the two times and diff them; the element named in the diff is the culprit.
+
+### 9.3 Manual checklist (do all of it, in a real browser)
+
+- [ ] **Seeking:** drag the scrub bar across the whole film; jump to each chapter; with `?t=` open every scene
+      boundary. No missing characters, no stuck faces, no leftover effects, no flicker of the wrong scene.
+- [ ] **Replay:** let it end, press replay; press restart mid-film; skip to end; scrub backward. Same pictures.
+- [ ] **Pause/resume:** pause mid-gag (the grain should freeze too), wait, resume; nothing jumps.
+- [ ] **Scene transitions:** every iris/fade/cut; first frame and last frame of every scene (`?t=<start>`, `<end-1>`).
+- [ ] **Titles:** read each card at normal speed. Captions (`?cc=1`) say what the picture says.
+- [ ] **Mobile:** viewport 375×812 (and ~700 px for a "panel"): picture, controls and chapter buttons fit,
+      thumb-size targets, scrub on its own row. Fullscreen works.
+- [ ] **Reduced motion:** `?reduced=1`: still readable as a story (cards, expressions, signs, impact words), no
+      decoration or camera shake.
+- [ ] **No console warnings** (`[movie] cue target not found`).
+
+### 9.4 Screenshots and the hidden-pane gotcha
+
+Seeking does not need a ticking clock, so `?t=…&bare=1&ui=0` + a screenshot is the quickest way to review
+a frame. **Real playback needs a *visible* page**: in a backgrounded/hidden pane or tab the clock appears
+frozen. In the Claude desktop app, bring the preview pane forward before judging playback.
+
+### 9.5 Visual QA by contact sheets (multi-agent review)
+
+Tests prove the picture is deterministic and structurally sound; they cannot tell you that a hose is not connected to its tank, that a
+crater appears before the rock lands, or that a gag happens too fast to read. For film two we added a **visual review**: render the whole
+film as one-second frames, split the sheets between several cheap, independent, vision-capable reviewers, consolidate what they
+report, verify each finding yourself and only then edit. It complements `npm test`, `npm run verify` and watching the film: it
+replaces none of them (see 9.6).
+
+**What we actually did on film two (this is the evidence behind the workflow).** Four Haiku agents were started with the Agent tool
+(`subagent_type: "general-purpose"`, `model: "haiku"`), each told not to edit anything. They looked at seven contact sheets of ~22
+frames each (one frame per second, sampled at 0.5 s, 1.5 s ... , four columns, ~320 px per frame) and were given overlapping stretches:
+A = sheets 0-1, B = 1-3, C = 3-5, D = 5-6, i.e. four consecutive chronological sections with a sheet of overlap so nothing at a
+boundary was lost. The prompt listed the scenes with their start and end times, the story beat each one tells and a checklist (hose
+connections, contact between hands and objects, floating / vanishing / duplicated / wrong-sized things, things visible too early or late,
+actions too fast to read); each report was "a concise bullet list: approximate film time, scene name, the problem, severity", at most 25 bullets.
+What went right and wrong:
+
+- **Confirmed defects the review found, which I then verified in stills and in the code and fixed:** the crater visible before the Emerald
+  lands (reported high by agent C); the torch hose dangling or not meeting a tank in the apartment, wall, despair and welding montage
+  scenes (A, B, C, D, so reported four times independently); the wall opening drawn the moment the cut starts (A); the gas cart
+  vanishing during the squeeze (B, high); no visible contact between the thief and the Emerald in the attempts (B); the torch lying on the
+  ground instead of in his hand in the despair scene (C); the newspaper floating without hands (D). While verifying I also found the same proprietor drawn twice in the plate scene, which no reviewer
+  had listed. The owner independently noticed the hose, the missing contact and the crater that appeared before the landing, so those three
+  were also confirmed by a human.
+- **Judged by design on inspection, left alone** (re-checked while writing this guide, not at the time): gloved hands without arms on the newspaper close-up (the `paper` scene draws only his gloves on purpose);
+  the thought bubble "popping in within a second" (it is a pop-in); an empty frame at the start of the wall scene (he walks in from off screen).
+- **Not reliable at that resolution:** position estimates (reported by the agents themselves as +/-20 px), "verify" items, and anything about
+  hands touching things. One agent zoomed to full-resolution frames for its flagged items, which made its findings the most useful;
+  others reported they could not zoom. Several findings were low severity, and **no per-item record of which low-severity notes were
+  fixed or declined was kept** (the moon appearing without a fade was declined). Do better: keep the consolidated list in a file.
+- **A tooling miss:** the ImageMagick sheet labels came out blank (no font), so the agents counted grid positions to infer times. This is why
+  `dev/shoot.mjs` now burns the time and scene id into every frame (`STAMP=1`).
+
+#### The workflow
+
+1. **Know the cut.** Owner timestamps and reviewer timestamps refer to the *current* film; adding or changing a scene moves everything
+   after it. Print the scene table and give it to every reviewer:
+   ```bash
+   node --input-type=module -e "import {loadFilm} from './src/films/index.js'; const b=(await loadFilm('<film-id>')).build(); for (const s of b.scenes) console.log((s.start/1000).toFixed(1), (s.end/1000).toFixed(1), s.id, '-', s.caption)"
+   ```
+2. **Render the whole film, stamped, at ~1 s intervals** (about 50 s for a three-minute film; no dependencies besides Chrome and ImageMagick):
+   ```bash
+   mkdir -p /tmp/qa && STAMP=1 SHEETS=8 COLS=4 W=640 H=360 SETTLE=60 npm run shoot -- <film-id> /tmp/qa/<film-id> every:1000
+   ```
+   `every:1000` samples the middle of each second; `STAMP=1` burns `m:ss.s scene-id` into each frame; `SHEETS=8` writes
+   `/tmp/qa/<film-id>-sheet-1.png` ... `-8.png` of ~22 frames (a 3-minute film) so each image stays readable; the individual frames
+   `/tmp/qa/<film-id>-NNN.png` are kept for zooming. See `dev/shoot.mjs` for the other options (`REDUCED=1`, `UI=1`, `CHROME_BIN`).
+3. **Split into four consecutive sections** (the quarters of the sheets) and give each to one independent reviewer, with one sheet of
+   overlap at each boundary. Use any inexpensive vision-capable model; nothing here depends on one provider. Reviewers must not edit
+   files and should not see each other's reports (independence is what makes a finding reported by two of them credible).
+4. **Give each reviewer the context it needs:** the film's one-paragraph premise, the approved beats from `STORY.md` (and which text and
+   endings are locked, so they do not "fix" them), the scene table from step 1 with a one-line description of what each scene is *meant* to
+   show, the sheet layout (columns, frame interval, where the stamps are), and what is intentionally unusual (grayscale, silent, cartoon
+   physics, a gag that is *supposed* to be too fast).
+5. **Ask them to look for:** visual elements appearing too early or too late; actions too quick to understand; unnecessarily long holds;
+   title cards gone before they can be read; character or prop continuity errors (a hat, a held tool, a hose, a rope, a count of balloons); objects teleporting,
+   overlapping or vanishing; wrong facial expressions or reactions; poor comedic timing (no beat before the punch, a reaction that
+   comes too early); effects at the wrong place or moment; camera framing (subject cropped, empty frame, a pan with no hold on its
+   target); scene transitions that hide important action.
+6. **Require this report format** and nothing vaguer: for every finding the exact timestamp (from the stamp) and scene id, what is
+   visible in which frame (the evidence), severity (high = the story is unreadable or something is plainly wrong, medium = noticeable,
+   low = polish), a suggested change, and whether it needs a closer look ("verify at full resolution / at 100 ms steps / in playback").
+   Also ask for what works, briefly, so you do not undo it.
+7. **Consolidate** into one list in a file (a findings table is enough): merge duplicates, mark findings reported by more than one reviewer,
+   separate *defects* from *taste* and from *uncertain*.
+8. **Verify independently before editing.** Render the frames around each timestamp yourself at full size
+   (`npm run shoot -- <film> /tmp/qa/v s-kick+2100 ...`, or step 100-250 ms around it), read the scene code, and classify the finding as
+   **confirmed defect**, **false positive** (design intent or a misread low-resolution frame), **subjective improvement** (ask the owner) or
+   **unresolved**. Do not fix what you have not seen.
+9. **Fix confirmed problems without disturbing approved material:** touch only the film's own folder (and shared art if it is a real
+   bug there), keep locked text and endings, never edit an approved film, and prefer the smallest change that removes the cause (see
+   section 13 for the causes we met).
+10. **Re-render and regress:** shoot the affected scenes again at full size, re-run `npm test` (sequence/overlap errors show up
+    immediately) and `npm run verify`, re-run the contact sheets for the scenes whose length changed (the scene table moved), and look at the
+    first and last frame of the neighbouring scenes.
+
+A reusable reviewer prompt (fill the angle brackets):
+
+```text
+You are reviewing contact sheets of a silent black-and-white cartoon, "<title>", for continuity, clarity and timing. Do NOT edit files.
+Premise: <one paragraph>. Locked, do not criticise: <locked cards / ending>.
+Sheets: <paths>. Each is a <4>-column grid, one frame per second (sampled mid-second), read left to right then top to bottom.
+Every frame has its time and scene id burned into the top-left corner; use those, never your own count.
+Scenes in your section (start-end seconds, id, what it is meant to show): <scene table with captions>.
+Look for: elements appearing too early or too late; actions too fast to follow (a big pose change between adjacent frames);
+holds that last too long; cards gone before they can be read; continuity of characters and props (held tools, hoses, ropes, counts);
+objects teleporting, overlapping or vanishing; wrong expressions; weak comic timing; effects in the wrong place or moment;
+framing and camera moves with no pause on their target; transitions that hide important action.
+For every finding give: timestamp (from the stamp), scene id, what you see in which frames, severity (high/medium/low),
+a suggested change, and "needs closer look" if one-second frames cannot settle it. Max 25 findings, most severe first.
+Also list up to five things that work well. Say plainly when you are unsure; do not guess positions to the pixel.
+```
+
+### 9.6 What the contact-sheet review cannot do (and what to do about it)
+
+One frame per second is excellent for overall continuity and pacing and is the wrong tool for several things. Add the matching
+check instead of trusting the sheets:
+
+| need | why one-second sheets fail | do this |
+|---|---|---|
+| a fast action (a kick, a pop, a snap, a squeeze) | a gag that lasts 400 ms may fall between two frames, so it looks missing or "teleported" | re-shoot that window every 100-250 ms (`npm run shoot -- <film> /tmp/qa/w <scene>+1900 <scene>+2000 ...`) or use `every:250` on a short film |
+| scene boundaries | the sampling rarely lands on the first and last frame of a shot, which is where cut-and-iris continuity errors live | shoot `<scene>+0`, `<scene>+1` and `<film ms of scene end - 1>` for every cut (the verify tool already samples the boundaries for determinism, not for looks) |
+| contact (a hand on a surface, a tool tip on a seam) | at ~320 px a 20 px gap is invisible, and reviewers have said so | have the reviewer name the frame, then look at it at full size or compute the contact from the art (13.1) |
+| motion quality and comic timing | a still has no speed or rhythm | watch it, in a visible window, at the real speed, and read every card at normal pace |
+| phone layout | the sheets use the desktop player size | `UI=1 W=375 H=812 npm run shoot -- <film> ...` and the `verify` mobile check |
+| effects that only static frames cannot validate (an effect that vanishes after a seek, a CSS animation not on the clock, reduced motion) | the sheets always seek forward from a fresh page | `npm run verify` (seek determinism, pause, replay, reduced motion, "no effect is lost after the controls") and the manual checklist in 9.3 |
+
+Reviewers should say when a finding needs one of these. The sheets are a *cheap first pass that finds where to look*; they never
+replace the automated timeline verification or a full playback review by a person.
+
+**Making it routine for the next film or an in-universe advertisement.** The command in step 2 is the whole tool; do not build a
+framework around it. A sensible habit: render the sheets when the first complete cut exists, again after each round of fixes
+that changes timing, and keep the consolidated findings file next to the film (`STORY.md` is a good neighbour). If a short
+commercial (say 30 s) is made, use `every:500` and two reviewers.
+
+---
+
+## 10. Packaging for RuneSpace
+
+The deliverable is the `src/` folder (about 480 KB of source for the two films, about 145 KB packed). It has **no dependencies, no build
+step, no network, no storage, no audio, no globals**.
+
+### 10.1 Two ways in
+
+**Vendor it** (simplest): copy `src/` into the app, e.g. `features/theatre/movies/`, and import the
+three stylesheets once.
+
+**Pack it:** `npm run pack:check` lists the tarball; `npm pack` produces `runespace-movies-<version>.tgz`
+(only `src/` + docs; dev tools and tests are excluded). `package.json` `exports` maps `.`,
+`./player.css`, `./effects.css`, `./film-look.css`, `./films/*`.
+
+### 10.2 Mounting in a Next.js / React client component
+
+```tsx
+'use client';
+import { useEffect, useRef } from 'react';
+import { createMoviePlayer, loadFilm, type MoviePlayer } from '@/features/theatre/movies/src';
+import '@/features/theatre/movies/src/player/player.css';
+import '@/features/theatre/movies/src/fx/effects.css';
+import '@/features/theatre/movies/src/fx/film-look.css';
+
+export function DriveInScreen({ filmId, onEnd }: { filmId: string; onEnd?: () => void }) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let player: MoviePlayer | undefined;
+    let off: (() => void) | undefined;
+    let cancelled = false;
+    loadFilm(filmId).then((film) => {            // lazy: only this film is fetched
+      if (cancelled || !host.current) return;
+      player = createMoviePlayer(host.current, { film });
+      off = player.on('state', (s) => s === 'ended' && onEnd?.());
+    });
+    return () => { cancelled = true; off?.(); player?.destroy(); };   // StrictMode-safe
+  }, [filmId, onEnd]);
+  return <div ref={host} />;
+}
+```
+
+Notes:
+
+- **SSR:** importing the barrel is safe in Node (tested). `createMoviePlayer`/`createTimeline` need `document`
+  so call them in an effect, as above.
+- **Bundle size:** `src/index.js` still has the legacy static `thatMinesMine` export, so importing the barrel
+  bundles film 1. Prefer `loadFilm(id)` (dynamic import per film) and, if you want zero film code in the
+  barrel, import from `.../src/player/player.js` and `.../src/films/index.js` directly.
+- **Sizing:** the player is `width: 100%` at the film's aspect ratio (`--mm-aspect`). Size it with its container.
+  Its mobile layout follows the *player's* width (CSS container query), so a narrow panel on a wide screen works.
+- **Reduced motion:** leave `'auto'`, or pass RuneSpace's own setting and call `player.setReducedMotion(v)` on change.
+- **Theming:** CSS custom properties on `.mm-player` (`--mm-accent`, `--mm-bar-bg`, `--mm-fg`, `--mm-muted`, `--mm-radius`).
+  Headless: `controls: false` and drive it with `player.play()/pause()/seek()` and `player.on('state' | 'time' | 'scene')`.
+- **Fonts:** title cards use a system serif stack (`Playfair Display, Bodoni MT, Didot, Georgia, …`) and impact words
+  use `Impact`. Nothing is downloaded. If the host loads Playfair Display the cards will match the intended look.
+- **Game hooks** (tickets, buffs, "watched") do not exist here. The host listens to `state === 'ended'` etc.
+- **Browser support:** developed and verified in Chromium (Chrome 154). Uses Web Animations
+  (`persist()`, `getAnimations({subtree:true})`), `clip-path`, `@container`, `aspect-ratio`; all current evergreen
+  browsers. Firefox/Safari are untested here.
+
+### 10.3 Checklist before handing a film to the host
+
+- [ ] `npm test` and `npm run verify` green; manual checklist (9.3) done
+- [ ] `src/films/index.js` entry added; `id` matches
+- [ ] `src/index.d.ts` unchanged API (or updated); `README.md` film list updated
+- [ ] `git status` clean, committed; `npm run pack:check` shows only `src/` and docs
+
+---
+
+## 11. Constraints and pitfalls (each of these has already bitten someone)
+
+1. **Absolute vs relative time.** Cue `at` and effect `at` are absolute film ms. Use `ctx.at()` everywhere,
+   including arguments you pass to helpers (`idle(pip, at(0), at(3300))`, not `idle(pip, 0, 3300)`).
+   Film 1 has two of these slips (see NEXT_FILM_HANDOFF.md → Known issues); the tests allow-list exactly those two.
+2. **`hop()` must land.** `Track.hop` returns to its starting y; chaining the old accumulating version made
+   characters float upward. Use `pip.bob.hop(...)` (not `pip.root`) for jumps so the root's ground line is untouched.
+3. **Never `setTimeout`/rAF for anything visual.** It will not pause or seek.
+4. **Never toggle `.is-reduced` yourself.** The timeline owns it.
+5. **Don't cancel adopted animations.** `timeline.destroy()` cancels only its own cue animations; the CSS ones
+   (including the player's grain/flicker/weave) are handed back. Cancelling them kills the film look permanently.
+6. **Don't remove `persist()`** in `compile()` (finished animations get garbage-collected and can't be seeked back).
+7. **`play()` on a finished animation rewinds it.** The timeline guards `resume()`; keep the guard.
+8. **Replaceable-animation fill rules.** Don't give two overlapping raw cues to the same property of one element.
+9. **Unique names.** `data-t` must be unique per film and prefixed with the scene id. Targets are looked up by
+   name; duplicates animate together.
+10. **CSS effects must be deterministic functions of time** (finite or looping keyframes using `--at`/`--dur`).
+    Random-looking scatter must come from `rng(seed)` at build time, never `Math.random()`.
+    `build()` must be deterministic; the tests build twice and compare.
+11. **Pivots live at the group origin.** Group art so (0,0) is the joint/grip/feet; rotate/scale then behave.
+    Characters: the root origin is between the feet; `y` is the ground line.
+12. **Facing:** `flip: -1` faces left. Leans/rotations use `fwd(c, deg)` so they follow the facing.
+13. **Reduced motion is opt-out per cue.** Add `reduce: 'skip'` to decoration and `'snap'` to travel; check `?reduced=1`.
+14. **Camera extents.** Backgrounds must extend past the frame in the directions the camera can pan/zoom (the finale once
+    revealed the world's edge). The player overscans the SVG by 0.6 % so gate weave never shows a border.
+15. **Last frame.** The last scene must stay visible at `t = duration`; `defineFilm` handles it, but the last
+    scene's cues must not rely on a later scene.
+16. **Perf budget.** Film 1: ~800 cues, ~1,350 live animations, ~100 s; fine on desktop and a phone emulator. If a
+    scene needs hundreds more (confetti), prefer CSS `.fx` effects over cues, and measure on a mid-range phone.
+17. **Fonts differ by OS.** Re-check the longest card line and `pow()` words on a non-Mac/Windows system.
+18. **Hidden page = frozen clock** (9.4).
+19. **Don't import across films; don't edit film 1.** Commit `e90a091` (formerly tag `film1-approved`) is the reference; the tests plus
+    `npm run verify` must stay green for it after any engine change.
+20. **Keep it dependency-free.** No GSAP, no framework, no build step. Anything that needs one belongs in the host.
+21. **Don't overlap cues on a Track** (rule 11). It is the easiest bug to write: `walk()` plus a `bob.to()` in the same
+    window, a `camera.look()` that overlaps a `shake()` (the shake is cut and the camera snaps to the look's pose), two `keys()`
+    on a group that must both end in one cue. Merge them into one cue, move one to another Track, or sequence them.
+    A looping decoration (`iterations`) counts for its whole length.
+22. **Full-frame effects go outside the camera group.** `flash()` / `dim()` are rects at the origin: inside a panned or zoomed
+    `cam.html()` they leave an edge. `return `${cam.html(...)}${flash(...)}``.
+23. **Rotations that turn through more than 180 degrees**: keys interpolate the numbers you give. A spin of -372 deg is a full
+    turn and a bit; afterwards `set()` the equivalent small angle (-12) before animating again, or the next cue unwinds the spin.
+24. **Poses of a cartoon "sit" and "lie" are just rotations about the feet** (the root origin is between the feet): a seated
+    thief is `legF/legB.rot = -90` plus `bob.y = +hip height`; a flying kick is `root.rot = -84` with `y` raised.
+
+---
+
+## 12. Quick API cheat sheet
+
+```js
+// player
+import { createMoviePlayer, loadFilm, listFilms, FILMS } from './src/index.js';
+const player = createMoviePlayer(el, { film, controls: true, captions: false, reducedMotion: 'auto', autoplay: false, keyboard: true });
+player.play(); player.pause(); player.toggle(); player.seek(ms); player.restart(); player.skip();
+player.load(film); player.setCaptions(bool); player.setReducedMotion(bool); player.destroy();
+player.state /* 'idle'|'playing'|'paused'|'ended' */; player.time; player.duration; player.scenes; player.chapters;
+const off = player.on('state' | 'time' | 'scene' | 'load', fn);
+
+// engine
+import { createTimeline, defineFilm } from './src/index.js';
+const tl = createTimeline(rootEl, { duration, cues, reducedMotion }); // tl.play/pause/seek/restart/skipToEnd/setReducedMotion/destroy; tl.on('state'|'time'|'reducedmotion')
+
+// authoring
+import { Track, tween, show } from './src/acting.js';
+import { Camera, driftClouds, idle, fwd, blow, popIn, reach, aimAlong, filmHelpers } from './src/kit.js';
+import { prospector } from './src/art/prospector.js';
+import { cutter, mallet, sign, cart, orePile, boulder, ore, placed } from './src/art/props.js';
+import { puff, dust, sparks, chips, drops, rays, speedLines, sparkle, pow, mark, zzz, dizzy, badIdea, lightbulb, arc, popBurst, rings, flash, dim, rng, FX_DEFS } from './src/fx/effects.js';
+import { torch, fenceRun, booth, signboard, plate } from './src/art/weld.js';
+import { emerald } from './src/art/emerald.js';
+import { BalloonCloud, bird } from './src/art/balloons.js';
+import { tourist } from './src/art/crowd.js';
+```
+
+Commands: `npm run dev` · `npm test` · `npm run verify` · `npm run pack:check` · `node dev/verify-headless.mjs <film-id>`.
+
+---
+
+## 13. Lessons from film two ("Rare or Weld Done?")
+
+Everything here is backed by the git history (`git log` from `fb1b8c3` on), the review findings in 9.5, or code that exists now.
+Each lesson says which it is. Items marked *(owner taste)* are the owner's art direction in review, not defects.
+
+### 13.1 Make contact, anchors and attachments computed, never eyeballed (confirmed defects; the owner and the reviewers both found them)
+
+A hand that is 20 px short of the surface it pushes, a hose that ends in the air and a rope that is not tied to anything were the most
+common defects of the first cut. What works:
+
+- **Replay the cues to know where a hand is.** `poseAt(cues, target, t, initial)` and `gripAt(c, cues, t, hand)` (`src/kit.js`)
+  recover a pose or a hand position at any film time from the cues already emitted. Everything that must stay attached to a moving
+  hand (hose, rope) samples this.
+- **Hoses and carts:** `connectHose` runs from the gas cart's valve (or a fixed anchor) to the hand, sagging or stretching by its real length;
+  `dragCart` makes the cart trail the character by the hose length, wheels turning. From `scenes/heist.js` (`wall`):
+  ```js
+  const cart = placed(cues, `${id}.cart`, `<g transform="scale(.9)">${gasCart(`${id}.gc`)}</g>`, { x: -400, y: GY });
+  dragCart(cues, cart, `${id}.gc.wheel`, thief, at(0), at(ctx.dur), { dist: 240 });
+  const hs = connectHose(cues, `${id}.hose`, { thief, tank: cart.track, t0: at(0), t1: at(ctx.dur), len: 420 });
+  return cam.html(`${museumFront(id)}${cart.html}${hs}${thief.html}${fx}`); // hose after the cart, before the thief
+  ```
+  Call `connectHose` *after* every cue it samples has been emitted. When the tank is off screen, use `anchor: { x, y }` off the frame.
+  If a shot cuts to a close-up, place the cart where it was left (`spot` and `study` place it at `SPOT_X - 240`): the audit's
+  "the cart vanishes" finding was exactly this.
+- **Large object plus pusher:** give the pusher the same easing and timing as the object and a fixed gap
+  (`scenes/sky.js`, `rise`): `thief.walk(at(400), 1300, 805 - GAP_FLOAT, { ..., ease: 'ease-in-out' })` next to
+  `lg.gem.to(at(400), 1300, { x: 805 }, { ease: 'ease-in-out' })`. `walk` accepts `ease` and `noRoot`. The two gap constants
+  (`GAP_FLOAT`, `GAP_LEAN`) were *derived with `gripAt`* from the gem's chamfer geometry (a floating gem meets his hands on its slanted
+  lower corner, not on its flat face) and are commented with how. When the thing you touch is not flat, compute where the surface is at the
+  hand's height.
+- **Sinking one object into another:** hide its base behind the *front lip* of the hole. A crater is drawn as back, object, front;
+  the object only looks embedded once its base is below the front lip band (`craterFront`'s band is about 51-69 px below the crater's
+  `y`): we sank the Emerald to `GY + 66` (crash, despair) and `YARD.gem.y = GY + 64`. Owner feedback twice: "it should be lower in the hole".
+
+### 13.2 Lean with the whole body, not the torso (confirmed, flagged by the owner twice)
+
+`torso.rot` bends the upper body away from planted legs; it reads as a broken figure. Lean by rotating the **root** (it pivots at the feet) and
+slide `root.x` back by the amount the hands move, as in `rise` (`thief.root.to(at(JAM + 300), 400, { rot: fwd(thief, 12), x: 806 - GAP_LEAN }, ...)`)
+and in `crash` (a stooped walk: `thief.walk(..., { noRoot: true })` plus one `root.to(..., { x, rot })` so `x` and `rot` are a single cue). Reserve `torso`
+for small jolts and vibration.
+
+### 13.3 Hold a prop at a chosen angle by counter-rotating it (confirmed; the owner corrected the bank bag twice)
+
+A held prop turns with the arm. To keep it at a chosen on-screen angle, set the prop's rotation to `net - armRot`
+(`scenes/getaway.js`, `sack`):
+```js
+const hold = (t, dur, arm, net = 0, ease = 'ease-out') => {
+  thief.armF.to(at(t), dur, { rot: arm }, { ease });
+  thief.propF.to(at(t), dur, { rot: net - arm }, { ease, reduce: 'snap' });
+};
+hold(1000, 380, ARM, NET); // NET 45: the bag's open mouth points up-right, square onto the gem's slanted lower-left face
+```
+Stretch a prop with `propF` `sx/sy` (it scales about the grip, so put the grip at the part that must stay put: the bag's origin is its mouth).
+**Write down the physical set-up before animating a gag** (which way does the opening face; which surface does it touch; where is the grip),
+then check one full-size frame. We drew the first bag with the opening facing the wrong way and the second upright; the third matched the idea.
+
+### 13.4 Cause before effect (confirmed defects)
+
+A crater, a hole, a crack or a dust ring must not exist before the thing that makes it. The first cut drew the crater from frame one
+and the cut-out opening before the torch had cut it. Put the consequence in its own `<g data-t>` and reveal it with a one-ms cue at the
+impact (`sky.js`, `crash`: `['craterB','craterF'].forEach(n => cues.push({ at: at(IMPACT - 1), dur: 1, target: `${id}.${n}`, ... }))`), and
+let the falling object land on bare ground first. Likewise a CSS effect whose first keyframe is visible shows during its start delay
+(`fill-mode: both`): add `.fx-late` (`arc`, `rings` carry it; pass `rays({ late: true })`).
+
+### 13.5 Persistent world state across shots (confirmed; new in the last review round)
+
+A gag that breaks something must leave it broken in every later shot, in the same place. In `world.js`: `museumFront(id, { light: 'broken',
+cam: 'broken' })` draws the dead lamp, the snapped bracket and, through the shared `WRECK` constants, the fallen camera and rock exactly where
+the `spot` shot's cues leave them; `yard.js` passes the same options. Keep one set of constants and use it in both the animation
+end pose and the static aftermath. A looping decoration that is interrupted needs a shot whose length makes the loop end on its first
+pose: `wall` runs two full searchlight sweeps (`SWEEP = 2200`, duration 4400) so `spot` starts the beam at the same angle.
+Share the position a character leaves one shot with the next as a constant (`SPOT_X`, `ROCK_X`, `STUDY_X`).
+
+### 13.6 Timing and the camera
+
+- **Slapstick needs more time than you think** *(confirmed by the audit: big pose changes between adjacent one-second frames)*: we slowed the
+  squeeze, the balloon lift-off, the welding posts and the thought bubble. The card rule (1 s + 0.4 s per word) was right and was
+  never complained about: leave cards alone.
+- **A camera move needs a beat on its target** *(owner feedback twice, `despair` and `reread`)*: a move of about 1 s, then a hold of about
+  1 to 1.2 s on each focal point before the next move; do not return to a wide shot between focal points. See `scenes/finale.js` (`despair`:
+  FENCE sign, Emerald, torch, bulb; `reread`: tourists, sign, proprietor) where each `cam.look` is commented with how long it holds.
+  This lengthened those scenes by 3 s and 3.6 s; it was what the owner wanted.
+- **A failed-attempts sequence reads best as a montage of short shots** *(owner request)*: `sack`, `push`, `shoulder`, `ropeTry` each `in: 'iris'` with a
+  different `irisIn` centre (in `index.js`), instead of one long scene with the same set-up repeated.
+- **Runtime grows with every review round** *(a fact, and a decision for the owner)*: 2:34 at first review, 2:46 after the continuity pass, 3:01 after
+  the rock gag, the bag gag and the held camera beats. The runtime ceiling in `test/rare-or-weld-done.test.mjs` started at 2:40 and was raised
+  with it (175 s, 180 s, now 190 s). If a runtime budget matters, name it before the review rounds start and trim non-text holds first.
+
+### 13.7 Choreographing several moving parts
+
+- Two bodies sharing a timeline: sample one from the other (see 13.1) rather than timing both by hand.
+- A thrown object: build the flight from `lob()` keyframes (x linear, y on a parabola) and start it from `gripAt(thief, cues, t, 'B')`, the position of the
+  *back* hand at the release time (`scenes/heist.js`, `spot`). The rock bounces off the lamp (a second `lob`) and falls with the camera it knocked off.
+- An object that carries things (the Emerald with sling, rope tail and balloons) is one `Track` group (`loadedGem` in `sky.js`); `BalloonCloud` positions the
+  balloons in that group's frame. The review flagged unexplained balloon counts; the fix was a visible harness and a carried bunch held in his raised hand.
+- An escalating attempt (1, 3, 8, then 18 balloons) needs a settle time after every toss; the toss helper returns the time the last
+  balloon settles so the next run starts after it.
+- A crowd of 14 stays cheap when each person is one tracked group (`art/crowd.js`, `tourist`).
+
+### 13.8 Visual storytelling without audio
+
+Things that carried the story with no sound and survived review: lettered impact words (`BOOOONG!`, `POP!`, `KRA-KOOM!`, `CRASH!`, `CLUNK!`, `BOING!`), a thought bubble to plant a
+joke the ending pays off (the FENCE dealer), signs and posters that show information (a wanted poster with his photo and the reward), close-up inserts
+(the headline banner), and expression changes on beats (`shock`, `plot`, `smug`, `ko`). Goggles hide his face, so the body, mouth and hat carry
+the welding scenes.
+*(owner taste)* Do not add decoration nobody asked for (we removed the drawn-on scrollwork and smoke from the ironwork scene: "just run the torch
+along the fence, sparks only"); make repeated background art sparse and varied (the gallery's identical, dense mountain pictures became planets, ships and
+galaxies, never the same twice in a row: `paintings()` in `world.js`); attach a new part *next to* an old one when told "on the right-hand side",
+never over its text (the OPEN DAILY plate overhangs nothing and covers no letter).
+
+### 13.9 Welding
+
+A believable weld in this engine is: goggles down (`thief.goggles(at, 'down')`), a pilot flame (`show(cues, `${id}.tc.pilot`, ...)`), the torch tip placed with
+`aimAlong` on a path, `arc()` flicker windows on the torch, `sparks` and `puff` on the returned tip samples, a `strokeDashoffset` or clip-path reveal
+of the seam *only where the story needs a visible result*, and a cut or a flash for the first strike (`flash()` outside the camera group). The ironwork scene
+shows the minimum: the tip runs along a rail while sparks fly.
+
+### 13.10 Performance
+
+Film two keeps about 2,400 live animations (film one about 1,340). In headless Chrome with software rendering the busiest scenes ran at
+roughly 20 to 36 ms per frame, comparable to film one measured the same way. This was **not** measured on a real phone. Prefer CSS `.fx` effects to cues for scatter,
+one tracked group per crowd member, and a `BalloonCloud` rather than 30 independent Tracks. After a change that adds many cues, run `npm run verify` (it loads
+the whole film) and note the live animation count it prints.
+
+### 13.11 Process pitfalls we hit
+
+- **The commit message is not the diff.** One commit claimed "tests, guide and handoff updated" and the handoff was in fact unchanged; it was
+  discovered a review round later. Check `git show --stat` before saying a thing was documented.
+- **The browser pane lies about size.** Screenshots in the desktop app's browser pane were zoomed and cropped; `npm run shoot` (headless Chrome) is the reliable way to look.
+- **Owner timestamps drift** as scenes are added (the owner said so). Always map a timestamp through the scene table (9.5 step 1) and say which scene you decided it was.
+- **Ambiguity cost iterations** (the bag's orientation, the plate's position, "the rock" that was the Emerald). When a note can be read two ways, state your reading
+  in the reply so it can be corrected in one round.
+- **A locked line can be changed by its owner.** The second card read "I'LL BRING THE FENCE" and became "I'LL BRING A FENCE" in review; the test, `config.js` and `STORY.md` were updated together.
+- **An effect disappearing after seeking was reported once and did not reproduce** (3.4). The guard that exists is a `verify` check; do not invent a fix without evidence.
+- **Overlapping cues** were the biggest source of silent bugs (62 on the first full pass); the test now fails the build, so sequence cues or use another Track.
+

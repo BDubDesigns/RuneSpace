@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Art sheet (dev)</title>
+<body style="margin:0;background:#888">
+<svg id="s" viewBox="0 0 1600 900" style="width:100%;display:block;background:#bbb"></svg>
+<svg id="s2" viewBox="0 0 1700 1400" style="width:100%;display:block;background:#c9c9c9"></svg>
+<script type="module">
+import { prospector, FACES } from '../src/art/prospector.js';
+import { cutter, mallet, sign, cart, ore, orePile, boulder } from '../src/art/props.js';
+const cues = [];
+let h = '';
+const pip = prospector(cues, 'pip', { kind:'pip', x:150, y:420, pack:true, props:{F: cutter('pip.c')}, face:'normal' });
+const rex = prospector(cues, 'rex', { kind:'rex', x:420, y:480, props:{F: mallet()}, face:'normal', flip:-1 });
+const thief = prospector(cues, 'thief', { kind:'thief', x:1500, y:700, face:'smug', goggles:'up' });
+const thiefD = prospector(cues, 'thiefD', { kind:'thief', x:1360, y:700, face:'normal', goggles:'down' });
+const thiefT = prospector(cues, 'thiefT', { kind:'thief', x:1220, y:700, face:'cheer', dressed:true });
+h += pip.html + rex.html + thief.html + thiefD.html + thiefT.html;
+// face strips
+FACES.forEach((f,i)=>{
+  const a = prospector(cues, 'pf'+i, { kind:'pip', x:80+i*130, y:760, scale:.55, face:f });
+  h += a.html;
+  const b = prospector(cues, 'rf'+i, { kind:'rex', x:80+i*130, y:880, scale:.42, face:f });
+  h += b.html;
+  const c = prospector(cues, 'tf'+i, { kind:'thief', x:80+i*130, y:560, scale:.4, face:f });
+  h += c.html;
+});
+h += `<g transform="translate(700 200)">${sign('pip')}</g><g transform="translate(900 200)">${sign('rex')}</g>`;
+h += `<g transform="translate(560 470)">${cutter('x')}</g><g transform="translate(700 470) scale(1)">${mallet()}</g>`;
+h += `<g transform="translate(1000 420)">${cart('c1',{loaded:28})}</g>`;
+h += `<g transform="translate(1350 420)">${orePile()}</g>`;
+h += `<g transform="translate(1100 700)">${boulder()}</g>`;
+[0,1,2].forEach(i=>h+=`<g transform="translate(${700+i*60} 620)">${ore(i,1.5)}</g>`);
+document.getElementById('s').innerHTML = h;
+
+// ---- "Rare or Weld Done?" art (second sheet)
+const { emerald, plinth, stanchion, rope, placard } = await import('../src/art/emerald.js');
+const { balloon, bird, scrap } = await import('../src/art/balloons.js');
+const { torch, gasCart, swagSack, post, fenceRun, gate, booth, signboard, plate, scroll } = await import('../src/art/weld.js');
+const { newspaper, bubble, dealer, creditPile, creditBag, coin } = await import('../src/art/heist.js');
+const { tourist } = await import('../src/art/crowd.js');
+const { FX_DEFS, arc, popBurst, lightbulb, sparkle } = await import('../src/fx/effects.js');
+let g = `<defs>${FX_DEFS}</defs>`;
+// row 1: the gem, museum furniture, balloons, bird, welding gear
+g += `<g transform="translate(180 330) scale(.8)">${emerald('sheet.em', { w: 300, h: 360 })}</g><g transform="translate(180 342) scale(.8)">${plinth(380, 70)}</g>`;
+g += `<g transform="translate(470 330)">${stanchion()}</g><g transform="translate(590 330)">${stanchion()}</g><g transform="translate(470 330)">${rope(120)}</g><g transform="translate(540 330)">${placard()}</g>`;
+[0, 1, 2, 3, 4].forEach((i) => (g += `<g transform="translate(${760 + i * 70} 200)">${balloon(i, 1)}</g>`));
+g += `<g transform="translate(900 300)">${bird('sheet.bird')}</g><g transform="translate(1000 300)">${scrap()}</g>`;
+g += `<g transform="translate(1100 250)">${torch('sheet.tc', arc({ x: 0, y: 0, at: 0, dur: 130, n: 1, r: 20 }))}</g><g transform="translate(1380 330)">${gasCart('sheet.gc')}</g><g transform="translate(1540 250)">${swagSack()}</g>`;
+// row 2: fence parts, booth, sign, plate, flourish
+g += `<g transform="translate(60 700)">${post(220)}</g><g transform="translate(140 700)">${fenceRun({ a: [0, 0], b: [260, 0], ha: 200, n: 6 })}</g>`;
+g += `<g transform="translate(520 700)">${gate('sheet.g', 200, 215)}</g><g transform="translate(790 700) scale(.8)">${booth('sheet.bo').back}${booth('sheet.bo2').front}</g>`;
+g += `<g transform="translate(1100 700) scale(.9)">${signboard('sheet.sb', ['THE NEBULA HEART', 'EMERALD', '5 CREDITS', 'ADMISSION']).html}</g><g transform="translate(1450 560) scale(.8)">${plate('sheet.pl', 330, 300, ['OPEN', 'DAILY'], 88)}</g>`;
+g += `<g transform="translate(1540 700)">${scroll('sheet.sc', 1.2)}</g>`;
+g += `<g transform="translate(1600 480)">${popBurst({ x: 0, y: 0, at: 0 })}</g><g transform="translate(1600 600)">${lightbulb({ x: 0, y: 0, at: 0, scale: 0.6 })}</g>`;
+// row 3: crowd, story props
+const cues2 = [];
+for (let v = 0; v < 7; v++) g += tourist(cues2, 'sheet.t' + v, { v, x: 80 + v * 110, y: 1040, scale: 0.9 }).html;
+g += `<g transform="translate(1000 1040)">${creditPile(3, 300, 160)}</g><g transform="translate(1190 1040)">${creditBag(.9)}</g><g transform="translate(1300 1000)">${coin(2)}</g>`;
+g += `<g transform="translate(1450 1040) scale(.8)">${dealer('sheet.dl')}</g><g transform="translate(1560 880) scale(.2)">${newspaper({ id: 'sheet.np' })}</g>`;
+g += `<g transform="translate(360 1250) scale(.55)">${bubble('sheet.bb', 640, 420)}</g>`;
+document.getElementById('s2').innerHTML = g;
+</script>

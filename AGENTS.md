@@ -40,6 +40,7 @@ boundary.** This file is the repository's normative agent-behavior contract;
   - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
   - Database and deployment operations: `docs/deployment-database.md`.
   - QC Studio exports: `docs/qc-studio.md`.
+  - Holo Film Studio (`tools/holo-film-studio/`, silent films): `docs/holo-film-studio.md`.
 - Inspect existing components, rules, schemas, helpers, tests, scripts, and CI
   before creating anything new.
 
@@ -172,8 +173,8 @@ Grep for these before re-deriving them from scratch.
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
    explicit product-owner instruction.
-8. Every PR push runs full CI: fast checks, PostgreSQL integration, and three
-   canonical E2E shards start together, and `Merge gate` passes only when all
+8. Every PR push runs full CI: fast checks, PostgreSQL integration, the Holo Film
+   Studio lane, and three canonical E2E shards start together, and `Merge gate` passes only when all
    succeed. Follow the run to a terminal state; inspect failed logs, repair on
    the same branch, push, and follow the replacement run. The handoff ends at
    the PR, its observed checks, and owner review.

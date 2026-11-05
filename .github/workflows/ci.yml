@@ -129,6 +129,60 @@ jobs:
       - name: Issue #126 PostgreSQL maintenance integration tests
         run: pnpm test:integration:issue-126
 
+  holo-film-studio:
+    name: Holo Film Studio (test, verify, pack)
+    # Development tool under tools/holo-film-studio/: dependency-free Node and a
+    # headless browser, no pnpm install and no PostgreSQL. It is deliberately not
+    # part of the canonical gameplay E2E. See docs/holo-film-studio.md.
+    # Pinned like the other browser lanes; `npm run verify` drives the runner's
+    # preinstalled Google Chrome.
+    # The job always starts and always succeeds or fails, so `Merge gate` still
+    # requires it. Only its steps are scoped: a PR that changes neither the studio
+    # nor this lane's CI skips them (no Chrome), and everything else runs them.
+    runs-on: ubuntu-24.04
+    env:
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+      # Chrome's sandbox needs unprivileged user namespaces, which GitHub's
+      # Ubuntu runners may restrict; this is a throwaway headless profile.
+      VERIFY_NO_SANDBOX: "1"
+    defaults:
+      run:
+        working-directory: tools/holo-film-studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
+          # A PR checks out its merge commit; two commits show what the PR changes.
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Decide whether the studio is affected
+        id: scope
+        working-directory: .
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/ci-studio-scope.mjs
+
+      - name: Browser available
+        if: steps.scope.outputs.run == 'true'
+        run: google-chrome --version
+
+      - name: Unit and structure tests (includes the film-one pin)
+        if: steps.scope.outputs.run == 'true'
+        run: npm test
+
+      - name: Real-browser verification of every film
+        if: steps.scope.outputs.run == 'true'
+        run: npm run verify
+
+      - name: Package contents
+        if: steps.scope.outputs.run == 'true'
+        run: npm run pack:check
+
   canonical-e2e:
     name: Canonical E2E shard ${{ matrix.shard }}/3
     # Pinned: Playwright 1.51.1 does not support chromium on ubuntu-26.04 (ubuntu-latest).
@@ -249,7 +303,7 @@ jobs:
     # always(): the gate must run and fail when a lane failed, was skipped, or
     # was canceled. A gate that is itself skipped reads as passing on GitHub.
     if: ${{ always() }}
-    needs: [fast-checks, integration, canonical-e2e, canonical-screenshots]
+    needs: [fast-checks, integration, holo-film-studio, canonical-e2e, canonical-screenshots]
     runs-on: ubuntu-latest
     env:
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}

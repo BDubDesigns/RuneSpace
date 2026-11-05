@@ -20,6 +20,8 @@ const eslintConfig = [
       "playwright-report/**",
       "test-results/**",
       "drizzle/**",
+      // Standalone dependency-free tool with its own conventions and tests.
+      "tools/holo-film-studio/**",
     ],
   },
 ];
