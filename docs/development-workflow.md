@@ -676,7 +676,12 @@ PostgreSQL service; none waits for or consumes another:
 - `PostgreSQL integration tests`;
 - `Holo Film Studio (test, verify, pack)` (`tools/holo-film-studio/`: `npm test`,
   `npm run verify` in headless Chrome, and `npm run pack:check`; plain Node 22, no
-  pnpm install or database; see `docs/holo-film-studio.md`);
+  pnpm install or database). The job always starts and `Merge gate` always
+  requires it, but its steps run only for a PR that changes
+  `tools/holo-film-studio/` or the CI that runs it (`.github/workflows/ci.yml`,
+  `scripts/ci-studio-scope.mjs`), and for every push to `main` and manual run. On
+  any other PR it finishes in seconds, without launching Chrome. See
+  `docs/holo-film-studio.md`;
 - `Canonical E2E shard 1/3`, `2/3`, and `3/3`.
 
 `Merge gate` depends on every lane, runs even when one failed, was skipped, or

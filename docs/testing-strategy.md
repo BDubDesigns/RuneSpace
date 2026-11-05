@@ -685,7 +685,13 @@ The Holo Film Studio lane runs that tool's own `node:test` suites and
 headless-browser verification (`docs/holo-film-studio.md`); they stay outside
 Vitest, Playwright, and the canonical E2E selection, and
 `tests/unit/holo-film-studio-boundary.test.ts` guards the boundary from this
-side.
+side. The lane's job always starts and `Merge gate` always requires its success,
+but its steps are scoped by `scripts/ci-studio-scope.mjs`: a PR runs them only
+when it changes `tools/holo-film-studio/` or the CI that runs it, and every
+`main` push and manual run runs them. Any other PR passes the lane in seconds
+without launching Chrome. `tests/unit/ci-studio-scope.test.ts` covers relevant
+and unrelated changes against real merge commits, and that the gate still
+fails a skipped, failed, or canceled studio job.
 
 CI retains a separate PostgreSQL integration job, a three-shard canonical E2E
 matrix, and an opt-in unsharded screenshot lane. The canonical runner is the

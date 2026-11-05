@@ -71,6 +71,28 @@ canonical gameplay E2E and does not touch PostgreSQL or the managed-host
 wrapper. A red studio lane is a real failure: read the job log, reproduce only
 the failing studio check locally, fix, and push.
 
+**When the checks actually run.** The job itself is never skipped (a skipped
+required job would fail `Merge gate`), but its first step,
+`scripts/ci-studio-scope.mjs`, decides whether the checks that follow it run:
+
+| Event | Studio checks (tests, Chrome verify, pack) |
+| --- | --- |
+| PR changing anything under `tools/holo-film-studio/` (source, films, engine, player, tests, docs) | Run |
+| PR changing `.github/workflows/ci.yml` or `scripts/ci-studio-scope.mjs` | Run |
+| Any other PR (gameplay, app, other tools, other docs, the merge gate, lockfile) | Skipped: the job passes in seconds and never launches Chrome |
+| Push to `main`, manual `workflow_dispatch` | Always run |
+| PR whose changed files cannot be determined | Run (fails safe) |
+
+A PR's changed files are what its merge commit changes relative to the base
+branch, so a studio change that landed on `main` after the PR branched does not
+count against it. `Merge gate` is unchanged: it still demands `success` from the
+studio job, so a failing studio check on a relevant PR fails the gate, and a job
+that is skipped, canceled, or missing still fails it. The label rerun and the
+canonical gameplay E2E lanes are untouched. Because `main` always runs the
+checks, a studio regression cannot hide behind unrelated PRs for long; to check
+an unrelated PR's effect on the studio anyway, run the lane's commands locally or
+start a manual `workflow_dispatch` run.
+
 ## Provenance and the film-one approval reference
 
 The studio was a standalone Git repository (`main`, 13 commits, no remote). It
