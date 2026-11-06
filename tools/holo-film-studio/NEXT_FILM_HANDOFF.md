@@ -27,7 +27,9 @@ Last updated when the project was imported into RuneSpace (issue #489); film two
   about 3:01 (181 s), 37 scenes (30 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
   tag, by the owner's choice.** The approval reference is RuneSpace's subtree import commit `62d2d0484e6101eb3fafe0a255ba1321cc9eaa88`, and the approved
   `build()` output is pinned by `test/film2-approved.test.mjs` (markup, cues, chapters, scene list and duration), exactly as film one's is. The import did not change film two.
-- Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, hidden `template`. Demo page: `?film=<id>`.
+- **Commercials (issue #491, Stage D): three 15-second silent spots**, `commercial-dewhat`, `commercial-visit-skatboll`, `commercial-fedhex`, authored for the
+  Holo Drive-In's pre-roll from the owner-approved scripts. **Awaiting the owner's individual approval of each**; they are not pinned until then. See the guide, section 14.
+- Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, the three commercials, hidden `template`. Demo page: `?film=<id>`.
 
 ### Film 2 at a glance
 

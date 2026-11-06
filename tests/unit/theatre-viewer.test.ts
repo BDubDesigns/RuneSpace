@@ -224,21 +224,19 @@ describe("the pre-roll slots", () => {
     expect(PRE_ROLL_DURATION_MS).toBe(15_000);
   });
 
-  it("holds no finished commercial yet, so the viewer is not ready for players", () => {
-    // The three commercials are the dedicated creative slice's deliverable, each individually
-    // owner-approved. Until a slot has its film, nothing stands in for it in front of a player.
-    // When that slice gives a slot a `filmId`, it must also make the viewer's pre-roll stage play
-    // that Holo Film Studio film (`PreRollStage` in features/theatre/TheatreViewer.tsx draws only
-    // a labelled stand-in), and then delete this expectation in the same change.
-    expect(THEATRE_PRE_ROLL_SLOTS.some((slot) => slot.filmId !== undefined)).toBe(false);
-    expect(theatreViewerReady()).toBe(false);
+  it("holds a finished commercial in every slot, so the viewer is ready for players", () => {
+    // The commercials' own scripts and timing are proven in tests/unit/theatre-commercials.test.ts.
+    expect(THEATRE_PRE_ROLL_SLOTS.every((slot) => slot.filmId !== undefined)).toBe(true);
+    expect(theatreViewerReady()).toBe(true);
   });
 
   it("is ready only when all three slots have a commercial", () => {
     const filled = THEATRE_PRE_ROLL_SLOTS.map((slot) => ({ ...slot, filmId: `ad-${slot.id}` }));
     expect(theatreViewerReady(filled)).toBe(true);
     expect(theatreViewerReady(filled.slice(0, 2))).toBe(false);
-    expect(theatreViewerReady([...filled.slice(0, 2), THEATRE_PRE_ROLL_SLOTS[2]!])).toBe(false);
+    expect(theatreViewerReady([...filled.slice(0, 2), { ...filled[2]!, filmId: undefined }])).toBe(
+      false,
+    );
     expect(theatreViewerReady([])).toBe(false);
   });
 

@@ -1184,8 +1184,7 @@ no rule, price, schedule or eligibility decision lives in a component.
 - **Play state.** `PlayGameplayState.theatre` keeps the programme and, **only while the character
   stands at a theatre**, adds `character`: `buffs` by skill ID, `latestTicket` (the replay
   entitlement), `heldTiers` (the tier of the ticket they already hold for what is showing now, by
-  `showingId`) and `viewer` (whether the viewer is offered, whether its slots are stand-ins, and the
-  pre-roll length). `loadCharacterTheatreProjection` reads it with three keyed queries in the
+  `showingId`) and `viewer` (whether the viewer is offered). `loadCharacterTheatreProjection` reads it with three keyed queries in the
   state's own transaction. At the end of a showing Play refreshes the state like it does at an
   arrival (`theatreBoundaryAt`, the shared boundary scheduler); until the fresh state arrives the
   panel shows the next showing from the same schedule rule and holds the ticket controls
@@ -1228,15 +1227,24 @@ no rule, price, schedule or eligibility decision lives in a component.
   the Holo Film Studio, and only its `src/` module (`createMoviePlayer`, `loadFilm` and the three
   stylesheets). The viewer is a dynamic, client-only import, so the engine and each film are
   separate chunks that load only when a player opens a film (`docs/holo-film-studio.md`).
-- **The commercials are not here.** The three pre-roll slots (DeWhat?, Visit Skatboll!, FedHex) are
-  `THEATRE_PRE_ROLL_SLOTS`, none of them with a finished commercial yet. The viewer is therefore
-  **not offered to players**: `theatreViewerReady()` is false and the Play state's
-  `viewer.available` is false, so no Watch Film or Replay Last Film control renders. Tickets, the
-  bonus and Tamsyn work; the stand-in cards (clearly labelled as not commercials) exist only for a
-  preview or test build that sets `RUNESPACE_THEATRE_STAND_IN_ADS=true` (and, for browser tests,
-  `RUNESPACE_THEATRE_STAND_IN_AD_MS`). The commercials slice fills each slot's `filmId`, makes the
-  pre-roll stage play that studio film, and each spot needs its own owner approval first; a unit
-  test fails until the stage does.
+- **The three commercials** (issue #491, Stage D). Each pre-roll slot (DeWhat?, Visit Skatboll!, FedHex,
+  `THEATRE_PRE_ROLL_SLOTS`) names a 15-second, silent Holo Film Studio film (`commercial-dewhat`,
+  `commercial-visit-skatboll`, `commercial-fedhex`), built from the owner-approved scripts and creative
+  direction, with the exact wording pinned by `tests/unit/theatre-commercials.test.ts` and the studio's
+  `test/commercials.test.mjs`. DeWhat? is the two-worker misunderstanding ending on the approved slogan;
+  Visit Skatboll! pans real approved 4:1 location art with tourism-board lettering and ends "It's not all
+  work" with the small "Mostly work." stamp; FedHex is the overpackaged bolt ending on the approved
+  one-off line, with the real FedHex hub art and the approved Fed purple and Hex orange wordmark. Each
+  needs the owner's individual creative approval before the stack that adds it merges. With all three
+  present `theatreViewerReady()` is true and the Play state's `viewer.available` is true; a slot without a
+  film would hide the viewer rather than play something unapproved.
+- **Pre-roll playback.** The drawn commercial plays in its own studio player (picture only, `inert`, so
+  nothing can be tapped, focused or keyed), after its art is decoded (`film.assets`, bounded wait). The
+  progress bar is the commercial's own clock scaled onto the 15 seconds (`PRE_ROLL_DURATION_MS`), so it
+  is honest and monotonic, and only the commercial's natural end hands over to the film. Scene
+  descriptions (the spots are silent; these are not captions) can be shown during it and carry into the
+  film, reduced motion follows the OS setting, and Fullscreen and Close are available throughout. If a
+  commercial cannot load, the viewing fails with Try again rather than skipping to the film.
 
 ### The Crash Site's two scenes (issue #330)
 

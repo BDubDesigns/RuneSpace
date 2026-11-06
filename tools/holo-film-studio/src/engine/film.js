@@ -8,6 +8,7 @@
  *   defineFilm({
  *     id, title, width, height, posterAt,
  *     defs: '<linearGradient .../>',              // shared SVG <defs> content
+ *     assets: ['/location-scenes/x.webp'],        // optional: URLs a host preloads before playing
  *     chapters: [{ id, label, scene }],           // jump points (the story beats)
  *     scenes: [{
  *       id, label, duration, caption,
@@ -134,5 +135,7 @@ export function defineFilm(def) {
     };
   }
 
-  return { id: def.id, title: def.title, width, height, posterAt: def.posterAt || 0, build };
+  // `assets` lists URLs a host should preload before it plays the film (images the markup
+  // references, such as a commercial's location art). Films that draw everything as SVG omit it.
+  return { id: def.id, title: def.title, width, height, posterAt: def.posterAt || 0, assets: def.assets || [], build };
 }

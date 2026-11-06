@@ -143,32 +143,40 @@ export const WELDING_FILM_BUFF = { xpBonusBps: 1_000 } as const;
  * The three pre-roll slots (#491). Every viewing start, restart and replay draws one at random
  * and plays it, unskippable, before the film.
  *
- * A slot is the advertiser the owner locked. `filmId` is the Holo Film Studio film of its finished
- * commercial, and it is absent until that commercial has been authored and the owner has
- * individually approved it: no creative stands in for an unfinished one. The viewer is offered to
- * players only when every slot has its commercial (`theatreViewerReady`), so the pre-roll never
- * plays a slot that does not exist.
+ * A slot is the advertiser the owner locked, and `filmId` is the Holo Film Studio film of its
+ * finished commercial (the studio's `commercial-*` films). Each is an in-world,
+ * silent, 15-second spot built from the owner-approved script, and each needs the owner's
+ * individual creative approval before the stack that adds it merges. A slot without a
+ * `filmId` would be an unfinished commercial, and the viewer is offered to players only when every
+ * slot has one (`theatreViewerReady`), so the pre-roll never plays something nobody approved.
  */
 export type TheatrePreRollSlot = {
   id: TheatrePreRollAdId;
   /** The advertiser's name, as locked in the design. */
   title: string;
-  /** The approved commercial's Holo Film Studio film ID, once it exists. */
+  /** The commercial's Holo Film Studio film ID. */
   filmId?: string;
 };
 
 export const THEATRE_PRE_ROLL_SLOTS: readonly TheatrePreRollSlot[] = [
-  { id: THEATRE_PRE_ROLL_AD_IDS.deWhat, title: "DeWhat?" },
-  { id: THEATRE_PRE_ROLL_AD_IDS.visitSkatboll, title: "Visit Skatboll!" },
-  { id: THEATRE_PRE_ROLL_AD_IDS.fedhex, title: "FedHex" },
+  { id: THEATRE_PRE_ROLL_AD_IDS.deWhat, title: "DeWhat?", filmId: "commercial-dewhat" },
+  {
+    id: THEATRE_PRE_ROLL_AD_IDS.visitSkatboll,
+    title: "Visit Skatboll!",
+    filmId: "commercial-visit-skatboll",
+  },
+  { id: THEATRE_PRE_ROLL_AD_IDS.fedhex, title: "FedHex", filmId: "commercial-fedhex" },
 ];
 
-/** An approximately 15-second pre-roll, exactly as designed. */
+/**
+ * The designed pre-roll length. Each commercial is authored to exactly this long, and the viewer
+ * reports progress from the commercial's own clock, so the bar is honest whatever the length.
+ */
 export const PRE_ROLL_DURATION_MS = 15_000;
 
 /**
- * Whether the film viewer can be offered: all three commercials exist. Until then tickets, the
- * buffs and Tamsyn work, and the viewer is not offered, because a mandatory pre-roll with a
+ * Whether the film viewer can be offered: all three commercials exist. Without them tickets, the
+ * buffs and Tamsyn still work and the viewer is not offered, because a mandatory pre-roll with a
  * missing commercial would show a player something nobody approved.
  */
 export function theatreViewerReady(slots: readonly TheatrePreRollSlot[] = THEATRE_PRE_ROLL_SLOTS) {

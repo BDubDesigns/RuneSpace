@@ -23,6 +23,8 @@ has setup, the public player API, and packaging.
   contact-sheet QA tooling.
 - Two films: **That Mines Mine!** (1:43, approved) and **Rare or Weld Done?**
   (about 3:01, 37 scenes, approved by the owner on November 5, 2026). Each one's approved output is pinned by a hash test.
+  Three 15-second pre-roll commercials (**DeWhat?**, **Visit Skatboll!**, **FedHex**, issue #491 Stage D) were authored with it for
+  the Drive-In; each needs the owner's individual approval and is not pinned until it has it.
 - It is **not** the Drive-In or Theatre feature. Theatre gameplay, tickets,
   Mining or Welding buffs, showtime scheduling, the Drive-In world location, new
   films, and commercials are separate product work (#491). The game's theatre viewer

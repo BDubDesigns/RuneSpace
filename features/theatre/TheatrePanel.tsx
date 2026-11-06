@@ -357,13 +357,7 @@ export function TheatrePanel() {
       </p>
 
       {viewerOpen && character.viewer.available ? (
-        <TheatreViewer
-          authorize={authorize}
-          onClose={closeViewer}
-          preRollMs={character.viewer.preRollMs}
-          returnFocusRef={viewerButton}
-          standInAds={character.viewer.standInAds}
-        />
+        <TheatreViewer authorize={authorize} onClose={closeViewer} returnFocusRef={viewerButton} />
       ) : null}
     </ActivityPanel>
   );

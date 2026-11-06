@@ -1046,3 +1046,24 @@ the whole film) and note the live animation count it prints.
 - **An effect disappearing after seeking was reported once and did not reproduce** (3.4). The guard that exists is a `verify` check; do not invent a fix without evidence.
 - **Overlapping cues** were the biggest source of silent bugs (62 on the first full pass); the test now fails the build, so sequence cues or use another Track.
 
+
+
+---
+
+## 14. Commercials (issue #491, Stage D)
+
+Three 15-second silent commercials ship with the studio for the Holo Drive-In's mandatory pre-roll: `commercial-dewhat`, `commercial-visit-skatboll`
+and `commercial-fedhex` (registered with `kind: 'commercial'` in `src/films/index.js`). They are ordinary films with a few rules:
+
+- **Exactly 15 000 ms**, in scenes whose durations sum to it. The host reports a pre-roll's progress from the film's own clock, so the length
+  is honest; `test/commercials.test.mjs` fails if any spot is not exactly 15 000 ms.
+- **The approved script, word for word.** On-screen text lives in each film's `config.js` `TEXT`, and the test pins the owner-approved lines
+  (capitals included: they are the DeWhat? joke). Do not "tighten" copy; shorten pauses instead. No audio, no invented claims.
+- **Real art by URL.** "Visit Skatboll!" pans RuneSpace's own 4:1 location art (`/location-scenes/*.webp`) and "FedHex" closes on the real
+  `fedhex-parcel-hub.webp`. Declare every image in the film's `assets` array; the test requires the list to match what the markup draws and
+  every file to exist under the app's `public/`. The host serves those URLs; `dev/serve.mjs` serves the repo's `public/` as a fallback.
+- **Owner approval per spot.** Present each with `npm run shoot` contact sheets (section 9.5) and the real player. Only after the owner approves
+  a spot may it be pinned like film one and film two.
+
+Tips from making them: use `rays(... late: true)` so a burst is invisible until its time; keep every speech balloon and title at 52 px or larger
+in the 1280 x 720 frame so it reads at phone width; pan real art with a single `Track` on a group (`reduce: 'snap'`), never JS.
