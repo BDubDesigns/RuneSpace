@@ -15,6 +15,9 @@ test-results
 # the Docker build context keeps builder payloads small. Rejected/unreferenced
 # master copies must never be re-added here.
 assets
-# Holo Film Studio is a development tool (issue #489): the production image never
-# needs its films, art, tests or docs, and nothing in the app imports it.
-tools/holo-film-studio
+# Holo Film Studio is a development tool (issue #489): the production image never needs its
+# demo page, dev server, tests, QA tooling or docs. Only its `src/` (the engine, player, films and
+# stylesheets) is the module the theatre viewer imports (issue #491, features/theatre/studio-player.ts),
+# so only that stays in the build context.
+tools/holo-film-studio/*
+!tools/holo-film-studio/src

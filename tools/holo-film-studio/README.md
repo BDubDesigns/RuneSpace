@@ -2,7 +2,7 @@
 
 > **Location.** This project lives in the RuneSpace repository at `tools/holo-film-studio/` (adopted in issue #489). It is an independently
 > operated development tool, like QC Studio: run every command below from that directory. It has no dependencies, needs no `pnpm install`, no
-> PostgreSQL and no Next.js, and nothing in the game imports it. RuneSpace-side rules (CI lane, build boundaries, provenance) are in
+> PostgreSQL and no Next.js, and the game imports only its `src/` module (the engine, player, films and stylesheets), through the theatre viewer's one adapter (issue #491). RuneSpace-side rules (CI lane, build boundaries, provenance) are in
 > `docs/holo-film-studio.md` at the repository root. Agents must also follow the root `AGENTS.md`.
 
 A standalone, dependency-free silent-film engine and player for the Skatboll holo-drive-in, plus the
@@ -13,7 +13,8 @@ panel (or any webview) without rewriting anything.
 | Film | Runtime | Status |
 |---|---|---|
 | **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (reference commit `e90a091`, formerly git tag `film1-approved`) |
-| **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, **awaiting owner approval** (no approval record yet) |
+| **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, approved by the owner on November 5, 2026 (reference: RuneSpace import commit `62d2d04`; no tag) |
+| **DeWHAT?**, **Visit Skatboll!**, **FedHex** (`commercial-*`) | exactly 0:15 each, silent, 16:9 | the Holo Drive-In's three pre-roll commercials (issue #491); owner-approved, pinned by `test/commercials-approved.test.mjs` |
 
 **Watching the films** (after `npm run dev`):
 
@@ -85,8 +86,8 @@ STAMP=1 SHEETS=8 COLS=4 W=640 H=360 SETTLE=60 npm run shoot -- rare-or-weld-done
 - `npm test` checks each film's structure (every cue target exists in the markup, every cue starts in its
   own scene, no two cues overlap on one element, gradients resolve, deterministic `build()`, scenes captioned,
   chapters valid), the engine's pure parts (`Track`, `defineFilm`, effects, `reach`/`aimAlong`, balloons, crowd),
-  SSR-safe imports, that the docs name real files/scripts, that **film one still builds exactly as approved**
-  (`test/film1-approved.test.mjs`) and the locked story points of film two (`test/rare-or-weld-done.test.mjs`).
+  SSR-safe imports, that the docs name real files/scripts, that **both films still build exactly as approved**
+  (`test/film1-approved.test.mjs`, `test/film2-approved.test.mjs`) and the locked story points of film two (`test/rare-or-weld-done.test.mjs`).
 - `npm run verify` proves the behaviour that matters: seek determinism (same picture however you arrive
   at a time), one scene/face visible at a time, pause freezes *everything* (including film grain), natural
   end/replay/restart, that no effect is lost after playback mixed with scrubbing, chapter jumps, skip and replay, reduced motion,
@@ -101,7 +102,7 @@ STAMP=1 SHEETS=8 COLS=4 W=640 H=360 SETTLE=60 npm run shoot -- rare-or-weld-done
 ```
 index.html / script.js / styles.css     demo page (not part of the module)
 dev/   serve.mjs  sheet.html  shoot.mjs  verify.html  verify.js  verify-headless.mjs   dev tools (not shipped)
-test/  films.test.mjs engine.test.mjs docs.test.mjs film1-approved.test.mjs rare-or-weld-done.test.mjs
+test/  films.test.mjs engine.test.mjs docs.test.mjs film1-approved.test.mjs film2-approved.test.mjs rare-or-weld-done.test.mjs commercials.test.mjs commercials-approved.test.mjs
 src/                                    THE MODULE (what ships)
   index.js  index.d.ts                  public entry + types
   engine/   timeline.js film.js         the ONE seekable clock · film definition -> markup + cues
@@ -116,6 +117,7 @@ src/                                    THE MODULE (what ships)
     index.js                            film registry (FILMS, listFilms, loadFilm)
     that-mines-mine/                    config.js index.js world.js scenes/*.js
     rare-or-weld-done/                  STORY.md config.js index.js world.js scenes/{setup,heist,getaway,sky,finale,yard}.js
+    commercial-dewhat/ commercial-visit-skatboll/ commercial-fedhex/   the three 15-second pre-roll commercials (kind: 'commercial')
     _template/                          minimal working film to copy for a new one
 ```
 
@@ -167,6 +169,8 @@ const off = player.on('state', (s) => {});   // also 'time', 'scene', 'load'
 Headless use (your own UI): `createMoviePlayer(el, { controls: false })`.
 Lowest level: `createTimeline(rootElement, { duration, cues })` gives the clock alone.
 Types: `src/index.d.ts`. Film registry: `FILMS`, `listFilms()`, `loadFilm(id)` (lazy dynamic import).
+A film may list `assets` (URLs its markup draws, such as RuneSpace location art served by the host at `/location-scenes/`); a host can
+preload them before playing. `dev/serve.mjs` falls back, read-only, to the repository's `public/` folder so such art previews here.
 
 ## 6. Adding a film
 

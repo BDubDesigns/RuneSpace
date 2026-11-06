@@ -844,7 +844,7 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 ## Development tools outside the game
 
 - `tools/qc-studio/` is the dialogue authoring environment served by the app at the flagged `/qc-studio` route (`docs/qc-studio.md`).
-- `tools/holo-film-studio/` (#489) is a standalone, dependency-free silent-film authoring and QA system for the Holo Drive-In (`docs/holo-film-studio.md`). It is not part of the Next.js app: no route, component, or server code imports it, it is excluded from the production image's build context, and it has its own `node:test` and headless-browser checks and CI lane. A future Theatre feature would consume only its public player API from a client component; that integration does not exist yet.
+- `tools/holo-film-studio/` (#489) is a standalone, dependency-free silent-film authoring and QA system for the Holo Drive-In (`docs/holo-film-studio.md`). It is not part of the Next.js app and has its own `node:test` and headless-browser checks and CI lane. The Theatre (#491) consumes only its `src/` module and public player API, from one client-only adapter (`features/theatre/studio-player.ts`) loaded on demand by the film viewer; no route, server code or other component imports it, and the production image's build context keeps only `src/`.
 
 ## Strict TypeScript & SSOT
 

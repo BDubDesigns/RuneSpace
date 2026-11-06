@@ -7,16 +7,25 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.md': 'text/markdown' };
+const hostPublic = fileURLToPath(new URL('../../../public', import.meta.url));
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.md': 'text/markdown', '.webp': 'image/webp', '.png': 'image/png' };
 
 export function startServer(port = 5173) {
   const server = createServer(async (req, res) => {
     try {
       let p = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
       if (p.endsWith('/')) p += 'index.html';
-      const file = join(root, p);
+      let file = join(root, p);
       if (!file.startsWith(root)) throw new Error('outside root');
-      if ((await stat(file)).isDirectory()) throw new Error('dir');
+      // The 15-second commercials pan real RuneSpace location art, which the host app serves from
+      // its own `public/` folder (for example /location-scenes/x.webp). In a RuneSpace checkout this
+      // dev-only server falls back to that folder, read-only, so the spots can be previewed here.
+      const exists = await stat(file).then((s) => !s.isDirectory(), () => false);
+      if (!exists) {
+        const hostFile = join(hostPublic, p);
+        if (!hostFile.startsWith(hostPublic) || !(await stat(hostFile).then((s) => s.isFile(), () => false))) throw new Error('missing');
+        file = hostFile;
+      }
       res.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
       res.end(await readFile(file));
     } catch {

@@ -371,6 +371,23 @@ export const ClaimFedhexParcelRequestSchema = z.object({
 });
 
 /**
+ * The Holo Drive-In (#491). A ticket request names only the showing the player saw and the tier
+ * they chose; the server re-derives the character's position, what is on now, their receipts,
+ * their Credits and their buff balance, and refuses a showing that has turned over. A viewing
+ * request names nothing but the character: which film plays is the ticket's, decided on the
+ * server.
+ */
+export const BuyTheatreTicketRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  showingId: z.string().min(1).max(200),
+  tierId: ContentId,
+});
+
+export const AuthorizeTheatreViewingRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/**
  * The Wise Old Enby's research jobs (#406). Accepting names a job; every command
  * on a run in progress names the run's own id, so a stale client acting on an
  * earlier run finds nothing to act on. The server resolves the rest.

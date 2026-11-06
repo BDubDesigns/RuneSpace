@@ -2,7 +2,16 @@ export type PlayerState = 'idle' | 'playing' | 'paused' | 'ended';
 
 export interface FilmScene { id: string; label: string; caption: string; start: number; end: number }
 export interface FilmChapter { id: string; label: string; at: number }
-export interface Film { id: string; title: string; width: number; height: number; posterAt: number; build(): unknown }
+export interface Film {
+  id: string;
+  title: string;
+  width: number;
+  height: number;
+  posterAt: number;
+  /** URLs the film's markup references (for example location art); a host may preload them before playing. */
+  assets: readonly string[];
+  build(): unknown;
+}
 
 export interface MoviePlayerOptions {
   film?: Film;

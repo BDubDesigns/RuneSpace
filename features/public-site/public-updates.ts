@@ -9,6 +9,67 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #491 — announce the Holo Drive-In theatre: Tamsyn Suzara, the two original films, the
+    // three commercials, hourly showings, tickets and the Mining and Welding bonuses. Publishes with
+    // the deployment that carries the theatre (merge to main); no separate news post.
+    slug: "a-night-at-the-drive-in-theatre",
+    title: "A Night At The (Drive-In) Theatre",
+    publishedAt: "2026-11-06T13:00:00-08:00",
+    summary:
+      "The Holo Drive-In's big screen is lit up again: two original silent films, an hourly programme, tickets for 20 or 50 Credits, and a Mining or Welding bonus that comes with the ticket.",
+    hero: {
+      src: "/location-scenes/holo-drive-in.webp",
+      alt: "A large weathered outdoor movie screen on a steel frame, floodlights above it, facing muddy parking lanes where sci-fi speeders and mining crew buses are parked, with a warm-lit concession stand under a neon Holo Drive-In sign on the left, mountains behind, under a stormy gray sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.tamsynSuzara, expressionId: "welcoming" },
+        side: "right",
+      },
+      "The big screen at the Holo Drive-In is lit up again. Walk north out of Holo Hollow and you'll find a weather-beaten open-air theatre with a towering screen, rows of faded parking lanes, a warm-lit concession stand and Tamsyn Suzara, who owns the place and runs the whole show. She's always glad to see another face in the lanes, and she'll gladly tell you what's on tonight.",
+      "Two original silent films take turns on the screen, both from Skatboll Silent Pictures. That Mines Mine! is a mining misadventure in one reel. Rare or Weld Done? is a heist in one reel, with a plan, a welding torch and a truly questionable approach to fences. The picture changes every hour, on the hour, and the Big Screen shows what's on now, what's up next and a countdown to the change.",
+      "Tickets are 20 Credits for a Film Ticket, or 50 Credits for a Ticket + Concessions, and they come with that many bonus attempts. Catch That Mines Mine! and every completed Mining attempt pays 5% more Mining XP, and a successful haul that comes up empty on the extras gets one more shot at finding something special. Catch Rare or Weld Done? and every section you finish pays 10% more Welding XP, those lovely Clean Passes included.",
+      "Here's the best part: the bonus comes with your ticket, not with your seat. Buy it, then watch the whole picture or head straight back to work. You get the same bonus attempts either way, though Tamsyn would certainly love it if you stayed. A new ticket tops your bonus attempts up to its size rather than adding to them, and the Big Screen tells you exactly what you'll get before you pay.",
+      "If you do stay, the film plays right there in the viewer, with Play and Pause, a seek bar, Restart, Fullscreen (and a friendly nudge to turn your phone sideways) and Scene Descriptions, a line of text describing the action, since these pictures are silent. Your most recent ticket's film can be replayed any time you're at the Drive-In with Replay Last Film, free of charge.",
+      "And because this is a proper night out, every viewing opens with a 15-second commercial break: a made-up spot for DeWHAT?, Visit Skatboll! or FedHex, picked at random. You can't skip them, but you can always walk out with Close.",
+      [
+        "Want the fine print? The ",
+        { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+        " guide covers tickets, bonus attempts and the viewer, and ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " and ",
+        { text: "Cargo Hold & Welding", articleSlug: "cargo-hold-and-welding" },
+        " show where the bonuses land.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "The Big Screen at the Holo Drive-In: an hourly programme alternating That Mines Mine! (even UTC hours) and Rare or Weld Done? (odd UTC hours), with Now Showing, Up Next and a countdown to the next showing.",
+          "Tickets from the Big Screen: Film Ticket for 20 Credits (20 bonus attempts) and Ticket + Concessions for 50 Credits (50 bonus attempts). One ticket per showing, bought at the Holo Drive-In while you are not walking or in the middle of an activity.",
+          "A ticket tops your bonus attempts for that skill up to its size, never adding on top. Bonus attempts do not expire and stay with you when you leave.",
+          "Mining bonus attempts from That Mines Mine!: +5% Mining XP on each completed attempt (added to Legendary Miner's Gloves and Boots, rounded up once per attempt), and one extra find roll when a success finds nothing. Chance, ore and speed are unchanged.",
+          "Welding bonus attempts from Rare or Weld Done?: +10% Welding XP on each finished repair, practice or Work Order section, and on Clean Pass sections, rounded up per section. Time, materials, Credits and other XP are unchanged.",
+          "The bonus comes from buying the ticket, not from watching the film.",
+          "The film viewer: Watch Film and Replay Last Film, Play and Pause, a seek bar, Restart, Fullscreen, Scene Descriptions and Close, with the pictures following your device's reduced-motion setting.",
+          "A random 15-second commercial (DeWHAT?, Visit Skatboll! or FedHex) before every viewing, restart and replay. It cannot be skipped, and Close is always available.",
+          "Tamsyn Suzara's conversations at the Holo Drive-In: What's showing?, Tell me about the projector and Why keep this place open?",
+          "A Holo Drive-In guide in the Wiki.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Travel & Scavenging, Holo Hollow, Getting Started, Mining & Refining, Cargo Hold & Welding, Practice Welding, Work Orders, Credits & Trading and Skills & Progression now mention the Holo Drive-In and its bonuses.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #484 — announce the Legendary Miner gear improvements shipped in #465.
     slug: "legendary-miner-gear-upgrade",
     title: "Legendary Miner Gear: Worth the Hunt",

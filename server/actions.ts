@@ -68,6 +68,12 @@ import {
 import { acknowledgeResonanceArrival } from "@/server/resonance-site-commands";
 import { claimFedhexParcel, type FedhexClaimResult } from "@/server/fedhex-commands";
 import {
+  authorizeTheatreViewing,
+  buyTheatreTicket,
+  type TheatreTicketResult,
+  type TheatreViewingResult,
+} from "@/server/theatre-commands";
+import {
   finishCurrentTinkering,
   setTinkeringScrapPreference,
   startTinkering,
@@ -249,6 +255,8 @@ import {
   DestroyMissionItemRequestSchema,
   ResearchAssignmentRequestSchema,
   ClaimFedhexParcelRequestSchema,
+  BuyTheatreTicketRequestSchema,
+  AuthorizeTheatreViewingRequestSchema,
   StartTinkeringRequestSchema,
   TinkeringCommandRequestSchema,
   TinkeringScrapPreferenceRequestSchema,
@@ -1505,6 +1513,49 @@ export async function claimFedhexParcelAction(input: unknown): Promise<FedhexCla
     const user = await requireCurrentUser(await headers());
     const { characterId, ...claim } = request.data;
     return await claimFedhexParcel(user.id, characterId, claim);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type TheatreTicketActionResult = TheatreTicketResult | { error: string };
+
+/**
+ * Buy a Holo Drive-In ticket (#491). The request names only the showing the player saw and the
+ * tier they chose; every rule, the schedule and the payment are the server's, in one
+ * transaction (`server/theatre-commands`).
+ */
+export async function buyTheatreTicketAction(input: unknown): Promise<TheatreTicketActionResult> {
+  const request = BuyTheatreTicketRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid ticket command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...ticket } = request.data;
+    return await buyTheatreTicket(user.id, characterId, ticket);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type TheatreViewingActionResult = TheatreViewingResult | { error: string };
+
+/**
+ * Ask whether the character may start a viewing now (#491): every Watch Film, Replay, in-viewer
+ * Replay and Restart. The film player is usable only at the Drive-In, so the server re-derives
+ * the character's position each time; it charges and grants nothing.
+ */
+export async function authorizeTheatreViewingAction(
+  input: unknown,
+): Promise<TheatreViewingActionResult> {
+  const request = AuthorizeTheatreViewingRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid viewing command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await authorizeTheatreViewing(user.id, request.data.characterId);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

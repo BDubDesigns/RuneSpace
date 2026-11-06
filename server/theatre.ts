@@ -1,9 +1,16 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   characterTheatreBuffs,
   characterTheatreLatestTickets,
   characterTheatreReceipts,
 } from "@/db/rune-space";
+import { isTheatreFilmId, PRE_ROLL_DURATION_MS, theatreViewerReady } from "@/game/content/theatre";
+import type {
+  CharacterTheatreProjection,
+  LatestTicketProjection,
+  TheatreProgrammeProjection,
+  TheatreViewerProjection,
+} from "@/game/domain/theatre";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
 /**
@@ -166,6 +173,23 @@ export async function loadLatestTheatreTicket(
   return row;
 }
 
+/**
+ * The replay entitlement as the Play state and the viewing command carry it. A receipt for a
+ * film the catalog no longer carries has nothing to replay, so it projects as no ticket.
+ */
+export function projectLatestTheatreTicket(
+  latest: LatestTheatreTicket | undefined,
+): LatestTicketProjection | undefined {
+  if (!latest || !isTheatreFilmId(latest.filmId)) return undefined;
+  return {
+    receiptId: latest.receiptId,
+    filmId: latest.filmId,
+    showtimeId: latest.showtimeId,
+    tierId: latest.tierId,
+    purchasedAt: latest.purchasedAt.toISOString(),
+  };
+}
+
 /** A character's whole theatre state in one read, for the Play projection of a later slice. */
 export type CharacterTheatreState = {
   buffs: Readonly<Record<string, number>>;
@@ -183,4 +207,65 @@ export async function loadCharacterTheatreState(
     loadTheatreReceipts(transaction, characterId),
   ]);
   return { buffs, latestTicket, receipts };
+}
+
+/**
+ * The film viewer the Play state offers (#491): available only when all three pre-roll
+ * commercials exist (`theatreViewerReady`). Read on the server so the browser never decides it.
+ */
+export function theatreViewerProjection(): TheatreViewerProjection {
+  return { available: theatreViewerReady() };
+}
+
+export function theatreViewerAvailable(): boolean {
+  return theatreViewerProjection().available;
+}
+
+/**
+ * A character's own theatre facts for the Play state (#491, slice 4), read in the state's
+ * transaction: both film buff balances, the replay entitlement and the tier of any ticket they
+ * already hold for what each screen is showing now. Three small keyed reads, issued only for a
+ * character standing at a theatre.
+ */
+export async function loadCharacterTheatreProjection(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  programme: TheatreProgrammeProjection,
+  locationId: string,
+): Promise<CharacterTheatreProjection | undefined> {
+  const screens = programme.screens.filter((screen) => screen.locationId === locationId);
+  if (screens.length === 0) return undefined;
+  const showtimeIds = [...new Set(screens.map((screen) => screen.now.showtimeId))];
+  const [buffs, latest, receipts] = await Promise.all([
+    loadTheatreBuffs(transaction, characterId),
+    loadLatestTheatreTicket(transaction, characterId),
+    transaction
+      .select({
+        filmId: characterTheatreReceipts.filmId,
+        showtimeId: characterTheatreReceipts.showtimeId,
+        tierId: characterTheatreReceipts.tierId,
+      })
+      .from(characterTheatreReceipts)
+      .where(
+        and(
+          eq(characterTheatreReceipts.characterId, characterId),
+          inArray(characterTheatreReceipts.showtimeId, showtimeIds),
+        ),
+      ),
+  ]);
+  const heldTiers: Record<string, string> = {};
+  for (const screen of screens) {
+    const held = receipts.find(
+      (receipt) =>
+        receipt.filmId === screen.now.filmId && receipt.showtimeId === screen.now.showtimeId,
+    );
+    if (held) heldTiers[screen.now.showingId] = held.tierId;
+  }
+  const latestTicket = projectLatestTheatreTicket(latest);
+  return {
+    buffs,
+    ...(latestTicket ? { latestTicket } : {}),
+    heldTiers,
+    viewer: theatreViewerProjection(),
+  };
 }

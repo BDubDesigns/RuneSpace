@@ -1,8 +1,8 @@
 /**
  * "Rare or Weld Done?" - editable content.
  *
- * NAMES  : placeholder lore. The Emerald's name and the third planet are NOT decided; every scene reads
- *          them from here, so renaming them is a one-line change (see STORY.md).
+ * NAMES  : lore labels. The Emerald's name is still a working name; the museum is on Tortuga-9, the approved
+ *          name of the third planet. Every scene reads them from here (see STORY.md).
  * TEXT   : every title card string and in-picture lettering.
  * TIMING : scene durations in ms (scene starts are the running sum, in the order set by index.js).
  * CAPTION: CC text for each scene; every id in TIMING needs one.
@@ -11,8 +11,12 @@
 export const NAMES = {
   /** The giant gem (working name, may change). Shown on the newspaper, the museum placard and the admission sign. */
   emerald: 'THE NEBULA HEART EMERALD',
-  /** Neutral label for the museum on the unnamed third planet (do not invent an official planet name). */
-  museum: 'PLANET THREE MUSEUM',
+  /**
+   * The museum on Tortuga-9, the approved name of the third planet (outside SSA jurisdiction). The museum itself
+   * has no official name, so the label is just the planet and the building. Owner-authorized change, replacing
+   * the earlier neutral "PLANET THREE MUSEUM"; scenes, jokes, dialogue, timing and ending are unchanged.
+   */
+  museum: 'TORTUGA-9 MUSEUM',
   /** In-fiction gag price. NOT the RuneSpace Holo Drive-In ticket price. */
   price: '5 CREDITS ADMISSION',
 };

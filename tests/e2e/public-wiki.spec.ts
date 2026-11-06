@@ -15,6 +15,7 @@ const articleTitles = [
   "Player Trading",
   "Travel & Scavenging",
   "Holo Hollow",
+  "Holo Drive-In",
   "Wade Rusk",
   "Tansy Rusk",
   "Bix Weller",

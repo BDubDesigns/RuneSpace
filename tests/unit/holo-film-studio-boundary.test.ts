@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 // browser tests run from tools/holo-film-studio/ (see docs/holo-film-studio.md).
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const STUDIO = resolve(ROOT, "tools/holo-film-studio");
+const ADAPTER = "features/theatre/studio-player.ts";
 
 function sourceFiles(dir: string, extensions: RegExp): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -36,7 +37,7 @@ describe("Holo Film Studio boundary", () => {
     expect(existsSync(resolve(ROOT, "pnpm-workspace.yaml"))).toBe(false);
   });
 
-  it("is imported by nothing the player build or the app ships", () => {
+  it("is reached by exactly one shipped file, and only for its supported module", () => {
     const shipped = [
       "app",
       "components",
@@ -53,8 +54,27 @@ describe("Holo Film Studio boundary", () => {
       ...rootFiles.map((name) => join(ROOT, name)),
     ].filter((file) => !file.endsWith("eslint.config.mjs"));
     expect(files.length).toBeGreaterThan(100);
-    const importers = files.filter((file) => /holo-film-studio/.test(readFileSync(file, "utf8")));
-    expect(importers).toEqual([]);
+    const importers = files
+      .filter((file) => /holo-film-studio/.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(ROOT.length + 1));
+    // The theatre viewer (#491) consumes the studio's public player API through one adapter.
+    expect(importers).toEqual([ADAPTER]);
+
+    // That adapter reaches only `src/` (the supported module): never the demo page, dev server,
+    // authoring helpers, tests or headless QA tooling.
+    const source = readFileSync(join(ROOT, ADAPTER), "utf8");
+    const specifiers = [...source.matchAll(/(?:from\s+|import\s+)["']([^"']+)["']/g)].map(
+      (match) => match[1]!,
+    );
+    expect(specifiers.length).toBeGreaterThan(0);
+    for (const specifier of specifiers.filter((value) => value.includes("holo-film-studio"))) {
+      expect(specifier.startsWith("@/tools/holo-film-studio/src/"), specifier).toBe(true);
+    }
+    // And only the viewer, which is itself loaded on demand, imports the adapter.
+    const adapterImporters = files
+      .filter((file) => /\.\/studio-player["']|studio-player["']/.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(ROOT.length + 1));
+    expect(adapterImporters).toEqual(["features/theatre/TheatreViewer.tsx"]);
   });
 
   it("imports only its own files and Node built-ins, with no framework reaching in", () => {
@@ -80,13 +100,15 @@ describe("Holo Film Studio boundary", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("stays out of formatting, linting, and the production image context", () => {
+  it("stays out of formatting, linting, and all but its src in the production image context", () => {
     const listed = (name: string) =>
       readFileSync(resolve(ROOT, name), "utf8")
         .split("\n")
         .map((line) => line.trim());
     expect(listed(".prettierignore")).toContain("tools/holo-film-studio");
-    expect(listed(".dockerignore")).toContain("tools/holo-film-studio");
+    // Everything but `src/` (the supported module the viewer imports) stays out of the image.
+    expect(listed(".dockerignore")).toContain("tools/holo-film-studio/*");
+    expect(listed(".dockerignore")).toContain("!tools/holo-film-studio/src");
     expect(readFileSync(resolve(ROOT, "eslint.config.mjs"), "utf8")).toContain(
       '"tools/holo-film-studio/**"',
     );

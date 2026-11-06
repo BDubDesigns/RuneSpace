@@ -48,7 +48,7 @@ function findChrome() {
 
 const { server, port } = await startServer(0);
 const profile = mkdtempSync(join(tmpdir(), 'mm-shoot-'));
-const chrome = spawn(findChrome(), ['--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--user-data-dir=${profile}`, '--remote-debugging-port=0', `--window-size=${W},${H}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+const chrome = spawn(findChrome(), [...(process.env.VERIFY_NO_SANDBOX || process.getuid?.() === 0 ? ['--no-sandbox'] : []), '--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--user-data-dir=${profile}`, '--remote-debugging-port=0', `--window-size=${W},${H}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 let wsUrl = '';
 await new Promise((res) => chrome.stderr.on('data', (d) => { const m = /ws:\/\/\S+/.exec(String(d)); if (m && !wsUrl) { wsUrl = m[0]; res(); } }));
 const tabs = await (await fetch(wsUrl.replace(/\/devtools\/.*/, '').replace('ws://', 'http://') + '/json')).json();

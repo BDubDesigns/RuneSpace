@@ -3,12 +3,14 @@ import {
   LOCATION_IDS,
   SKILL_IDS,
   THEATRE_FILM_IDS,
+  THEATRE_PRE_ROLL_AD_IDS,
   THEATRE_SCREEN_IDS,
   THEATRE_TICKET_TIER_IDS,
   type DialogueId,
   type LocationId,
   type SkillId,
   type TheatreFilmId,
+  type TheatrePreRollAdId,
   type TheatreScreenId,
   type TheatreTicketTierId,
 } from "@/game/config/foundations";
@@ -64,6 +66,8 @@ export const THEATRE_FILMS = [
  */
 export type TheatreTicketTierDefinition = {
   id: TheatreTicketTierId;
+  /** The owner-approved ticket name: "<name>: <credits> Credits" is the choice's label. */
+  name: string;
   /** Ordinary Credits (`characters.credits`). */
   credits: number;
   /** What the matching skill buff's remaining charges are filled to. */
@@ -72,9 +76,16 @@ export type TheatreTicketTierDefinition = {
 };
 
 export const THEATRE_TICKET_TIERS = [
-  { id: THEATRE_TICKET_TIER_IDS.film, credits: 20, capacity: 20, includesConcessions: false },
+  {
+    id: THEATRE_TICKET_TIER_IDS.film,
+    name: "Film Ticket",
+    credits: 20,
+    capacity: 20,
+    includesConcessions: false,
+  },
   {
     id: THEATRE_TICKET_TIER_IDS.concessions,
+    name: "Ticket + Concessions",
     credits: 50,
     capacity: 50,
     includesConcessions: true,
@@ -128,8 +139,75 @@ export const THEATRE_SCREENS: readonly TheatreScreenDefinition[] = [
 export const MINING_FILM_BUFF = { xpBonusBps: 500 } as const;
 export const WELDING_FILM_BUFF = { xpBonusBps: 1_000 } as const;
 
+/**
+ * The three pre-roll slots (#491). Every viewing start, restart and replay draws one at random
+ * and plays it, unskippable, before the film.
+ *
+ * A slot is the advertiser the owner locked, and `filmId` is the Holo Film Studio film of its
+ * finished commercial (the studio's `commercial-*` films). Each is an in-world,
+ * silent, 15-second spot built from the owner-approved script, and the owner approved all three
+ * (the studio pins them). A slot without a
+ * `filmId` would be an unfinished commercial, and the viewer is offered to players only when every
+ * slot has one (`theatreViewerReady`), so the pre-roll never plays something nobody approved.
+ */
+export type TheatrePreRollSlot = {
+  id: TheatrePreRollAdId;
+  /** The advertiser's name, as locked in the design. */
+  title: string;
+  /** The commercial's Holo Film Studio film ID. */
+  filmId?: string;
+};
+
+export const THEATRE_PRE_ROLL_SLOTS: readonly TheatrePreRollSlot[] = [
+  { id: THEATRE_PRE_ROLL_AD_IDS.deWhat, title: "DeWHAT?", filmId: "commercial-dewhat" },
+  {
+    id: THEATRE_PRE_ROLL_AD_IDS.visitSkatboll,
+    title: "Visit Skatboll!",
+    filmId: "commercial-visit-skatboll",
+  },
+  { id: THEATRE_PRE_ROLL_AD_IDS.fedhex, title: "FedHex", filmId: "commercial-fedhex" },
+];
+
+/**
+ * The designed pre-roll length. Each commercial is authored to exactly this long, and the viewer
+ * reports progress from the commercial's own clock, so the bar is honest whatever the length.
+ */
+export const PRE_ROLL_DURATION_MS = 15_000;
+
+/**
+ * Whether the film viewer can be offered: all three commercials exist. Without them tickets, the
+ * buffs and Tamsyn still work and the viewer is not offered, because a mandatory pre-roll with a
+ * missing commercial would show a player something nobody approved.
+ */
+export function theatreViewerReady(slots: readonly TheatrePreRollSlot[] = THEATRE_PRE_ROLL_SLOTS) {
+  return slots.length === 3 && slots.every((slot) => slot.filmId !== undefined);
+}
+
+/**
+ * The owner-approved player-facing theatre copy (#491, "Holo Drive-In World Location and theatre
+ * UI: owner-approved launch copy"). Do not rewrite it without owner review. "Bonus attempts" means
+ * the count of future completed eligible Mining attempts or Welding sections that carry the
+ * buff; it never means extra free activity attempts.
+ */
+export const THEATRE_COPY = {
+  sectionHeading: "The Big Screen",
+  nowShowing: "Now Showing",
+  upNext: "Up Next",
+  /** Followed by the countdown: "Next showing in 12:34". */
+  nextShowingIn: "Next showing in",
+  watchFilm: "Watch Film",
+  replayLastFilm: "Replay Last Film",
+  close: "Close",
+  ticketExplanation:
+    "Your skill bonus starts when you buy your ticket. Stay for the picture, or head back to work. You get the buffed attempts either way.",
+} as const;
+
 export function getTheatreFilm(filmId: string): TheatreFilmDefinition | undefined {
   return THEATRE_FILMS.find((film) => film.filmId === filmId);
+}
+
+export function isTheatreFilmId(filmId: string): filmId is TheatreFilmId {
+  return getTheatreFilm(filmId) !== undefined;
 }
 
 export function getTheatreTicketTier(tierId: string): TheatreTicketTierDefinition | undefined {

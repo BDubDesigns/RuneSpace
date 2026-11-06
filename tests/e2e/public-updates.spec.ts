@@ -6,7 +6,53 @@ const updateSlug = "runespace-is-starting-to-feel-like-a-game";
 const updateTitle = "RuneSpace Is Starting to Feel Like a Game";
 
 test.describe("public Updates", () => {
-  test("announces Legendary Miner gear on Updates, homepage and RSS (#484)", async ({ page }) => {
+  test("announces the Holo Drive-In theatre on Updates, homepage and RSS (#491)", async ({
+    page,
+  }) => {
+    const title = "A Night At The (Drive-In) Theatre";
+    const slug = "a-night-at-the-drive-in-theatre";
+
+    await page.goto("/updates");
+    const link = page.getByRole("link", { name: title, exact: true });
+    await expect(link).toHaveAttribute("href", `/updates/${slug}`);
+    await link.click();
+    await expect(page).toHaveURL(`/updates/${slug}`);
+    await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
+    await expect(
+      page.getByText(/the bonus comes with your ticket, not with your seat/),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Holo Drive-In", exact: true })).toHaveAttribute(
+      "href",
+      "/wiki/holo-drive-in",
+    );
+    const hero = page.getByRole("img", { name: /large weathered outdoor movie screen/ });
+    await hero.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => hero.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
+      "href",
+      `/updates/${slug}`,
+    );
+
+    const response = await page.request.get("/feed.xml");
+    expect(response.ok()).toBe(true);
+    const feed = await response.text();
+    expect(feed).toContain(`<title>${title}</title>`);
+    expect(feed).toContain(`/updates/${slug}`);
+
+    // The guide the Update links to is live and covers the theatre.
+    await page.goto("/wiki/holo-drive-in");
+    await expect(page.getByRole("heading", { name: "Holo Drive-In", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tickets", level: 2 })).toBeVisible();
+  });
+
+  test("announces Legendary Miner gear on Updates and RSS (#484)", async ({ page }) => {
     const gearTitle = "Legendary Miner Gear: Worth the Hunt";
     const gearSlug = "legendary-miner-gear-upgrade";
 
@@ -24,13 +70,6 @@ test.describe("public Updates", () => {
     );
     await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
-
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: gearTitle, level: 2 })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
-      "href",
-      `/updates/${gearSlug}`,
-    );
 
     const response = await page.request.get("/feed.xml");
     expect(response.ok()).toBe(true);

@@ -57,7 +57,7 @@ test('placeholder lore lives in config.js only: no scene hard-codes the Emerald\
   const offenders = [];
   for (const f of ['world.js', 'index.js', ...readdirSync(join(dir, 'scenes')).map((x) => `scenes/${x}`)]) {
     const text = readFileSync(join(dir, f), 'utf8');
-    for (const m of text.matchAll(/NEBULA|PLANET THREE|THIRD PLANET|5 CREDITS|CREDITS ADMISSION/gi)) offenders.push(`${f}: ${m[0]}`);
+    for (const m of text.matchAll(/NEBULA|TORTUGA|PLANET THREE|THIRD PLANET|5 CREDITS|CREDITS ADMISSION/gi)) offenders.push(`${f}: ${m[0]}`);
   }
   assert.deepEqual(offenders, []);
   assert.match(built.markup, new RegExp(NAMES.museum), 'the museum label from config is on the wall');

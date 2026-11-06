@@ -155,7 +155,8 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("Legendary Miner Gear: Worth the Hunt");
+    expect(latestUpdateSection).toContain("A Night At The (Drive-In) Theatre");
+    expect(latestUpdateSection).not.toContain("Legendary Miner Gear: Worth the Hunt");
     expect(latestUpdateSection).not.toContain("A Resonance Rig of Your Own");
     expect(latestUpdateSection).not.toContain("Lapidary: Cut Topaz and Cut Sapphire");
     expect(latestUpdateSection).not.toContain("Earn Your Place at Werner’s Workbench");
@@ -190,6 +191,8 @@ describe("canonical article art", () => {
       // like any other, it is an article-only feature.
       expect(markup).not.toContain("wheel-assembly.webp");
       expect(markup).not.toContain("drive-mount.webp");
+      // The Drive-In Update's portrait figure is article-only too (#491).
+      expect(markup).not.toContain("tamsyn-suzara-welcoming.png");
     }
   });
 

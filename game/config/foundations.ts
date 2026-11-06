@@ -547,6 +547,7 @@ const conversationTopicIds = {
   wernerTheQuarry: asContentId("werner_the_quarry"),
   wernerGemCutting: asContentId("werner_gem_cutting"),
   wernerBeyondTheBasics: asContentId("werner_beyond_the_basics"),
+  tamsynWhatsShowing: asContentId("tamsyn_whats_showing"),
   tamsynAboutTheProjector: asContentId("tamsyn_about_the_projector"),
   tamsynWhyKeepItOpen: asContentId("tamsyn_why_keep_it_open"),
 } as const satisfies Record<string, ContentId>;
@@ -1032,6 +1033,19 @@ export const THEATRE_SCREEN_IDS = {
   main: asContentId("holo_drive_in_main"),
 } as const;
 export type TheatreScreenId = (typeof THEATRE_SCREEN_IDS)[keyof typeof THEATRE_SCREEN_IDS];
+
+/**
+ * The three pre-roll advertisement slots every viewing starts with (#491). Each is the
+ * advertiser the owner locked; the commercials themselves are authored and individually
+ * approved in a later slice, and `game/content/theatre.ts` carries the slots.
+ */
+export const THEATRE_PRE_ROLL_AD_IDS = {
+  deWhat: "dewhat",
+  visitSkatboll: "visit-skatboll",
+  fedhex: "fedhex",
+} as const;
+export type TheatrePreRollAdId =
+  (typeof THEATRE_PRE_ROLL_AD_IDS)[keyof typeof THEATRE_PRE_ROLL_AD_IDS];
 
 /** The two ordinary-Credit ticket choices (#491): the film alone, and the film with concessions. */
 export const THEATRE_TICKET_TIER_IDS = {
