@@ -97,7 +97,10 @@ At that coordinate Holo Hollow is directly adjacent to:
 
 - **Crash Site**;
 - **Emergency Power Annex**;
-- **The Long Scramble**.
+- **The Long Scramble**;
+- **Rusk Recovery** (#190);
+- **Holo Drive-In** (#491), the theatre one hex directly north at `(-1, 0)`, joined by one
+  ordinary walking edge and no Local Place hop.
 
 It is **not** directly adjacent to The Jag or the Abandoned Processing Yard.
 This is intentional. Wade can send the player directly into town, Bix's Power

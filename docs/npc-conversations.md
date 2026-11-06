@@ -371,6 +371,8 @@ at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Toll Kade | Skatboll | always |
 | Toll Kade | Stillreach | always |
 | Toll Kade | Fuel | always |
+| Tamsyn Suzara | Tell me about the projector | always |
+| Tamsyn Suzara | Why keep this place open? | always |
 | Werner | About the Lab | always |
 | Werner | The Quarry | always |
 | Werner | Gem Cutting | always |
@@ -438,6 +440,18 @@ interior background, with his four portraits kept separate from it. His **Trade*
 action is a separate control that reads the merchant's completed-Thrust-Issues
 unlock (`docs/gameplay-foundations.md`) and, while locked, says so instead of
 opening a counter.
+
+Tamsyn Suzara (#491) owns and operates the Holo Drive-In and stands at that World Location
+itself, with no Local Place, booth or hub, so her topics are listed for anyone who walks there,
+before any Mission, level or conversation. Her two launch topics have three and four beats whose
+text and per-beat expression (neutral, welcoming, amused, wistful) are owner-approved and authored
+verbatim in `game/content/dialogue.ts` against the concession stand's own people-free 15:8
+backdrop, with her four portraits kept separate from it. They carry no ticket, price, buff or
+showing: the third approved topic, What's showing?, arrives with the theatre because it reads the
+authoritative current showing. There is no farewell topic, because Back and Finish already end
+every conversation. Her topic labels are the owner's exact first-person wording, so
+`tests/unit/npc-conversation.test.ts` names "What's showing?" and "Why keep this place open?" as
+the only labels allowed to end in a question mark; every other label is still a short subject.
 
 Werner (#429) stands at the World Location Werner's Lab itself, with no Local Place, so
 his three topics are listed for anyone who walks there, before any Mission, level or

@@ -331,6 +331,19 @@ A later route adds its own entry to `FLIGHT_CINEMATICS` (typed over every
 `ShipRouteId`); there is no generic cinematic engine. The interplanetary leg (#375) is two
 such entries, below.
 
+## Holo Drive-In (issue #491)
+
+The Holo Drive-In is an ordinary single-scene location: a native-ratio 4:1 opaque lossy WebP at
+1536×384 (q80), `public/location-scenes/holo-drive-in.webp`, downsampled whole from the approved
+2508×627 master with no overlay and no state variant. Its 15:8 conversation background,
+`holo-drive-in-concessions.webp` (1665×888), is the approved master as delivered, already exactly
+15:8, so there is no crop and no resampling; it is dialogue scenery only and is never reused for
+the panorama. Both are empty of people: Tamsyn is the separate portrait. The unaltered masters are
+kept in `assets/location-scenes/` and `scripts/prepare-holo-drive-in-art.mjs` derives them after
+checking each SHA-256. The alt text and location description describe only what ships (a faded but
+operating theatre with a resident who talks); showing and ticket UI belongs to the location panel in
+a later slice, never to the concession backdrop.
+
 ## Werner's Lab (issue #429)
 
 Werner's Lab, Stillreach's ninth World Location, is an ordinary single-scene location like

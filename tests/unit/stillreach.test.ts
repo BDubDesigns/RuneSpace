@@ -145,17 +145,17 @@ function shortestLegs(from: string, to: string): number {
 }
 
 describe("Stillreach planet membership (#373)", () => {
-  it("places exactly the nine approved locations on Stillreach and the original eleven on Skatboll", () => {
+  it("places exactly the nine approved locations on Stillreach and twelve on Skatboll, the original eleven and the Holo Drive-In (#491)", () => {
     expect(stillreachLocations.map((location) => location.id).sort()).toEqual(
       [...stillreachIds].sort(),
     );
-    expect(skatbollLocations).toHaveLength(11);
+    expect(skatbollLocations).toHaveLength(12);
     expect(skatbollLocations.map((location) => location.id)).toContain(
       LOCATION_IDS.holoHollowLanding,
     );
     expect(stillreachLocations).toHaveLength(9);
-    expect(LOCATIONS).toHaveLength(20);
-    expect(new Set(LOCATIONS.map((location) => location.id)).size).toBe(20);
+    expect(LOCATIONS).toHaveLength(21);
+    expect(new Set(LOCATIONS.map((location) => location.id)).size).toBe(21);
   });
 
   it("derives a location's planet from the registry", () => {
@@ -417,10 +417,10 @@ describe("planet-scoped local map geometry (#373)", () => {
     }
   });
 
-  it("keeps the Skatboll map to its existing eleven hexes and fifteen routes", () => {
+  it("keeps the Skatboll map to its eleven original hexes and fifteen routes, plus the Holo Drive-In's hex and one route (#491)", () => {
     const geometry = LOCAL_MAP_GEOMETRY_BY_PLANET.skatboll;
-    expect(geometry.layouts).toHaveLength(11);
-    expect(geometry.undirectedRoutes).toHaveLength(15);
+    expect(geometry.layouts).toHaveLength(12);
+    expect(geometry.undirectedRoutes).toHaveLength(16);
     expect(geometry.layouts.every((layout) => !stillreachIds.includes(layout.locationId))).toBe(
       true,
     );

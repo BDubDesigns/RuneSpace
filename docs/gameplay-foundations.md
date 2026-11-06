@@ -1042,6 +1042,34 @@ migration**.
   Stone shaping, gem cutting, workstation or Cut Gem item exists, and none is advertised
   or shown disabled.
 
+### The Holo Drive-In (issue #491, slice 1)
+
+Skatboll's twelfth World Location, the open-air theatre, is the first slice of the Holo Drive-In
+launch. It is a content-only change that fits the existing registries and persisted shapes, so
+there is **no database migration**. Showings, tickets, receipts, buffs, the viewer and the
+commercials are later slices of #491 and are not shipped here.
+
+- **Place.** `LOCATION_IDS.holoDriveIn`, planet Skatboll, region `holo_hollow`, axial (-1,0),
+  displayed as "Holo Drive-In". Exactly one authored, bidirectional ordinary walking edge: Holo
+  Hollow (-1,1). The hex touches the Emergency Power Annex (0,0) and Rusk Recovery (-2,1), but
+  no route is authored to either and nothing is inferred from adjacency. Legs use the ordinary
+  walk, turn-back and path validation; there is no unlock gate, Mission, skill requirement,
+  Local Place, instant hop, ship route or NPC movement.
+- **Tamsyn Suzara.** `NPC_IDS.tamsynSuzara`, the owner and operator, stands at the World
+  Location itself like Werner and the Wise Old Enby. No first-meeting flag, Mission or level
+  decides whether she is there. Public text uses "Tamsyn Suzara" or "Tamsyn"; the shortened
+  form is reserved for close friends and appears nowhere.
+- **Topics.** Two `always` replayable topics so far, authored verbatim in
+  `game/content/dialogue.ts`: Tell me about the projector (neutral, amused, neutral) and Why keep
+  this place open? (neutral, wistful, wistful, welcoming). Each beat chooses its own expression.
+  They record nothing and grant nothing. The third approved topic, What's showing?, reads the
+  authoritative current showing and arrives with the theatre. There is deliberately no farewell
+  topic: Back and Finish already end every conversation.
+- **Beginner Echo.** Appended to `BEGINNER_ECHO_TARGET_POOLS` for Skatboll as its eleventh member.
+  A hunt already stored keeps its target and clue.
+- **Scenery only for now.** The projector and screen in the art are scenery. No ticket, showing
+  or viewer control exists, and none is advertised or shown disabled.
+
 ### The Crash Site's two scenes (issue #330)
 
 The Crash Site shows the approved **Rivet Utility Shuttle** as one empty
@@ -1963,8 +1991,9 @@ Each character has at most one active Beginner hunt per planet
 reading on a planet with no active hunt chooses a hidden target uniformly from
 that planet's **fixed** pool (`game/content/echo-hunts.ts`) and resolves against
 it at once, so the first reading may succeed where the player stands. Pools
-never grow with progression: **Skatboll** — its ten ordinary World Locations,
-Deep Jag permanently excluded; **Stillreach** — its eight original World Locations
+never grow with progression: **Skatboll** — its ten original ordinary World Locations
+plus the Holo Drive-In (#491), eleven in all, added by an explicit owner-approved exception
+because it is freely visitable from the start, Deep Jag permanently excluded; **Stillreach** — its eight original World Locations
 plus Werner's Lab (#429), nine in all, added by an explicit owner-approved exception to
 the earlier eight-site freeze rather than by automatically including every future
 location. A hunt already stored keeps its target and clue: nothing rerolls or

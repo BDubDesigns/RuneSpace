@@ -23,6 +23,7 @@ export const MAP_IDENTIFIER_ASSET_BY_KEY = {
   the_dry_seam: "/map-icons/the-dry-seam.webp",
   harmonic_workings: "/map-icons/harmonic-workings.webp",
   werner_lab: "/map-icons/werner-lab.webp",
+  holo_drive_in: "/map-icons/holo-drive-in.webp",
 } as const satisfies Record<MapIconKey, string>;
 
 /**

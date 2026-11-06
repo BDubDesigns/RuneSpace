@@ -22,7 +22,12 @@ lossless WebP (`public/map-icons/south-access-track.webp`, `the-south-cut.webp`;
 in `assets/map-icons/`). The panel's job is fast readable navigation and
 gameplay-state communication on a phone; hexes are **not** miniature scene paintings.
 
-Those eleven are **Skatboll's** map. Stillreach (`stillreach`, #373) is a second
+The Holo Drive-In (`holo_drive_in`, axial `q=-1, r=0`, #491) is the twelfth: directly north
+of Holo Hollow and joined to it by exactly one ordinary walking edge. It touches the Emergency
+Power Annex (0,0) and Rusk Recovery (-2,1) on the hex grid but has no route to either; nothing is
+inferred from axial adjacency. See "Holo Drive-In map identifier (issue #491)" below.
+
+Those first eleven are **Skatboll's** original map. Stillreach (`stillreach`, #373) is a second
 planet with its own eight-location map — Stillreach Landing Station (0,0), Windward Track
 (1,0), Hilltop Workshop (2,-1), Prospecting Quarry (1,1), The Low Hum (3,-2), The Survey
 Line (2,1), The Dry Seam (3,0) and Harmonic Workings (2,2) — joined by exactly seven
@@ -181,7 +186,7 @@ than duplicating it in map tiles.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag","holo_hollow"])`.
-  …plus `rusk_recovery`, `deep_jag`, the South Access Track / South Cut / Holo Hollow Landing keys, Stillreach's eight (#373) and Werner's Lab (`werner_lab`, #429). No second identifier field was added.
+  …plus `rusk_recovery`, `deep_jag`, the South Access Track / South Cut / Holo Hollow Landing keys, Stillreach's eight (#373), Werner's Lab (`werner_lab`, #429) and the Holo Drive-In (`holo_drive_in`, #491). No second identifier field was added.
   **CAVE-IN and MINING are gameplay status, not identifiers**: Deep Jag has exactly one
   `mapIconKey` and one committed asset across both of its states. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
@@ -248,8 +253,8 @@ throws unless each list is exactly that planet's locations.
 - **One geometry per planet.** `buildLocalMapGeometry(planetId)` lays out only that
   planet's hexes, bounds and routes, so two planets can both use (0,0) with no overlap or
   leaked hex; the duplicate-coordinate check is per planet
-  (`assertPlanetMembership`). Skatboll's geometry is byte-identical to before (11 hexes,
-  15 routes). The panel no longer rebuilds geometry on window resize: the hex width is
+  (`assertPlanetMembership`). Skatboll's geometry was byte-identical to before (11 hexes,
+  15 routes) until the Holo Drive-In (#491) added one hex and one route (12 hexes, 16 routes). The panel no longer rebuilds geometry on window resize: the hex width is
   constant, so the rebuild changed nothing.
 - **Walking cannot cross planets.** `assertBidirectionalAdjacency` rejects any edge joining
   two planets at load, so `areLocationsAdjacent`, `planTravel` and the persisted-journey
@@ -273,6 +278,16 @@ throws unless each list is exactly that planet's locations.
 - **Reaching it.** In play, by the Rivet's interplanetary flight (#375). Admin → Teleport /
   Set Location (`ADMIN_DESTINATIONS`, derived from `LOCATIONS`) still places a character
   on either planet for support and preview; it moves the character, not the ship.
+
+### Holo Drive-In map identifier (issue #491)
+
+The Holo Drive-In's identifier, `public/map-icons/holo-drive-in.webp`, is the owner-approved
+1254×1254 grayscale direct-alpha master (`assets/map-icons/holo-drive-in.png`, the screen and
+concession building with no baked map tile outline) run through the same recipe by
+`scripts/prepare-holo-drive-in-art.mjs`: alpha under 4 cleared, near-opaque alpha snapped to
+255, trimmed, scaled to a 512 px long edge (512×326), lossless WebP. The location sits at axial
+(-1,0), directly north of Holo Hollow (-1,1), with one authored bidirectional walking edge to it.
+Skatboll's geometry is therefore twelve hexes and sixteen routes.
 
 ### Werner's Lab map identifier (issue #429)
 

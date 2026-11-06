@@ -25,6 +25,8 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "south_access_track",
         "the_south_cut",
         "holo_hollow_landing",
+        // The Holo Drive-In (#491).
+        "holo_drive_in",
         // Stillreach Slice A (#373): reachable for playtest only through this teleport.
         "stillreach_landing_station",
         "windward_track",

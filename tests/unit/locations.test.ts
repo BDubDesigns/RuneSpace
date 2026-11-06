@@ -15,7 +15,7 @@ describe("issue #47 location content", () => {
     expect(LOCATION_IDS.crashSite).toBe("crash_site");
   });
 
-  it("resolves exactly the approved local locations (issues #83, #159, #190, #342, #357, #373 and #429)", () => {
+  it("resolves exactly the approved local locations (issues #83, #159, #190, #342, #357, #373, #429 and #491)", () => {
     expect(LOCATIONS.map((l) => l.id).sort()).toEqual(
       [
         LOCATION_IDS.crashSite,
@@ -29,6 +29,7 @@ describe("issue #47 location content", () => {
         LOCATION_IDS.southAccessTrack,
         LOCATION_IDS.theSouthCut,
         LOCATION_IDS.holoHollowLanding,
+        LOCATION_IDS.holoDriveIn,
         LOCATION_IDS.stillreachLandingStation,
         LOCATION_IDS.windwardTrack,
         LOCATION_IDS.hilltopWorkshop,

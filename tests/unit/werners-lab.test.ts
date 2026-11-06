@@ -616,9 +616,9 @@ describe("the Stillreach Beginner Echo pool with Werner's Lab (#429)", () => {
     expect(() => selectEchoTarget(pool, { nextInteger: () => 9 })).toThrow(RangeError);
   });
 
-  it("leaves Skatboll's ten-location pool untouched", () => {
+  it("leaves Skatboll's pool alone (eleven, with the Holo Drive-In from #491)", () => {
     const skatboll = BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll];
-    expect(skatboll).toHaveLength(10);
+    expect(skatboll).toHaveLength(11);
     expect(skatboll).not.toContain(lab);
     expect(skatboll).not.toContain(LOCATION_IDS.deepJag);
   });
