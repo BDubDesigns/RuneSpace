@@ -453,6 +453,12 @@ every conversation. Her topic labels are the owner's exact first-person wording,
 `tests/unit/npc-conversation.test.ts` names "What's showing?" and "Why keep this place open?" as
 the only labels allowed to end in a question mark; every other label is still a short subject.
 
+Her third approved topic, **What's showing?** (#491), is authored and wired but not yet offered:
+it is one sequence that plays the film-specific opening of the showing the conversation was opened
+at and then two shared closing beats that say the bonus comes with a ticket, so it stays out of
+her hub (`tests/unit/theatre-exposure.test.ts`) until tickets can be bought. See "Theatre showing
+dialogue" below.
+
 Werner (#429) stands at the World Location Werner's Lab itself, with no Local Place, so
 his three topics are listed for anyone who walks there, before any Mission, level or
 conversation. Each has three beats whose text and expression (neutral, thoughtful, amused,
@@ -667,7 +673,32 @@ server's selection at Mining 7, 8 and with no Mining XP row).
   its own to preview and is left out of the QC Studio dialogue list
   (`docs/qc-studio.md`).
 
-Do not grow this into conditions on Missions, items or flags. A line that
+Do not grow this into conditions on Missions, items or flags.
+
+### Theatre showing dialogue (#491)
+
+A narrow sibling of the skill-level choice, for one NPC and one question: *which film is on right
+now*. It is not a scripting engine and adds no per-film topics.
+
+| Piece | Home |
+| --- | --- |
+| The catalog linking each film to Tamsyn's opening | `THEATRE_FILMS[].showingDialogueId` in `game/content/theatre.ts` |
+| The openings | Ordinary Tamsyn sequences in `game/content/dialogue.ts`, one per film, beats only |
+| Invoking it | `currentShowingDialogue: true` on the topic's sequence, whose own beats are the shared closing |
+| Selection (pure) | `resolveShowingFilmId`, `resolveShowingOpening` in `game/domain/theatre.ts`; played by `resolvePresentedDialogue` / `composePresentedDialogue`'s optional `showingFilmId` |
+| Authority | `PlayGameplayState.theatre`, decided from the server's clock |
+| Freezing | `features/npc/NpcConversation.tsx` reads the film once, when the entry is selected, and keeps it in the open conversation |
+| Fail-fast validation | `validateTheatreContent`, run at module load by `server/mission-state.ts` |
+
+- **Order.** The opening plays first, then the invoking sequence's own beats: a prefix, where a
+  skill-level choice is a tail. A sequence cannot have both.
+- **Fallback.** No film named (a state from before the theatre) plays the closing alone, never
+  nothing. A projection that has run out falls back to the same schedule rule, so the topic never
+  names the previous hour's film.
+- **Reuse.** Common concessions and ticket copy is authored once, in the closing. A future film is
+  a catalog entry and its opening; Tamsyn's permanent topics are never rewritten.
+- **Copy.** Dialogue beats carry no emphasis markup, so the film titles in the approved copy are
+  plain text. Ticket numbers in the closing are checked against the ticket tiers by test. A line that
 depends on a Mission's state is Mission dialogue (`docs/missions.md` §9); a
 topic that depends on a Mission is topic availability (§5).
 

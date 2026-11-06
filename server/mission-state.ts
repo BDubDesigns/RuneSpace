@@ -30,6 +30,7 @@ import { SKILL_IDS } from "@/game/config/foundations";
 import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
 import { validateSkillLevelDialogues } from "@/game/domain/skill-level-dialogue";
+import { validateTheatreContent } from "@/game/domain/theatre";
 import { DIALOGUE_SEQUENCES } from "@/game/content/dialogue";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import { LOCATIONS } from "@/game/content/locations";
@@ -65,6 +66,10 @@ validateConversationTopics(CONVERSATION_TOPICS, MISSIONS);
 // mismatched variants, thresholds out of order or off the skill's curve, and a
 // sequence invoking an unknown choice or one of another NPC all fail here.
 validateSkillLevelDialogues(DIALOGUE_SEQUENCES);
+// The Holo Drive-In's catalog (#491), on the same boundary: a film without Tamsyn's showing
+// dialogue, a mis-priced ticket tier, a schedule naming an unknown film, and a showing-opening
+// sequence that is not hers all fail here.
+validateTheatreContent(DIALOGUE_SEQUENCES);
 
 // Local Place access that derives from Mission completion is validated on the
 // same boundary: a place gating on a Mission that does not exist would stay

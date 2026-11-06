@@ -414,6 +414,13 @@
       "when": 1793469335488,
       "tag": "0058_route_to",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793950532841,
+      "tag": "0059_holo_drive_in_theatre",
+      "breakpoints": true
     }
   ]
 }

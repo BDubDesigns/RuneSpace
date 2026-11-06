@@ -35,6 +35,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     progression: { characterLevel: 1, skills: [] },
     skillTotalXp: {},
     skillLevelDialogue: {},
+    theatre: { screens: [] },
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},

@@ -1696,6 +1696,113 @@ export const characterMerchantDailyPurchases = pgTable(
 );
 
 /**
+ * One paid Holo Drive-In ticket (#491): the durable receipt that makes a showing a
+ * character's, and the record the one-purchase rule is enforced from.
+ *
+ * `(character, film, showtime)` is unique, which IS the rule: a character can hold at most
+ * one receipt for an actual film in a canonical showtime, so a same-show rebuy, a tier
+ * upgrade, a retry after a lost response, a double tap, a second tab and a second screen
+ * carrying the same film in the same window all collide on it and mint nothing. The screen
+ * is recorded as metadata (`screen_id`, `showing_id`) and is deliberately not in the key.
+ * Different films in the same window, and the same film in a later window, are different
+ * keys and stay purchasable.
+ *
+ * Receipts are the history eligibility reads; they are never the replay entitlement, which
+ * is `character_theatre_latest_tickets`, and never a buff balance, which is
+ * `character_theatre_buffs`. Written only by the purchase transaction, in the same
+ * transaction as the Credit debit, the latest-ticket pointer and the buff grant, so a
+ * refused or rolled-back purchase leaves no trace. `credits_paid`, `tier_capacity` and the
+ * before/after charges are what that purchase actually did, kept so the invariants stay
+ * auditable if the tiers are ever retuned. The tier, film and showtime IDs are content
+ * (`game/content/theatre`), never mirrored here.
+ */
+export const characterTheatreReceipts = pgTable(
+  "character_theatre_receipts",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    filmId: text("film_id").notNull(),
+    showtimeId: text("showtime_id").notNull(),
+    screenId: text("screen_id").notNull(),
+    showingId: text("showing_id").notNull(),
+    tierId: text("tier_id").notNull(),
+    skillId: text("skill_id").notNull(),
+    creditsPaid: integer("credits_paid").notNull(),
+    tierCapacity: integer("tier_capacity").notNull(),
+    chargesBefore: integer("charges_before").notNull(),
+    chargesAfter: integer("charges_after").notNull(),
+    purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("character_theatre_receipts_character_film_showtime_uq").on(
+      table.characterId,
+      table.filmId,
+      table.showtimeId,
+    ),
+    index("character_theatre_receipts_character_id_idx").on(table.characterId),
+    // The receipt can only describe a purchase that paid, filled a real capacity and never
+    // took a paid charge away.
+    check(
+      "character_theatre_receipts_purchase_shape",
+      sql`${table.creditsPaid} > 0 AND ${table.tierCapacity} > 0 AND ${table.chargesBefore} >= 0 AND ${table.chargesAfter} >= ${table.chargesBefore} AND ${table.chargesAfter} >= ${table.tierCapacity}`,
+    ),
+  ],
+);
+
+/**
+ * A character's one replay entitlement (#491): the single most recently purchased ticket,
+ * kept across logout, travel and showtime rollover. A newer purchase replaces it; replaying
+ * never writes it, charges Credits, or grants or refills a buff. One row per character is
+ * the "not a film library" rule, and the primary key is what enforces it. It points at the
+ * receipt it came from (`ON DELETE RESTRICT`, so a receipt that is someone's replay can never
+ * be removed from under them) and repeats the film and showtime so a read needs no join.
+ */
+export const characterTheatreLatestTickets = pgTable("character_theatre_latest_tickets", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.id, { onDelete: "restrict" }),
+  receiptId: text("receipt_id")
+    .notNull()
+    .references(() => characterTheatreReceipts.id, { onDelete: "restrict" }),
+  filmId: text("film_id").notNull(),
+  showtimeId: text("showtime_id").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+/**
+ * A character's remaining theatre buff charges for one skill (#491). Mining and Welding
+ * are independent rows and never share a balance. A ticket for the same skill sets
+ * `remaining_charges` to the larger of what remains and the tier's capacity: never a sum, and
+ * never less than the character already bought. A completed eligible attempt spends one in
+ * the same authoritative resolution that earns its effect (later slices of #491); nothing
+ * about watching a film touches it, and logout, travel and a programme change leave it alone.
+ * A spent-out row stays at zero rather than being deleted. The skill is content, never
+ * mirrored here; the CHECK only rejects a balance that could not exist.
+ */
+export const characterTheatreBuffs = pgTable(
+  "character_theatre_buffs",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    skillId: text("skill_id").notNull(),
+    remainingCharges: integer("remaining_charges").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.skillId],
+      name: "character_theatre_buffs_pk",
+    }),
+    check("character_theatre_buffs_remaining_not_negative", sql`${table.remainingCharges} >= 0`),
+  ],
+);
+
+/**
  * Append-only operator audit log (Issue #113). One immutable row records a
  * SUCCESSFUL operator mutation, atomically committed with that mutation inside
  * the same transaction. Refused/failed commands, no-op/idempotent commands,

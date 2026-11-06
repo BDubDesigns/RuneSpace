@@ -431,6 +431,16 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx
       .delete(rune.characterWorkOrderBoardRefreshes)
       .where(eq(rune.characterWorkOrderBoardRefreshes.characterId, characterId));
+    // The Holo Drive-In (#491): the replay pointer references its receipt, so it goes first.
+    await tx
+      .delete(rune.characterTheatreLatestTickets)
+      .where(eq(rune.characterTheatreLatestTickets.characterId, characterId));
+    await tx
+      .delete(rune.characterTheatreReceipts)
+      .where(eq(rune.characterTheatreReceipts.characterId, characterId));
+    await tx
+      .delete(rune.characterTheatreBuffs)
+      .where(eq(rune.characterTheatreBuffs.characterId, characterId));
     await tx
       .delete(rune.characterMerchantDailyPurchases)
       .where(eq(rune.characterMerchantDailyPurchases.characterId, characterId));

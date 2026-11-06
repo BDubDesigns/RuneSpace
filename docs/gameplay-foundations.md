@@ -1070,6 +1070,63 @@ commercials are later slices of #491 and are not shipped here.
 - **Scenery only for now.** The projector and screen in the art are scenery. No ticket, showing
   or viewer control exists, and none is advertised or shown disabled.
 
+#### The theatre's server foundation (issue #491, slice 2)
+
+The second slice adds the schedule, the film catalog, the durable ticket records and the server
+purchase transaction, and **exposes none of it to players**: the Mining and Welding buff effects
+a ticket sells are later slices, and a ticket must not be sellable before the thing it sells
+exists. `server/theatre-commands.ts` (`buyTheatreTicket`) is imported by no route, action or
+component, and `tests/unit/theatre-exposure.test.ts` fails if one ever imports it, or if Tamsyn's
+"What's showing?" topic is offered in her hub (her closing says the bonus comes with a ticket).
+The slice that implements the effects removes that guard in the change that exposes the purchase.
+
+- **Content.** `game/content/theatre.ts` is the one catalog: `THEATRE_FILMS` (the Holo Film
+  Studio's own film ID, title, the skill whose buff a ticket grants, and Tamsyn's showing
+  dialogue), `THEATRE_TICKET_TIERS` (20 Credits for 20 charges, 50 Credits with concessions for
+  50: exactly one Credit an attempt, never a discount, concessions a bundle and not an item) and
+  `THEATRE_SCREENS` (the one screen at the Holo Drive-In, a one-hour window, and its film
+  rotation). The film IDs are restated in `game/config/foundations.ts` because the studio is an
+  independent tool nothing shipped imports; `tests/unit/theatre.test.ts` proves they still match
+  its registry. A new film is one catalog entry plus the Tamsyn dialogue it names.
+- **Schedule.** `game/domain/theatre.ts` (`showingAt`, `nextShowingAt`, `currentShowingsAt`) is
+  pure and takes the instant it decides at. Windows are `[HH:00:00, next HH:00:00)` UTC, so an
+  instant exactly on the hour is the incoming showing. Even UTC hours show That Mines Mine!
+  (Mining) and odd hours Rare or Weld Done? (Welding). A showing has a stable `showingId` (the
+  screen and the canonical showtime) and a `showtimeId` that names only the interval, so a second
+  screen later cannot make a second purchase. `PlayGameplayState.theatre` carries each screen's
+  current and next showing from the server's clock; it carries no receipts or balances yet.
+- **Purchase.** One transaction on the shared locked-owned-character boundary, like a trade.
+  Under the lock it re-derives the character's location (they must be at the theatre, not on the
+  way), idleness, the showing on at the server's `now` (a request for a showing that has turned
+  over is `showing_changed`, never silently the incoming film), the receipt history and the
+  balance, then commits one guarded Credit debit, the receipt, the latest-ticket pointer and the
+  buff upsert together. Any refusal writes nothing, and a failure part-way (the integration
+  tests inject one) rolls everything back.
+- **One receipt per character, film and showtime.** Enforced by a unique index, not only by a
+  check: a same-show rebuy, a tier upgrade or downgrade, a retry after a lost response, a double
+  tap, a second tab and a second screen carrying the same film in the same window all find the
+  existing receipt (`already_purchased`, with the tier it was bought at so a client can recognise
+  its own purchase) and change nothing, even after the charges are spent. Different films in one
+  window and the same film in a later window are different keys.
+- **Buff top-up.** `topUpCharges` sets the same skill's remaining charges to the larger of what
+  remains and the tier's capacity (the upsert's own `GREATEST`): never a sum, never less than the
+  character already bought, and a ticket that adds nothing still buys its receipt and its replay.
+  Mining and Welding are independent rows. Watching, the viewer and completion are not inputs.
+- **Replay entitlement.** `character_theatre_latest_tickets` holds one row per character, the most
+  recent purchase, replaced by a newer one and kept across logout, travel and rollover. Replaying
+  charges and grants nothing (the viewer is a later slice).
+- **State.** Migration `0059_holo_drive_in_theatre`, additive, no backfill:
+  `character_theatre_receipts`, `character_theatre_latest_tickets`, `character_theatre_buffs`,
+  all `ON DELETE RESTRICT`. The receipt records what the purchase actually did (Credits paid, the
+  tier's capacity and the charges before and after) so the invariants stay auditable.
+- **Tamsyn's "What's showing?".** One topic sequence, `tamsynWhatsShowingTopic`, flagged
+  `currentShowingDialogue`: it plays the film-specific three-beat opening of the showing the
+  conversation was opened at (`resolveShowingOpening`, from the catalog) and then its own two
+  shared closing beats. The surface reads `resolveShowingFilmId` from the Play state's
+  programme once when the topic is opened and keeps that film, so a turnover mid-dialogue changes
+  nothing; reopening picks the new film. It is authored verbatim but **not registered** in
+  `CONVERSATION_TOPICS`, for the reason above.
+
 ### The Crash Site's two scenes (issue #330)
 
 The Crash Site shows the approved **Rivet Utility Shuttle** as one empty

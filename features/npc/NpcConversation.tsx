@@ -17,7 +17,9 @@ import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
 import { ResearchJobsView } from "@/features/research/ResearchJobsView";
 import { RESEARCH_GIVER } from "@/game/content/research-jobs";
 import { usePlay } from "@/features/play/PlayContext";
+import { getDialogue } from "@/game/content/dialogue";
 import { composePresentedDialogue } from "@/game/domain/skill-level-dialogue";
+import { resolveShowingFilmId } from "@/game/domain/theatre";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
@@ -58,6 +60,12 @@ type OpenConversation = {
    * outcome, played on as one scene so Back and Next cross between them.
    */
   then?: readonly string[];
+  /**
+   * The film on the screen when a sequence that opens with the current showing's dialogue
+   * (#491) was opened, read once then and kept: the programme turning over mid-conversation
+   * does not change which opening this conversation plays.
+   */
+  showingFilmId?: string;
 };
 
 function fromEntry(entry: NpcConversationEntry): OpenConversation {
@@ -91,7 +99,7 @@ export function NpcConversation({
   onClose: () => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acceptState, acquireCommand, releaseCommand, state } = usePlay();
+  const { acceptState, acquireCommand, releaseCommand, serverNowMs, state } = usePlay();
   const [open, setOpen] = useState<OpenConversation>();
   // Which list the hub is showing (#406). The Wise Old Enby groups their replayable
   // topics and their research jobs under two buttons beneath the story
@@ -107,7 +115,11 @@ export function NpcConversation({
   // A sequence that closes with skill-level-dependent dialogue (#391) plays the
   // variant the server selected for this character's current level.
   const sequence = open
-    ? composePresentedDialogue([open.dialogueId, ...(open.then ?? [])], state.skillLevelDialogue)
+    ? composePresentedDialogue(
+        [open.dialogueId, ...(open.then ?? [])],
+        state.skillLevelDialogue,
+        open.showingFilmId,
+      )
     : undefined;
   // Where this person is standing now, for the sequences authored as a
   // present-tense local conversation rather than a scene (#190).
@@ -161,7 +173,13 @@ export function NpcConversation({
 
   function selectEntry(entry: NpcConversationEntry) {
     setMessage(undefined);
-    setOpen(fromEntry(entry));
+    const opened = fromEntry(entry);
+    // A sequence that opens with the current showing (#491) reads the programme the server
+    // projected, once, as it is opened, and keeps that film for the whole conversation.
+    const showingFilmId = getDialogue(opened.dialogueId)?.currentShowingDialogue
+      ? resolveShowingFilmId(state.theatre, state.location.currentLocationId, serverNowMs())
+      : undefined;
+    setOpen(showingFilmId === undefined ? opened : { ...opened, showingFilmId });
   }
 
   function runConversationAction() {
