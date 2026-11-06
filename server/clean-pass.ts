@@ -11,7 +11,7 @@ import {
 import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { cleanPassClaim, withCleanPassOutcome } from "@/game/domain/clean-pass";
 import type { MiningRandom } from "@/game/domain/mining";
-import { withResolvedOwnedCharacter } from "@/server/action-resolution";
+import { withResolvedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
 import { defaultMiningRandom } from "@/server/mining";
 import {
   createPlayResolver,
@@ -25,7 +25,9 @@ import {
   writePracticeState,
 } from "@/server/practice-welding";
 import { getWorkOrder } from "@/game/content/work-orders";
+import { weldingSectionAward } from "@/game/domain/theatre";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 import { loadActiveWorkOrder, writeActiveWorkOrderProgress } from "@/server/work-orders";
 import { loadRepairTargetRow, repairStateFromRow, writeRepairCleanPass } from "@/server/welding";
 
@@ -52,6 +54,38 @@ export type CleanPassClaimResult = {
   state: PlayGameplayState;
   cleanPass: CleanPassClaimStatus;
 };
+
+/**
+ * What a successfully claimed Clean Pass section pays, and the film buff charge it spends
+ * (#491). The claimed section is a real, XP-paying section like any other: with Rare or Weld
+ * Done? charges left it pays +10% and spends exactly one, in this same transaction as its XP
+ * and progress; without them it pays ordinary XP. Only a claim that already passed its checks
+ * reaches here, so a missed, expired or refused claim never spends a charge. Called after the
+ * shared resolution has reconciled any due sections, so the balance read is the one those
+ * sections left.
+ */
+async function claimedSectionXp(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  baseXp: number,
+  now: Date,
+): Promise<number> {
+  const remainingCharges = await loadTheatreBuffCharges(
+    transaction,
+    characterId,
+    SKILL_IDS.welding,
+  );
+  const award = weldingSectionAward({ sectionXp: baseXp, remainingCharges });
+  if (award.chargeConsumed) {
+    await consumeTheatreBuffCharges(transaction, {
+      characterId,
+      skillId: SKILL_IDS.welding,
+      charges: 1,
+      now,
+    });
+  }
+  return award.xp;
+}
 
 const REFUSALS = {
   no_welding: "Clean Pass is only available while you are welding.",
@@ -129,7 +163,12 @@ export async function claimCleanPass(
         if (practice.sectionsCompleted + 1 >= balance.practiceWelding.sectionsPerWeld) {
           throw new Error("A Clean Pass claim cannot complete a Practice weld");
         }
-        const awardedXp = practiceSectionXp(balance);
+        const awardedXp = await claimedSectionXp(
+          transaction,
+          context.character.id,
+          practiceSectionXp(balance),
+          now,
+        );
         await grantCharacterSkillXp(transaction, {
           characterId: context.character.id,
           skillId: SKILL_IDS.welding,
@@ -186,7 +225,12 @@ export async function claimCleanPass(
         if (active.sectionsCompleted + 1 >= definition.sections) {
           throw new Error("A Clean Pass claim cannot complete a Work Order");
         }
-        const awardedXp = workOrderSectionXp(balance);
+        const awardedXp = await claimedSectionXp(
+          transaction,
+          context.character.id,
+          workOrderSectionXp(balance),
+          now,
+        );
         await grantCharacterSkillXp(transaction, {
           characterId: context.character.id,
           skillId: SKILL_IDS.welding,
@@ -242,7 +286,12 @@ export async function claimCleanPass(
       if (repair.weldingProgress + 1 >= target.repairIncrements) {
         throw new Error("A Clean Pass claim cannot complete a repair");
       }
-      const awardedXp = balance.welding.xpPerIncrement;
+      const awardedXp = await claimedSectionXp(
+        transaction,
+        context.character.id,
+        balance.welding.xpPerIncrement,
+        now,
+      );
       await grantCharacterSkillXp(transaction, {
         characterId: context.character.id,
         skillId: SKILL_IDS.welding,

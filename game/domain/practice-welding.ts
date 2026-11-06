@@ -12,6 +12,7 @@ import {
 import { BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
 import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import { planExactStackRemoval } from "@/game/domain/inventory";
+import { weldingSectionAward } from "@/game/domain/theatre";
 
 /**
  * Practice Welding — the repeatable Welding training loop at Wade's Workbench
@@ -94,6 +95,13 @@ export type PracticeSnapshot = {
    * decides whether another begins after it.
    */
   runAllowance: BoundedRunAllowance;
+  /**
+   * The character's remaining Rare or Weld Done? film buff charges (#491), read under the
+   * character lock. Each COMPLETED section spends one while any remain and pays +10%
+   * Welding XP (a Practice section's 10 becomes 11); sections after the last charge pay
+   * ordinary XP, mid-weld or mid-batch. Scrap, timing and Slag are untouched. Absent means none.
+   */
+  filmBuffCharges?: number;
 };
 
 /** One completed weld, as `This Run` shows it. */
@@ -138,6 +146,8 @@ export type PracticeResolution = {
   slagKept: number;
   slagDiscarded: number;
   awardedXp: number;
+  /** Film buff charges the completed sections spent (#491). */
+  filmChargesConsumed: number;
   /** The durable state to persist, including any freshly rolled Clean Pass. */
   practice: PracticeWeldState;
   resolvedWelds: readonly PracticeResolvedWeld[];
@@ -257,6 +267,10 @@ export function resolvePracticeWelding(input: {
   let remainingTicks = input.elapsedTicks;
   let consumedTicks = 0;
   let sectionsResolved = 0;
+  let awardedXp = 0;
+  let weldXp = 0;
+  const initialFilmCharges = snapshot.filmBuffCharges ?? 0;
+  let remainingFilmCharges = initialFilmCharges;
   let scrapConsumed = 0;
   let slagKept = 0;
   let slagDiscarded = 0;
@@ -298,6 +312,7 @@ export function resolvePracticeWelding(input: {
       cycleActive = true;
       sectionsCompleted = 0;
       weldSections = 0;
+      weldXp = 0;
       cleanPass = rolledCleanPass(input.random, practiceWelding.sectionsPerWeld, balance);
     }
 
@@ -307,6 +322,12 @@ export function resolvePracticeWelding(input: {
     sectionsCompleted += 1;
     sectionsResolved += 1;
     weldSections += 1;
+    // Each completed section is judged on its own, so a buff that runs out partway through a
+    // weld or a batch pays the bonus exactly to its last charge (#491).
+    const section = weldingSectionAward({ sectionXp, remainingCharges: remainingFilmCharges });
+    if (section.chargeConsumed) remainingFilmCharges -= 1;
+    awardedXp += section.xp;
+    weldXp += section.xp;
 
     if (sectionsCompleted >= practiceWelding.sectionsPerWeld) {
       // The Slag setting is read here, at completion time, so flipping it
@@ -326,11 +347,12 @@ export function resolvePracticeWelding(input: {
         scrapConsumed: practiceWelding.scrapPerWeld,
         slagKept: produced.kept,
         slagDiscarded: produced.discarded,
-        xpGained: weldSections * sectionXp,
+        xpGained: weldXp,
       });
       cycleActive = false;
       sectionsCompleted = 0;
       weldSections = 0;
+      weldXp = 0;
       cleanPass = UNROLLED_CLEAN_PASS;
     }
   }
@@ -346,7 +368,8 @@ export function resolvePracticeWelding(input: {
     scrapConsumed,
     slagKept,
     slagDiscarded,
-    awardedXp: sectionsResolved * sectionXp,
+    awardedXp,
+    filmChargesConsumed: initialFilmCharges - remainingFilmCharges,
     practice: { sectionsCompleted, cycleActive, cleanPass },
     resolvedWelds,
     slagBudget: {

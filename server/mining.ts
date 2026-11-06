@@ -37,6 +37,7 @@ import { getLocation } from "@/game/content/locations";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { recordRareFindAnnouncement } from "@/server/public-system-messages";
 import { loadPlaySnapshot } from "@/server/play-state";
+import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 import { loadPrioritizePrimaryResources } from "@/server/character-preferences";
 
 const systemRandom: MiningRandom = {
@@ -92,6 +93,13 @@ export type MiningRunAttempt = {
   durationTicks: number;
   chargeConsumed: boolean;
   remainingCharge: number;
+  /**
+   * That Mines Mine!'s film buff spent a charge on this attempt (#491). Absent on an attempt
+   * recorded before the theatre existed.
+   */
+  filmBuffed?: boolean;
+  /** The buff's one blank-secondary bonus roll was made on this attempt (#491). */
+  filmBonusRoll?: boolean;
 };
 
 export type MiningRunState = {
@@ -110,6 +118,8 @@ export type MiningSnapshot = {
   successLevelBonus: number;
   /** Worn gear's additive Mining XP bonus in basis points, applied per attempt (#465). */
   xpBonusBps: number;
+  /** Remaining That Mines Mine! film buff charges (#491), read under the character lock. */
+  filmBuffCharges: number;
   /** The character's Prioritize primary resources setting (#342). */
   prioritizePrimaryResources: boolean;
   /** The equipped Mining tool's authored definition, or undefined (#233). */
@@ -169,6 +179,7 @@ export async function loadMiningSnapshot(
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
     successLevelBonus: play.equipmentLoadout.miningSuccessLevelBonus,
     xpBonusBps: play.equipmentLoadout.miningXpBonusBps,
+    filmBuffCharges: await loadTheatreBuffCharges(transaction, characterId, SKILL_IDS.mining),
     // Read under the same character lock as everything else the resolution uses,
     // so a lazy or offline attempt resolves under the setting last committed.
     prioritizePrimaryResources: await loadPrioritizePrimaryResources(transaction, characterId),
@@ -248,6 +259,14 @@ export function createMiningResolver(
             ),
           );
       }
+      // The film buff's charges are spent in the same transaction as the XP, finds and run
+      // history they earned, so a charge can never be spent without its effect or the reverse.
+      await consumeTheatreBuffCharges(transaction, {
+        characterId: outcome.characterId,
+        skillId: SKILL_IDS.mining,
+        charges: outcome.filmChargesConsumed,
+        now: new Date(),
+      });
       if (outcome.awardedXp > 0)
         await grantCharacterSkillXp(transaction, {
           characterId: outcome.characterId,

@@ -2,6 +2,7 @@ import { NPC_IDS, type TheatreFilmId } from "@/game/config/foundations";
 import { getDialogue, DIALOGUE_SEQUENCES, type DialogueSequence } from "@/game/content/dialogue";
 import {
   getTheatreFilm,
+  WELDING_FILM_BUFF,
   getTheatreScreensAt,
   getTheatreTicketTier,
   THEATRE_FILMS,
@@ -288,6 +289,64 @@ export function ticketRefusalMessage(reason: TicketRefusalReason): string {
     case "insufficient_credits":
       return "You cannot afford that ticket.";
   }
+}
+
+/**
+ * One section's or attempt's XP with a film buff's bonus applied: `ceil(baseXp * (10000 +
+ * bonusBps) / 10000)` in integers (#491). Zero stays zero, so an attempt that earns nothing
+ * is not made something by a buff, and a section that pays 50 pays 55 at +10%.
+ */
+export function applyFilmXpBonus(baseXp: number, bonusBps: number): number {
+  if (!Number.isInteger(baseXp) || baseXp < 0) {
+    throw new RangeError("Base XP must be a non-negative integer");
+  }
+  if (!Number.isInteger(bonusBps) || bonusBps < 0) {
+    throw new RangeError("A film XP bonus must be a non-negative integer of basis points");
+  }
+  return Math.ceil((baseXp * (10_000 + bonusBps)) / 10_000);
+}
+
+/**
+ * Whether a Welding film buff applies to the next completed section, and what that section
+ * pays: the charge is spent only when a section actually completes and pays XP (a section that
+ * pays nothing leaves the buff alone). Pure, so every Welding resolver and the Clean Pass claim
+ * spend a charge by one rule.
+ */
+export function weldingSectionAward(input: { sectionXp: number; remainingCharges: number }): {
+  xp: number;
+  chargeConsumed: boolean;
+} {
+  if (!Number.isInteger(input.remainingCharges) || input.remainingCharges < 0) {
+    throw new RangeError("Remaining charges must be a whole number of at least zero");
+  }
+  const buffed = input.remainingCharges > 0 && input.sectionXp > 0;
+  return {
+    xp: buffed ? applyFilmXpBonus(input.sectionXp, WELDING_FILM_BUFF.xpBonusBps) : input.sectionXp,
+    chargeConsumed: buffed,
+  };
+}
+
+/**
+ * `sections` completed sections of equal worth in one window, with a film buff of
+ * `remainingCharges`: the first charged sections pay the bonus, then the buff runs out
+ * partway and the rest pay ordinary XP. Equivalent to calling `weldingSectionAward` once per
+ * section, so a batch and one-at-a-time resolution can never disagree.
+ */
+export function weldingSectionsAward(input: {
+  sections: number;
+  sectionXp: number;
+  remainingCharges: number;
+}): { xp: number; chargesConsumed: number } {
+  if (!Number.isInteger(input.sections) || input.sections < 0) {
+    throw new RangeError("Sections must be a non-negative integer");
+  }
+  const buffed = input.sectionXp > 0 ? Math.min(input.sections, input.remainingCharges) : 0;
+  const bonusXp =
+    buffed === 0 ? 0 : applyFilmXpBonus(input.sectionXp, WELDING_FILM_BUFF.xpBonusBps);
+  return {
+    xp: buffed * bonusXp + (input.sections - buffed) * input.sectionXp,
+    chargesConsumed: buffed,
+  };
 }
 
 /**

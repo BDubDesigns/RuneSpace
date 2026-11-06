@@ -4,6 +4,7 @@ import type {
   RepairTargetBalance,
 } from "@/game/config/balance";
 import { UNROLLED_CLEAN_PASS, type CleanPassState } from "@/game/domain/clean-pass";
+import { weldingSectionsAward } from "@/game/domain/theatre";
 
 /**
  * The durable state of one repair target for one character (#172).
@@ -145,6 +146,8 @@ export type WeldingResolution = {
   completedIncrements: number;
   weldingProgress: number;
   awardedXp: number;
+  /** Film buff charges these sections spent (#491): one per buffed completed section. */
+  filmChargesConsumed: number;
   completed: boolean;
   stopReason?: "materials_incomplete" | "completed";
 };
@@ -162,6 +165,12 @@ export function resolveWelding(input: {
   snapshot: WeldingSnapshot;
   target: RepairTargetBalance;
   balance: EffectiveGameBalance;
+  /**
+   * The character's remaining Rare or Weld Done? film buff charges (#491). Each completed
+   * section spends one while any remain and pays +10% Welding XP; sections after the last
+   * charge pay ordinary XP. Absent means none.
+   */
+  filmBuffCharges?: number;
 }): WeldingResolution {
   const { balance, snapshot, target } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0) {
@@ -174,6 +183,7 @@ export function resolveWelding(input: {
       completedIncrements: 0,
       weldingProgress: snapshot.weldingProgress,
       awardedXp: 0,
+      filmChargesConsumed: 0,
       completed: false,
       stopReason: "materials_incomplete",
     };
@@ -186,6 +196,7 @@ export function resolveWelding(input: {
       completedIncrements: 0,
       weldingProgress: Math.min(snapshot.weldingProgress, target.repairIncrements),
       awardedXp: 0,
+      filmChargesConsumed: 0,
       completed: true,
       stopReason: "completed",
     };
@@ -199,6 +210,7 @@ export function resolveWelding(input: {
       completedIncrements: 0,
       weldingProgress: snapshot.weldingProgress,
       awardedXp: 0,
+      filmChargesConsumed: 0,
       completed: false,
       stopReason: "completed",
     };
@@ -208,11 +220,17 @@ export function resolveWelding(input: {
   const completedIncrements = Math.min(remainingIncrements, availableIncrements);
   const weldingProgress = snapshot.weldingProgress + completedIncrements;
   const completed = weldingProgress >= target.repairIncrements;
+  const award = weldingSectionsAward({
+    sections: completedIncrements,
+    sectionXp: balance.welding.xpPerIncrement,
+    remainingCharges: input.filmBuffCharges ?? 0,
+  });
   return {
     consumedTicks: completedIncrements * balance.welding.attemptDurationTicks,
     completedIncrements,
     weldingProgress,
-    awardedXp: completedIncrements * balance.welding.xpPerIncrement,
+    awardedXp: award.xp,
+    filmChargesConsumed: award.chargesConsumed,
     completed,
     ...(completed ? { stopReason: "completed" as const } : {}),
   };

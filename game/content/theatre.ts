@@ -110,6 +110,24 @@ export const THEATRE_SCREENS: readonly TheatreScreenDefinition[] = [
   },
 ];
 
+/**
+ * What a film's buff does while it has charges (#491). One charge is spent per eligible
+ * completed attempt or section, in the same authoritative resolution that earns the effect.
+ *
+ * - Mining (That Mines Mine!): `xpBonusBps` is ADDED to the worn Legendary gear's Mining XP
+ *   bonus (500 each) and the sum is rounded once per attempt, over the attempt's primary and
+ *   retained secondary-find XP together. It does not change the success chance, the yield or
+ *   the speed. The same charge also grants the one blank-secondary bonus roll (see
+ *   `resolveMining`): a successful extraction whose first secondary roll found nothing rolls
+ *   the source's whole, unchanged table once more.
+ * - Welding (Rare or Weld Done?): `xpBonusBps` applies to each completed XP-paying section's
+ *   own XP (Practice, repairs, Work Orders and a successfully claimed Clean Pass section),
+ *   rounded up per section: 50 -> 55 and Practice's 10 -> 11. No section-time reduction, no
+ *   material discount, nothing for Missions, turn-ins or any other XP.
+ */
+export const MINING_FILM_BUFF = { xpBonusBps: 500 } as const;
+export const WELDING_FILM_BUFF = { xpBonusBps: 1_000 } as const;
+
 export function getTheatreFilm(filmId: string): TheatreFilmDefinition | undefined {
   return THEATRE_FILMS.find((film) => film.filmId === filmId);
 }

@@ -9,6 +9,7 @@ import {
   type StackBundleEntry,
   type StackState,
 } from "@/game/domain/inventory";
+import { MINING_FILM_BUFF } from "@/game/content/theatre";
 import { effectiveAttemptDurationTicks, scaledAttemptDurationTicks } from "@/game/domain/timing";
 
 export const MINING_STOP_REASONS = [
@@ -221,6 +222,16 @@ export type MiningSnapshot<Id = string> = {
    */
   xpBonusBps?: number;
   /**
+   * The character's remaining Mining film buff charges (#491, That Mines Mine!), read under
+   * the same character lock as the resolution. While it is above zero, every COMPLETED
+   * extraction attempt is buffed and spends one: +5% Mining XP, added to the gear bonus above
+   * and rounded once over the attempt's primary and retained find XP, and, on a success whose
+   * first Secondary Find roll was blank, one more independent roll over the source's whole
+   * table. It never changes the success chance, yield or speed, and an attempt that does not
+   * finish spends nothing. Absent means none.
+   */
+  filmBuffCharges?: number;
+  /**
    * The character's Prioritize primary resources setting (#342), read under the
    * same character lock as the resolution. Off, the default and when omitted,
    * protects Secondary Finds: an attempt needs room for the source's full
@@ -250,6 +261,10 @@ export type MiningResolution<Id = string> = {
   createdStacks: readonly { itemId: string; quantity: number }[];
   attempts: readonly MiningResolvedAttempt[];
   remainingCutterCharge: number;
+  /** Film buff charges these attempts spent (#491): one per buffed completed attempt. */
+  filmChargesConsumed: number;
+  /** What the film buff has left after these attempts. */
+  remainingFilmCharges: number;
   stopReason?: MiningStopReason;
 };
 
@@ -291,6 +306,13 @@ export type MiningResolvedAttempt = {
   durationTicks: number;
   chargeConsumed: boolean;
   remainingCharge: number;
+  /** The film buff was active and spent one charge on this completed attempt (#491). */
+  filmBuffed: boolean;
+  /**
+   * The film buff's blank-secondary bonus roll was made on this attempt (#491): a success
+   * whose first Secondary Find roll found nothing. The roll itself may also be blank.
+   */
+  filmBonusRoll: boolean;
 };
 
 /**
@@ -510,6 +532,11 @@ export function resolveMining<Id>(input: {
   let remainingTicks = input.elapsedTicks;
   let consumedTicks = 0;
   let remainingCutterCharge = tool ? normalizeCutterCharge(snapshot.cutterCharge, tool) : 0;
+  const initialFilmCharges = snapshot.filmBuffCharges ?? 0;
+  if (!Number.isInteger(initialFilmCharges) || initialFilmCharges < 0) {
+    throw new RangeError("Film buff charges must be a non-negative integer");
+  }
+  let remainingFilmCharges = initialFilmCharges;
   const initialStopReason = miningPreflightStopReason(snapshot, balance, source);
   if (initialStopReason)
     return {
@@ -521,6 +548,8 @@ export function resolveMining<Id>(input: {
       createdStacks: [],
       attempts: [],
       remainingCutterCharge,
+      filmChargesConsumed: 0,
+      remainingFilmCharges,
       stopReason: initialStopReason,
     };
   const stacks = snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true }));
@@ -599,6 +628,8 @@ export function resolveMining<Id>(input: {
           .map(({ itemId, quantity }) => ({ itemId, quantity })),
         attempts: resolvedAttempts,
         remainingCutterCharge,
+        filmChargesConsumed: initialFilmCharges - remainingFilmCharges,
+        remainingFilmCharges,
         stopReason,
       };
     }
@@ -607,6 +638,13 @@ export function resolveMining<Id>(input: {
     if (remainingTicks < durationTicks) break;
     remainingTicks -= durationTicks;
     consumedTicks += durationTicks;
+    // The film buff is judged here, once the attempt is certain to finish: an attempt the
+    // window cannot complete broke out above and spent nothing (#491). It is spent on every
+    // completed attempt, a miss included, and one charge powers both the XP bonus and the
+    // blank-secondary bonus roll.
+    const filmBuffed = remainingFilmCharges > 0;
+    if (filmBuffed) remainingFilmCharges -= 1;
+    const attemptXpBonusBps = xpBonusBps + (filmBuffed ? MINING_FILM_BUFF.xpBonusBps : 0);
     const rolledBasisPoints = random.nextBasisPoints();
     if (rolledBasisPoints >= thresholdBasisPoints) {
       failures += 1;
@@ -639,11 +677,14 @@ export function resolveMining<Id>(input: {
         itemId: source.itemId,
         quantityAwarded: lowYieldQuantity,
         secondaryFinds: [],
-        xpAwarded: applyMiningXpBonus(lowYield?.xp ?? 0, xpBonusBps),
+        xpAwarded: applyMiningXpBonus(lowYield?.xp ?? 0, attemptXpBonusBps),
         boosted,
         durationTicks,
         chargeConsumed: boosted,
         remainingCharge: remainingCutterCharge,
+        // A failed extraction spends the charge and its XP, but never rolls the bonus table.
+        filmBuffed,
+        filmBonusRoll: false,
       });
       continue;
     }
@@ -651,7 +692,17 @@ export function resolveMining<Id>(input: {
     // only on a true success (#308). The find is always rolled whatever the
     // inventory looks like, so capacity can never steer which find drops.
     const rolledQuantity = drawPrimaryQuantity(award, random);
-    const rolledFind = drawSecondaryFind(award.secondaryFinds, random);
+    const firstFind = drawSecondaryFind(award.secondaryFinds, random);
+    // A film-buffed success whose first roll found NOTHING gets exactly one more independent
+    // roll over the same complete table, rare and ultra-rare finds included (#491). If the
+    // first roll found something there is no second; the second roll may itself be blank; the
+    // attempt still holds at most one find. Capacity rules below treat it like any other find.
+    const filmBonusRoll =
+      filmBuffed &&
+      firstFind === undefined &&
+      award.secondaryFinds.length > 0 &&
+      random.nextInteger !== undefined;
+    const rolledFind = filmBonusRoll ? drawSecondaryFind(award.secondaryFinds, random) : firstFind;
     // A charged tool's extra ore comes on top of the ordinarily resolved yield
     // (#233), and only on a success. It is PRIMARY ore only; a Secondary Find is
     // never duplicated by it (#308).
@@ -698,12 +749,14 @@ export function resolveMining<Id>(input: {
       secondaryFinds: find ? [{ itemId: find.itemId, quantity: find.quantity }] : [],
       xpAwarded: applyMiningXpBonus(
         source.successXp + (find ? find.bonusXp * find.quantity : 0),
-        xpBonusBps,
+        attemptXpBonusBps,
       ),
       boosted,
       durationTicks,
       chargeConsumed: boosted,
       remainingCharge: remainingCutterCharge,
+      filmBuffed,
+      filmBonusRoll,
     });
   }
   return {
@@ -719,6 +772,8 @@ export function resolveMining<Id>(input: {
       .map(({ itemId, quantity }) => ({ itemId, quantity })),
     attempts: resolvedAttempts,
     remainingCutterCharge,
+    filmChargesConsumed: initialFilmCharges - remainingFilmCharges,
+    remainingFilmCharges,
   };
 }
 
