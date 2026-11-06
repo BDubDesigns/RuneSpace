@@ -99,6 +99,8 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
     "Crash Site",
     // Visible from the start as a future-world tease, behind The Jag (#209).
     "Deep Jag",
+    // The theatre half a row above Holo Hollow, open from the start (#491).
+    "Holo Drive-In",
     "Holo Hollow",
     // Skatboll's landing pad joins the map as a sixth neighbor of the Crash Site (#357).
     "Holo Hollow Landing",
@@ -129,11 +131,11 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
-// Eleven hexes from the Crash Site: it is "You are here", the Processing Yard,
+// Twelve hexes from the Crash Site: it is "You are here", the Processing Yard,
 // Power Annex, Long Scramble, Holo Hollow, the South Access Track (#342) and Holo
-// Hollow Landing (#357) are all directly reachable, and The Jag, Rusk Recovery (#190), Deep Jag (#209) and
-// The South Cut (#342) are visible behind the Scramble, behind Holo Hollow,
-// behind The Jag, and behind the Track respectively.
+// Hollow Landing (#357) are all directly reachable, and The Jag, Rusk Recovery (#190), Deep Jag (#209),
+// The South Cut (#342) and the Holo Drive-In (#491) are visible behind the Scramble, behind Holo
+// Hollow, behind The Jag, behind the Track, and behind Holo Hollow respectively.
 const STATIONARY_STATE_LABELS = [
   "You are here",
   "Reachable",
@@ -142,6 +144,7 @@ const STATIONARY_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
   "Visible",
   "Visible",
@@ -159,6 +162,7 @@ const SELECTED_STATE_LABELS = [
   "Visible",
   "Visible",
   "Visible",
+  "Visible",
 ] as const;
 const IN_TRANSIT_STATE_LABELS = [
   "Origin",
@@ -168,6 +172,7 @@ const IN_TRANSIT_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
   "Visible",
   "Visible",

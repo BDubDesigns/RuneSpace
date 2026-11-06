@@ -354,14 +354,17 @@ affordance model with nothing added: native `overflow: auto` on
 `left` / `right` / `top` / `bottom` from real measured scroll metrics. There is
 no zoom, no grab-drag engine, and no minimap.
 
-The viewport is bounded (`max-h-[76dvh]`) so the map cannot push the rest of the
+The viewport is bounded (`max-h-[84dvh]`) so the map cannot push the rest of the
 page off a phone, and deliberately not shorter than that: a nested scroller
 small enough to trap ordinary vertical page scrolling would be worse than a tall
 map. The South Access Track and The South Cut (#342) lengthened the map to about
 611 px (606.97 px canvas plus the viewport's 4 px padding) — a few pixels more than
 the former 72dvh cap allowed on a 390×844 phone, which would have put a vertical
-scroller and a bottom arrow on a map that is otherwise whole — so the cap is
-76dvh. Verified at 390×844 and at desktop width with no horizontal page overflow.
+scroller and a bottom arrow on a map that is otherwise whole — so the cap was
+76dvh. The Holo Drive-In (#491) sits half a row above Holo Hollow, lengthening the map to
+about 687 px (682.6 px canvas plus the 4 px padding), which 76dvh again cut short on a
+390×844 phone, so the cap is now 84dvh (709 px there). Verified at 390×844 and at
+desktop width with no horizontal page overflow.
 
 ## The selected-destination panel (issue #240)
 
