@@ -20,6 +20,7 @@ import {
   type CleanPassState,
 } from "@/game/domain/clean-pass";
 import { pacificResetDate } from "@/game/domain/daily-reset";
+import { weldingSectionsAward } from "@/game/domain/theatre";
 import {
   eligibleWorkOrders,
   selectInitialWorkOrderBoard,
@@ -31,6 +32,7 @@ import {
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { recordTrackedActivity } from "@/server/mission-progress";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 import { characterSkillLevel } from "@/server/skill-levels";
 
 /**
@@ -551,6 +553,8 @@ export async function commitWorkOrderBoardRefresh(
 export type WorkOrderWeldingSnapshot = {
   active: ActiveWorkOrderState | undefined;
   slotIndex: number | undefined;
+  /** Remaining Rare or Weld Done? film buff charges (#491), read under the character lock. */
+  filmBuffCharges: number;
 };
 
 export type PersistedWorkOrderOutcome = {
@@ -559,6 +563,8 @@ export type PersistedWorkOrderOutcome = {
   slotIndex: number | undefined;
   sectionsResolved: number;
   awardedXp: number;
+  /** Film buff charges the completed sections spent (#491). */
+  filmChargesConsumed: number;
   sectionsCompleted: number;
   cleanPass: CleanPassState;
   completed: boolean;
@@ -585,7 +591,11 @@ export function createWorkOrderWeldingResolver(
     load: async (transaction, { character }) => {
       const board = await loadWorkOrderBoard(transaction, character.id);
       const accepted = board.postings.find((posting) => posting.acceptedAt !== null);
-      return { active: board.active, slotIndex: accepted?.slotIndex };
+      return {
+        active: board.active,
+        slotIndex: accepted?.slotIndex,
+        filmBuffCharges: await loadTheatreBuffCharges(transaction, character.id, SKILL_IDS.welding),
+      };
     },
     resolve: ({ action, snapshot, window }) => {
       const balance = getEffectiveGameBalance();
@@ -600,6 +610,7 @@ export function createWorkOrderWeldingResolver(
             slotIndex: undefined,
             sectionsResolved: 0,
             awardedXp: 0,
+            filmChargesConsumed: 0,
             sectionsCompleted: 0,
             cleanPass: UNROLLED_CLEAN_PASS,
             completed: false,
@@ -616,13 +627,19 @@ export function createWorkOrderWeldingResolver(
       const sectionsResolved = Math.max(0, Math.min(remainingSections, availableSections));
       const sectionsCompleted = snapshot.active.sectionsCompleted + sectionsResolved;
       const completed = workOrderComplete(definition, sectionsCompleted);
+      const award = weldingSectionsAward({
+        sections: sectionsResolved,
+        sectionXp: workOrderSectionXp(balance),
+        remainingCharges: snapshot.filmBuffCharges,
+      });
 
       const outcome: PersistedWorkOrderOutcome = {
         characterId: action.characterId,
         workOrderId: snapshot.active.workOrderId,
         slotIndex: snapshot.slotIndex,
         sectionsResolved,
-        awardedXp: sectionsResolved * workOrderSectionXp(balance),
+        awardedXp: award.xp,
+        filmChargesConsumed: award.chargesConsumed,
         sectionsCompleted,
         cleanPass: snapshot.active.cleanPass,
         completed,
@@ -640,6 +657,13 @@ export function createWorkOrderWeldingResolver(
       if (outcome.stopped && outcome.workOrderId === undefined) return;
       const now = new Date();
 
+      // The film buff's charges are spent in the transaction that pays the XP they earned (#491).
+      await consumeTheatreBuffCharges(transaction, {
+        characterId: outcome.characterId,
+        skillId: SKILL_IDS.welding,
+        charges: outcome.filmChargesConsumed,
+        now,
+      });
       if (outcome.awardedXp > 0) {
         await grantCharacterSkillXp(transaction, {
           characterId: outcome.characterId,

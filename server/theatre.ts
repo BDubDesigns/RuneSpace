@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   characterTheatreBuffs,
   characterTheatreLatestTickets,
@@ -72,6 +72,63 @@ export async function loadTheatreBuffs(
     .where(eq(characterTheatreBuffs.characterId, characterId));
   const rows = await (options.lockRows ? query.for("update") : query);
   return Object.fromEntries(rows.map((row) => [row.skillId, row.remainingCharges]));
+}
+
+/**
+ * One skill's remaining film buff charges for a character, zero when they hold none (#491).
+ * The Mining and Welding resolvers read this under the character lock they already hold, so
+ * what a resolution judges is what the same transaction then spends.
+ */
+export async function loadTheatreBuffCharges(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  skillId: string,
+): Promise<number> {
+  const [row] = await transaction
+    .select({ remainingCharges: characterTheatreBuffs.remainingCharges })
+    .from(characterTheatreBuffs)
+    .where(
+      and(
+        eq(characterTheatreBuffs.characterId, characterId),
+        eq(characterTheatreBuffs.skillId, skillId),
+      ),
+    )
+    .limit(1);
+  return row?.remainingCharges ?? 0;
+}
+
+/**
+ * Spend `charges` of one skill's film buff, in the same transaction that earned their effect
+ * (#491). One guarded `UPDATE ... WHERE remaining_charges >= charges`, so a balance can never
+ * go negative: a resolution that planned to spend more than the row holds throws, which rolls
+ * the whole resolution back rather than leaving its XP without its charge. Spending nothing
+ * writes nothing.
+ */
+export async function consumeTheatreBuffCharges(
+  transaction: DatabaseTransaction,
+  input: { characterId: string; skillId: string; charges: number; now: Date },
+): Promise<void> {
+  if (!Number.isInteger(input.charges) || input.charges < 0) {
+    throw new RangeError("Charges to spend must be a non-negative integer");
+  }
+  if (input.charges === 0) return;
+  const spent = await transaction
+    .update(characterTheatreBuffs)
+    .set({
+      remainingCharges: sql`${characterTheatreBuffs.remainingCharges} - ${input.charges}`,
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(characterTheatreBuffs.characterId, input.characterId),
+        eq(characterTheatreBuffs.skillId, input.skillId),
+        sql`${characterTheatreBuffs.remainingCharges} >= ${input.charges}`,
+      ),
+    )
+    .returning({ remainingCharges: characterTheatreBuffs.remainingCharges });
+  if (spent.length === 0) {
+    throw new Error("A resolution spent more film buff charges than the character held");
+  }
 }
 
 export type LatestTheatreTicket = {

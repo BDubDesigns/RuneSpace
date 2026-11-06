@@ -48,6 +48,7 @@ import {
 import { loadAutoDiscardSlag } from "@/server/character-preferences";
 import { isMissionAccepted } from "@/server/mission-state";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 
 /** One `This Run` entry: an immutable server-resolved weld summary. */
 export type PracticeRunWeld = PracticeResolvedWeld & {
@@ -77,6 +78,8 @@ export type PersistedPracticeOutcome = {
   slagKept: number;
   slagDiscarded: number;
   awardedXp: number;
+  /** Film buff charges the completed sections spent (#491). */
+  filmChargesConsumed: number;
   practice: PracticeWeldState;
   resolvedWelds: readonly PracticeResolvedWeld[];
   weldResolvedAt: readonly string[];
@@ -185,6 +188,7 @@ export async function loadPracticeSnapshot(
     massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
     autoDiscardSlag: await loadAutoDiscardSlag(transaction, characterId),
     finishCurrentWeld: row?.finishCurrentWeld ?? false,
+    filmBuffCharges: await loadTheatreBuffCharges(transaction, characterId, SKILL_IDS.welding),
     runAllowance: row
       ? boundedRunAllowance(boundedRunSelectionFromColumn(row.runSelectedWelds), row.runWelds)
       : { remaining: 0, exhaustedReason: "run_completed" },
@@ -319,6 +323,7 @@ export function createPracticeWeldingResolver(
         slagKept: resolved.slagKept,
         slagDiscarded: resolved.slagDiscarded,
         awardedXp: resolved.awardedXp,
+        filmChargesConsumed: resolved.filmChargesConsumed,
         practice: resolved.practice,
         resolvedWelds: resolved.resolvedWelds,
         weldResolvedAt,
@@ -381,6 +386,13 @@ export function createPracticeWeldingResolver(
         });
       }
 
+      // The film buff's charges are spent in the transaction that pays the XP they earned (#491).
+      await consumeTheatreBuffCharges(transaction, {
+        characterId: outcome.characterId,
+        skillId: SKILL_IDS.welding,
+        charges: outcome.filmChargesConsumed,
+        now,
+      });
       if (outcome.awardedXp > 0) {
         await grantCharacterSkillXp(transaction, {
           characterId: outcome.characterId,

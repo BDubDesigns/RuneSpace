@@ -132,6 +132,8 @@ describe("Ferrite Shale Mining resolution", () => {
         durationTicks: 10,
         chargeConsumed: false,
         remainingCharge: 0,
+        filmBuffed: false,
+        filmBonusRoll: false,
       },
     ]);
     expect(failure.attempts).toEqual([
@@ -148,6 +150,8 @@ describe("Ferrite Shale Mining resolution", () => {
         durationTicks: 10,
         chargeConsumed: false,
         remainingCharge: 0,
+        filmBuffed: false,
+        filmBonusRoll: false,
       },
     ]);
   });
@@ -173,6 +177,8 @@ describe("Ferrite Shale Mining resolution", () => {
         durationTicks: 10,
         chargeConsumed: false,
         remainingCharge: 0,
+        filmBuffed: false,
+        filmBonusRoll: false,
       },
       {
         success: false,
@@ -187,6 +193,8 @@ describe("Ferrite Shale Mining resolution", () => {
         durationTicks: 10,
         chargeConsumed: false,
         remainingCharge: 0,
+        filmBuffed: false,
+        filmBonusRoll: false,
       },
       {
         success: true,
@@ -201,6 +209,8 @@ describe("Ferrite Shale Mining resolution", () => {
         durationTicks: 10,
         chargeConsumed: false,
         remainingCharge: 0,
+        filmBuffed: false,
+        filmBonusRoll: false,
       },
     ]);
     expect(miningNearMissBasisPoints(3602, 3500)).toBe(103);

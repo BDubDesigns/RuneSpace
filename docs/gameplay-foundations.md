@@ -1078,7 +1078,8 @@ a ticket sells are later slices, and a ticket must not be sellable before the th
 exists. `server/theatre-commands.ts` (`buyTheatreTicket`) is imported by no route, action or
 component, and `tests/unit/theatre-exposure.test.ts` fails if one ever imports it, or if Tamsyn's
 "What's showing?" topic is offered in her hub (her closing says the bonus comes with a ticket).
-The slice that implements the effects removes that guard in the change that exposes the purchase.
+The slice that exposes the purchase removes that guard (the buff effects themselves are slice 3,
+below, which keeps the guard in place).
 
 - **Content.** `game/content/theatre.ts` is the one catalog: `THEATRE_FILMS` (the Holo Film
   Studio's own film ID, title, the skill whose buff a ticket grants, and Tamsyn's showing
@@ -1126,6 +1127,48 @@ The slice that implements the effects removes that guard in the change that expo
   programme once when the topic is opened and keeps that film, so a turnover mid-dialogue changes
   nothing; reopening picks the new film. It is authored verbatim but **not registered** in
   `CONVERSATION_TOPICS`, for the reason above.
+
+#### The film buffs' effects (issue #491, slice 3)
+
+The persisted buff balances from slice 2 now take effect at the existing authoritative resolution
+boundaries. Nothing is exposed: a character only has charges if the (unreachable) purchase command
+ran, `tests/unit/theatre-exposure.test.ts` still guards the purchase and Tamsyn's topic, and a
+character with no charges resolves exactly as before. The magnitudes live in
+`game/content/theatre.ts` (`MINING_FILM_BUFF`, `WELDING_FILM_BUFF`).
+
+- **Where it is read and spent.** Each resolver loads the skill's remaining charges in its own
+  `load` step, under the character lock it already holds, judges every attempt or section against
+  them in the pure rule, and spends the charges it used in the same transaction as the XP, items,
+  run history and announcements it paid, through one guarded `UPDATE ... WHERE remaining_charges >=
+  n` (`consumeTheatreBuffCharges`, which throws and so rolls the whole resolution back rather than
+  go negative). A lazily resolved or offline batch is the same call, so a buff that runs out part
+  way through a batch pays the bonus exactly to its last charge and ordinary XP after; a retried or
+  raced read of the same window finds nothing left to resolve and spends nothing twice.
+- **Mining: That Mines Mine!** (`resolveMining`). Every COMPLETED extraction attempt, a miss
+  included, spends one charge; an attempt the window cannot finish, or a preflight stop, spends
+  none. The attempt's XP bonus is the worn Legendary gear's (500 bps each) plus the film's 500,
+  added and rounded up once over the primary and the actually retained secondary-find XP together
+  (a Jag success of 15 pays 16, 17 or 18 with the film alone, plus one piece, plus both). A low-
+  yield miss pays its XP plus the bonus; a dead miss stays 0. On a success whose **first**
+  secondary roll was blank, the same charge buys exactly one more independent roll over the
+  source's whole, unchanged table (rare, ultra-rare and Runestone finds included): a first find
+  means no second roll, a blank second roll is just blank, a failed extraction never rolls the
+  table, and an attempt holds at most one find. Capacity rules are the existing ones: the
+  preflight already reserves room for any one find, and under Prioritize primary resources a find
+  with no room is forfeited, never rerolled. Rarity announcements and run history follow the
+  existing paths; each recorded attempt gains `filmBuffed` and `filmBonusRoll` for audit. Success
+  chance, yield and speed are untouched.
+- **Welding: Rare or Weld Done?** (`resolveWelding`, `resolvePracticeWelding`, the Work Order
+  resolver and `claimCleanPass`). Every completed section that pays XP spends one charge and pays
+  `ceil(xp * 1.10)`: a repair or Work Order section's 50 becomes 55 and Practice's 10 becomes 11
+  (a Work Order pays its own authored section share). A successfully claimed Clean Pass section
+  is a real section: the claim spends exactly one more charge and pays the bonus (the claim
+  reconciles due sections first, so the balance it reads is the one they left). A missed, expired,
+  refused or already-claimed claim spends nothing and grants no extra section. Section time,
+  materials, Scrap, Slag, Clean Pass placement and claim grace are unchanged, a partial section
+  earns and spends nothing, and Mission and turn-in XP, customer payouts and every other source
+  are not boosted.
+- **Independence.** Mining and Welding are separate rows; neither buff touches the other skill.
 
 ### The Crash Site's two scenes (issue #330)
 

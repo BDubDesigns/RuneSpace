@@ -24,10 +24,13 @@ import {
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 
 export type WeldingSnapshot = {
   targetId: RepairTargetId;
   repair: RepairTargetState;
+  /** Remaining Rare or Weld Done? film buff charges (#491), read under the character lock. */
+  filmBuffCharges: number;
 };
 
 export type PersistedWeldingOutcome = WeldingResolution & {
@@ -239,7 +242,11 @@ export function createWeldingResolver(
       if (!targetId) throw new Error(`No repair target owns action "${action.actionId}"`);
       const row = await loadRepairTargetRow(transaction, character.id, targetId);
       if (!row) throw new Error("Repair state must exist before Welding resolution");
-      return { targetId, repair: repairStateFromRow(row) };
+      return {
+        targetId,
+        repair: repairStateFromRow(row),
+        filmBuffCharges: await loadTheatreBuffCharges(transaction, character.id, SKILL_IDS.welding),
+      };
     },
     resolve: ({ action, snapshot, window }) => {
       const balance = getEffectiveGameBalance();
@@ -248,6 +255,7 @@ export function createWeldingResolver(
         snapshot: snapshot.repair,
         target: getRepairTargetBalance(snapshot.targetId, balance),
         balance,
+        filmBuffCharges: snapshot.filmBuffCharges,
       });
       let cumulativeAttemptTicks = 0;
       const attemptResolvedAt = Array.from({ length: resolved.completedIncrements }, () =>
@@ -270,6 +278,13 @@ export function createWeldingResolver(
       };
     },
     persist: async (transaction, outcome) => {
+      // The film buff's charges are spent in the transaction that pays the XP they earned (#491).
+      await consumeTheatreBuffCharges(transaction, {
+        characterId: outcome.characterId,
+        skillId: SKILL_IDS.welding,
+        charges: outcome.filmChargesConsumed,
+        now: new Date(),
+      });
       if (outcome.awardedXp > 0) {
         await grantCharacterSkillXp(transaction, {
           characterId: outcome.characterId,
