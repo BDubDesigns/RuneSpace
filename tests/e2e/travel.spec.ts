@@ -2025,6 +2025,36 @@ async function ageActiveLeg(characterId: string, ageMs: number) {
   return legStartedAt;
 }
 
+/**
+ * Wait until the Walk the test just clicked is the authoritative persisted one: an active
+ * `travel` action and a `walk` travel row from `origin` to `destination` (#495).
+ *
+ * A click only sends the Walk; its server action commits it afterwards, and the click returns
+ * first. Aging the leg's clock before the commit ages nothing (there is no row to update), and
+ * reloading before it aborts the in-flight request, so the walk can silently never start and
+ * the test fails a minute later on a map that honestly offers a longer route. Waiting on the
+ * persisted rows the server reads makes the walk's existence the thing the test depends on.
+ */
+async function expectWalkCommitted(characterId: string, origin: string, destination: string) {
+  await expect
+    .poll(
+      async () => {
+        const [action, travel] = await Promise.all([
+          actionRow(characterId),
+          travelRow(characterId),
+        ]);
+        return {
+          actionId: action?.actionId,
+          mode: travel?.mode,
+          origin: travel?.originLocationId,
+          destination: travel?.destinationLocationId,
+        };
+      },
+      { message: `the Walk from ${origin} to ${destination} to be persisted` },
+    )
+    .toEqual({ actionId: ACTION_IDS.travel, mode: "walk", origin, destination });
+}
+
 test("Route To walks Crash Site → Long Scramble → The Jag, committing each leg, through reloads (#450)", async ({
   page,
 }) => {
@@ -2168,9 +2198,20 @@ test("Route To keeps each leg's Scavenge, stops after a leg, and turns back to t
   await openMapSurface(page);
   await page.locator('[data-map-location="crash_site"]').click();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  // The Walk must be committed before its clock is aged and the page reloaded (#495).
+  await expectWalkCommitted(characterId, LOCATION_IDS.holoHollow, LOCATION_IDS.crashSite);
   await ageActiveLeg(characterId, 25_000);
   await page.reload();
   await openMapSurface(page);
+  // The aged walk has landed: they are at the Crash Site, which is what makes South Cut two
+  // legs away. A wrong state fails here, at once, rather than as an impossible two-leg button.
+  await expect(page.locator('[data-map-location="crash_site"]')).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  expect(await characterRow(characterId)).toMatchObject({
+    currentLocationId: LOCATION_IDS.crashSite,
+  });
   await page.locator('[data-map-location="the_south_cut"]').click();
   await page.getByRole("button", { name: /^Route To The South Cut, 2 legs/ }).click();
   await route.getByRole("button", { name: "Stop After This Leg" }).click();
