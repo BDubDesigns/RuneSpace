@@ -174,6 +174,7 @@ const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
 const lastLegShop = CONVERSATION_BACKGROUND_IDS.lastLegTradingInterior;
 const hilltopWorkshop = CONVERSATION_BACKGROUND_IDS.hilltopWorkshopInterior;
 const wernersLab = CONVERSATION_BACKGROUND_IDS.wernersLabInterior;
+const holoDriveInConcessions = CONVERSATION_BACKGROUND_IDS.holoDriveInConcessions;
 // The Wise Old Enby's visit to this character's personal Resonance Rig (#441): the
 // empty ship-departed Crash Site and the Rig, never the repaired Rivet.
 const resonanceSite = CONVERSATION_BACKGROUND_IDS.crashSiteResonanceSite;
@@ -251,6 +252,17 @@ function wernerLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.werner,
     expressionId,
     backgroundId: wernersLab,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function tamsynLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.tamsynSuzara,
+    expressionId,
+    backgroundId: holoDriveInConcessions,
     presentationMode: "local",
     text,
   };
@@ -3102,6 +3114,51 @@ const dialogue = {
       wernerLocal(
         EXPRESSION_IDS.amused,
         "When you find one, bring it to me. Preferably before you've done something regrettable with a hammer.",
+      ),
+    ],
+  },
+  // Tamsyn Suzara's two launch topics at the Holo Drive-In (#491). The copy, its order and
+  // the expression on every beat are owner-approved and locked verbatim in the issue:
+  // nothing here paraphrases them. Each beat chooses its own expression for its own
+  // emotional beat. They are presentation only and say nothing about tickets, so they
+  // read the same before and after the theatre ships.
+  [DIALOGUE_IDS.tamsynAboutTheProjectorTopic]: {
+    id: DIALOGUE_IDS.tamsynAboutTheProjectorTopic,
+    npcId: NPC_IDS.tamsynSuzara,
+    beats: [
+      tamsynLocal(
+        EXPRESSION_IDS.neutral,
+        "Oh, that old girl? She's been here longer than some of the buildings in the Hollow.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.amused,
+        "She still runs beautifully. Well, she runs. Beautifully is a matter of opinion.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.neutral,
+        "Can't play the newer film formats, mind you. But the old pictures? Those she knows by heart.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tamsynWhyKeepItOpenTopic]: {
+    id: DIALOGUE_IDS.tamsynWhyKeepItOpenTopic,
+    npcId: NPC_IDS.tamsynSuzara,
+    beats: [
+      tamsynLocal(
+        EXPRESSION_IDS.neutral,
+        "Used to get visitors from all over. Whole families coming out to the Hollow just for a night at the pictures.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.wistful,
+        "Then the new films stopped coming. The crowds followed.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.wistful,
+        "But there's still the regulars. Families, workers finishing a long shift, people who just want to forget about everything for a little while.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "Because people still come to watch them. Isn't that reason enough?",
       ),
     ],
   },

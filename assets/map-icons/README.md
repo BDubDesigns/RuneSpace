@@ -45,6 +45,11 @@ served to clients.
   `scripts/prepare-werner-lab-art.mjs`, which derives `public/map-icons/werner-lab.webp`
   (512×281, grayscale, lossless) by the same recipe. Nothing was regenerated or recoloured.
 
+- `holo-drive-in.png` (#491) is the owner-approved 1254×1254 grayscale direct-alpha master of the
+  Holo Drive-In's screen and concession building, kept unaltered and SHA-256 checked by
+  `scripts/prepare-holo-drive-in-art.mjs`, which derives `public/map-icons/holo-drive-in.webp`
+  (512×326, grayscale, lossless) by the same recipe. Nothing was regenerated or recoloured.
+
 The other four identifiers keep no master here: their pre-key colour sources
 live in working-art storage rather than the repository, which
 `docs/art-cookbook.md` explicitly allows.

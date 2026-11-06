@@ -123,7 +123,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has eleven connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
+          "Holo Hollow currently has twelve connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
@@ -137,13 +137,14 @@ const authoredWikiArticles = [
           [
             "Holo Hollow — the ",
             { text: "town", articleSlug: "holo-hollow" },
-            " connects to Crash Site, the Power Annex, The Long Scramble, and Rusk Recovery. There's no direct route between the town and The Jag or the Processing Yard.",
+            " connects to Crash Site, the Power Annex, The Long Scramble, Rusk Recovery and the Holo Drive-In. There's no direct route between the town and The Jag or the Processing Yard.",
           ],
           [
             "Rusk Recovery — ",
             { text: "Wade Rusk's", articleSlug: "wade-rusk" },
             " own yard, on the northwest edge of town. It only connects to Holo Hollow, so the town is the way in and the way out.",
           ],
+          "Holo Drive-In — a weathered open-air theatre just north of the town, with a towering movie screen, rows of faded parking lanes and a warm-lit concession stand. It is an ordinary place on foot, open from the start: it only connects to Holo Hollow, one normal walk away, and has no route to the Power Annex or Rusk Recovery even though it sits beside them on the map. Tamsyn Suzara owns and runs it, and will talk to anyone who walks up.",
           [
             "Deep Jag — the lower workings, southwest of The Jag and reachable only from it. It shows on your map from the start, marked CAVE-IN, and you cannot walk into it: the passage is blocked by fallen rock until you reopen it during ",
             { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },

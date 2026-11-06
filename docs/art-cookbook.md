@@ -753,6 +753,21 @@ Current production conventions:
   (`public/map-icons/werner-lab.webp`). Master SHA-256 (first 12 hex): neutral `e96bac935690`,
   thoughtful `a7959c6e7fa3`, amused `88589f8cc26c`, intense `0e437862a2ac`, exterior
   `73d35b87d57e`, interior `26fc34d06e90`, identifier `0ae3086c63ae`
+- Holo Drive-In (#491): the seven approved masters from the owner's handoff ZIP
+  (`RuneSpace_Holo_Drive_In_Approved_Art_7_Images.zip`), kept unaltered and SHA-256 checked by
+  `scripts/prepare-holo-drive-in-art.mjs`. The four transparent portraits
+  (`assets/npc-art/tamsyn-suzara/tamsyn-suzara-{neutral,welcoming,amused,wistful}-master.png`) are
+  not one canvas size (1086×1448, 1087×1447, 1087×1446 and 1088×1446), so one scale (500/1448) is
+  applied to all four, each is centred and seated on the bottom edge of one shared transparent
+  400×500 canvas (every figure runs off the bottom, head to mid-thigh) and the expressions switch in
+  place (`public/npc-art/tamsyn-suzara-*.png`); the 2508×627 exterior is downsampled whole to
+  1536×384 lossy WebP q80 (`public/location-scenes/holo-drive-in.webp`); the 1665×888 concession
+  stand is already exactly 15:8 and is converted at native size with no crop
+  (`public/location-scenes/holo-drive-in-concessions.webp`, q80); and the 1254×1254 grayscale
+  direct-alpha identifier goes through the direct-alpha recipe to a 512×326 lossless WebP
+  (`public/map-icons/holo-drive-in.webp`). Master SHA-256 (first 12 hex): neutral `e0b034a366b0`,
+  welcoming `3e3fa5f4eaf4`, amused `4b285e58e920`, wistful `6e1671e17b1f`, exterior `089aaf5faadd`,
+  concession stand `3c9f2e25fda8`, identifier `d0710c55331f`
 - map identifiers -> `public/map-icons/`
 - genuinely Update-owned heroes -> `public/updates/` (existing game art is referenced in place)
 

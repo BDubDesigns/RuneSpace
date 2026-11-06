@@ -624,11 +624,11 @@ suite("issue #429 Werner's Lab (real PostgreSQL)", () => {
       expect(await hunts(characterId)).toHaveLength(1);
     });
 
-    it("leaves Skatboll's ten-location pool and its hunts alone", async () => {
+    it("leaves Skatboll's pool (eleven since the Holo Drive-In, #491) and its hunts alone", async () => {
       const { userId, characterId } = await makeCharacter({ locationId: LOCATION_IDS.theJag });
       await give(characterId, SEEKER, 2);
       const skatbollPool = BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll];
-      expect(skatbollPool).toHaveLength(10);
+      expect(skatbollPool).toHaveLength(11);
       const target = skatbollPool.indexOf(LOCATION_IDS.crashSite);
       const { state } = await readFrom(userId, characterId, today, [target]);
       expect(state.echoHunt.notice).toMatchObject({ outcome: "wrong" });

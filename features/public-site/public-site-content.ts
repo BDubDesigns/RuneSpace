@@ -49,7 +49,7 @@ export const publicLandingContent = {
     eyebrow: "Current build",
     title: "Two planets of ground under it",
     description:
-      "The current build spans two planets — 11 locations on Skatboll and 8 on Stillreach. Move between locations, find useful material, put it through the right work, and make the wreck more capable one job at a time.",
+      "The current build spans two planets — 12 locations on Skatboll and 9 on Stillreach. Move between locations, find useful material, put it through the right work, and make the wreck more capable one job at a time.",
   },
   capabilitiesHeader: {
     eyebrow: "The current build",
@@ -66,9 +66,9 @@ export const publicLandingContent = {
     },
     {
       src: "/landing/map-skatboll.webp",
-      alt: "RuneSpace local Map view showing the eleven connected Skatboll locations",
+      alt: "RuneSpace local Map view of Skatboll, from before the Holo Drive-In joined it: this screenshot shows the original eleven connected locations, and the planet now has twelve",
       label: "Map",
-      detail: "Skatboll — 11 locations",
+      detail: "Skatboll — 12 locations",
       width: 864,
       height: 739,
     },

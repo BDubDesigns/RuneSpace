@@ -67,8 +67,10 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
     // Site <-> South Access Track and South Access Track <-> The South Cut.
     // Holo Hollow Landing (#357) adds exactly three more: Crash Site, Abandoned
     // Processing Yard and South Access Track, each walkable both ways.
-    expect(geometry.undirectedRoutes).toHaveLength(15);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(31);
+    // The Holo Drive-In (#491) adds exactly one more: the reciprocal walk to Holo Hollow,
+    // the only place it connects to.
+    expect(geometry.undirectedRoutes).toHaveLength(16);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(33);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

@@ -195,6 +195,7 @@ export const LocationDefinitionSchema = z
         "the_dry_seam",
         "harmonic_workings",
         "werner_lab",
+        "holo_drive_in",
       ]),
       layout: z.enum([
         "crash_site",
@@ -217,6 +218,7 @@ export const LocationDefinitionSchema = z
         "the_dry_seam",
         "harmonic_workings",
         "werner_lab",
+        "holo_drive_in",
       ]),
       /** Local Place directory heading for this World Location, when it has venues. */
       localPlacesEyebrow: z.string().trim().min(1).optional(),

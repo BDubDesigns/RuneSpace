@@ -443,6 +443,11 @@ describe("issue #164 replayable social topics", () => {
     expect(again).toEqual(entries);
   });
 
+  const OWNER_APPROVED_QUESTION_LABELS: ReadonlySet<string> = new Set([
+    "What's showing?",
+    "Why keep this place open?",
+  ]);
+
   it("authors the approved Wade and Tansy topics as short subjects, never player lines", () => {
     expect(getNpcConversationTopics(NPC_IDS.wadeRusk).map((topic) => topic.label)).toEqual([
       "Recovery work",
@@ -457,7 +462,11 @@ describe("issue #164 replayable social topics", () => {
     for (const topic of CONVERSATION_TOPICS) {
       // A subject, not a sentence the silent player character speaks.
       expect(topic.label.length).toBeLessThanOrEqual(28);
-      expect(topic.label).not.toMatch(/[.?!]$/);
+      // The one exception is the owner's exact wording for Tamsyn Suzara's topics (#491),
+      // which the issue locks verbatim: "What's showing?" and "Why keep this place open?".
+      if (!OWNER_APPROVED_QUESTION_LABELS.has(topic.label)) {
+        expect(topic.label).not.toMatch(/[.?!]$/);
+      }
       // Every beat is spoken/presented by the topic's own NPC.
       const sequence = getDialogue(topic.dialogueId);
       expect(sequence?.npcId).toBe(topic.npcId);

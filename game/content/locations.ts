@@ -44,6 +44,10 @@ import {
  *   World Location at (1,1) with three walking edges. Its one Local Place is
  *   Last Leg Trading. The pad is empty until the character's own Rivet lands
  *   there (#358); only then does its scene carry the ship overlay.
+ * - Holo Drive-In (#491): Skatboll's open-air theatre at (-1,0), directly north of
+ *   Holo Hollow. An ordinary World Location, open from the start, whose one walking
+ *   edge is Holo Hollow. Its resident, Tamsyn Suzara, talks to visitors at the
+ *   location itself; there is no Local Place.
  * - Stillreach (#373): a second planet with its own local map (eight locations, a ninth, Werner's Lab, added in #429); each
  *   location belongs to one planet, and a walking edge never joins two. The Rivet
  *   reaches it by flight (#375) and berths at Stillreach Landing Station, whose
@@ -383,6 +387,7 @@ const locationDefinitions = [
       LOCATION_IDS.emergencyPowerAnnex,
       LOCATION_IDS.theLongScramble,
       LOCATION_IDS.ruskRecovery,
+      LOCATION_IDS.holoDriveIn,
     ],
     availableActionIds: [],
     dormantActivities: [],
@@ -641,6 +646,39 @@ const locationDefinitions = [
         height: 384,
         alt: "An empty industrial landing pad with a weathered H.H. painted inside a worn white circle, edge lights glowing, two low service sheds and fuel tanks behind it, and cold mountains under a heavy overcast sky",
         focal: { x: 50, y: 62 } as const,
+      },
+    },
+  },
+  {
+    // The Holo Drive-In (#491): Skatboll's weathered open-air theatre, a separate
+    // World Location directly north of Holo Hollow on the hex grid. It is open from
+    // the beginning with no Mission or skill gate. Its one authored walking edge is
+    // Holo Hollow, in both directions. It also touches the Emergency Power Annex (0,0)
+    // and Rusk Recovery (-2,1) on the hex grid but has no route to either, because
+    // nothing is inferred from axial adjacency. Tamsyn Suzara stands at the location itself, so there is no Local
+    // Place, nested hub or instant hop. The showings and tickets arrive in a later
+    // slice of #491; this entry is the place and its people.
+    id: LOCATION_IDS.holoDriveIn,
+    displayName: "Holo Drive-In",
+    description:
+      "A towering, weather-beaten movie screen overlooks rows of faded parking lanes, old speeders, and mining crew buses. Warm light spills from the concession stand. The projector may be outdated, but the pictures still run.",
+    planetId: PLANET_IDS.skatboll,
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [LOCATION_IDS.holoHollow],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "holo_drive_in" as const,
+      layout: "holo_drive_in" as const,
+      localMap: { axial: { q: -1, r: 0 }, label: "Holo Drive-In" },
+      scene: {
+        // The owner-approved 2508x627 4:1 master, downsampled whole to 1536x384
+        // like every other World Location exterior; never upscaled.
+        asset: "/location-scenes/holo-drive-in.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "A large weathered outdoor movie screen on a steel frame, floodlights above it, facing muddy parking lanes where sci-fi speeders and mining crew buses are parked, with a warm-lit concession stand under a neon Holo Drive-In sign on the left, mountains behind, under a stormy gray sky",
+        focal: { x: 50, y: 50 } as const,
       },
     },
   },
@@ -953,6 +991,7 @@ export const LOCAL_MAP_LOCATION_IDS_BY_PLANET: Readonly<
     LOCATION_IDS.southAccessTrack,
     LOCATION_IDS.theSouthCut,
     LOCATION_IDS.holoHollowLanding,
+    LOCATION_IDS.holoDriveIn,
   ],
   [PLANET_IDS.stillreach]: [
     LOCATION_IDS.stillreachLandingStation,

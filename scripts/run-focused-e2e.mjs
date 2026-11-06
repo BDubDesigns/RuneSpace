@@ -95,6 +95,7 @@ export const FOCUSED_PHASES = [
   "scroll-affordances",
   "stillreach",
   "stillreach-flight",
+  "holo-drive-in",
   "refiner-to-go",
   "fedhex",
   "milky-waymo",

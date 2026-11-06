@@ -129,6 +129,8 @@ const npcIds = {
   wiseOldEnby: asContentId("wise_old_enby"),
   // The mineralogist at Werner's Lab on Stillreach (#429).
   werner: asContentId("werner"),
+  // The owner and operator of the Holo Drive-In on Skatboll (#491).
+  tamsynSuzara: asContentId("tamsyn_suzara"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -456,6 +458,10 @@ const dialogueIds = {
   wernerAboutTheLabTopic: asContentId("werner_topic_about_the_lab"),
   wernerTheQuarryTopic: asContentId("werner_topic_the_quarry"),
   wernerGemCuttingTopic: asContentId("werner_topic_gem_cutting"),
+  // Tamsyn Suzara's replayable topics at the Holo Drive-In (#491). "What's showing?"
+  // arrives with the theatre's showing projection in a later slice.
+  tamsynAboutTheProjectorTopic: asContentId("tamsyn_topic_about_the_projector"),
+  tamsynWhyKeepItOpenTopic: asContentId("tamsyn_topic_why_keep_it_open"),
   // Werner's optional Lapidary 8 conversation (#433).
   wernerBeyondTheBasicsTopic: asContentId("werner_topic_beyond_the_basics"),
   // The Wise Old Enby's repeatable research jobs (#406). Presentation only: the
@@ -535,6 +541,8 @@ const conversationTopicIds = {
   wernerTheQuarry: asContentId("werner_the_quarry"),
   wernerGemCutting: asContentId("werner_gem_cutting"),
   wernerBeyondTheBasics: asContentId("werner_beyond_the_basics"),
+  tamsynAboutTheProjector: asContentId("tamsyn_about_the_projector"),
+  tamsynWhyKeepItOpen: asContentId("tamsyn_why_keep_it_open"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -558,6 +566,10 @@ const expressionIds = {
   // Werner's approved set (#429) is neutral, thoughtful, amused and this one: a
   // controlled, unblinking stare. Everything else he does maps to existing vocabulary.
   intense: asContentId("intense"),
+  // Tamsyn Suzara's approved set (#491) is neutral, amused and these two: an open,
+  // genuinely glad host, and a soft, faraway look back at what the theatre used to be.
+  welcoming: asContentId("welcoming"),
+  wistful: asContentId("wistful"),
 } as const satisfies Record<string, ContentId>;
 
 const conversationBackgroundIds = {
@@ -584,6 +596,8 @@ const conversationBackgroundIds = {
   hilltopWorkshopInterior: asContentId("hilltop_workshop_interior"),
   // Werner's laboratory interior at Werner's Lab (#429).
   wernersLabInterior: asContentId("werners_lab_interior"),
+  // Tamsyn's concession stand at the Holo Drive-In (#491).
+  holoDriveInConcessions: asContentId("holo_drive_in_concessions"),
   // The Crash Site as this character's finished personal Resonance Site (#441):
   // the empty ship-departed panorama with the Rig overlay, never the Rivet.
   crashSiteResonanceSite: asContentId("crash_site_resonance_site"),
@@ -798,6 +812,9 @@ export const LOCATION_IDS = {
   harmonicWorkings: asContentId("harmonic_workings"),
   // Werner's parked mineral laboratory (#429): Stillreach's ninth World Location.
   wernersLab: asContentId("werners_lab"),
+  // Skatboll's walkable open-air theatre (#491), north of Holo Hollow: an ordinary
+  // World Location with one walking edge and no Local Place.
+  holoDriveIn: asContentId("holo_drive_in"),
 } as const satisfies Record<string, ContentId>;
 
 /**

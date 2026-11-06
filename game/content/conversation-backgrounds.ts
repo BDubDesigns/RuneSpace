@@ -212,6 +212,17 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/werner-lab-interior.webp",
     alt: "The inside of a working mineral laboratory: a yellow, scuffed workbench lined with rough stone and gem samples, a grinding wheel and a blueprint-lit screen of crystal diagrams on the left, a stool and a drawer unit under two aurora-lit windows at the back, tool cases, a hat on a wall hook and a lantern on the right",
   },
+  {
+    // The Holo Drive-In's concession stand (#491): the approved empty 15:8 counter
+    // interior, Tamsyn always the separate portrait over it. The Drive-In has no Local
+    // Place, so it is labelled by its World Location; the 4:1 exterior is the location's
+    // own scene and is not reused. Showing and ticket UI belongs to the location panel,
+    // never to this backdrop.
+    id: CONVERSATION_BACKGROUND_IDS.holoDriveInConcessions,
+    locationId: LOCATION_IDS.holoDriveIn,
+    asset: "/location-scenes/holo-drive-in-concessions.webp",
+    alt: "The inside of a warm, weathered retro-futuristic concession stand: a worn metal counter in front, a popcorn machine, snack warmer, drink dispensers and a lit drinks fridge behind it, a Concessions menu board and a neon Holo Drive-In sign above, framed photos on the wall, and a window onto the parking lanes and the big screen",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

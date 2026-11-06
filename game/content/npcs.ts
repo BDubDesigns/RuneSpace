@@ -259,6 +259,25 @@ export const NPCS: readonly NpcDefinition[] = [
       [EXPRESSION_IDS.intense]: "/npc-art/werner-intense.png",
     },
   },
+  {
+    // Tamsyn Suzara (#491) owns and operates the Holo Drive-In, standing at the World
+    // Location itself (it has no Local Place, booth or hub). Anyone who walks there can
+    // talk to her: no Mission, item, skill level or first-meeting state decides whether
+    // she is there or what she will say. Four approved expressions, two of them (neutral,
+    // amused) shared vocabulary and two new (welcoming, wistful). Public text calls her
+    // Tamsyn Suzara or Tamsyn; the shortened form is for close friends only.
+    id: NPC_IDS.tamsynSuzara,
+    displayName: "Tamsyn Suzara",
+    role: "Holo Drive-In owner & operator",
+    homeLocationId: LOCATION_IDS.holoDriveIn,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.holoDriveInConcessions,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/tamsyn-suzara-neutral.png",
+      [EXPRESSION_IDS.welcoming]: "/npc-art/tamsyn-suzara-welcoming.png",
+      [EXPRESSION_IDS.amused]: "/npc-art/tamsyn-suzara-amused.png",
+      [EXPRESSION_IDS.wistful]: "/npc-art/tamsyn-suzara-wistful.png",
+    },
+  },
 ] as const satisfies readonly NpcDefinition[];
 
 const npcById = new Map<string, NpcDefinition>(NPCS.map((npc) => [npc.id, npc]));

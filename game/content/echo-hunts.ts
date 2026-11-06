@@ -11,9 +11,11 @@ import {
  * Fixed, owner-approved pools. They never grow when a player unlocks more of a
  * planet, so unlocking content can never make a Beginner hunt harder:
  *
- * - Skatboll: its ten Beginner-accessible World Locations. Deep Jag is
- *   permanently excluded — it is Mission-gated, and stays out even once a
- *   character has opened it.
+ * - Skatboll: its eleven Beginner-accessible World Locations: the original ten and the
+ *   Holo Drive-In (#491), which joined by an explicit, owner-approved exception because
+ *   it is freely visitable from the start. Deep Jag is permanently excluded — it is
+ *   Mission-gated, and stays out even once a character has opened it. A hunt already
+ *   running keeps the target it persisted, so adding a site never rerolls one.
  * - Stillreach: its eight original walkable World Locations plus Werner's Lab (#429),
  *   nine in all. Werner's Lab joined by an explicit, owner-approved exception to the
  *   earlier eight-site freeze; the list is still closed, so a Stillreach location added
@@ -36,6 +38,7 @@ export const BEGINNER_ECHO_TARGET_POOLS: Readonly<Record<PlanetId, readonly Loca
     LOCATION_IDS.southAccessTrack,
     LOCATION_IDS.theSouthCut,
     LOCATION_IDS.holoHollowLanding,
+    LOCATION_IDS.holoDriveIn,
   ],
   [PLANET_IDS.stillreach]: [
     LOCATION_IDS.stillreachLandingStation,

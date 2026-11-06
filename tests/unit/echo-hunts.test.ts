@@ -91,12 +91,13 @@ function snapshot(
 }
 
 describe("the fixed Beginner pools", () => {
-  it("are Skatboll's ten ordinary locations without Deep Jag, and all nine of Stillreach (#429)", () => {
+  it("are Skatboll's eleven ordinary locations without Deep Jag (#491), and all nine of Stillreach (#429)", () => {
     const skatboll = LOCATIONS.filter((l) => l.planetId === PLANET_IDS.skatboll).map((l) => l.id);
     const stillreach = LOCATIONS.filter((l) => l.planetId === PLANET_IDS.stillreach).map(
       (l) => l.id,
     );
-    expect(BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll]).toHaveLength(10);
+    expect(BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll]).toHaveLength(11);
+    expect(BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll]).toContain(LOCATION_IDS.holoDriveIn);
     expect(BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll]).not.toContain(LOCATION_IDS.deepJag);
     expect([...BEGINNER_ECHO_TARGET_POOLS[PLANET_IDS.skatboll]].sort()).toEqual(
       skatboll.filter((id) => id !== LOCATION_IDS.deepJag).sort(),
