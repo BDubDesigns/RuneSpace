@@ -70,7 +70,7 @@ export function accountBoundaryE2eEnv({ port, runId }) {
  */
 export const theatreStandInEnv = {
   RUNESPACE_THEATRE_STAND_IN_ADS: "true",
-  RUNESPACE_THEATRE_STAND_IN_AD_MS: "2500",
+  RUNESPACE_THEATRE_STAND_IN_AD_MS: "5000",
 };
 
 export function readPositiveInteger(value, fallback, label) {

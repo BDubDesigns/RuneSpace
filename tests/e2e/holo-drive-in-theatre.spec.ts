@@ -37,7 +37,7 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * depend on what is showing now first wait out the last 90 seconds of the hour and read the film
  * from the same schedule rule the server uses; tests of the viewer seed a ticket row directly, so
  * either film is reachable whatever hour it is. The pre-roll cards are the labelled stand-ins the
- * test runners opt into (`RUNESPACE_THEATRE_STAND_IN_ADS`, 2.5 s long): no commercial exists yet.
+ * test runners opt into (`RUNESPACE_THEATRE_STAND_IN_ADS`, 5 s long): no commercial exists yet.
  */
 
 const DRIVE_IN = LOCATION_IDS.holoDriveIn;
@@ -207,7 +207,7 @@ async function waitForPhase(dialog: Locator, phase: string, timeout = 20_000) {
   await expect(dialog).toHaveAttribute("data-phase", phase, { timeout });
 }
 
-/** Open the viewer and ride the 2.5 s stand-in pre-roll into the film. */
+/** Open the viewer and ride the 5 s stand-in pre-roll into the film. */
 async function watchToFilm(page: Page, name: string) {
   const dialog = await openViewer(page, name);
   await waitForPhase(dialog, "film");
@@ -694,18 +694,38 @@ for (const filmId of [MINES, WELD]) {
     // The pre-roll: a labelled card for one of the three slots, an honest progress bar, and
     // nothing that could skip or seek: only Fullscreen and Close.
     await waitForPhase(dialog, "pre_roll");
-    const card = dialog.locator("[data-pre-roll-slot]");
-    await expect(card).toHaveCount(1);
-    expect(SLOT_IDS).toContain(await card.getAttribute("data-pre-roll-slot"));
-    await expect(card).toContainText("Stand-in card, not a finished commercial");
-    const bar = dialog.getByRole("progressbar", { name: "Commercial break progress" });
-    await expect(bar).toBeVisible();
-    await expect(dialog.getByRole("slider")).toHaveCount(0);
-    await expect(dialog.getByRole("button", { name: /^(Play|Pause|Restart|Replay)$/ })).toHaveCount(
-      0,
-    );
-    await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Fullscreen", exact: true })).toBeVisible();
+    // One synchronous read of everything on screen, so the pre-roll cannot end between two
+    // assertions on a slow runner.
+    const seen = await dialog.evaluate((root) => {
+      const card = root.querySelector("[data-pre-roll-slot]");
+      const buttons = Array.from(root.querySelectorAll("button")).map((button) =>
+        (button.textContent ?? "").trim(),
+      );
+      return {
+        phase: root.getAttribute("data-phase"),
+        cards: root.querySelectorAll("[data-pre-roll-slot]").length,
+        slot: card?.getAttribute("data-pre-roll-slot") ?? null,
+        label: card?.textContent ?? "",
+        bar: root.querySelectorAll('[role="progressbar"][aria-label="Commercial break progress"]')
+          .length,
+        // The viewer's own controls only: the studio's hidden player keeps an inert range input.
+        sliders: root.querySelectorAll('[data-theatre-controls] input[type="range"]').length,
+        filmControls: buttons.filter((name) => /^(Play|Pause|Restart|Replay)$/.test(name)).length,
+        close: buttons.includes("Close"),
+        fullscreen: buttons.includes("Fullscreen"),
+      };
+    });
+    expect(seen).toMatchObject({
+      phase: "pre_roll",
+      cards: 1,
+      bar: 1,
+      sliders: 0,
+      filmControls: 0,
+      close: true,
+      fullscreen: true,
+    });
+    expect(SLOT_IDS).toContain(seen.slot);
+    expect(seen.label).toContain("Stand-in card, not a finished commercial");
     await captureReviewScreenshot(page, "holo-drive-in-pre-roll-mobile.png");
 
     // The film starts by itself when the pre-roll completes.
