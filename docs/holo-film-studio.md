@@ -28,7 +28,9 @@ has setup, the public player API, and packaging.
   films, and commercials are separate product work that needs its own issues.
   Mounting a film in the game would consume the studio's public player API
   (`tools/holo-film-studio/README.md` §5 and §8) from a future feature; nothing
-  in the game does so today.
+  in the game does so today. The game's theatre catalog (`game/content/theatre.ts`, #491) restates
+  the two film IDs only; `tests/unit/theatre.test.ts` reads the studio's film registry to prove
+  they still match, and imports nothing from the studio.
 - It is not merged with QC Studio and its engine is not rewritten around React.
 
 ## Run it

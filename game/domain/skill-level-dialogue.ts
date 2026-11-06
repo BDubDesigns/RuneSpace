@@ -7,6 +7,7 @@ import {
   type SkillLevelDialogue,
 } from "@/game/content/dialogue";
 import { STARTING_LEVEL } from "@/game/domain/character-progression";
+import { resolveShowingOpening } from "@/game/domain/theatre";
 
 /**
  * Skill-level-dependent dialogue (#391): the one rule that picks which variant
@@ -58,13 +59,30 @@ export function selectSkillLevelDialogues(
 export function resolvePresentedDialogue(
   dialogueId: string,
   selections: Readonly<Record<string, string>>,
+  showingFilmId?: string,
 ): DialogueSequence | undefined {
-  const sequence = getDialogue(dialogueId);
+  const sequence = withShowingOpening(getDialogue(dialogueId), showingFilmId);
   if (!sequence?.skillLevelDialogueId) return sequence;
   const choice = getSkillLevelDialogue(sequence.skillLevelDialogueId);
   if (!choice) return sequence;
   const variant = getDialogue(selections[choice.id] ?? choice.variants[0]!.dialogueId);
   return variant ? { ...sequence, beats: [...sequence.beats, ...variant.beats] } : sequence;
+}
+
+/**
+ * A sequence that opens with the current showing's dialogue (#491) is the film-specific
+ * opening of the showing the conversation was opened at, then its own beats. The caller
+ * names that film once, when the topic is opened, and keeps naming it: a programme that
+ * turns over mid-conversation changes nothing here. With no film named (a state from
+ * before the theatre existed) the sequence plays its own beats alone, never nothing.
+ */
+function withShowingOpening(
+  sequence: DialogueSequence | undefined,
+  showingFilmId: string | undefined,
+): DialogueSequence | undefined {
+  if (!sequence?.currentShowingDialogue || showingFilmId === undefined) return sequence;
+  const opening = resolveShowingOpening(showingFilmId);
+  return opening ? { ...sequence, beats: [...opening.beats, ...sequence.beats] } : sequence;
 }
 
 /**
@@ -76,9 +94,10 @@ export function resolvePresentedDialogue(
 export function composePresentedDialogue(
   dialogueIds: readonly string[],
   selections: Readonly<Record<string, string>>,
+  showingFilmId?: string,
 ): DialogueSequence | undefined {
   const parts = dialogueIds.flatMap((id) => {
-    const resolved = resolvePresentedDialogue(id, selections);
+    const resolved = resolvePresentedDialogue(id, selections, showingFilmId);
     return resolved ? [resolved] : [];
   });
   const [first, ...rest] = parts;

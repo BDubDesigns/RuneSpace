@@ -462,6 +462,12 @@ const dialogueIds = {
   // arrives with the theatre's showing projection in a later slice.
   tamsynAboutTheProjectorTopic: asContentId("tamsyn_topic_about_the_projector"),
   tamsynWhyKeepItOpenTopic: asContentId("tamsyn_topic_why_keep_it_open"),
+  // "What's showing?" (#491): the film-specific opening for each film in the Holo Drive-In's
+  // catalog (`game/content/theatre`), and the one topic sequence that plays the opening of
+  // the showing it was opened at and then its own shared closing.
+  tamsynShowingThatMinesMine: asContentId("tamsyn_showing_that_mines_mine"),
+  tamsynShowingRareOrWeldDone: asContentId("tamsyn_showing_rare_or_weld_done"),
+  tamsynWhatsShowingTopic: asContentId("tamsyn_topic_whats_showing"),
   // Werner's optional Lapidary 8 conversation (#433).
   wernerBeyondTheBasicsTopic: asContentId("werner_topic_beyond_the_basics"),
   // The Wise Old Enby's repeatable research jobs (#406). Presentation only: the
@@ -1006,6 +1012,34 @@ export const NPC_IDS = npcIds;
 export const MISSION_IDS = missionIds;
 export const DIALOGUE_IDS = dialogueIds;
 export const SKILL_LEVEL_DIALOGUE_IDS = skillLevelDialogueIds;
+
+/**
+ * The Holo Drive-In's films (#491), by the Holo Film Studio's own film ID. These are the
+ * IDs the Film Studio's own film registry (`src/films/index.js` in its tool directory) registers;
+ * the studio is an independent development tool that nothing shipped imports, so they are
+ * restated here, and
+ * `tests/unit/theatre.test.ts` proves they still match the studio's registry. They are
+ * kebab-case because the studio's are, which is why they are not `ContentId`s.
+ */
+export const THEATRE_FILM_IDS = {
+  thatMinesMine: "that-mines-mine",
+  rareOrWeldDone: "rare-or-weld-done",
+} as const;
+export type TheatreFilmId = (typeof THEATRE_FILM_IDS)[keyof typeof THEATRE_FILM_IDS];
+
+/** The Holo Drive-In's screens. One at launch; later screens add an ID, never a rewrite. */
+export const THEATRE_SCREEN_IDS = {
+  main: asContentId("holo_drive_in_main"),
+} as const;
+export type TheatreScreenId = (typeof THEATRE_SCREEN_IDS)[keyof typeof THEATRE_SCREEN_IDS];
+
+/** The two ordinary-Credit ticket choices (#491): the film alone, and the film with concessions. */
+export const THEATRE_TICKET_TIER_IDS = {
+  film: asContentId("film_ticket"),
+  concessions: asContentId("ticket_concessions"),
+} as const;
+export type TheatreTicketTierId =
+  (typeof THEATRE_TICKET_TIER_IDS)[keyof typeof THEATRE_TICKET_TIER_IDS];
 export const CONVERSATION_TOPIC_IDS = conversationTopicIds;
 export const EXPRESSION_IDS = expressionIds;
 export const CONVERSATION_BACKGROUND_IDS = conversationBackgroundIds;

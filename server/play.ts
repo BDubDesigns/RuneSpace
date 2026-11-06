@@ -224,6 +224,7 @@ import {
 } from "@/game/domain/bounded-run";
 import { isMissionAccepted } from "@/server/mission-state";
 import { selectSkillLevelDialogues } from "@/game/domain/skill-level-dialogue";
+import { projectTheatreProgramme, type TheatreProgrammeProjection } from "@/game/domain/theatre";
 import {
   createWorkOrderWeldingResolver,
   ensureWorkOrderBoard,
@@ -1029,6 +1030,14 @@ export type PlayGameplayState = {
    * variant this names and never evaluates a level itself.
    */
   skillLevelDialogue: Readonly<Record<string, string>>;
+  /**
+   * The Holo Drive-In's programme (#491): what each screen is showing now and next, decided
+   * here from the server's clock. The one thing the client reads from it is which film
+   * Tamsyn speaks about when her "What's showing?" topic is opened; the countdown and the
+   * ticket surface arrive with the theatre UI. Tickets, receipts and buff balances are not in
+   * the Play state yet.
+   */
+  theatre: TheatreProgrammeProjection;
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
@@ -2862,6 +2871,7 @@ export async function stateFromTransaction(
         }),
       ),
     ),
+    theatre: projectTheatreProgramme(now.getTime()),
     mining: {
       totalXp,
       level: miningProgress.level,

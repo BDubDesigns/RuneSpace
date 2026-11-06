@@ -116,6 +116,16 @@ export type DialogueSequence = {
    */
   skillLevelDialogueId?: SkillLevelDialogueId;
   /**
+   * Theatre showing dialogue (#491): this sequence opens with the film-specific opening of
+   * the showing the conversation was opened at (`THEATRE_FILMS` in
+   * `game/content/theatre`, chosen by `resolveShowingOpening`), then plays its own beats as
+   * the closing both films share. Only Tamsyn's "What's showing?" topic uses it. Presentation
+   * only, and read once when the topic is opened: the conversation keeps that opening even
+   * if the programme changes mid-dialogue. It is a prefix, where a skill-level choice is a
+   * tail, and a sequence cannot have both.
+   */
+  currentShowingDialogue?: true;
+  /**
    * A scene-cue sequence (`game/content/scene-cues.ts`) played over this scene once
    * its last beat is finished, before the conversation ends (#441): the Wise Old
    * Enby leaving through their own rift. Presentation only — whoever is leaving has
@@ -3159,6 +3169,60 @@ const dialogue = {
       tamsynLocal(
         EXPRESSION_IDS.welcoming,
         "Because people still come to watch them. Isn't that reason enough?",
+      ),
+    ],
+  },
+  // Tamsyn's "What's showing?" (#491). The copy, its order and the expression on every beat
+  // are owner-approved and locked verbatim in the issue (the film titles are plain text
+  // here: dialogue beats carry no emphasis markup). One topic, one sequence per film for the
+  // three opening beats, then the same two closing beats for either: the topic plays the
+  // opening of the showing it was opened at and then its own beats. The ticket numbers in
+  // the closing are checked against the ticket tiers by tests/unit/theatre.test.ts.
+  [DIALOGUE_IDS.tamsynShowingThatMinesMine]: {
+    id: DIALOGUE_IDS.tamsynShowingThatMinesMine,
+    npcId: NPC_IDS.tamsynSuzara,
+    beats: [
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "Right now we've got That Mines Mine! on the screen. A classic! Well, by my standards, anyway.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.amused,
+        "Some of the rocks give better performances than the actors. But don't tell anybody I said that.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "It's a good one for miners, too. A little extra experience, and another shot at finding something special when a successful haul comes up empty on the extras.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tamsynShowingRareOrWeldDone]: {
+    id: DIALOGUE_IDS.tamsynShowingRareOrWeldDone,
+    npcId: NPC_IDS.tamsynSuzara,
+    beats: [
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "Tonight's feature is Rare or Weld Done? Wonderful picture. Sparks, suspense, and some truly questionable craftsmanship.",
+      ),
+      tamsynLocal(EXPRESSION_IDS.amused, "At least the welding looks convincing. Mostly."),
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "And it's good for your own welding! A little extra experience for each section you finish, including those lovely Clean Passes.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tamsynWhatsShowingTopic]: {
+    id: DIALOGUE_IDS.tamsynWhatsShowingTopic,
+    npcId: NPC_IDS.tamsynSuzara,
+    currentShowingDialogue: true,
+    beats: [
+      tamsynLocal(
+        EXPRESSION_IDS.neutral,
+        "Tickets are 20 Credits, or 50 with concessions. That's 20 or 50 attempts with the bonus, whichever you choose. We change pictures every hour.",
+      ),
+      tamsynLocal(
+        EXPRESSION_IDS.welcoming,
+        "And the bonus comes with your ticket, so you don't have to watch the whole thing. Though I'd certainly love it if you stayed.",
       ),
     ],
   },
