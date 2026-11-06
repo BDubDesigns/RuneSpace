@@ -145,8 +145,8 @@ export const WELDING_FILM_BUFF = { xpBonusBps: 1_000 } as const;
  *
  * A slot is the advertiser the owner locked, and `filmId` is the Holo Film Studio film of its
  * finished commercial (the studio's `commercial-*` films). Each is an in-world,
- * silent, 15-second spot built from the owner-approved script, and each needs the owner's
- * individual creative approval before the stack that adds it merges. A slot without a
+ * silent, 15-second spot built from the owner-approved script, and the owner approved all three
+ * (the studio pins them). A slot without a
  * `filmId` would be an unfinished commercial, and the viewer is offered to players only when every
  * slot has one (`theatreViewerReady`), so the pre-roll never plays something nobody approved.
  */

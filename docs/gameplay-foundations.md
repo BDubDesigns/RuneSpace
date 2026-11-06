@@ -1234,8 +1234,9 @@ no rule, price, schedule or eligibility decision lives in a component.
   `test/commercials.test.mjs`. DeWHAT? (the yellow-and-black parody logo, only the e lowercase, with its question mark; spoken "DeWhat", shouted "DeWHAT") is the two-worker misunderstanding ending on the approved slogan;
   Visit Skatboll! pans real approved 4:1 location art with tourism-board lettering and ends "It's not all
   work" with the small "Mostly work." stamp; FedHex is the overpackaged bolt ending on the approved
-  one-off line, with the real FedHex hub art, the owner's real FedHex logo (`public/branding/fedhex-logo.webp`) and its real hexagonal e (`fedhex-e.webp`, cropped from that logo and made black and white) on the packages, stamps and ships. Each
-  needs the owner's individual creative approval before the stack that adds it merges. With all three
+  one-off line, with the real FedHex hub art, the owner's real FedHex logo (`public/branding/fedhex-logo.webp`) and its real hexagonal e (`fedhex-e.webp`, cropped from that logo and made black and white) on the packages, stamps and ships. The
+  owner approved all three on November 6, 2026 (DeWHAT? with its question mark), and the studio's
+  `test/commercials-approved.test.mjs` pins their build output and the artwork they use. With all three
   present `theatreViewerReady()` is true and the Play state's `viewer.available` is true; a slot without a
   film would hide the viewer rather than play something unapproved.
 - **Pre-roll playback.** The drawn commercial plays in its own studio player (picture only, `inert`, so
@@ -1245,6 +1246,15 @@ no rule, price, schedule or eligibility decision lives in a component.
   descriptions (the spots are silent; these are not captions) can be shown during it and carry into the
   film, reduced motion follows the OS setting, and Fullscreen and Close are available throughout. If a
   commercial cannot load, the viewing fails with Try again rather than skipping to the film.
+- **Public release content** (issue #491, Stage D). The theatre is documented for players in the Wiki guide
+  `holo-drive-in` (`features/public-site/public-wiki.ts`; Tamsyn is covered there from shipped facts only, as her
+  Notion Canon page has no Public-Wiki-safe facts for a People article) with cross-links from the travel,
+  mining, welding, credits and progression articles, and announced by the Update "A Night At The (Drive-In)
+  Theatre" (`features/public-site/public-updates.ts`, which publishes with the deployment that carries the
+  theatre). `tests/unit/public-wiki-theatre.test.ts` reads the guide's prices, bonuses and schedule from the
+  theatre content, so the Wiki cannot drift from the rules. The second film's museum sign reads
+  `TORTUGA-9 MUSEUM` (owner-authorized; see `docs/holo-film-studio.md`). Tortuga-9 is not a playable planet and
+  appears in no Wiki article or Update.
 
 ### The Crash Site's two scenes (issue #330)
 

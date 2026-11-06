@@ -109,7 +109,9 @@ const authoredWikiArticles = [
             { text: "Mining & Refining", articleSlug: "mining-and-refining" },
             " for the two work loops, and ",
             { text: "Missions", articleSlug: "missions" },
-            " for the full job list.",
+            " for the full job list. When you have Credits to spend on a night out, the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            " sells tickets that give your Mining or Welding a bonus.",
           ],
         ],
       },
@@ -144,7 +146,11 @@ const authoredWikiArticles = [
             { text: "Wade Rusk's", articleSlug: "wade-rusk" },
             " own yard, on the northwest edge of town. It only connects to Holo Hollow, so the town is the way in and the way out.",
           ],
-          "Holo Drive-In — a weathered open-air theatre just north of the town, with a towering movie screen, rows of faded parking lanes and a warm-lit concession stand. It is an ordinary place on foot, open from the start: it only connects to Holo Hollow, one normal walk away, and has no route to the Power Annex or Rusk Recovery even though it sits beside them on the map. Tamsyn Suzara owns and runs it, and will talk to anyone who walks up.",
+          [
+            "Holo Drive-In — a weathered open-air theatre just north of the town, with a towering movie screen, rows of faded parking lanes and a warm-lit concession stand. It is an ordinary place on foot, open from the start: it only connects to Holo Hollow, one normal walk away, and has no route to the Power Annex or Rusk Recovery even though it sits beside them on the map. Tamsyn Suzara owns and runs it, and will talk to anyone who walks up. It is where you can buy a ticket to a film for a ",
+            { text: "Mining or Welding bonus", articleSlug: "holo-drive-in" },
+            ".",
+          ],
           [
             "Deep Jag — the lower workings, southwest of The Jag and reachable only from it. It shows on your map from the start, marked CAVE-IN, and you cannot walk into it: the passage is blocked by fallen rock until you reopen it during ",
             { text: "Brace Yourself", articleSlug: "mission-brace-yourself" },
@@ -403,6 +409,11 @@ const authoredWikiArticles = [
           "Leave a spare slot while you mine, so a rare find always has somewhere to go — or turn on Prioritize primary resources if you would rather keep mining and accept losing a find that has no room.",
           "Oil Shale is 600g a piece, and a Motherlode Slab is 12kg: check your carrying weight before a long run at The South Cut. A fuel attempt takes ten Oil Shale, and a Full canister is 6kg.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
+          [
+            "A ticket to That Mines Mine! at the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            " gives you bonus Mining attempts: extra Mining XP on each, and another roll for a find when a success turns up none.",
+          ],
         ],
       },
     ],
@@ -574,6 +585,11 @@ const authoredWikiArticles = [
             " and in your ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
             ", and it's shown while you're trading.",
+          ],
+          [
+            "Credits also buy a ticket at the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            ": 20 Credits for a Film Ticket, or 50 for a Ticket + Concessions, each giving a skill bonus.",
           ],
         ],
       },
@@ -886,7 +902,11 @@ const authoredWikiArticles = [
             { text: "Work Order", articleSlug: "work-orders" },
             " — moments open up where the bead is running clean and you can lay one in. How many you get depends on how long the job is: a short one might not get any at all, and a longer one can get more than one — roughly one for every five sections of welding, starting once a job reaches six sections. A Clean Pass control appears next to the normal controls for about three seconds when one comes up.",
           ],
-          "Take it in time and the work jumps forward a whole extra pass, and pays that pass's XP. Miss it and absolutely nothing happens: it costs no material, no progress, and no time, so there is never a reason not to let one go by. Every chance is decided before the job starts, and stopping and resuming never moves them or gives you another go at one you were in the middle of.",
+          [
+            "Take it in time and the work jumps forward a whole extra pass, and pays that pass's XP, with the 10% bonus if you have Welding bonus attempts from the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            ". Miss it and absolutely nothing happens: it costs no material, no progress, and no time, so there is never a reason not to let one go by. Every chance is decided before the job starts, and stopping and resuming never moves them or gives you another go at one you were in the middle of.",
+          ],
         ],
       },
     ],
@@ -927,6 +947,11 @@ const authoredWikiArticles = [
           "A weld is ten sections, each about three seconds, the same cadence as any other welding.",
           "Each finished section pays 10 Welding XP — a fraction of what a repair section pays, because nothing is actually being repaired — so a whole weld is worth 100.",
           "Finishing a weld produces up to 2 Slag.",
+          [
+            "With Welding bonus attempts from a ticket to Rare or Weld Done? (see the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            "), each finished section pays 11 XP instead of 10 and spends one.",
+          ],
         ],
       },
       {
@@ -1038,6 +1063,11 @@ const authoredWikiArticles = [
             "Finish a job and it pays out immediately — real ",
             { text: "Credits", articleSlug: "credits-and-trading" },
             ", plus Welding XP for every section you completed. The moment it is done, a new job takes its place on the board, so there are always three to choose from.",
+          ],
+          [
+            "Sections you finish while you have Welding bonus attempts from the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            " pay 10% more Welding XP. The Credits a job pays do not change.",
           ],
         ],
       },
@@ -1512,7 +1542,9 @@ const authoredWikiArticles = [
           [
             "Holo Hollow — the town itself, a declining mining settlement built on the remains of a holo-tourism economy. It connects to the Crash Site, the Power Annex, The Long Scramble, and Rusk Recovery, and it's where you can ",
             { text: "spend Credits", articleSlug: "credits-and-trading" },
-            ".",
+            ". Just north of it, one walk away, is the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            ", the open-air theatre.",
           ],
           [
             "Rusk Recovery — Wade Rusk's recovery yard on the northwest edge of town: racked salvage, stripped components, damaged work vehicles, and a workbench you can ",
@@ -1582,6 +1614,120 @@ const authoredWikiArticles = [
     ],
   },
   {
+    slug: "holo-drive-in",
+    title: "Holo Drive-In",
+    category: "places-and-travel",
+    summary:
+      "Skatboll's open-air theatre: Tamsyn Suzara and the Big Screen, the hourly showings, 20- and 50-Credit tickets, the Mining and Welding bonuses a ticket gives, and how to watch or replay a film.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "The Holo Drive-In is a weather-beaten open-air theatre just north of the town of ",
+            { text: "Holo Hollow", articleSlug: "holo-hollow" },
+            ": a towering movie screen over rows of faded parking lanes, with a warm-lit concession stand under a neon sign. It is an ordinary place on foot, open from the start, with no Mission or skill needed. It connects only to the town, so it is one normal walk from there (see ",
+            { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+            ").",
+          ],
+          "It has no building to step into. Everything happens at the location itself, in a panel called The Big Screen. Two silent animated films take turns on the screen, and a ticket to either one gives you a skill bonus.",
+        ],
+      },
+      {
+        heading: "Tamsyn Suzara",
+        paragraphs: [
+          "Tamsyn Suzara owns and runs the Holo Drive-In. She stands at the Drive-In itself, so anyone who walks there can talk to her. Nothing you have done in the game changes whether she is there or what she will talk about.",
+          "She has three topics: What's showing?, Tell me about the projector, and Why keep this place open? What's showing? tells you about the film on the screen right now and what it is good for, what tickets cost, and that the picture changes every hour. She also says the bonus comes with your ticket, so you do not have to watch the whole film. She would certainly love it if you did.",
+        ],
+      },
+      {
+        heading: "The Big Screen",
+        paragraphs: ["While you stand at the Holo Drive-In, The Big Screen panel shows:"],
+        list: [
+          "Now Showing — the film on the screen at this moment — and Up Next, the film after it, with a countdown to the next showing.",
+          "Your bonus attempts for each skill, Mining and Welding, so you can see what you have left.",
+          "The two tickets, with your Credits, and, once you hold a ticket for the current showing, a note saying which one.",
+          "A Watch Film or Replay Last Film button, once you have bought a ticket.",
+        ],
+      },
+      {
+        heading: "The showings",
+        paragraphs: [
+          "Each showing lasts one hour and the film changes on the hour, on UTC time. The two films alternate: That Mines Mine! plays during the even UTC hours (00:00, 02:00, 04:00 and so on) and Rare or Weld Done? during the odd ones (01:00, 03:00, 05:00 and so on). Everyone sees the same programme, and the countdown on the Big Screen runs to the next change.",
+          "That Mines Mine! runs about 1 minute 43 seconds, and Rare or Weld Done? about 3 minutes. Both are original silent films, drawn for the Drive-In.",
+        ],
+      },
+      {
+        heading: "Tickets",
+        list: [
+          "Film Ticket: 20 Credits for 20 bonus attempts.",
+          "Ticket + Concessions: 50 Credits for 50 bonus attempts. The concessions are part of the evening only; they are not an item you carry, and eating them does nothing.",
+          "Either way a bonus attempt costs one Credit. The bigger ticket is not a discount, only more attempts at once.",
+          "A ticket is always for the film on the screen right now; you cannot buy ahead for the next one. Choose a ticket and the Big Screen shows what the purchase will do before you pay: your Credits before and after, and your bonus attempts before and after. Nothing is charged until you select Confirm purchase.",
+          "You can hold one ticket per showing. If you already have one for the current showing, you cannot buy a second, and a double tap or a second tab never charges you twice. The next showing of the same film, two hours on, is a new showing and a new ticket.",
+          [
+            "You need to be standing at the Holo Drive-In and not on the road, and you cannot buy a ticket while another activity is running: finish or stop it first. You also need the ",
+            { text: "Credits", articleSlug: "credits-and-trading" },
+            ".",
+          ],
+        ],
+      },
+      {
+        heading: "How bonus attempts work",
+        paragraphs: [
+          "A ticket's bonus starts the moment you buy it, not when you watch. Watching the film, all of it, part of it or none of it, changes nothing about your bonus, and closing the viewer never takes it away.",
+          "Each film's bonus belongs to one skill, and a skill keeps its own count: That Mines Mine! gives Mining bonus attempts and Rare or Weld Done? gives Welding bonus attempts. You can hold both at once. Bonus attempts do not run out with time: they stay until you use them, even if you leave the Drive-In.",
+          "A bonus attempt is not an extra try. It is one of your future completed Mining attempts or Welding sections, which carries the bonus.",
+          "A new ticket tops your count up to its size; it never adds on top. With 5 Mining bonus attempts left, a Film Ticket brings you to 20 (it adds 15), and a Ticket + Concessions brings you to 50 (it adds 45). If you already have as many as the ticket gives, it adds none, but it is still a valid ticket for that showing and the film is still yours to replay. The confirmation tells you this before you pay.",
+        ],
+      },
+      {
+        heading: "Mining bonus (That Mines Mine!)",
+        list: [
+          [
+            "Every completed Mining attempt spends one bonus attempt, whether it succeeds or misses, and pays 5% more Mining XP. It adds to the 5% that each worn Legendary Miner's Glove or Boot gives (see ",
+            { text: "Inventory & Equipment", articleSlug: "inventory-and-equipment" },
+            "), and the total is rounded up once per attempt.",
+          ],
+          [
+            "A successful attempt whose find roll turns up nothing gets one more roll for a find from the same source (see ",
+            { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+            "). If the first roll finds something there is no second roll, and an attempt still never gives more than one find.",
+          ],
+          "It does not change your chance of success, the ore, how long an attempt takes, or any other skill. An attempt that does not finish spends nothing.",
+        ],
+      },
+      {
+        heading: "Welding bonus (Rare or Weld Done?)",
+        list: [
+          [
+            "Every finished welding section spends one bonus attempt and pays 10% more Welding XP, rounded up per section: a 50 XP section pays 55, and a 10 XP practice section pays 11. This covers ",
+            { text: "repairs", articleSlug: "cargo-hold-and-welding" },
+            ", ",
+            { text: "practice welds", articleSlug: "practice-welding" },
+            ", ",
+            { text: "Work Orders", articleSlug: "work-orders" },
+            " and the extra section a Clean Pass you take adds.",
+          ],
+          "If your bonus attempts run out partway through a job, the remaining sections pay ordinary XP.",
+          "It does not make a section faster, save you materials, or change Mission rewards, Credit payouts or any other XP.",
+        ],
+      },
+      {
+        heading: "Watching a film",
+        paragraphs: [
+          "After you buy a ticket, the button on the Big Screen reads Watch Film while the showing you bought for is still on. Once the programme has moved on it reads Replay Last Film instead. Either way it plays the film on your most recent ticket, not whatever is on the screen at that moment, and it costs nothing. Buying a ticket for a different film makes that ticket the one you replay. You can replay as often as you like, but you need to be at the Holo Drive-In: your ticket waits for you while you are away, and a film does not play while you are on the road.",
+          "Every time a viewing starts, whether it is your first, a Restart or a Replay, a short commercial plays first. It is chosen at random from three silent 15-second spots (DeWHAT?, Visit Skatboll! and FedHex), the same one can come up twice in a row, and it cannot be skipped. A bar shows how much of the commercial is left. You can leave at any time with Close, and then nothing about your ticket or bonus changes.",
+        ],
+        list: [
+          "Play and Pause, a Seek bar to jump around the film, and Restart, which starts again from a fresh commercial.",
+          "Scene descriptions, which you can switch on during the commercial or the film: a line of text describing what is happening on screen, since the films are silent.",
+          "Fullscreen, and Exit fullscreen to return. On a phone, the viewer may suggest turning it sideways. The film keeps its place when you go in and out of fullscreen.",
+          "Close, shown the whole time, and Replay once the film has finished. The film follows your device's reduced-motion setting.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "skills-and-progression",
     title: "Skills & Progression",
     category: "getting-started",
@@ -1611,14 +1757,22 @@ const authoredWikiArticles = [
       {
         heading: "How you earn XP",
         list: [
-          "Mining — a successful Mining attempt at The Jag grants Mining XP.",
+          [
+            "Mining — a successful Mining attempt at The Jag grants Mining XP. A ticket to That Mines Mine! at the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            " adds 5% to the Mining XP of each attempt while your Mining bonus attempts last.",
+          ],
           [
             "Lapidary — finished Stone shaping and Quartz cutting at Werner’s ",
             { text: "Lapidary Workbench", articleSlug: "lapidary" },
             " grant Lapidary XP. Both always succeed.",
           ],
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
-          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear, the Propulsion System or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
+          [
+            "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, the Landing Gear, the Propulsion System or the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired. A ticket to Rare or Weld Done? at the ",
+            { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
+            " adds 10% to the Welding XP of each finished repair, practice or Work Order section while your Welding bonus attempts last.",
+          ],
           [
             "Fabrication — each finished piece at the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },

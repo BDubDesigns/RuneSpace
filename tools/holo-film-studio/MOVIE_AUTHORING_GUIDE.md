@@ -600,7 +600,7 @@ film; **every cue target exists in the markup** (a typo is otherwise silent); ev
 (forgot `FX_DEFS`); no `data-t` name is shared between scenes; **every cue starts inside the scene that
 owns its target** (forgot `at()`); **no two cues overlap on the same element property** (rule 11; the approved
 film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the approved commit's (`e90a091`)
-hashes, and `test/film2-approved.test.mjs` does the same for film two against RuneSpace's import commit `62d2d04`, so a shared-library change that alters an approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
+hashes, and `test/film2-approved.test.mjs` does the same for film two against RuneSpace's import commit `62d2d04` (plus its one owner-authorized `TORTUGA-9 MUSEUM` label change), `test/commercials-approved.test.mjs` pins the three approved commercials, so a shared-library change that alters an approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
 regression), `defineFilm`, effects and the SSR-safe import. `test/docs.test.mjs` checks that file paths
 and `npm run` commands named in the docs exist.
 
@@ -1063,7 +1063,8 @@ and `commercial-fedhex` (registered with `kind: 'commercial'` in `src/films/inde
   `fedhex-parcel-hub.webp` and the owner's real logo (`/branding/fedhex-logo.webp`). Declare every image in the film's `assets` array; the test requires the list to match what the markup draws and
   every file to exist under the app's `public/`. The host serves those URLs; `dev/serve.mjs` serves the repo's `public/` as a fallback.
 - **Owner approval per spot.** Present each with `npm run shoot` contact sheets (section 9.5) and the real player. Only after the owner approves
-  a spot may it be pinned like film one and film two.
+  a spot may it be pinned like film one and film two. The three shipped spots were approved on November 6, 2026 and are pinned in
+  `test/commercials-approved.test.mjs`; a new spot gets its own entry there after its own approval.
 
 Tips from making them: use `rays(... late: true)` so a burst is invisible until its time; keep every speech balloon and title at 52 px or larger
 in the 1280 x 720 frame so it reads at phone width; pan real art with a single `Track` on a group (`reduce: 'snap'`), never JS.

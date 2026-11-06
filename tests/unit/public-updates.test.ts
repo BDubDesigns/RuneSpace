@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, NPC_IDS } from "@/game/config/foundations";
 import {
   formatPublicUpdateDate,
   getLatestPublishedUpdate,
@@ -136,7 +136,7 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("legendary-miner-gear-upgrade");
+    expect(getLatestPublishedUpdate().slug).toBe("a-night-at-the-drive-in-theatre");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );
@@ -161,12 +161,12 @@ describe("public Updates content boundary", () => {
     expect(text).not.toContain("Survey Line to");
   });
 
-  it("publishes the Legendary Miner gear upgrade as the newest Update with both item figures (#484)", () => {
+  it("publishes the Legendary Miner gear upgrade with both item figures (#484)", () => {
     const update = getPublicUpdate("legendary-miner-gear-upgrade")!;
     expect(update.title).toBe("Legendary Miner Gear: Worth the Hunt");
     expect(update.publishedAt).toBe("2026-11-02T05:29:00-08:00");
-    expect(getLatestPublishedUpdate()).toEqual(update);
-    expect(getPublishedUpdates()[0]).toEqual(update);
+    // The Drive-In Update (#491) is newer; this one is unchanged and now second.
+    expect(getPublishedUpdates()[1]).toEqual(update);
     expect(update.hero).toBeUndefined();
 
     const figures = update.body.filter(
@@ -206,7 +206,7 @@ describe("public Updates content boundary", () => {
     expect(update.title).toBe("Route To Is Here");
     expect(update.publishedAt).toBe("2026-11-01T22:37:00-08:00");
     expect(getPublishedUpdates()).toContainEqual(update);
-    expect(getPublishedUpdates().indexOf(update)).toBe(1);
+    expect(getPublishedUpdates().indexOf(update)).toBe(2);
     expect(update.hero).toBeUndefined();
 
     const text = JSON.stringify(update);
@@ -741,6 +741,61 @@ describe("public Updates content boundary", () => {
       .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Safety & Privacy", articleSlug: "safety-and-privacy" });
+  });
+
+  it("publishes A Night At The (Drive-In) Theatre as the newest Update (#491)", () => {
+    const update = getPublicUpdate("a-night-at-the-drive-in-theatre")!;
+    expect(update.title).toBe("A Night At The (Drive-In) Theatre");
+    expect(update.publishedAt).toBe("2026-11-06T13:00:00-08:00");
+    expect(Date.parse(update.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(getLatestPublishedUpdate()).toEqual(update);
+    expect(getPublishedUpdates()[0]).toEqual(update);
+    // Its instant is unique across every Update and newer than the one before it.
+    const instants = getPublishedUpdates().map((entry) => Date.parse(entry.publishedAt));
+    expect(new Set(instants).size).toBe(instants.length);
+    expect(instants[0]).toBeGreaterThan(instants[1]!);
+
+    // The approved Drive-In exterior, at its real size, with the location's own description.
+    expect(update.hero).toMatchObject({
+      src: "/location-scenes/holo-drive-in.webp",
+      width: 1536,
+      height: 384,
+    });
+    expect(update.hero?.alt).toMatch(/movie screen/i);
+    expect(update.body[0]).toEqual({
+      kind: "figure",
+      art: { kind: "npc", npcId: NPC_IDS.tamsynSuzara, expressionId: "welcoming" },
+      side: "right",
+    });
+
+    const text = JSON.stringify(update);
+    for (const fact of [
+      "20 Credits",
+      "50 Credits",
+      "That Mines Mine!",
+      "Rare or Weld Done?",
+      "5% more Mining XP",
+      "10% more Welding XP",
+      "15-second commercial",
+      "DeWHAT?",
+      "Visit Skatboll!",
+      "FedHex",
+      "Scene Descriptions",
+      "Replay Last Film",
+      "Fullscreen",
+      "the bonus comes with your ticket, not with your seat",
+      "The bonus comes from buying the ticket, not from watching the film.",
+    ]) {
+      expect(text).toContain(fact);
+    }
+    // Unshipped lore and Tamsyn's private history never reach a public Update.
+    expect(text).not.toMatch(/Tortuga|Tansy|projector upgrade|SSA/i);
+
+    const links = update.body
+      .flatMap((paragraph) => (Array.isArray(paragraph) ? paragraph : []))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Holo Drive-In", articleSlug: "holo-drive-in" });
+    expect(update.patchNotes.map((section) => section.heading)).toEqual(["Added", "Changed"]);
   });
 
   it("uses one stable route projection for lookup and links", () => {
