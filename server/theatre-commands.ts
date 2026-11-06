@@ -10,21 +10,27 @@ import {
 import { ACTION_IDS } from "@/game/config/foundations";
 import {
   planTicketPurchase,
+  planViewing,
   ticketRefusalMessage,
+  viewingRefusalMessage,
   type TicketRefusalReason,
   type TopUp,
+  type ViewingRefusalReason,
 } from "@/game/domain/theatre";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
 import { stateFromTransaction, type PlayGameplayState } from "@/server/play";
-import { loadTheatreBuffs, loadTheatreReceipts } from "@/server/theatre";
+import {
+  loadLatestTheatreTicket,
+  loadTheatreBuffs,
+  loadTheatreReceipts,
+  projectLatestTheatreTicket,
+  theatreViewerAvailable,
+} from "@/server/theatre";
 
 /**
- * NOT YET REACHABLE BY PLAYERS (#491). This command is the server half of buying a Holo
- * Drive-In ticket and is deliberately wired to no route, action or UI: the Mining and
- * Welding buff effects it grants are later slices, and a ticket must not be sellable
- * before the thing it sells exists. `tests/unit/theatre-exposure.test.ts` fails if any
- * shipped surface imports it; the slice that implements the effects removes that guard in
- * the same change that exposes the purchase.
+ * The Holo Drive-In's two player commands (#491): buying a ticket and being allowed to watch.
+ * Each is one character-authoritative transaction; the browser names only intent and the server
+ * re-derives where the character is, what is showing and what they hold.
  */
 
 export type TheatreTicketRequest = {
@@ -82,6 +88,33 @@ async function stateOf(
 }
 
 /**
+ * Whether the locked character is on the road (a walk or any travel action) or busy with some
+ * other activity. Read with row locks so a concurrent departure queues behind the decision.
+ */
+async function characterBusy(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<"in_transit" | "active_action" | undefined> {
+  const [[action], [walking]] = await Promise.all([
+    transaction
+      .select({ actionId: activeActions.actionId })
+      .from(activeActions)
+      .where(eq(activeActions.characterId, characterId))
+      .for("update"),
+    transaction
+      .select({ characterId: characterTravelState.characterId })
+      .from(characterTravelState)
+      .where(eq(characterTravelState.characterId, characterId))
+      .for("update"),
+  ]);
+  return walking || action?.actionId === ACTION_IDS.travel
+    ? "in_transit"
+    : action
+      ? "active_action"
+      : undefined;
+}
+
+/**
  * Buy one Holo Drive-In ticket.
  *
  * One character-authoritative transaction decides everything. The character row is locked
@@ -131,24 +164,7 @@ export async function buyTheatreTicket(
 
       // An unrelated action or a walk blocks the purchase for the same reason it blocks a
       // trade: the character must be physically standing at the theatre, not on the way.
-      const [[action], [walking]] = await Promise.all([
-        transaction
-          .select({ actionId: activeActions.actionId })
-          .from(activeActions)
-          .where(eq(activeActions.characterId, character.id))
-          .for("update"),
-        transaction
-          .select({ characterId: characterTravelState.characterId })
-          .from(characterTravelState)
-          .where(eq(characterTravelState.characterId, character.id))
-          .for("update"),
-      ]);
-      const busy =
-        walking || action?.actionId === ACTION_IDS.travel
-          ? ("in_transit" as const)
-          : action
-            ? ("active_action" as const)
-            : undefined;
+      const busy = await characterBusy(transaction, character.id);
 
       const [receipts, buffs] = await Promise.all([
         loadTheatreReceipts(transaction, character.id),
@@ -262,6 +278,69 @@ export async function buyTheatreTicket(
           credits: charged[0]!.credits,
           buff: plan.topUp,
         },
+      };
+    },
+    { now },
+  );
+}
+
+export type TheatreViewingResult = {
+  viewing:
+    | {
+        status: "allowed";
+        /** The film of the character's latest ticket, never the film showing now. */
+        filmId: string;
+        showtimeId: string;
+        tierId: string;
+      }
+    | { status: "refused"; reason: ViewingRefusalReason; message: string };
+};
+
+/**
+ * Authorize one viewing start (#491): a first Watch Film, a Replay Last Film, an in-viewer Replay
+ * or a Restart. The film player is usable only at the Drive-In, even though the latest ticket's
+ * entitlement persists while the character is away, so every start asks here and the answer is
+ * re-derived under the character lock from the character's own row: where they stand, that they
+ * are not on the road, and the one ticket the entitlement points at. It reads, charges and grants
+ * nothing, so it returns no Play state: nothing it could change is there to refresh. A refusal
+ * changes nothing, and a viewer the browser already has open closes on it.
+ *
+ * The film is always the ticket's. A programme change does not move it, so a paid viewing keeps
+ * working across the hour; and because nothing here reads the buff, no viewing, restart, replay
+ * or close can charge, refill or discard it.
+ */
+export async function authorizeTheatreViewing(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+): Promise<TheatreViewingResult> {
+  return withLockedOwnedCharacter(
+    userId,
+    characterId,
+    async (transaction, { character }) => {
+      const [busy, latest] = await Promise.all([
+        characterBusy(transaction, character.id),
+        loadLatestTheatreTicket(transaction, character.id),
+      ]);
+      const plan = planViewing({
+        atLocationId: character.currentLocationId,
+        busy,
+        latestTicket: projectLatestTheatreTicket(latest),
+        viewerAvailable: theatreViewerAvailable(),
+      });
+      return {
+        viewing: plan.ok
+          ? {
+              status: "allowed",
+              filmId: plan.filmId,
+              showtimeId: plan.showtimeId,
+              tierId: plan.tierId,
+            }
+          : {
+              status: "refused",
+              reason: plan.reason,
+              message: viewingRefusalMessage(plan.reason),
+            },
       };
     },
     { now },

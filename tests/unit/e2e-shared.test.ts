@@ -91,6 +91,9 @@ describe("buildFocusedEnv", () => {
     expect(env.RUNESPACE_E2E_MINING).toBe("true");
     expect(env.RUNESPACE_E2E_PLAY_ERROR).toBe("true");
     expect(env.RUNESPACE_E2E_TRAVEL).toBeUndefined();
+    // The Holo Drive-In viewer's stand-in pre-roll cards (#491), at a test-length pre-roll.
+    expect(env.RUNESPACE_THEATRE_STAND_IN_ADS).toBe("true");
+    expect(env.RUNESPACE_THEATRE_STAND_IN_AD_MS).toBe("2500");
     expect(env.PLAYWRIGHT_PORT).toBe("3310");
     expect(env.PORT).toBe("3310");
     expect(env.BASE_URL).toBe("http://127.0.0.1:3310");

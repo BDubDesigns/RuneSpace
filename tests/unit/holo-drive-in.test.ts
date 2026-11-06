@@ -350,17 +350,19 @@ describe("Tamsyn's launch topics", () => {
         : { kind: beat.kind },
     );
 
-  it("offers Tell me about the projector and Why keep this place open?, always, in that order", () => {
+  it("offers exactly her three approved topics, always, in that order (#491 slice 4)", () => {
     expect(topics.map((topic) => topic.label)).toEqual([
+      "What's showing?",
       "Tell me about the projector",
       "Why keep this place open?",
     ]);
     expect(topics.map((topic) => topic.id)).toEqual([
+      CONVERSATION_TOPIC_IDS.tamsynWhatsShowing,
       CONVERSATION_TOPIC_IDS.tamsynAboutTheProjector,
       CONVERSATION_TOPIC_IDS.tamsynWhyKeepItOpen,
     ]);
     expect(topics.every((topic) => topic.availability.kind === "always")).toBe(true);
-    expect(CONVERSATION_TOPICS.filter((topic) => topic.npcId === tamsyn)).toHaveLength(2);
+    expect(CONVERSATION_TOPICS.filter((topic) => topic.npcId === tamsyn)).toHaveLength(3);
   });
 
   it("creates no farewell topic: Back and Finish already end every conversation", () => {
@@ -370,17 +372,17 @@ describe("Tamsyn's launch topics", () => {
     expect(labels.join("\n")).not.toMatch(/see you|goodbye|farewell|bye\b/);
   });
 
-  it("lists both with no Mission, first-meeting or unlock entry in the hub", () => {
+  it("lists all three with no Mission, first-meeting or unlock entry in the hub", () => {
     const conversation = resolveNpcConversation(tamsyn, [], {
       workOrdersRefreshUnlocked: false,
     });
-    expect(conversation.map((entry) => entry.kind)).toEqual(["topic", "topic"]);
+    expect(conversation.map((entry) => entry.kind)).toEqual(["topic", "topic", "topic"]);
     const veteran = resolveNpcConversation(
       tamsyn,
       [{ missionId: "keep_the_change", status: "completed" } as never],
       { workOrdersRefreshUnlocked: true },
     );
-    expect(veteran.map((entry) => entry.kind)).toEqual(["topic", "topic"]);
+    expect(veteran.map((entry) => entry.kind)).toEqual(["topic", "topic", "topic"]);
   });
 
   it("speaks Tell me about the projector verbatim, with the approved per-beat expressions", () => {
@@ -432,7 +434,7 @@ describe("Tamsyn's launch topics", () => {
     const all = DIALOGUE_SEQUENCES.filter((sequence) =>
       topics.some((topic) => topic.dialogueId === sequence.id),
     );
-    expect(all).toHaveLength(2);
+    expect(all).toHaveLength(3);
     for (const sequence of all) {
       for (const beat of sequence.beats) {
         expect(beat.kind).toBe("npc");
@@ -444,7 +446,12 @@ describe("Tamsyn's launch topics", () => {
         expect(resolveNpcExpression(tamsyn, beat.expressionId)).toBeDefined();
         expect(beat.text).not.toMatch(/—/);
       }
-      expect(Object.keys(sequence).sort()).toEqual(["beats", "id", "npcId"]);
+      // The one flag a topic may carry is the showing opening its conversation plays first.
+      expect(Object.keys(sequence).sort()).toEqual(
+        sequence.id === DIALOGUE_IDS.tamsynWhatsShowingTopic
+          ? ["beats", "currentShowingDialogue", "id", "npcId"]
+          : ["beats", "id", "npcId"],
+      );
     }
   });
 
@@ -459,9 +466,11 @@ describe("Tamsyn's launch topics", () => {
     expect(used(DIALOGUE_IDS.tamsynWhyKeepItOpenTopic).size).toBe(3);
   });
 
-  it("keeps the theatre out of these topics: no ticket, price, buff or showing is promised yet", () => {
-    const text = DIALOGUE_SEQUENCES.filter((sequence) =>
-      topics.some((topic) => topic.dialogueId === sequence.id),
+  it("keeps the theatre out of her two story topics: only What's showing? speaks of tickets", () => {
+    const text = DIALOGUE_SEQUENCES.filter(
+      (sequence) =>
+        sequence.id !== DIALOGUE_IDS.tamsynWhatsShowingTopic &&
+        topics.some((topic) => topic.dialogueId === sequence.id),
     )
       .flatMap((sequence) => sequence.beats)
       .map((beat) => ("text" in beat ? beat.text : ""))

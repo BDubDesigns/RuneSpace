@@ -107,7 +107,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 110 production player actions", () => {
+  it("enumerates exactly the 112 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -134,12 +134,13 @@ describe("player server actions (server/actions.ts)", () => {
     // of the Wise Old Enby's arrival at a finished personal Resonance Rig. #456
     // adds destroying one carried, unequipped unique item from Inventory. #450
     // adds Route To and Stop After This Leg.
-    expect(bodies.size).toBe(110);
+    // #491 adds buying a Holo Drive-In ticket and authorizing a film viewing.
+    expect(bodies.size).toBe(112);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(106);
+    expect(gameplay).toHaveLength(108);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }

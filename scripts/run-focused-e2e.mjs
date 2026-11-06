@@ -36,6 +36,7 @@ import {
   fail,
   readPositiveInteger,
   ROOT,
+  theatreStandInEnv,
 } from "./e2e-shared.mjs";
 import {
   createDisposableDatabase,
@@ -96,6 +97,7 @@ export const FOCUSED_PHASES = [
   "stillreach",
   "stillreach-flight",
   "holo-drive-in",
+  "holo-drive-in-theatre",
   "refiner-to-go",
   "fedhex",
   "milky-waymo",
@@ -165,6 +167,8 @@ export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
     // next.config.ts for the Play-boundary test.
     RUNESPACE_E2E_MINING: "true",
     RUNESPACE_E2E_PLAY_ERROR: "true",
+    // The Holo Drive-In viewer's labelled stand-in pre-roll cards (#491).
+    ...theatreStandInEnv,
     // Operator journeys (the gameplay-access phase) sign in as the fixed
     // loopback test admin, exactly as in the canonical runner.
     RUNESPACE_ADMIN_USER_IDS: E2E_ADMIN_USER_IDS,

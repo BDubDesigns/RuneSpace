@@ -435,12 +435,14 @@ describe("the film catalog and its tickets", () => {
     expect(THEATRE_TICKET_TIERS).toHaveLength(2);
     expect(getTheatreTicketTier(THEATRE_TICKET_TIER_IDS.film)).toEqual({
       id: THEATRE_TICKET_TIER_IDS.film,
+      name: "Film Ticket",
       credits: 20,
       capacity: 20,
       includesConcessions: false,
     });
     expect(getTheatreTicketTier(THEATRE_TICKET_TIER_IDS.concessions)).toEqual({
       id: THEATRE_TICKET_TIER_IDS.concessions,
+      name: "Ticket + Concessions",
       credits: 50,
       capacity: 50,
       includesConcessions: true,

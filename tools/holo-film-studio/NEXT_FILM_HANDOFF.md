@@ -23,10 +23,10 @@ Last updated when the project was imported into RuneSpace (issue #489); film two
   by `test/film1-approved.test.mjs` (hashes recorded from that commit), so a change to shared code that alters it fails `npm test`.
   Its folder has not changed since the multi-film refactor commit `cfa2acc` (original standalone history, still reachable in RuneSpace) (`git diff cfa2acc -- src/films/that-mines-mine` is empty; that refactor only moved
   shared helpers into `src/` and the pin test proves the output is identical to the approved commit `e90a091`), so none of the film-two work touched it.
-- **Film 2, "Rare or Weld Done?": built, tested and through several owner review rounds; AWAITING THE OWNER'S APPROVAL.**
+- **Film 2, "Rare or Weld Done?": complete; the owner gave final creative approval on November 5, 2026.**
   about 3:01 (181 s), 37 scenes (30 shots + 7 cards), the eight approved beats as chapters. **There is no `film2-approved`
-  tag or other approval record: create one only after the owner explicitly approves**, and ask the owner how to record it in RuneSpace (the film-one precedent is a
-  reference commit plus a hash-pin test; a tag in the shared RuneSpace repository is the owner's call). The import into RuneSpace did not change film two.
+  tag, by the owner's choice.** The approval reference is RuneSpace's subtree import commit `62d2d0484e6101eb3fafe0a255ba1321cc9eaa88`, and the approved
+  `build()` output is pinned by `test/film2-approved.test.mjs` (markup, cues, chapters, scene list and duration), exactly as film one's is. The import did not change film two.
 - Registry `src/films/index.js`: `that-mines-mine`, `rare-or-weld-done`, hidden `template`. Demo page: `?film=<id>`.
 
 ### Film 2 at a glance
@@ -71,6 +71,7 @@ neutral museum label, the in-fiction "5 CREDITS ADMISSION" price, which is not t
 |---|---|
 | Whole suite | `npm test`: 76 tests, 75 pass, 1 skipped by design (the no-overlap check is not applied to approved film one), 0 fail (re-run at the end of this documentation pass) |
 | Film 1 unchanged | `test/film1-approved.test.mjs`: markup / cues / chapters hashes and duration match the approved commit `e90a091` (formerly tag `film1-approved`); shared-library changes did not touch its output |
+| Film 2 unchanged | `test/film2-approved.test.mjs`: markup / cues / chapters / scene-list hashes and duration match the approved import commit `62d2d04` (no tag); a shared-library change that alters its picture, timing or scene descriptions fails `npm test` |
 | Structure of every film | `films.test.mjs`: cue targets resolve, cues start in their own scene, **no two cues overlap on one element property**, gradients resolve, deterministic build, captions, chapters |
 | Film 2 story points | `rare-or-weld-done.test.mjs`: locked card wording, chapter list, ending scenes, FENCE planted twice, no police officer, names only in `config.js`, runtime window 2:00-3:10 (a ceiling that was raised with each review round; see guide 13.6) |
 | Real-browser behaviour | `npm run verify`: all films PASS in headless Chrome (seek determinism over 186 sample times for film 2, one scene + one face at a time, pause freezes everything, replay/restart/skip, **no effect lost after playback + scrubbing + skip + replay**, reduced motion, load/destroy leak nothing, 375 px player). It does not cover whether a gag is funny or readable. |

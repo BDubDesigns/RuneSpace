@@ -340,10 +340,18 @@ export const CONVERSATION_TOPICS = [
     availability: { kind: "skill_level", skillId: SKILL_IDS.lapidary, minimumLevel: 8 },
   },
   {
-    // Tamsyn's two launch topics (#491) are ordinary and always available. A third,
-    // "What's showing?", reads the current showing and arrives with the theatre in a
-    // later slice. There is deliberately no farewell topic: Back and Finish already
-    // end every conversation.
+    // Tamsyn's three launch topics (#491) are ordinary and always available. "What's
+    // showing?" is first and plays the opening for the film showing when it is opened (its
+    // sequence is flagged `currentShowingDialogue`; the conversation surface freezes that
+    // film for the whole conversation), then her shared closing. There is deliberately no
+    // farewell topic: Back and Finish already end every conversation.
+    id: CONVERSATION_TOPIC_IDS.tamsynWhatsShowing,
+    npcId: NPC_IDS.tamsynSuzara,
+    label: "What's showing?",
+    dialogueId: DIALOGUE_IDS.tamsynWhatsShowingTopic,
+    availability: { kind: "always" },
+  },
+  {
     id: CONVERSATION_TOPIC_IDS.tamsynAboutTheProjector,
     npcId: NPC_IDS.tamsynSuzara,
     label: "Tell me about the projector",

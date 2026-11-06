@@ -68,7 +68,20 @@ const PlayContext = createContext<PlayContextValue | undefined>(undefined);
 const BOUNDARY_REFRESH_RETRY_DELAYS_MS = [250, 500, 1_000, 1_500, 2_000] as const;
 const BOUNDARY_REFRESH_GRACE_MS = 150;
 
+/**
+ * When the showing a character is standing at ends (#491), or undefined away from a theatre. The
+ * Big Screen's programme turns over then, so Play asks the server for the next one at that
+ * boundary just as it does for an arrival; the server alone decides what is showing.
+ */
+function theatreBoundaryAt(state: PlayGameplayState): string | undefined {
+  if (!state.theatre.character) return undefined;
+  return state.theatre.screens.find(
+    (screen) => screen.locationId === state.location.currentLocationId,
+  )?.now.endsAt;
+}
+
 function boundaryKeyForState(state: PlayGameplayState): string | undefined {
+  const theatreEndsAt = theatreBoundaryAt(state);
   return state.travelState
     ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
     : state.ship.flight
@@ -77,7 +90,9 @@ function boundaryKeyForState(state: PlayGameplayState): string | undefined {
         ? `passenger:${state.passenger.journey.routeId}:${state.passenger.journey.arrivesAt}`
         : state.activeAction
           ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
-          : undefined;
+          : theatreEndsAt
+            ? `theatre:${theatreEndsAt}`
+            : undefined;
 }
 
 /**
@@ -254,7 +269,8 @@ export function PlayProvider({
     state.travelState?.arrivesAt ??
     state.ship.flight?.arrivesAt ??
     state.passenger.journey?.arrivesAt ??
-    state.activeAction?.nextAttemptAt;
+    state.activeAction?.nextAttemptAt ??
+    theatreBoundaryAt(state);
 
   useEffect(() => {
     if (!boundaryKey || !boundaryAt) return;

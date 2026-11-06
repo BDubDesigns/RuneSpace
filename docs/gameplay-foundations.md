@@ -1059,27 +1059,24 @@ commercials are later slices of #491 and are not shipped here.
   Location itself like Werner and the Wise Old Enby. No first-meeting flag, Mission or level
   decides whether she is there. Public text uses "Tamsyn Suzara" or "Tamsyn"; the shortened
   form is reserved for close friends and appears nowhere.
-- **Topics.** Two `always` replayable topics so far, authored verbatim in
-  `game/content/dialogue.ts`: Tell me about the projector (neutral, amused, neutral) and Why keep
-  this place open? (neutral, wistful, wistful, welcoming). Each beat chooses its own expression.
-  They record nothing and grant nothing. The third approved topic, What's showing?, reads the
-  authoritative current showing and arrives with the theatre. There is deliberately no farewell
-  topic: Back and Finish already end every conversation.
+- **Topics.** Three `always` replayable topics, authored verbatim in `game/content/dialogue.ts`:
+  What's showing? (slice 4, below), Tell me about the projector (neutral, amused, neutral) and Why
+  keep this place open? (neutral, wistful, wistful, welcoming). Each beat chooses its own
+  expression. They record nothing and grant nothing. There is deliberately no farewell topic: Back
+  and Finish already end every conversation.
 - **Beginner Echo.** Appended to `BEGINNER_ECHO_TARGET_POOLS` for Skatboll as its eleventh member.
   A hunt already stored keeps its target and clue.
-- **Scenery only for now.** The projector and screen in the art are scenery. No ticket, showing
-  or viewer control exists, and none is advertised or shown disabled.
+- **Scenery in this slice.** The projector and screen in the art were scenery; the Big Screen
+  (slice 4, below) is the showing, ticket and viewer UI on the location panel.
 
 #### The theatre's server foundation (issue #491, slice 2)
 
 The second slice adds the schedule, the film catalog, the durable ticket records and the server
-purchase transaction, and **exposes none of it to players**: the Mining and Welding buff effects
-a ticket sells are later slices, and a ticket must not be sellable before the thing it sells
-exists. `server/theatre-commands.ts` (`buyTheatreTicket`) is imported by no route, action or
-component, and `tests/unit/theatre-exposure.test.ts` fails if one ever imports it, or if Tamsyn's
-"What's showing?" topic is offered in her hub (her closing says the bonus comes with a ticket).
-The slice that exposes the purchase removes that guard (the buff effects themselves are slice 3,
-below, which keeps the guard in place).
+purchase transaction. It exposed none of it: a ticket must not be sellable before the thing it
+sells exists, so `server/theatre-commands.ts` (`buyTheatreTicket`) was imported by nothing and a
+guard test failed if anything imported it or registered Tamsyn's "What's showing?" topic. The buff
+effects are slice 3 and the player-facing theatre is slice 4 (both below); slice 4 removed that
+guard in the same change that exposed the purchase.
 
 - **Content.** `game/content/theatre.ts` is the one catalog: `THEATRE_FILMS` (the Holo Film
   Studio's own film ID, title, the skill whose buff a ticket grants, and Tamsyn's showing
@@ -1095,7 +1092,8 @@ below, which keeps the guard in place).
   (Mining) and odd hours Rare or Weld Done? (Welding). A showing has a stable `showingId` (the
   screen and the canonical showtime) and a `showtimeId` that names only the interval, so a second
   screen later cannot make a second purchase. `PlayGameplayState.theatre` carries each screen's
-  current and next showing from the server's clock; it carries no receipts or balances yet.
+  current and next showing from the server's clock. Slice 4 adds the character's own facts to it
+  while they stand at a theatre.
 - **Purchase.** One transaction on the shared locked-owned-character boundary, like a trade.
   Under the lock it re-derives the character's location (they must be at the theatre, not on the
   way), idleness, the showing on at the server's `now` (a request for a showing that has turned
@@ -1115,7 +1113,7 @@ below, which keeps the guard in place).
   Mining and Welding are independent rows. Watching, the viewer and completion are not inputs.
 - **Replay entitlement.** `character_theatre_latest_tickets` holds one row per character, the most
   recent purchase, replaced by a newer one and kept across logout, travel and rollover. Replaying
-  charges and grants nothing (the viewer is a later slice).
+  charges and grants nothing (the viewer is slice 4).
 - **State.** Migration `0059_holo_drive_in_theatre`, additive, no backfill:
   `character_theatre_receipts`, `character_theatre_latest_tickets`, `character_theatre_buffs`,
   all `ON DELETE RESTRICT`. The receipt records what the purchase actually did (Credits paid, the
@@ -1125,15 +1123,14 @@ below, which keeps the guard in place).
   conversation was opened at (`resolveShowingOpening`, from the catalog) and then its own two
   shared closing beats. The surface reads `resolveShowingFilmId` from the Play state's
   programme once when the topic is opened and keeps that film, so a turnover mid-dialogue changes
-  nothing; reopening picks the new film. It is authored verbatim but **not registered** in
-  `CONVERSATION_TOPICS`, for the reason above.
+  nothing; reopening picks the new film. It is registered in `CONVERSATION_TOPICS` (slice 4), first
+  in Tamsyn's hub.
 
 #### The film buffs' effects (issue #491, slice 3)
 
 The persisted buff balances from slice 2 now take effect at the existing authoritative resolution
-boundaries. Nothing is exposed: a character only has charges if the (unreachable) purchase command
-ran, `tests/unit/theatre-exposure.test.ts` still guards the purchase and Tamsyn's topic, and a
-character with no charges resolves exactly as before. The magnitudes live in
+boundaries. A character with no charges resolves exactly as before, and a character only has
+charges after buying a ticket (slice 4). The magnitudes live in
 `game/content/theatre.ts` (`MINING_FILM_BUFF`, `WELDING_FILM_BUFF`).
 
 - **Where it is read and spent.** Each resolver loads the skill's remaining charges in its own
@@ -1169,6 +1166,77 @@ character with no charges resolves exactly as before. The magnitudes live in
   earns and spends nothing, and Mission and turn-in XP, customer payouts and every other source
   are not boosted.
 - **Independence.** Mining and Welding are separate rows; neither buff touches the other skill.
+
+#### The player-facing theatre (issue #491, slice 4)
+
+The Big Screen, the tickets, the buff balances, Tamsyn's third topic and the film viewer, on the
+Holo Drive-In's location panel. All of it is presentation and intent over the server rules above;
+no rule, price, schedule or eligibility decision lives in a component.
+
+- **The Big Screen** (`features/theatre/TheatrePanel.tsx`, in `LocationActivity`). Heading
+  "The Big Screen"; Now Showing and Up Next from the Play state's programme; "Next showing in
+  M:SS" counting to the end of the showing on the synchronized server clock
+  (`serverNowMs`, never the browser's); both skills' remaining bonus attempts; the two ticket
+  choices with the owner's labels (`Film Ticket: 20 Credits`, `Ticket + Concessions: 50 Credits`,
+  "20 / 50 bonus attempts") and the approved ticket explanation. All of that copy is
+  `THEATRE_COPY` in `game/content/theatre.ts`. The panel renders only for a character standing
+  at a theatre.
+- **Play state.** `PlayGameplayState.theatre` keeps the programme and, **only while the character
+  stands at a theatre**, adds `character`: `buffs` by skill ID, `latestTicket` (the replay
+  entitlement), `heldTiers` (the tier of the ticket they already hold for what is showing now, by
+  `showingId`) and `viewer` (whether the viewer is offered, whether its slots are stand-ins, and the
+  pre-roll length). `loadCharacterTheatreProjection` reads it with three keyed queries in the
+  state's own transaction. At the end of a showing Play refreshes the state like it does at an
+  arrival (`theatreBoundaryAt`, the shared boundary scheduler); until the fresh state arrives the
+  panel shows the next showing from the same schedule rule and holds the ticket controls
+  (`displayedShowings`).
+- **Buying.** Choose a ticket, read the confirmation, Confirm. The confirmation
+  (`describeTicketOffer`) shows the Credits before and after and "<Skill> bonus attempts: N to M",
+  and, whenever that skill's bonus already has attempts, an explicit statement of what the ticket
+  does: tops it up to the ticket's size (adding M minus N rather than the ticket's whole size) or
+  adds none, with the bonus staying where it is. It never calls the player ineligible. It is a
+  derivation for display; `buyTheatreTicketAction` is the existing server transaction, which
+  recomputes it under the lock. A stale showing, a second tab, a double tap, a lost response and
+  unaffordable tickets are all server refusals the panel reports without a second charge; a retry
+  that finds the same tier already held reads as the purchase it was. Looking charges nothing and
+  Cancel changes nothing.
+- **Tamsyn.** "What's showing?" is registered as her first topic and plays the opening for the film
+  showing when it was opened, then her shared closing. The Big Screen's ticket section does not
+  appear in her dialogue.
+- **The viewer** (`features/theatre/TheatreViewer.tsx`, lifecycle in `viewer-machine.ts`). The
+  entry is "Watch Film" while the latest ticket is for the showing on now and "Replay Last Film"
+  for an older one (`viewerEntry`). It plays the **ticket's** film, whatever is showing now. Every
+  start (the first, Restart, the end card's Replay, reopening) asks `authorizeTheatreViewing`, which
+  re-derives under the character lock that they stand at the Drive-In, are not on the road, and hold
+  a ticket; it reads and writes nothing else, so a viewing, a restart, a replay and a close can
+  never charge, refill or discard a bonus. Then one pre-roll slot is drawn independently at
+  random (`selectPreRollSlot`; repeats allowed) and plays with an honest, non-seekable progress
+  bar, and only the clock reaching its length starts the film; tapping, keys and seeking do not
+  skip it. The film has Play/Pause, a movie-only seek bar, Restart, a "Scene descriptions" line
+  (the silent films' descriptions are not closed captions, so nothing is labelled CC),
+  Fullscreen and Close; Close is on screen in every phase, Escape closes, and focus returns to the
+  button that opened it. None of the studio's own control bar, chapter shortcuts or caption toggle
+  is shown. If the character leaves the Drive-In the panel, and the viewer inside it, go with it
+  once the state says so, and the next start is refused regardless.
+- **Fullscreen.** Native `requestFullscreen` on the viewer where supported, and otherwise (or if
+  refused) the same overlay expanded to the viewport. It is a class change on the same element tree, so
+  entering and leaving keeps the film's place and state and never asks the server or the buff. On a
+  portrait touch device, entering it shows a brief, dismissible suggestion to turn the phone sideways,
+  once per browsing session; nothing is forced or blocked. The films follow the OS reduced-motion
+  setting through the studio's own reduced mode.
+- **Studio boundary.** `features/theatre/studio-player.ts` is the only shipped file that reaches
+  the Holo Film Studio, and only its `src/` module (`createMoviePlayer`, `loadFilm` and the three
+  stylesheets). The viewer is a dynamic, client-only import, so the engine and each film are
+  separate chunks that load only when a player opens a film (`docs/holo-film-studio.md`).
+- **The commercials are not here.** The three pre-roll slots (DeWhat?, Visit Skatboll!, FedHex) are
+  `THEATRE_PRE_ROLL_SLOTS`, none of them with a finished commercial yet. The viewer is therefore
+  **not offered to players**: `theatreViewerReady()` is false and the Play state's
+  `viewer.available` is false, so no Watch Film or Replay Last Film control renders. Tickets, the
+  bonus and Tamsyn work; the stand-in cards (clearly labelled as not commercials) exist only for a
+  preview or test build that sets `RUNESPACE_THEATRE_STAND_IN_ADS=true` (and, for browser tests,
+  `RUNESPACE_THEATRE_STAND_IN_AD_MS`). The commercials slice fills each slot's `filmId`, makes the
+  pre-roll stage play that studio film, and each spot needs its own owner approval first; a unit
+  test fails until the stage does.
 
 ### The Crash Site's two scenes (issue #330)
 

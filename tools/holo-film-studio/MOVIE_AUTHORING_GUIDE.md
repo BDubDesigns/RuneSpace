@@ -600,7 +600,7 @@ film; **every cue target exists in the markup** (a typo is otherwise silent); ev
 (forgot `FX_DEFS`); no `data-t` name is shared between scenes; **every cue starts inside the scene that
 owns its target** (forgot `at()`); **no two cues overlap on the same element property** (rule 11; the approved
 film one is exempt). `test/film1-approved.test.mjs` pins film one's build output to the approved commit's (`e90a091`)
-hashes, so a shared-library change that alters the approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
+hashes, and `test/film2-approved.test.mjs` does the same for film two against RuneSpace's import commit `62d2d04`, so a shared-library change that alters an approved picture fails loudly. `test/engine.test.mjs` unit-tests `Track` (including the `hop` landing
 regression), `defineFilm`, effects and the SSR-safe import. `test/docs.test.mjs` checks that file paths
 and `npm run` commands named in the docs exist.
 

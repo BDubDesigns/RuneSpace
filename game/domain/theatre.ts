@@ -6,6 +6,7 @@ import {
   getTheatreScreensAt,
   getTheatreTicketTier,
   THEATRE_FILMS,
+  type TheatrePreRollSlot,
   THEATRE_SCREENS,
   THEATRE_TICKET_TIERS,
   type TheatreFilmDefinition,
@@ -13,6 +14,7 @@ import {
   type TheatreTicketTierDefinition,
 } from "@/game/content/theatre";
 import { getSkillLevelDialogue } from "@/game/content/dialogue";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
 
 /**
  * The Holo Drive-In's pure rules (#491): which film a screen shows when, how a ticket
@@ -62,6 +64,52 @@ export type TheatreProgrammeProjection = {
     now: ShowingProjection;
     next: ShowingProjection;
   }[];
+};
+
+/**
+ * A character's own theatre facts, projected only while they stand at a theatre (#491, slice 4):
+ * their film buff balances, the one ticket their replay entitlement points at, and the tier of
+ * any ticket they already hold for what is showing now. Present only at a theatre because that
+ * is the only place anything reads it.
+ */
+export type CharacterTheatreProjection = {
+  /** Remaining film buff charges by skill ID. A skill the character has none for reads zero. */
+  buffs: Readonly<Record<string, number>>;
+  /** The most recently purchased ticket, or undefined if the character has never bought one. */
+  latestTicket?: LatestTicketProjection;
+  /**
+   * For each screen's current showing (by `showingId`), the tier of the ticket the character
+   * already holds for that film and showtime. A showing absent here has no ticket yet.
+   */
+  heldTiers: Readonly<Record<string, string>>;
+  /** The film viewer, decided on the server and never by the browser. */
+  viewer: TheatreViewerProjection;
+};
+
+export type TheatreViewerProjection = {
+  /** Whether the viewer is offered at all right now. */
+  available: boolean;
+  /**
+   * True while any slot is filled by a clearly labelled stand-in card because its commercial is
+   * not finished: only a preview or local build that opted in ever has this, and never production.
+   */
+  standInAds: boolean;
+  /** How long each pre-roll lasts: the designed 15 seconds, or a shorter stand-in for browser tests. */
+  preRollMs: number;
+};
+
+export type LatestTicketProjection = {
+  receiptId: string;
+  filmId: TheatreFilmId;
+  showtimeId: string;
+  tierId: string;
+  /** ISO instant the ticket was bought. */
+  purchasedAt: string;
+};
+
+/** What `PlayGameplayState.theatre` carries: the programme, plus the character's own facts at a theatre. */
+export type TheatreProjection = TheatreProgrammeProjection & {
+  character?: CharacterTheatreProjection;
 };
 
 export function showtimeIdAt(startsAtMs: number): string {
@@ -114,6 +162,29 @@ function projectShowing(showing: ShowingInstance): ShowingProjection {
     filmId: showing.filmId,
     startsAt: new Date(showing.startsAtMs).toISOString(),
     endsAt: new Date(showing.endsAtMs).toISOString(),
+  };
+}
+
+/**
+ * The showings a screen displays at `nowMs` given what the server last projected for it (#491).
+ * Until the synchronized clock reaches the projection's `endsAt` the projection is displayed
+ * as it is. From the instant it does (the end is exclusive: that instant belongs to the incoming
+ * showing) until a fresh state arrives, the same schedule rule shows what comes next, flagged
+ * `stale` so the ticket controls wait for the server's own projection rather than sell a showing
+ * the server has since moved on from. The server alone judges a purchase either way.
+ */
+export function displayedShowings(
+  screen: TheatreScreenDefinition,
+  projected: { now: ShowingProjection; next: ShowingProjection },
+  nowMs: number,
+): { now: ShowingProjection; next: ShowingProjection; stale: boolean } {
+  if (nowMs < Date.parse(projected.now.endsAt)) {
+    return { now: projected.now, next: projected.next, stale: false };
+  }
+  return {
+    now: projectShowing(showingAt(screen, nowMs)),
+    next: projectShowing(nextShowingAt(screen, nowMs)),
+    stale: true,
   };
 }
 
@@ -288,6 +359,153 @@ export function ticketRefusalMessage(reason: TicketRefusalReason): string {
       return "You already have a ticket for this showing.";
     case "insufficient_credits":
       return "You cannot afford that ticket.";
+  }
+}
+
+/**
+ * What a ticket would do for one character, derived for the confirmation they see BEFORE paying
+ * (#491): the tier's price and the Credits left, the buff's count before and after, and, whenever
+ * the skill's buff still has attempts, an explicit statement of how the purchase changes them,
+ * including the zero-added and top-up-instead-of-add cases. It judges nothing: the server's
+ * purchase transaction is the only authority, and it recomputes all of this under the lock.
+ */
+export type TicketOffer = {
+  tierId: string;
+  /** "Film Ticket: 20 Credits". */
+  label: string;
+  credits: number;
+  creditsAfter: number;
+  affordable: boolean;
+  skillId: string;
+  skillName: string;
+  topUp: TopUp;
+  /** "Mining bonus attempts: 5 to 20". */
+  summary: string;
+  /** Present exactly when the skill's buff already has attempts remaining. */
+  warning?: string;
+};
+
+export function ticketLabel(tier: TheatreTicketTierDefinition): string {
+  return `${tier.name}: ${tier.credits} Credits`;
+}
+
+export function describeTicketOffer(input: {
+  tier: TheatreTicketTierDefinition;
+  film: TheatreFilmDefinition;
+  remaining: number;
+  credits: number;
+}): TicketOffer {
+  const { tier, film } = input;
+  const topUp = topUpCharges(input.remaining, tier.capacity);
+  const skillName = getSkillPresentation(film.skillId)?.displayName ?? film.skillId;
+  let warning: string | undefined;
+  if (topUp.remainingBefore > 0) {
+    warning =
+      topUp.outcome === "adds_none"
+        ? `You already have ${topUp.remainingBefore} ${skillName} bonus attempts. This ticket adds none, so your bonus stays at ${topUp.remainingAfter}. You can still buy it for this showing.`
+        : `You already have ${topUp.remainingBefore} ${skillName} bonus attempts. This ticket raises your bonus to ${topUp.remainingAfter}, adding ${topUp.added} rather than ${tier.capacity}: tickets top your bonus up to their size, they do not add to it.`;
+  }
+  return {
+    tierId: tier.id,
+    label: ticketLabel(tier),
+    credits: tier.credits,
+    creditsAfter: Math.max(0, input.credits - tier.credits),
+    affordable: input.credits >= tier.credits,
+    skillId: film.skillId,
+    skillName,
+    topUp,
+    summary: `${skillName} bonus attempts: ${topUp.remainingBefore} to ${topUp.remainingAfter}`,
+    ...(warning === undefined ? {} : { warning }),
+  };
+}
+
+/**
+ * The viewer entry the Big Screen offers a character at the theatre, from the one ticket their
+ * replay entitlement points at and the showing that is on now. A ticket for what is showing now is
+ * "Watch Film"; a ticket from an earlier showing is "Replay Last Film"; no ticket, no entry.
+ * Which film plays is always the ticket's, never the current showing's.
+ */
+export function viewerEntry(
+  latestTicket: LatestTicketProjection | undefined,
+  currentShowtimeId: string | undefined,
+): { kind: "watch" | "replay"; filmId: TheatreFilmId } | undefined {
+  if (!latestTicket) return undefined;
+  return {
+    kind: latestTicket.showtimeId === currentShowtimeId ? "watch" : "replay",
+    filmId: latestTicket.filmId,
+  };
+}
+
+/**
+ * The seconds left to a showing's end as the countdown shows it: M:SS, or H:MM:SS from an hour
+ * up. Rounded up, so it never reads 0:00 while any of the showing remains, and never negative.
+ */
+export function formatCountdown(remainingMs: number): string {
+  const total = Math.max(0, Math.ceil(remainingMs / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const ss = String(seconds).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${ss}` : `${minutes}:${ss}`;
+}
+
+/**
+ * Pick one pre-roll slot uniformly and independently of every earlier pick: a repeat is allowed.
+ * `random` is a unit-interval source so a test can choose; the viewer passes `Math.random`.
+ * Only a slot whose commercial exists (or that the caller keeps) is ever in `slots`.
+ */
+export function selectPreRollSlot(
+  slots: readonly TheatrePreRollSlot[],
+  random: () => number,
+): TheatrePreRollSlot {
+  if (slots.length === 0) throw new RangeError("There is no pre-roll slot to select.");
+  const draw = random();
+  const index = Math.min(slots.length - 1, Math.max(0, Math.floor(draw * slots.length)));
+  return slots[index]!;
+}
+
+export type ViewingRefusalReason = "not_at_theatre" | "in_transit" | "no_ticket" | "unavailable";
+
+export type ViewingPlan =
+  | { ok: true; filmId: TheatreFilmId; showtimeId: string; tierId: string }
+  | { ok: false; reason: ViewingRefusalReason };
+
+/**
+ * Whether a character may start (or restart, or replay) a viewing now, from facts the server just
+ * read under the character lock: where they stand, whether they are on the road, the one ticket
+ * their entitlement points at and whether the viewer is offered at all. The entitlement
+ * persists while they are away, but the film plays only at the theatre.
+ */
+export function planViewing(input: {
+  atLocationId: string;
+  busy: "in_transit" | "active_action" | undefined;
+  latestTicket: LatestTicketProjection | undefined;
+  viewerAvailable: boolean;
+}): ViewingPlan {
+  if (getTheatreScreensAt(input.atLocationId).length === 0) {
+    return { ok: false, reason: "not_at_theatre" };
+  }
+  if (input.busy === "in_transit") return { ok: false, reason: "in_transit" };
+  if (!input.latestTicket) return { ok: false, reason: "no_ticket" };
+  if (!input.viewerAvailable) return { ok: false, reason: "unavailable" };
+  return {
+    ok: true,
+    filmId: input.latestTicket.filmId,
+    showtimeId: input.latestTicket.showtimeId,
+    tierId: input.latestTicket.tierId,
+  };
+}
+
+export function viewingRefusalMessage(reason: ViewingRefusalReason): string {
+  switch (reason) {
+    case "not_at_theatre":
+      return "Films are shown at the Holo Drive-In.";
+    case "in_transit":
+      return "Arrive at the Holo Drive-In before watching a film.";
+    case "no_ticket":
+      return "Buy a ticket to watch a film.";
+    case "unavailable":
+      return "The projector is not ready for this film yet.";
   }
 }
 

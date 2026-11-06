@@ -22,15 +22,15 @@ has setup, the public player API, and packaging.
   `node:test` suites, a headless-Chrome verification harness, and timestamped
   contact-sheet QA tooling.
 - Two films: **That Mines Mine!** (1:43, approved) and **Rare or Weld Done?**
-  (about 3:01, 37 scenes, awaiting final owner approval).
+  (about 3:01, 37 scenes, approved by the owner on November 5, 2026). Each one's approved output is pinned by a hash test.
 - It is **not** the Drive-In or Theatre feature. Theatre gameplay, tickets,
   Mining or Welding buffs, showtime scheduling, the Drive-In world location, new
-  films, and commercials are separate product work that needs its own issues.
-  Mounting a film in the game would consume the studio's public player API
-  (`tools/holo-film-studio/README.md` §5 and §8) from a future feature; nothing
-  in the game does so today. The game's theatre catalog (`game/content/theatre.ts`, #491) restates
-  the two film IDs only; `tests/unit/theatre.test.ts` reads the studio's film registry to prove
-  they still match, and imports nothing from the studio.
+  films, and commercials are separate product work (#491). The game's theatre viewer
+  (`features/theatre/`) consumes the studio's public player API
+  (`tools/holo-film-studio/README.md` §5 and §8) through one adapter,
+  `features/theatre/studio-player.ts`, and nothing else of the studio. The game's theatre catalog
+  (`game/content/theatre.ts`) restates the two film IDs only; `tests/unit/theatre.test.ts` reads
+  the studio's film registry to prove they still match.
 - It is not merged with QC Studio and its engine is not rewritten around React.
 
 ## Run it
@@ -40,7 +40,7 @@ Everything runs from the studio directory. No `pnpm install`, no PostgreSQL, no
 
 ```bash
 cd tools/holo-film-studio
-npm test             # structure, engine, docs, film-one pin, film-two story (~1 s, Node only)
+npm test             # structure, engine, docs, both films' approved-output pins, film-two story (~1 s, Node only)
 npm run verify       # real engine in headless Chrome, every film (~100 s; needs Chrome/Chromium)
 npm run pack:check   # what `npm pack` would ship
 npm run dev          # http://127.0.0.1:5173/?film=<id> preview
@@ -55,11 +55,11 @@ unavailable, as CI does. Real playback needs a visible page.
 
 | Boundary | How it is held |
 | --- | --- |
-| Not shipped to players | Nothing in `app/`, `components/`, `features/`, `game/`, `server/`, `db/`, `minigames/`, or `tools/qc-studio/` references it, so Next.js never bundles it. `.dockerignore` keeps it out of the production image's build context. |
+| Only `src/` ships, through one adapter | Exactly one shipped file, `features/theatre/studio-player.ts`, reaches the studio, and only its `src/` module: `createMoviePlayer`, `loadFilm` and the three stylesheets. The viewer imports it on demand, so the engine and each film are separate client chunks fetched only when a player opens a film, and nothing else in `app/`, `components/`, `features/`, `game/`, `server/`, `db/`, `minigames/`, or `tools/qc-studio/` references the studio. The dev server, demo page, authoring helpers, tests and headless QA tooling are never imported. `.dockerignore` keeps everything except `src/` out of the production image's build context. |
 | No dependencies | Its `package.json` is `private` with no dependency fields; its source imports only its own files and Node built-ins. There is no `pnpm-workspace.yaml`, so the nested package is invisible to `pnpm install` and `pnpm-lock.yaml`. |
 | Source kept as authored | `.prettierignore` and the ESLint ignore list exclude it. Do not run Prettier over it: its formatting is its own, and the approved film's pinned output must not be perturbed. `tsconfig.json` includes only `.ts` files with `allowJs: false`, so only `src/index.d.ts` is seen by `tsc` (and `skipLibCheck` skips declaration bodies). |
 | Own test runner | Its tests are `node:test` files run by `npm test`; Vitest's `tests/unit/**` include does not pick them up and Playwright never loads them. |
-| Guarded | `tests/unit/holo-film-studio-boundary.test.ts` fails if the studio gains a dependency, imports outside itself, is imported by shipped code, drops out of the Prettier, ESLint, or Docker ignores, or loses its CI lane. |
+| Guarded | `tests/unit/holo-film-studio-boundary.test.ts` fails if the studio gains a dependency, imports outside itself, is imported by shipped code other than that one adapter (or the adapter reaches outside `src/`, or anything but the viewer imports the adapter), drops out of the Prettier or ESLint ignores, stops excluding all but `src/` from the Docker context, or loses its CI lane. |
 
 ## CI
 
@@ -106,7 +106,8 @@ commit is part of RuneSpace's history **with its original SHA**:
 | Imported standalone head | `9ce0ddf04bfa4cfaf421c828da47db8d5c5ba630` (the import commit's `git-subtree-split` trailer) |
 | Film one approved (formerly tag `film1-approved`) | `e90a091c8f8460e1fad4b5acb3c4fd1b8b9d14e3`, "Baseline: That Mines Mine! as approved" |
 | Film one build output pinned to that commit | duration `103400` ms; `sha256(JSON)[:16]` of markup `d2ce8eaa1ae8a6d6`, cues `3c2332c3c862e9cc`, chapters `bcc616fbe97ca9d3` (`tools/holo-film-studio/test/film1-approved.test.mjs`) |
-| Film two | built, in owner review, **no approval record and no `film2-approved` tag**; 37 scenes, 181300 ms |
+| Film two approved | The owner's final creative approval was given on November 5, 2026, by the owner's choice **without a `film2-approved` tag**. The approved version is the subtree import commit `62d2d0484e6101eb3fafe0a255ba1321cc9eaa88` (the studio's `src/` is unchanged since it) |
+| Film two build output pinned to that commit | duration `181300` ms, 37 scenes; `sha256(JSON)[:16]` of markup `a7df342acb79cd6e`, cues `3ca2aba4a5146077`, chapters `37439ce27512434a`, scenes `26b60bf875f59fc7` (`tools/holo-film-studio/test/film2-approved.test.mjs`) |
 
 The import added the studio tree byte-for-byte: the imported
 `tools/holo-film-studio` tree object equals the standalone `9ce0ddf` root tree
@@ -131,6 +132,17 @@ Hashing `src/films/that-mines-mine/index.js`'s `build()` output from the
 extracted approved tree and from the current tree gives the same values as the
 pin above. If a shared-engine change ever alters the approved picture, the pin
 test fails; do not update the hashes without the owner re-approving film one.
+
+Film two has no tag, so its reference is the import commit itself. The same
+recipe, with the studio's `src/` extracted from it, reproduces its pin:
+
+```bash
+git archive 62d2d04 tools/holo-film-studio/src | tar -x -C "$(mktemp -d)" # then hash build() output of src/films/rare-or-weld-done there
+cd tools/holo-film-studio && node --test test/film2-approved.test.mjs
+```
+
+The same rule holds: do not update film two's hashes without the owner
+re-approving film two.
 
 ## Changing the studio
 

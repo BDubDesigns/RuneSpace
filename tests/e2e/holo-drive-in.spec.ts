@@ -17,8 +17,8 @@ import { captureReviewScreenshot } from "./review-screenshot";
 /**
  * The Holo Drive-In (#491, slice 1): Skatboll's twelfth World Location north of Holo
  * Hollow, its one ordinary walking edge, and Tamsyn Suzara standing at the location
- * with her two launch topics. The showings, tickets and viewer are later slices and are
- * deliberately not exercised here.
+ * with her launch topics. The showings, tickets, buffs and viewer are exercised by
+ * `holo-drive-in-theatre.spec.ts`.
  */
 
 const DRIVE_IN = LOCATION_IDS.holoDriveIn;
@@ -74,7 +74,7 @@ for (const viewport of [
     await expect(page.getByText(location.description)).toBeVisible();
 
     // Tamsyn stands at the World Location itself: one resident, no Local Place, no
-    // Trade, and no ticket or showing control in this slice.
+    // Trade. The Big Screen is a section of the location panel (see the theatre spec).
     await expect(page.locator("[data-local-place-directory]")).toHaveCount(0);
     await expect(page.locator("[data-local-place]")).toHaveCount(0);
     const tamsyn = page.locator('[data-npc-interaction="tamsyn_suzara"]');
@@ -85,13 +85,14 @@ for (const viewport of [
     await expect(tamsyn.locator('[data-npc-action="trade"]')).toHaveCount(0);
     await expect(page.locator("[data-ship-berth]")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^(Start|Stop) / })).toHaveCount(0);
+    await expect(page.locator("[data-theatre-panel]")).toBeVisible();
 
     await expectNoPageOverflow(page);
     if (viewport.name === "phone") await captureReviewScreenshot(page, "holo-drive-in-mobile.png");
   });
 }
 
-test("Tamsyn's two topics play in order with the approved portrait on each beat", async ({
+test("Tamsyn's two story topics play in order with the approved portrait on each beat", async ({
   page,
   testCharacter,
 }) => {
@@ -106,7 +107,8 @@ test("Tamsyn's two topics play in order with the approved portrait on each beat"
   await expect(
     conversation.getByRole("button", { name: /Why keep this place open\?/ }),
   ).toBeVisible();
-  // Two ordinary topics and nothing else: no farewell, story entry or Mission action.
+  await expect(conversation.getByRole("button", { name: /What's showing\?/ })).toBeVisible();
+  // Her three topics and nothing else: no farewell, story entry or Mission action.
   await expect(
     conversation.getByRole("button", { name: /See you|Goodbye|Mission|Accept/i }),
   ).toHaveCount(0);

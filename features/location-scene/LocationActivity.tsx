@@ -11,6 +11,7 @@ import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWor
 import { ResearchDelivery } from "@/features/research/ResearchDelivery";
 import { ResearchFieldAction } from "@/features/research/ResearchFieldAction";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { TheatrePanel } from "@/features/theatre/TheatrePanel";
 import { LapidaryWorkbench } from "@/features/lapidary/LapidaryWorkbench";
 import { ResonanceRig } from "@/features/runeworking/ResonanceRig";
 import { PERSONAL_RESONANCE_RIG } from "@/game/content/resonance-rig";
@@ -161,6 +162,10 @@ function primaryActivity(
       return <RefiningConsole />;
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
+    case LOCATION_IDS.holoDriveIn:
+      // The Big Screen (#491): the programme, tickets, film bonuses and viewer. Tamsyn stands
+      // here as an ordinary resident Talk NPC; the showing UI belongs to the location panel.
+      return <TheatrePanel />;
     case LOCATION_IDS.ruskRecovery:
       // Wade's Welding Workshop — one bench, one component, following the
       // authoritative Workbench occupancy (#207) — and, once Tansy opens it,

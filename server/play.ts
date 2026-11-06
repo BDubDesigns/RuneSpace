@@ -224,7 +224,8 @@ import {
 } from "@/game/domain/bounded-run";
 import { isMissionAccepted } from "@/server/mission-state";
 import { selectSkillLevelDialogues } from "@/game/domain/skill-level-dialogue";
-import { projectTheatreProgramme, type TheatreProgrammeProjection } from "@/game/domain/theatre";
+import { projectTheatreProgramme, type TheatreProjection } from "@/game/domain/theatre";
+import { loadCharacterTheatreProjection } from "@/server/theatre";
 import {
   createWorkOrderWeldingResolver,
   ensureWorkOrderBoard,
@@ -1032,12 +1033,13 @@ export type PlayGameplayState = {
   skillLevelDialogue: Readonly<Record<string, string>>;
   /**
    * The Holo Drive-In's programme (#491): what each screen is showing now and next, decided
-   * here from the server's clock. The one thing the client reads from it is which film
-   * Tamsyn speaks about when her "What's showing?" topic is opened; the countdown and the
-   * ticket surface arrive with the theatre UI. Tickets, receipts and buff balances are not in
-   * the Play state yet.
+   * here from the server's clock. The client reads it for Now Showing, Up Next, the countdown
+   * and which film Tamsyn speaks about when her "What's showing?" topic is opened. For a
+   * character standing at a theatre it also carries their own film buff balances, their replay
+   * entitlement and the tier of any ticket they already hold for what is showing now
+   * (`character`); it is absent elsewhere because nothing elsewhere reads it.
    */
-  theatre: TheatreProgrammeProjection;
+  theatre: TheatreProjection;
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
@@ -2817,6 +2819,17 @@ export async function stateFromTransaction(
   });
   const runeTeleport = await loadRuneTeleportProjection(transaction, characterId);
   const resonanceArrival = await loadResonanceArrival(transaction, characterId);
+  const theatreProgramme = projectTheatreProgramme(now.getTime());
+  const theatreCharacter = await loadCharacterTheatreProjection(
+    transaction,
+    characterId,
+    theatreProgramme,
+    currentLocationId,
+  );
+  const theatre: TheatreProjection = {
+    ...theatreProgramme,
+    ...(theatreCharacter ? { character: theatreCharacter } : {}),
+  };
   return {
     characterId,
     serverNow: now.toISOString(),
@@ -2871,7 +2884,7 @@ export async function stateFromTransaction(
         }),
       ),
     ),
-    theatre: projectTheatreProgramme(now.getTime()),
+    theatre,
     mining: {
       totalXp,
       level: miningProgress.level,
