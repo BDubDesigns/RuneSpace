@@ -43,7 +43,7 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * depend on what is showing now first wait out the last 90 seconds of the hour and read the film
  * from the same schedule rule the server uses; tests of the viewer seed a ticket row directly, so
  * either film is reachable whatever hour it is. The pre-rolls are the three real 15-second
- * commercials. Every test but one runs the page's animation clock at 6x through the browser's own
+ * commercials. Every test but one runs the page's animation clock at 4x through the browser's own
  * DevTools protocol (`speedUpAnimations`), so a commercial, and a 1:43 film, play through in a few
  * seconds with no sleeps and no test seam in the app; one test runs at real speed and measures
  * that a pre-roll takes its designed 15 seconds.
@@ -218,7 +218,7 @@ const sped = new WeakSet<Page>();
  * seconds, and the viewer's progress (read from the player's own clock) stays honest. The app has
  * no test seam: this changes only the browser's clock.
  */
-async function speedUpAnimations(page: Page, rate = 6) {
+async function speedUpAnimations(page: Page, rate = 4) {
   if (sped.has(page)) return;
   sped.add(page);
   const cdp = await page.context().newCDPSession(page);
@@ -714,13 +714,16 @@ for (const filmId of [MINES, WELD]) {
     page,
     testCharacter,
   }) => {
+    // This test inspects the whole pre-roll screen, so it runs at real speed: a 15 s window cannot
+    // end between its checks however slow the runner is.
+    test.setTimeout(90_000);
     await page.setViewportSize(PHONE);
     await standAt(testCharacter.id, DRIVE_IN);
     await seedTicket(testCharacter.id, filmId);
     const before = await ledger(testCharacter.id);
     await openTestCharacter(page, testCharacter.id);
 
-    const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
+    const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm, { fast: false });
     await expect(dialog).toHaveAccessibleName(/Holo Drive-In/);
     // The pre-roll: one of the three real commercials, playing in its own player, an honest
     // progress bar, and nothing that could skip or seek: only Scene descriptions, Fullscreen and Close.
@@ -769,7 +772,7 @@ for (const filmId of [MINES, WELD]) {
     await captureReviewScreenshot(page, "holo-drive-in-pre-roll-mobile.png");
 
     // The film starts by itself when the pre-roll completes.
-    await waitForPhase(dialog, "film");
+    await waitForPhase(dialog, "film", 40_000);
     const player = dialog.locator(".mm-player");
     await expect(player).toHaveAttribute("data-state", "playing");
     await expect(dialog.locator("[data-theatre-film-host]")).toBeVisible();
