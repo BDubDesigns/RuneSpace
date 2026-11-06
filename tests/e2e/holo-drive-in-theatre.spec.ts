@@ -15,7 +15,13 @@ import {
   THEATRE_SCREEN_IDS,
   THEATRE_TICKET_TIER_IDS,
 } from "@/game/config/foundations";
-import { getTheatreFilm, getTheatreScreen, THEATRE_COPY } from "@/game/content/theatre";
+import {
+  getTheatreFilm,
+  getTheatreScreen,
+  PRE_ROLL_DURATION_MS,
+  THEATRE_COPY,
+  THEATRE_PRE_ROLL_SLOTS,
+} from "@/game/content/theatre";
 import { showingAt } from "@/game/domain/theatre";
 import {
   expect,
@@ -36,8 +42,11 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * The server owns the schedule and reads the real clock, so a spec cannot move it. Tests that
  * depend on what is showing now first wait out the last 90 seconds of the hour and read the film
  * from the same schedule rule the server uses; tests of the viewer seed a ticket row directly, so
- * either film is reachable whatever hour it is. The pre-roll cards are the labelled stand-ins the
- * test runners opt into (`RUNESPACE_THEATRE_STAND_IN_ADS`, 5 s long): no commercial exists yet.
+ * either film is reachable whatever hour it is. The pre-rolls are the three real 15-second
+ * commercials. Every test but one runs the page's animation clock at 4x through the browser's own
+ * DevTools protocol (`speedUpAnimations`), so a commercial, and a 1:43 film, play through in a few
+ * seconds with no sleeps and no test seam in the app; one test runs at real speed and measures
+ * that a pre-roll takes its designed 15 seconds.
  */
 
 const DRIVE_IN = LOCATION_IDS.holoDriveIn;
@@ -50,7 +59,10 @@ const WELD = THEATRE_FILM_IDS.rareOrWeldDone;
 const FILM_TIER = THEATRE_TICKET_TIER_IDS.film;
 const COMBO_TIER = THEATRE_TICKET_TIER_IDS.concessions;
 const screen = getTheatreScreen(THEATRE_SCREEN_IDS.main)!;
-const SLOT_IDS = Object.values(THEATRE_PRE_ROLL_AD_IDS);
+const SLOTS = THEATRE_PRE_ROLL_SLOTS;
+const SLOT_FILMS = SLOTS.map((slot) => slot.filmId!);
+/** Where `Math.random` lands in each slot of the draw: thirds of the unit interval. */
+const DRAW = { dewhat: 0.1, skatboll: 0.5, fedhex: 0.9 } as const;
 
 const skillOf = (filmId: string) => getTheatreFilm(filmId)!.skillId;
 const titleOf = (filmId: string) => getTheatreFilm(filmId)!.title;
@@ -62,6 +74,9 @@ function showingNow() {
 
 /** Wait out the last 90 seconds of the hour so a test never straddles a changeover. */
 async function awayFromHourBoundary() {
+  // Only a test that starts in the last 90 seconds of an hour has anything to wait for, and it
+  // may wait up to 90 s, which is longer than a test's own timeout, so extend that first.
+  if (HOUR - (Date.now() % HOUR) <= 90_000) test.setTimeout(test.info().timeout + 120_000);
   await expect
     .poll(() => HOUR - (Date.now() % HOUR), {
       message: "waiting out the end of the hour",
@@ -196,7 +211,23 @@ async function queueRandom(page: Page, ...values: number[]) {
 const panel = (page: Page) => page.locator("[data-theatre-panel]");
 const viewer = (page: Page) => page.getByRole("dialog");
 
-async function openViewer(page: Page, name: string) {
+const sped = new WeakSet<Page>();
+/**
+ * Run the page's animation timeline at `rate`x through Chromium's DevTools protocol. The studio's
+ * player is driven by Web Animations, so a 15-second commercial and a 1:43 film play through in
+ * seconds, and the viewer's progress (read from the player's own clock) stays honest. The app has
+ * no test seam: this changes only the browser's clock.
+ */
+async function speedUpAnimations(page: Page, rate = 4) {
+  if (sped.has(page)) return;
+  sped.add(page);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: rate });
+}
+
+async function openViewer(page: Page, name: string, { fast = true } = {}) {
+  if (fast) await speedUpAnimations(page);
   await panel(page).getByRole("button", { name, exact: true }).click();
   const dialog = viewer(page);
   await expect(dialog).toBeVisible();
@@ -207,7 +238,7 @@ async function waitForPhase(dialog: Locator, phase: string, timeout = 20_000) {
   await expect(dialog).toHaveAttribute("data-phase", phase, { timeout });
 }
 
-/** Open the viewer and ride the 5 s stand-in pre-roll into the film. */
+/** Open the viewer and ride the pre-roll commercial into the film. */
 async function watchToFilm(page: Page, name: string) {
   const dialog = await openViewer(page, name);
   await waitForPhase(dialog, "film");
@@ -683,29 +714,37 @@ for (const filmId of [MINES, WELD]) {
     page,
     testCharacter,
   }) => {
+    // This test inspects the whole pre-roll screen, so it runs at real speed: a 15 s window cannot
+    // end between its checks however slow the runner is.
+    test.setTimeout(90_000);
     await page.setViewportSize(PHONE);
     await standAt(testCharacter.id, DRIVE_IN);
     await seedTicket(testCharacter.id, filmId);
     const before = await ledger(testCharacter.id);
     await openTestCharacter(page, testCharacter.id);
 
-    const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
+    const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm, { fast: false });
     await expect(dialog).toHaveAccessibleName(/Holo Drive-In/);
-    // The pre-roll: a labelled card for one of the three slots, an honest progress bar, and
-    // nothing that could skip or seek: only Fullscreen and Close.
+    // The pre-roll: one of the three real commercials, playing in its own player, an honest
+    // progress bar, and nothing that could skip or seek: only Scene descriptions, Fullscreen and Close.
     await waitForPhase(dialog, "pre_roll");
+    await expect(dialog.locator("[data-theatre-ad-host] .mm-player")).toHaveCount(1);
     // One synchronous read of everything on screen, so the pre-roll cannot end between two
     // assertions on a slow runner.
     const seen = await dialog.evaluate((root) => {
-      const card = root.querySelector("[data-pre-roll-slot]");
+      const host = root.querySelector("[data-theatre-ad-host]");
       const buttons = Array.from(root.querySelectorAll("button")).map((button) =>
         (button.textContent ?? "").trim(),
       );
       return {
         phase: root.getAttribute("data-phase"),
-        cards: root.querySelectorAll("[data-pre-roll-slot]").length,
-        slot: card?.getAttribute("data-pre-roll-slot") ?? null,
-        label: card?.textContent ?? "",
+        film: host?.getAttribute("data-pre-roll-film") ?? null,
+        slot: host?.getAttribute("data-pre-roll-slot") ?? null,
+        title: host?.querySelector(".mm-stage")?.getAttribute("aria-label") ?? null,
+        players: host?.querySelectorAll(".mm-player").length ?? 0,
+        // Not a stand-in card of any kind: a real animated picture.
+        standIn: root.textContent?.includes("Stand-in") ?? false,
+        inert: host?.hasAttribute("inert") ?? false,
         bar: root.querySelectorAll('[role="progressbar"][aria-label="Commercial break progress"]')
           .length,
         // The viewer's own controls only: the studio's hidden player keeps an inert range input.
@@ -713,23 +752,27 @@ for (const filmId of [MINES, WELD]) {
         filmControls: buttons.filter((name) => /^(Play|Pause|Restart|Replay)$/.test(name)).length,
         close: buttons.includes("Close"),
         fullscreen: buttons.includes("Fullscreen"),
+        descriptions: buttons.includes("Scene descriptions"),
       };
     });
     expect(seen).toMatchObject({
       phase: "pre_roll",
-      cards: 1,
+      players: 1,
+      standIn: false,
+      inert: true,
       bar: 1,
       sliders: 0,
       filmControls: 0,
       close: true,
       fullscreen: true,
+      descriptions: true,
     });
-    expect(SLOT_IDS).toContain(seen.slot);
-    expect(seen.label).toContain("Stand-in card, not a finished commercial");
+    expect(SLOT_FILMS).toContain(seen.film);
+    expect(SLOTS.map((slot) => slot.title)).toContain(seen.title);
     await captureReviewScreenshot(page, "holo-drive-in-pre-roll-mobile.png");
 
     // The film starts by itself when the pre-roll completes.
-    await waitForPhase(dialog, "film");
+    await waitForPhase(dialog, "film", 40_000);
     const player = dialog.locator(".mm-player");
     await expect(player).toHaveAttribute("data-state", "playing");
     await expect(dialog.locator("[data-theatre-film-host]")).toBeVisible();
@@ -781,10 +824,10 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
   await stubRandom(page);
   await openTestCharacter(page, testCharacter.id);
 
-  await queueRandom(page, 0.1);
+  await queueRandom(page, DRAW.dewhat);
   const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
   await waitForPhase(dialog, "pre_roll");
-  await expect(dialog.locator("[data-pre-roll-slot]")).toHaveAttribute(
+  await expect(dialog.locator("[data-theatre-ad-host]")).toHaveAttribute(
     "data-pre-roll-slot",
     THEATRE_PRE_ROLL_AD_IDS.deWhat,
   );
@@ -800,10 +843,10 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
   ).toBeVisible();
 
   // Replay: a fresh pre-roll, drawn independently (a different slot here), then the film again.
-  await queueRandom(page, 0.5);
+  await queueRandom(page, DRAW.skatboll);
   await dialog.locator("[data-theatre-ended]").getByRole("button", { name: "Replay" }).click();
   await waitForPhase(dialog, "pre_roll");
-  await expect(dialog.locator("[data-pre-roll-slot]")).toHaveAttribute(
+  await expect(dialog.locator("[data-theatre-ad-host]")).toHaveAttribute(
     "data-pre-roll-slot",
     THEATRE_PRE_ROLL_AD_IDS.visitSkatboll,
   );
@@ -811,10 +854,10 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
   await expect(dialog.locator(".mm-player")).toHaveAttribute("data-state", "playing");
 
   // Restart mid-film: asks again and draws again; consecutive repeats are allowed.
-  await queueRandom(page, 0.5);
+  await queueRandom(page, DRAW.skatboll);
   await dialog.getByRole("button", { name: "Restart", exact: true }).click();
   await waitForPhase(dialog, "pre_roll");
-  await expect(dialog.locator("[data-pre-roll-slot]")).toHaveAttribute(
+  await expect(dialog.locator("[data-theatre-ad-host]")).toHaveAttribute(
     "data-pre-roll-slot",
     THEATRE_PRE_ROLL_AD_IDS.visitSkatboll,
   );
@@ -824,20 +867,166 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("End");
   await expect(dialog).toHaveAttribute("data-phase", "pre_roll");
-  await queueRandom(page, 0.9);
   await waitForPhase(dialog, "film");
   await dialog.getByRole("button", { name: "Close", exact: true }).click();
 
   // Reopening starts a new viewing too (another draw), and nothing was ever refilled or charged.
-  await queueRandom(page, 0.9);
+  await queueRandom(page, DRAW.fedhex);
   const reopened = await openViewer(page, THEATRE_COPY.replayLastFilm);
   await waitForPhase(reopened, "pre_roll");
-  await expect(reopened.locator("[data-pre-roll-slot]")).toHaveAttribute(
+  await expect(reopened.locator("[data-theatre-ad-host]")).toHaveAttribute(
     "data-pre-roll-slot",
     THEATRE_PRE_ROLL_AD_IDS.fedhex,
   );
   await reopened.getByRole("button", { name: "Close", exact: true }).click();
   expect(await ledger(testCharacter.id)).toEqual(before);
+});
+
+for (const [name, draw] of [
+  ["DeWHAT?", DRAW.dewhat],
+  ["Visit Skatboll!", DRAW.skatboll],
+  ["FedHex", DRAW.fedhex],
+] as const) {
+  test(`plays the ${name} commercial when it is drawn: a real animated spot, then the film`, async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await standAt(testCharacter.id, DRIVE_IN);
+    await seedTicket(testCharacter.id, MINES);
+    const before = await ledger(testCharacter.id);
+    await stubRandom(page);
+    await openTestCharacter(page, testCharacter.id);
+
+    await queueRandom(page, draw);
+    const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
+    const ad = dialog.locator("[data-theatre-ad-host]");
+    // Its own studio film is on screen, drawn as animated SVG (not a card) and moving.
+    await expect(ad.locator(`.mm-stage[aria-label="${name}"]`)).toBeVisible();
+    await expect(ad.locator(".mm-svg")).toBeVisible();
+    await expect(ad.locator(".mm-player")).toHaveAttribute("data-state", "playing");
+    // Its progress is the commercial's own clock: it climbs while it plays.
+    const bar = dialog.getByRole("progressbar", { name: "Commercial break progress" });
+    const first = Number(await bar.getAttribute("aria-valuenow"));
+    await expect
+      .poll(async () => Number(await bar.getAttribute("aria-valuenow")), { intervals: [100] })
+      .toBeGreaterThan(first);
+
+    // Only its natural end hands over to the film, and the commercial's player is torn down.
+    await waitForPhase(dialog, "film");
+    await expect(ad.locator(".mm-player")).toHaveCount(0);
+    await expect(dialog.locator("[data-theatre-film-host] .mm-player")).toHaveAttribute(
+      "data-state",
+      "playing",
+    );
+    expect(await ledger(testCharacter.id)).toEqual(before);
+  });
+}
+
+test("runs each commercial's full designed length in real time with an honest, monotonic progress bar", async ({
+  page,
+  testCharacter,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(PHONE);
+  await standAt(testCharacter.id, DRIVE_IN);
+  await seedTicket(testCharacter.id, MINES);
+  await stubRandom(page);
+  await openTestCharacter(page, testCharacter.id);
+  await queueRandom(page, DRAW.fedhex);
+  // Sample the bar in the page, from before the viewer opens until it is gone.
+  await page.evaluate(() => {
+    const samples: Array<[number, number]> = [];
+    (window as unknown as { __rsBar: typeof samples }).__rsBar = samples;
+    window.setInterval(() => {
+      const bar = document.querySelector('[role="progressbar"]');
+      if (bar) samples.push([performance.now(), Number(bar.getAttribute("aria-valuenow"))]);
+    }, 150);
+  });
+
+  const clickedAt = Date.now();
+  const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm, { fast: false });
+  await waitForPhase(dialog, "pre_roll");
+  // The whole pre-roll layout is on screen and fits while the commercial plays at real speed.
+  await expect(dialog.locator("[data-theatre-ad-host] .mm-player")).toBeVisible();
+  await expectViewerFits(page, dialog);
+  await captureReviewScreenshot(page, "holo-drive-in-commercial-mobile.png");
+  await waitForPhase(dialog, "film", 40_000);
+  const elapsed = Date.now() - clickedAt;
+  // Exactly the designed 15 seconds of commercial, plus only the server check and the load.
+  expect(elapsed).toBeGreaterThan(PRE_ROLL_DURATION_MS - 300);
+  expect(elapsed).toBeLessThan(PRE_ROLL_DURATION_MS + 4_500);
+
+  const samples = await page.evaluate(
+    () => (window as unknown as { __rsBar: Array<[number, number]> }).__rsBar,
+  );
+  const values = samples.map(([, value]) => value);
+  expect(values.length).toBeGreaterThan(40);
+  // Never goes backwards, and ends where it should.
+  for (let i = 1; i < values.length; i += 1)
+    expect(values[i]!).toBeGreaterThanOrEqual(values[i - 1]!);
+  expect(values.at(-1)!).toBeGreaterThanOrEqual(90);
+  // It is linear in real time: half way takes about half of the 15 seconds.
+  const started = samples.find(([, value]) => value >= 1)!;
+  const half = samples.find(([, value]) => value >= 50)!;
+  const done = samples.at(-1)!;
+  expect(half[0] - started[0]).toBeGreaterThan(6_000);
+  expect(half[0] - started[0]).toBeLessThan(9_000);
+  expect(done[0] - started[0]).toBeGreaterThan(13_000);
+  expect(done[0] - started[0]).toBeLessThan(16_500);
+});
+
+test("can be closed in the middle of a commercial without touching the ticket or the bonus", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAt(testCharacter.id, DRIVE_IN);
+  await seedTicket(testCharacter.id, WELD, { remaining: 9 });
+  const before = await ledger(testCharacter.id);
+  await openTestCharacter(page, testCharacter.id);
+  const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
+  await expect(dialog.locator("[data-theatre-ad-host] .mm-player")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(viewer(page)).toHaveCount(0);
+  // The commercial's player and the film's are both gone, and the entry still works.
+  await expect(page.locator(".mm-player")).toHaveCount(0);
+  expect(await ledger(testCharacter.id)).toEqual(before);
+  await watchToFilm(page, THEATRE_COPY.replayLastFilm);
+});
+
+test("shows a commercial's scene descriptions on request, keeps the choice into the film, and follows reduced motion", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize(PHONE);
+  await standAt(testCharacter.id, DRIVE_IN);
+  await seedTicket(testCharacter.id, MINES);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await stubRandom(page);
+  await openTestCharacter(page, testCharacter.id);
+  await queueRandom(page, DRAW.dewhat);
+  const dialog = await openViewer(page, THEATRE_COPY.replayLastFilm);
+  const ad = dialog.locator("[data-theatre-ad-host]");
+  // Reduced motion reaches the commercial: the studio's calm mode is on for its player.
+  await expect(ad.locator(".mm-stage.is-reduced")).toHaveCount(1);
+  const caption = ad.locator(".mm-caption");
+  await expect(caption).toBeHidden();
+  const toggle = dialog.getByRole("button", { name: "Scene descriptions" });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(caption).toBeVisible();
+  await expect(caption).not.toBeEmpty();
+  // No closed-caption control: the spots are silent.
+  await expect(dialog.getByRole("button", { name: /^(cc|captions?)$/i })).toHaveCount(0);
+  await captureReviewScreenshot(page, "holo-drive-in-commercial-reduced-motion-mobile.png");
+  // The choice carries into the film.
+  await waitForPhase(dialog, "film");
+  await expect(dialog.getByRole("button", { name: "Scene descriptions" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(dialog.locator("[data-theatre-film-host] .mm-caption")).toBeVisible();
 });
 
 test("closes from any phase: during the check, the pre-roll, the film and the end card", async ({

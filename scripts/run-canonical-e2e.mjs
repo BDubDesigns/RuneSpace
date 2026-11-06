@@ -12,7 +12,6 @@ import {
   readPositiveInteger,
   readPositiveDuration,
   ROOT,
-  theatreStandInEnv,
 } from "./e2e-shared.mjs";
 import {
   createDisposableDatabase,
@@ -262,10 +261,6 @@ async function main() {
       RUNESPACE_E2E_MINING: "true",
       RUNESPACE_E2E_PLAY_ERROR: "true",
       RUNESPACE_E2E_TRAVEL: "true",
-      // The Holo Drive-In viewer (#491) is offered to players only when all three commercials
-      // exist. Browser tests opt into the labelled stand-in cards, and a shorter pre-roll, so the
-      // viewer's whole lifecycle is exercised without authoring or waiting for 15 seconds.
-      ...theatreStandInEnv,
       RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright", `power-annex-clock-${runId}`),
       RUNESPACE_E2E_CANONICAL_HTTP: "true",
       RUNESPACE_E2E_EXTERNAL_SERVER: "true",

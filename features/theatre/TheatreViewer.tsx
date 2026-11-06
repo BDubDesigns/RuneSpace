@@ -40,10 +40,34 @@ export type ViewingAuthorization =
 
 const FULLSCREEN_SUGGESTION_KEY = "runespace:theatre:landscape-suggested";
 const SUGGESTION_VISIBLE_MS = 6_000;
-/** How often the honest pre-roll progress is re-read from the clock. */
-const PRE_ROLL_TICK_MS = 100;
-/** How often the film's position is re-read for the seek bar and clock. */
+/** How often a player's position is re-read: the pre-roll's progress, and the film's seek bar. */
 const TIME_POLL_MS = 100;
+/** The longest a commercial waits for its art to be decoded before it plays regardless. */
+const ART_PRELOAD_TIMEOUT_MS = 6_000;
+
+/**
+ * Decode a commercial's location art before it plays, so no segment opens on a blank frame. The
+ * wait is bounded: art that cannot load costs a picture, never the viewing.
+ */
+async function preloadArt(urls: readonly string[]): Promise<void> {
+  let timer: number | undefined;
+  const limit = new Promise<void>((resolve) => {
+    timer = window.setTimeout(resolve, ART_PRELOAD_TIMEOUT_MS);
+  });
+  const decoded = Promise.all(
+    urls.map(async (url) => {
+      try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+      } catch {
+        // A missing or undecodable image leaves its frame empty; the spot still plays.
+      }
+    }),
+  ).then(() => undefined);
+  await Promise.race([decoded, limit]);
+  window.clearTimeout(timer);
+}
 
 function formatClock(ms: number): string {
   const seconds = Math.max(0, Math.round(ms / 1000));
@@ -74,8 +98,9 @@ type FullscreenMode = "none" | "native" | "expanded";
  * pre-roll and then the ticket's film through the Holo Film Studio's public player.
  *
  * Lifecycle (see `viewer-machine`): every start asks the server first, draws a fresh pre-roll slot
- * independently at random, plays it with an honest, non-seekable progress bar, and only then starts
- * the film. The film has Play/Pause, a movie-only seek bar, Restart, an optional Scene
+ * independently at random and plays that commercial (a Holo Film Studio film, in its own player)
+ * with an honest, non-seekable progress bar driven by the commercial's own clock, and only then
+ * starts the film. The film has Play/Pause, a movie-only seek bar, Restart, an optional Scene
  * descriptions line (the films are silent and these are not closed captions), optional fullscreen
  * and Close; Close is on screen in every phase. The studio's own control bar, chapter picker and
  * caption toggle are never shown.
@@ -91,23 +116,20 @@ type FullscreenMode = "none" | "native" | "expanded";
 export default function TheatreViewer({
   authorize,
   onClose,
-  preRollMs = PRE_ROLL_DURATION_MS,
-  standInAds,
   random = Math.random,
   returnFocusRef,
 }: {
   authorize: () => Promise<ViewingAuthorization>;
   onClose: () => void;
-  preRollMs?: number;
-  /** True when the three slots are clearly labelled stand-in cards rather than finished commercials. */
-  standInAds: boolean;
   random?: () => number;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
-  const [machine, dispatch] = useReducer(viewerReducer, preRollMs, initialViewerState);
+  const [machine, dispatch] = useReducer(viewerReducer, PRE_ROLL_DURATION_MS, initialViewerState);
   const { phase } = machine;
   const dialogRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const adHostRef = useRef<HTMLDivElement>(null);
+  const adPlayerRef = useRef<MoviePlayer | undefined>(undefined);
   const sliderRef = useRef<HTMLInputElement>(null);
   const clockRef = useRef<HTMLSpanElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -125,6 +147,7 @@ export default function TheatreViewer({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const startedFilmFor = useRef(0);
+  const sceneDescriptionsRef = useRef(false);
 
   // --- Every start asks the server, then draws its own pre-roll slot -------------------------
   useEffect(() => {
@@ -155,16 +178,62 @@ export default function TheatreViewer({
     };
   }, [machine.starts]);
 
-  // --- The pre-roll's honest clock ------------------------------------------------------------
+  // --- The pre-roll: the drawn commercial plays in its own player, and its own clock is the bar --
   const inPreRoll = phase.kind === "pre_roll";
+  const adFilmId = slot?.filmId;
   useEffect(() => {
-    if (!inPreRoll) return;
-    const startedAt = performance.now();
-    const timer = window.setInterval(() => {
-      dispatch({ type: "pre_roll_tick", elapsedMs: performance.now() - startedAt });
-    }, PRE_ROLL_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [inPreRoll, machine.starts]);
+    const host = adHostRef.current;
+    if (!inPreRoll || !adFilmId || !host) return;
+    let cancelled = false;
+    let poll: number | undefined;
+    let player: MoviePlayer | undefined;
+    let offState: (() => void) | undefined;
+    (async () => {
+      try {
+        const film = await loadFilm(adFilmId);
+        await preloadArt(film.assets);
+        if (cancelled) return;
+        // Picture only, and unskippable: no studio controls, no keyboard, nothing to seek with.
+        // It follows the OS reduced-motion setting like the film does.
+        player = createMoviePlayer(host, {
+          film,
+          controls: false,
+          keyboard: false,
+          captions: sceneDescriptionsRef.current,
+          reducedMotion: "auto",
+        });
+        adPlayerRef.current = player;
+        // The bar is the commercial's own progress, scaled onto the pre-roll's length, so it is
+        // honest whatever the spot's exact duration is; only its natural end (or the clock
+        // reaching the end) hands over to the film.
+        const report = () => {
+          const duration = player?.duration ?? 0;
+          if (duration <= 0 || !player) return;
+          dispatch({
+            type: "pre_roll_tick",
+            elapsedMs: Math.min(1, player.time / duration) * PRE_ROLL_DURATION_MS,
+          });
+        };
+        offState = player.on("state", (state) => {
+          if (state === "ended")
+            dispatch({ type: "pre_roll_tick", elapsedMs: PRE_ROLL_DURATION_MS });
+        });
+        poll = window.setInterval(report, TIME_POLL_MS);
+        player.restart();
+      } catch {
+        if (!cancelled) {
+          dispatch({ type: "failed", message: "The commercial could not be loaded." });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (poll !== undefined) window.clearInterval(poll);
+      offState?.();
+      player?.destroy();
+      adPlayerRef.current = undefined;
+    };
+  }, [inPreRoll, adFilmId, slot?.id, machine.starts]);
 
   // --- The film, loaded while the pre-roll plays so it can start the moment the pre-roll ends --
   const filmId = machine.filmId;
@@ -244,9 +313,12 @@ export default function TheatreViewer({
     if (phase.kind === "authorizing") playerRef.current?.pause();
   }, [phase.kind, machine.starts]);
 
+  // Scene descriptions follow whichever picture is up: the commercial, then the film.
   useEffect(() => {
+    sceneDescriptionsRef.current = sceneDescriptions;
     playerRef.current?.setCaptions(sceneDescriptions);
-  }, [sceneDescriptions, playerReady]);
+    adPlayerRef.current?.setCaptions(sceneDescriptions);
+  }, [sceneDescriptions, playerReady, inPreRoll]);
 
   // --- Fullscreen: native where supported, the same overlay expanded where not -------------
   useEffect(() => {
@@ -399,9 +471,18 @@ export default function TheatreViewer({
             data-theatre-film-host
             ref={hostRef}
           />
-          {phase.kind === "pre_roll" && slot ? (
-            <PreRollStage slot={slot} standIn={standInAds} />
-          ) : null}
+          {/* The pre-roll commercial's own host; empty (and hidden) outside the pre-roll. */}
+          <div
+            className={
+              inPreRoll ? "absolute inset-0 bg-black [&_.mm-player]:rounded-none" : "hidden"
+            }
+            data-pre-roll-film={inPreRoll ? adFilmId : undefined}
+            data-pre-roll-slot={inPreRoll ? slot?.id : undefined}
+            data-theatre-ad-host
+            // Nothing in the commercial can be tapped, focused or keyed: it plays through.
+            inert
+            ref={adHostRef}
+          />
           {phase.kind === "authorizing" ? (
             <ScreenMessage tone="info">Checking your ticket...</ScreenMessage>
           ) : null}
@@ -509,6 +590,15 @@ export default function TheatreViewer({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
+            {phase.kind === "pre_roll" ? (
+              <ActionButton
+                aria-pressed={sceneDescriptions}
+                intent={sceneDescriptions ? "primary" : "secondary"}
+                onClick={() => setSceneDescriptions((on) => !on)}
+              >
+                Scene descriptions
+              </ActionButton>
+            ) : null}
             {filmControls ? (
               <>
                 <ActionButton
@@ -561,31 +651,6 @@ function ScreenMessage({ children, tone }: { children: ReactNode; tone: "info" |
       }`}
     >
       {children}
-    </div>
-  );
-}
-
-/**
- * The pre-roll's picture. Every slot is a plainly labelled stand-in card that says it is not a
- * commercial, so a playtest can exercise the whole lifecycle without anyone mistaking it for
- * approved creative. The viewer is not offered to players at all while a slot lacks its finished
- * commercial (`theatreViewerReady`), so this card only ever shows on an owner's preview or a test
- * build. The dedicated commercials slice replaces it with the studio film for each slot that gains
- * a `filmId`; `tests/unit/theatre-viewer.test.ts` fails until it does.
- */
-function PreRollStage({ slot, standIn }: { slot: TheatrePreRollSlot; standIn: boolean }) {
-  return (
-    <div
-      className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[color:var(--rs-surface-page)] p-4 text-center"
-      data-pre-roll-slot={slot.id}
-      data-pre-roll-stand-in={standIn ? "true" : undefined}
-    >
-      <p className="font-display text-2xl font-bold text-[color:var(--rs-text-primary)]">
-        {slot.title}
-      </p>
-      <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--rs-text-muted)]">
-        Stand-in card, not a finished commercial
-      </p>
     </div>
   );
 }

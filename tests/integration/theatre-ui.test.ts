@@ -7,7 +7,7 @@ import {
   THEATRE_SCREEN_IDS,
   THEATRE_TICKET_TIER_IDS,
 } from "@/game/config/foundations";
-import { PRE_ROLL_DURATION_MS, getTheatreScreen } from "@/game/content/theatre";
+import { getTheatreScreen } from "@/game/content/theatre";
 import { showingAt } from "@/game/domain/theatre";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -46,9 +46,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
   const T19 = "2026-11-06T19:30:00.000Z";
   const T20 = "2026-11-06T20:30:00.000Z";
 
-  const ENV_KEYS = ["RUNESPACE_THEATRE_STAND_IN_ADS", "RUNESPACE_THEATRE_STAND_IN_AD_MS"] as const;
-  const savedEnv: Record<string, string | undefined> = {};
-
   beforeAll(async () => {
     db = (await import("@/db")).db;
     authSchema = await import("@/db/auth-schema");
@@ -57,14 +54,9 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     characters = await import("@/server/characters");
     play = await import("@/server/play");
     commands = await import("@/server/theatre-commands");
-    for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
   });
 
   afterEach(async () => {
-    for (const key of ENV_KEYS) {
-      if (savedEnv[key] === undefined) delete process.env[key];
-      else process.env[key] = savedEnv[key];
-    }
     for (const userId of createdUsers.splice(0))
       await cleanupTestUser(db, authSchema, rune, userId);
   });
@@ -137,7 +129,8 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
       expect(theatre.character).toEqual({
         buffs: {},
         heldTiers: {},
-        viewer: { available: false, standInAds: false, preRollMs: PRE_ROLL_DURATION_MS },
+        // All three commercials exist, so the viewer is offered.
+        viewer: { available: true },
       });
       expect(theatre.screens[0]?.now.filmId).toBe(MINES);
       expect(theatre.screens[0]?.next.filmId).toBe(WELD);
@@ -208,32 +201,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
       expect(character.latestTicket).toMatchObject({ filmId: WELD, tierId: COMBO_TIER });
       expect(character.heldTiers).toEqual({ [showing(T19).showingId]: COMBO_TIER });
     });
-
-    it("name the viewer the server offers: none in production, stand-ins and a shorter pre-roll on opt-in", async () => {
-      const who = await makeCharacter();
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
-      process.env.RUNESPACE_THEATRE_STAND_IN_AD_MS = "2500";
-      expect((await stateAt(who, T18)).theatre.character?.viewer).toEqual({
-        available: true,
-        standInAds: true,
-        preRollMs: 2500,
-      });
-      // A bad or out-of-range override falls back to the designed length, never to nothing.
-      for (const bad of ["abc", "0", "-5", "499", "15001", "1.5", ""]) {
-        process.env.RUNESPACE_THEATRE_STAND_IN_AD_MS = bad;
-        expect((await stateAt(who, T18)).theatre.character?.viewer.preRollMs).toBe(
-          PRE_ROLL_DURATION_MS,
-        );
-      }
-      // The override means nothing without the opt-in.
-      delete process.env.RUNESPACE_THEATRE_STAND_IN_ADS;
-      process.env.RUNESPACE_THEATRE_STAND_IN_AD_MS = "2500";
-      expect((await stateAt(who, T18)).theatre.character?.viewer).toEqual({
-        available: false,
-        standInAds: false,
-        preRollMs: PRE_ROLL_DURATION_MS,
-      });
-    });
   });
 
   describe("authorizing a viewing", () => {
@@ -242,7 +209,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     }
 
     it("refuses a character with no ticket", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const who = await makeCharacter();
       expect((await authorize(who)).viewing).toEqual({
         status: "refused",
@@ -251,15 +217,9 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
       });
     });
 
-    it("allows the ticket's film, and refuses while the viewer is not offered", async () => {
+    it("allows the ticket's film", async () => {
       const who = await makeCharacter();
       await buy(who, T18);
-      // Production: no commercials, no viewer. The ticket, buff and receipt are untouched.
-      expect((await authorize(who)).viewing).toMatchObject({
-        status: "refused",
-        reason: "unavailable",
-      });
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       expect((await authorize(who)).viewing).toEqual({
         status: "allowed",
         filmId: MINES,
@@ -269,7 +229,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     });
 
     it("plays the ticket's film after the hour turns, never the film showing now", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const who = await makeCharacter();
       await buy(who, T18);
       // 19:30 is Rare or Weld Done?; the viewing still belongs to the 18:00 ticket.
@@ -290,7 +249,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     });
 
     it("keeps the entitlement while the character is away but plays it only at the Drive-In", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const who = await makeCharacter();
       await buy(who, T18);
       await db
@@ -315,7 +273,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     });
 
     it("refuses a character already on the road, so a walk cannot carry a portable replay", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const who = await makeCharacter();
       await buy(who, T18);
       const begun = await play.beginTravel(
@@ -332,7 +289,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     });
 
     it("charges, grants and records nothing, however many times it is asked", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const who = await makeCharacter();
       await buy(who, T18, COMBO_TIER);
       const before = await ledger(who.characterId);
@@ -352,7 +308,6 @@ suite("issue #491 theatre Play state and viewing (real PostgreSQL)", () => {
     });
 
     it("refuses another player's character", async () => {
-      process.env.RUNESPACE_THEATRE_STAND_IN_ADS = "true";
       const owner = await makeCharacter();
       const stranger = await makeCharacter();
       await buy(owner, T18);

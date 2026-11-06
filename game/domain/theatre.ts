@@ -89,13 +89,6 @@ export type CharacterTheatreProjection = {
 export type TheatreViewerProjection = {
   /** Whether the viewer is offered at all right now. */
   available: boolean;
-  /**
-   * True while any slot is filled by a clearly labelled stand-in card because its commercial is
-   * not finished: only a preview or local build that opted in ever has this, and never production.
-   */
-  standInAds: boolean;
-  /** How long each pre-roll lasts: the designed 15 seconds, or a shorter stand-in for browser tests. */
-  preRollMs: number;
 };
 
 export type LatestTicketProjection = {

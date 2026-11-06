@@ -60,19 +60,6 @@ export function accountBoundaryE2eEnv({ port, runId }) {
   };
 }
 
-/**
- * The Holo Drive-In viewer (issue #491) is offered to players only when all three pre-roll
- * commercials exist, and they are a later slice. The browser tests opt into the plainly labelled
- * stand-in cards and a short pre-roll so the viewer's whole lifecycle (authorize, one random
- * pre-roll, the film, restart, replay, fullscreen, close) is exercised without authoring any
- * creative or waiting for the designed 15 seconds. The designed length itself is proven by
- * `tests/unit/theatre-viewer.test.ts`; production sets neither variable.
- */
-export const theatreStandInEnv = {
-  RUNESPACE_THEATRE_STAND_IN_ADS: "true",
-  RUNESPACE_THEATRE_STAND_IN_AD_MS: "5000",
-};
-
 export function readPositiveInteger(value, fallback, label) {
   if (value === undefined || value === null || value === "") return fallback;
   // The whole value must be an integer representation; parseInt would silently

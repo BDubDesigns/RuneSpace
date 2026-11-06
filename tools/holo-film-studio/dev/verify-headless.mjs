@@ -64,7 +64,8 @@ const chrome = spawn(findChrome(), [
 let failed = 0;
 try {
   let debugPort;
-  for (let i = 0; i < 100 && !debugPort; i++) {
+  // Up to 30 s: a cold Chrome on a loaded CI runner can take longer than 10 s to write DevToolsActivePort.
+  for (let i = 0; i < 300 && !debugPort; i++) {
     await sleep(100);
     const f = join(profile, 'DevToolsActivePort');
     if (existsSync(f)) debugPort = readFileSync(f, 'utf8').split('\n')[0];

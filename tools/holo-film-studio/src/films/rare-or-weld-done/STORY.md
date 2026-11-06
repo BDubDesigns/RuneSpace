@@ -4,7 +4,7 @@ Status: **screenplay approved and locked by the project owner.** Do not change b
 locked title-card wording without asking. (Implementation notes at the bottom.)
 
 - **Genre:** black-and-white silent slapstick heist comedy, no audio needed.
-- **Setting:** a museum on RuneSpace's as-yet-unnamed third planet.
+- **Setting:** a museum on Tortuga-9, the approved name of RuneSpace's third planet (outside SSA jurisdiction). The museum itself has no official name.
 - **Premise:** a thief learns a museum is displaying a priceless giant Emerald for one week and plans to sell it to
   a criminal fence. He cuts through the wall, but the Emerald is absurdly heavy. After several disastrous attempts to
   move it he realises he can build a literal fence around it and charge tourists admission.
@@ -12,10 +12,12 @@ locked title-card wording without asking. (Implementation notes at the bottom.)
   *fence* must be understood: the criminal dealer is set up clearly at the start and paid off with the physical fence.
 - **Target runtime:** about 2 minutes, up to roughly 2½. Do not rush a gag to hit a number.
 
-## Placeholder names (NOT canon)
+## Names
 
-"The Nebula Heart Emerald" is a working name and the third planet has no name yet. Both live in `NAMES` in
-`config.js` (the museum label is deliberately neutral). Change them there; no scene hard-codes either.
+"The Nebula Heart Emerald" is still a working name (not canon). The museum label is `TORTUGA-9 MUSEUM`: Tortuga-9 is
+the approved name of the third planet, but the museum has no official name. (Owner-authorized change from the earlier
+neutral `PLANET THREE MUSEUM`; only the lettering and the scene-8 caption changed, no beats, jokes, dialogue, timing or
+ending.) Both live in `NAMES` in `config.js`; no scene hard-codes either.
 "5 CREDITS ADMISSION" is an in-fiction gag price, **not** the Drive-In ticket price.
 
 ## Beats

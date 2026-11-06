@@ -7,6 +7,10 @@
 // `tools/holo-film-studio/src` (sha256 of the JSON, first 16 hex characters), and the current tree
 // reproduces them byte for byte.
 //
+// One owner-authorized revision since the import: the museum label "PLANET THREE MUSEUM" became "TORTUGA-9 MUSEUM"
+// (Tortuga-9 is the approved name of the third planet). Only the markup and scene-description hashes changed; the
+// cues, chapters, scene list, scene order and the 181,300 ms runtime are byte-identical to the original approval.
+//
 // If this fails after you touched src/, you changed the approved picture, timing or scene descriptions:
 // either undo it or, if the change is intended and the owner has re-approved the film, update the hashes in
 // the same commit and say so.
@@ -24,10 +28,10 @@ test('"Rare or Weld Done?" builds exactly as approved (markup, cues, chapters, s
   const b = film.build();
   assert.equal(b.duration, 181300);
   assert.equal(b.scenes.length, 37);
-  assert.equal(h(b.markup), 'a7df342acb79cd6e', 'markup changed');
+  assert.equal(h(b.markup), '1af0b4814d2a5c85', 'markup changed');
   assert.equal(h(b.cues), '3ca2aba4a5146077', 'cues changed');
   assert.equal(h(b.chapters), '37439ce27512434a', 'chapters changed');
-  assert.equal(h(b.scenes), '26b60bf875f59fc7', 'scene list or scene descriptions changed');
+  assert.equal(h(b.scenes), '01ed1e0e99fab8f6', 'scene list or scene descriptions changed');
 });
 
 test('the approved build is deterministic: two builds are identical', () => {

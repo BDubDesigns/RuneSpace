@@ -23,6 +23,8 @@ has setup, the public player API, and packaging.
   contact-sheet QA tooling.
 - Two films: **That Mines Mine!** (1:43, approved) and **Rare or Weld Done?**
   (about 3:01, 37 scenes, approved by the owner on November 5, 2026). Each one's approved output is pinned by a hash test.
+  Three 15-second pre-roll commercials (**DeWHAT?**, **Visit Skatboll!**, **FedHex**, issue #491 Stage D) were authored with it for
+  the Drive-In. The owner approved all three on November 6, 2026 and each is pinned by `test/commercials-approved.test.mjs`.
 - It is **not** the Drive-In or Theatre feature. Theatre gameplay, tickets,
   Mining or Welding buffs, showtime scheduling, the Drive-In world location, new
   films, and commercials are separate product work (#491). The game's theatre viewer
@@ -108,6 +110,8 @@ commit is part of RuneSpace's history **with its original SHA**:
 | Film one build output pinned to that commit | duration `103400` ms; `sha256(JSON)[:16]` of markup `d2ce8eaa1ae8a6d6`, cues `3c2332c3c862e9cc`, chapters `bcc616fbe97ca9d3` (`tools/holo-film-studio/test/film1-approved.test.mjs`) |
 | Film two approved | The owner's final creative approval was given on November 5, 2026, by the owner's choice **without a `film2-approved` tag**. The approved version is the subtree import commit `62d2d0484e6101eb3fafe0a255ba1321cc9eaa88` (the studio's `src/` is unchanged since it) |
 | Film two build output pinned to that commit | duration `181300` ms, 37 scenes; `sha256(JSON)[:16]` of markup `a7df342acb79cd6e`, cues `3ca2aba4a5146077`, chapters `37439ce27512434a`, scenes `26b60bf875f59fc7` (`tools/holo-film-studio/test/film2-approved.test.mjs`) |
+| Film two, owner-authorized planet-name change | The museum label **`PLANET THREE MUSEUM` became `TORTUGA-9 MUSEUM`** (Tortuga-9 is the approved name of the third planet; the museum itself has no official name). The owner authorized exactly this lettering and caption change: no scene, joke, dialogue, timing or ending changed. The pin was regenerated for it: markup `1af0b4814d2a5c85` and scenes `01ed1e0e99fab8f6`; duration, scene count, cues `3ca2aba4a5146077` and chapters `37439ce27512434a` are identical to the original approval |
+| The three pre-roll commercials approved | The owner approved "DeWHAT?" (with the question mark), "Visit Skatboll!" and "FedHex" on November 6, 2026. Each builds to exactly `15000` ms. Pinned in `tools/holo-film-studio/test/commercials-approved.test.mjs`: build output (markup, cues, chapters, scenes) and, inside a RuneSpace checkout, the sha256 of the real FedHex logo, its black-and-white "e", and the five location pictures they use |
 
 The import added the studio tree byte-for-byte: the imported
 `tools/holo-film-studio` tree object equals the standalone `9ce0ddf` root tree
@@ -142,7 +146,13 @@ cd tools/holo-film-studio && node --test test/film2-approved.test.mjs
 ```
 
 The same rule holds: do not update film two's hashes without the owner
-re-approving film two.
+re-approving film two. The one change since the import was the owner-authorized
+Tortuga-9 museum label above, recorded in the test's header.
+
+The three commercials are pinned the same way, from the approved build
+(`node --test test/commercials-approved.test.mjs`). Do not update their hashes,
+or replace `public/branding/fedhex-logo.webp`, `public/branding/fedhex-e.webp` or
+the location pictures they pan over, without the owner re-approving that spot.
 
 ## Changing the studio
 

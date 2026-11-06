@@ -210,26 +210,11 @@ export async function loadCharacterTheatreState(
 }
 
 /**
- * The film viewer the Play state offers (#491). Production: available only when all three
- * commercials exist (`theatreViewerReady`). A preview or local build may also set
- * `RUNESPACE_THEATRE_STAND_IN_ADS=true` so the viewer's whole lifecycle can be playtested and
- * browser-tested with clearly labelled stand-in cards in the three slots, and
- * `RUNESPACE_THEATRE_STAND_IN_AD_MS` to shorten them for tests; neither authors a commercial,
- * and no deployment sets them unless its owner is playtesting the viewer. Read on the server so
- * the browser never decides it.
+ * The film viewer the Play state offers (#491): available only when all three pre-roll
+ * commercials exist (`theatreViewerReady`). Read on the server so the browser never decides it.
  */
 export function theatreViewerProjection(): TheatreViewerProjection {
-  const ready = theatreViewerReady();
-  const standIns = !ready && process.env.RUNESPACE_THEATRE_STAND_IN_ADS === "true";
-  const override = Number(process.env.RUNESPACE_THEATRE_STAND_IN_AD_MS);
-  return {
-    available: ready || standIns,
-    standInAds: standIns,
-    preRollMs:
-      standIns && Number.isInteger(override) && override >= 500 && override <= PRE_ROLL_DURATION_MS
-        ? override
-        : PRE_ROLL_DURATION_MS,
-  };
+  return { available: theatreViewerReady() };
 }
 
 export function theatreViewerAvailable(): boolean {
