@@ -1,10 +1,11 @@
 /**
  * "FedHex" commercial - the bolt, the boxes, the stamps, the freighter and the wordmark.
- * Black-and-white cartoon art in the studio's house style; only the closing wordmark is in colour
- * (Fed purple, Hex orange), as the owner approved.
+ * Black-and-white cartoon art in the studio's house style; the real FedHex logo and its hexagonal e
+ * (Fed purple, Hex orange) are the colour.
  */
 import { FX_DEFS } from '../../fx/effects.js';
 import { INK } from '../../art/props.js';
+import { ART } from './config.js';
 
 /** The colours of the real FedHex logo (sampled from it). */
 export const PURPLE = '#3d087f';
@@ -29,12 +30,14 @@ const hex = (r) =>
     return `${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`;
   }).join(' ');
 
-/** The hexagonal "e" emblem. Colour (purple hexagon, orange e) or one-colour ink for a stamp. */
-export function hexE(r = 60, { color = true, line = 5 } = {}) {
-  const fill = color ? PURPLE : '#fff';
-  const ink = color ? ORANGE : INK;
-  return `<g><polygon points="${hex(r)}" fill="${fill}" stroke="${INK}" stroke-width="${line}" stroke-linejoin="round"/>
-    <text y="${r * 0.36}" font-size="${r * 1.12}" font-weight="900" text-anchor="middle" fill="${ink}" font-family="${SANS}">e</text></g>`;
+/**
+ * The FedHex hexagonal-e emblem: the real "e" cropped from the owner's FedHex logo (as in "Fed"),
+ * in black and white for the film's black-and-white scenes, not a redraw. `r` is the hexagon's radius, so it is `2r` tall; it is centred on its origin.
+ */
+export function hexE(r = 60) {
+  const h = 2 * r;
+  const w = (h * ART.emblem.w) / ART.emblem.h;
+  return `<image href="${ART.emblem.src}" x="${(-w / 2).toFixed(1)}" y="${-r}" width="${w.toFixed(1)}" height="${h}" preserveAspectRatio="none"/>`;
 }
 
 /** A hex-head bolt, drawn big because it is the star: head, washer face, shank, threads. */
@@ -66,7 +69,7 @@ export function stamper(s = 1) {
   return `<g transform="scale(${s})">
     <rect x="-10" y="-300" width="20" height="230" fill="#8d8d8d" ${S} stroke-width="5"/>
     <rect x="-46" y="-86" width="92" height="64" rx="8" fill="#555" ${S} stroke-width="6"/>
-    <g transform="translate(0 -22) scale(1 0.5)">${hexE(34, { color: false, line: 5 })}</g>
+    <g transform="translate(0 -54)">${hexE(26)}</g>
   </g>`;
 }
 

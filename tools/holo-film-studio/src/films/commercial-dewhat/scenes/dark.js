@@ -34,7 +34,7 @@ export function dark(ctx) {
   rex.fold(at(1500));
   rex.face(at(1900), 'smug');
 
-  const line = speech(cues, `${id}.say`, TEXT.opening, { x: 425, bottom: 350, tailX: -110, size: 58 });
+  const line = speech(cues, `${id}.say`, TEXT.opening, { x: 425, bottom: 262, tailX: -110, size: 58 });
   line.appear(at(1060)).shout(at(1340), 700);
 
   const alarms = [0, 1, 2, 3].map((i) => `<rect data-t="${id}.alarm${i}" width="1280" height="720" fill="#fff" style="opacity:0"/>`).join('');

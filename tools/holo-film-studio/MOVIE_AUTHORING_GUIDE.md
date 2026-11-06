@@ -1058,7 +1058,7 @@ and `commercial-fedhex` (registered with `kind: 'commercial'` in `src/films/inde
 - **Exactly 15 000 ms**, in scenes whose durations sum to it. The host reports a pre-roll's progress from the film's own clock, so the length
   is honest; `test/commercials.test.mjs` fails if any spot is not exactly 15 000 ms.
 - **The approved script, word for word.** On-screen text lives in each film's `config.js` `TEXT`, and the test pins the owner-approved lines
-  (capitals included: they are the DeWHAT joke: the logo is DeWHAT, only the e lowercase and never a question mark; spoken "DeWhat", shouted "DeWHAT"). Do not "tighten" copy; shorten pauses instead. No audio, no invented claims.
+  (capitals included: they are the DeWHAT? joke: the logo is DeWHAT?, only the e lowercase, with its question mark; spoken "DeWhat", shouted "DeWHAT"). Do not "tighten" copy; shorten pauses instead. No audio, no invented claims.
 - **Real art by URL.** "Visit Skatboll!" pans RuneSpace's own 4:1 location art (`/location-scenes/*.webp`) and "FedHex" closes on the real
   `fedhex-parcel-hub.webp` and the owner's real logo (`/branding/fedhex-logo.webp`). Declare every image in the film's `assets` array; the test requires the list to match what the markup draws and
   every file to exist under the app's `public/`. The host serves those URLs; `dev/serve.mjs` serves the repo's `public/` as a fallback.

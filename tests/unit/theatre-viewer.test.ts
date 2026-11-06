@@ -211,7 +211,7 @@ describe("the countdown", () => {
 describe("the pre-roll slots", () => {
   it("has exactly the three locked advertisers", () => {
     expect(THEATRE_PRE_ROLL_SLOTS.map((slot) => slot.title)).toEqual([
-      "DeWHAT",
+      "DeWHAT?",
       "Visit Skatboll!",
       "FedHex",
     ]);

@@ -122,7 +122,7 @@ describe("the pre-roll slots and their commercials", () => {
   }
 });
 
-describe("DeWHAT: the approved script, with consistent capitals", () => {
+describe("DeWHAT?: the approved script, with consistent capitals", () => {
   it("has the six-line escalating argument in the approved order, with its capitals", async () => {
     const { TEXT } = await loadConfig("commercial-dewhat");
     expect(TEXT.opening.join(" ")).toBe("Power's out! What do we do?!");
@@ -141,19 +141,14 @@ describe("DeWHAT: the approved script, with consistent capitals", () => {
   it("ends on the exact approved slogan and the sign, and puts every line on screen", async () => {
     const { TEXT } = await loadConfig("commercial-dewhat");
     expect(`${TEXT.brand} ${TEXT.slogan.join(" ")}`).toBe(
-      "DeWHAT Sometimes you gotta DeWhat you wanna do™.",
+      "DeWHAT? Sometimes you gotta DeWhat you wanna do™.",
     );
-    expect(TEXT.sign).toEqual(["DeWHAT", "EMERGENCY POWER ANNEX"]);
-    // The logo is DeWHAT (only the e lowercase, no question mark); spoken DeWhat, shouted DeWHAT.
-    const everything = JSON.stringify([
-      TEXT.opening,
-      TEXT.lines,
-      TEXT.sign,
-      TEXT.brand,
-      TEXT.slogan,
-    ]);
-    expect(everything).not.toMatch(/DeWh?at\?|DeWHAT\?/i);
-    expect(everything).not.toMatch(/DEWHAT/);
+    expect(TEXT.sign).toEqual(["DeWHAT?", "EMERGENCY POWER ANNEX"]);
+    // The logo is DeWHAT? (only the e lowercase, with its question mark); spoken DeWhat, shouted DeWHAT.
+    expect(TEXT.brand).toBe("DeWHAT?");
+    const spoken = JSON.stringify([TEXT.opening, TEXT.lines, TEXT.slogan]);
+    expect(spoken).not.toMatch(/DeWh?at\?/i);
+    expect(JSON.stringify(TEXT)).not.toMatch(/DEWHAT/);
     const shown = text((await loadStudioFilm("commercial-dewhat")).build().markup);
     for (const line of [
       "Power's out!",
@@ -161,7 +156,7 @@ describe("DeWHAT: the approved script, with consistent capitals", () => {
       "No, DeWHAT!",
       "WHAT DO WE DO?!",
       "DeWHAT!",
-      "DeWHAT",
+      "DeWHAT?",
       "EMERGENCY POWER ANNEX",
       "Sometimes you gotta",
       "DeWhat you wanna do™.",
@@ -170,7 +165,7 @@ describe("DeWHAT: the approved script, with consistent capitals", () => {
     }
   });
 
-  it("invents no product, policy or guarantee for DeWHAT", async () => {
+  it("invents no product, policy or guarantee for DeWHAT?", async () => {
     const built = (await loadStudioFilm("commercial-dewhat")).build();
     const everything = `${text(built.markup)} ${built.scenes.map((scene) => scene.caption).join(" ")}`;
     expect(everything).not.toMatch(
@@ -239,6 +234,16 @@ describe("FedHex: the approved nested-box story and one-off ending", () => {
     const { ART } = await loadConfig("commercial-fedhex");
     expect(ART.logo).toEqual({ src: "/branding/fedhex-logo.webp", w: 2172, h: 724 });
     expect(existsSync(join(ROOT, "public/branding/fedhex-logo.webp"))).toBe(true);
+    // Every hexagonal e in the film is the real one, cropped from that logo, never a redraw.
+    expect(ART.emblem).toEqual({ src: "/branding/fedhex-e.webp", w: 317, h: 362 });
+    expect(existsSync(join(ROOT, "public/branding/fedhex-e.webp"))).toBe(true);
+    const world = readFileSync(join(STUDIO, "films/commercial-fedhex/world.js"), "utf8");
+    const emblemFn = world.slice(
+      world.indexOf("export function hexE"),
+      world.indexOf("/** A hex-head bolt"),
+    );
+    expect(emblemFn).toContain("ART.emblem.src");
+    expect(emblemFn).not.toContain("<polygon");
     const film = await loadStudioFilm("commercial-fedhex");
     expect(film.assets).toContain(ART.logo.src);
     expect(film.build().markup).toContain(`href="${ART.logo.src}"`);

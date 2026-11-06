@@ -1,5 +1,5 @@
 // Checks specific to the three 15-second pre-roll commercials for the Holo Drive-In (issue #491, Stage D):
-// "DeWHAT", "Visit Skatboll!" and "FedHex". Structural checks for every film (cues in range, captions,
+// "DeWHAT?", "Visit Skatboll!" and "FedHex". Structural checks for every film (cues in range, captions,
 // determinism, no overlapping cues) are in films.test.mjs and cover them automatically.
 //
 // These keep each spot on its owner-approved script and its exact length. Whether a gag is funny or legible is
@@ -24,7 +24,7 @@ test('the three commercials are registered, by id, as commercials', () => {
   assert.deepEqual(
     COMMERCIALS.map((f) => [f.id, f.title]),
     [
-      ['commercial-dewhat', 'DeWHAT'],
+      ['commercial-dewhat', 'DeWHAT?'],
       ['commercial-visit-skatboll', 'Visit Skatboll!'],
       ['commercial-fedhex', 'FedHex'],
     ]
@@ -49,7 +49,7 @@ for (const entry of COMMERCIALS) {
   });
 }
 
-test('"DeWHAT" keeps the approved argument, its consistent capitals and its slogan', async () => {
+test('"DeWHAT?" keeps the approved argument, its consistent capitals and its slogan', async () => {
   const { TEXT } = await import('../src/films/commercial-dewhat/config.js');
   assert.equal(TEXT.opening.join(' '), "Power's out! What do we do?!");
   assert.deepEqual(
@@ -63,13 +63,16 @@ test('"DeWHAT" keeps the approved argument, its consistent capitals and its slog
       [1, "I DON'T KNOW WHAT!"],
     ]
   );
-  // The logo is DeWHAT (only the e lowercase, no question mark); talking is DeWhat, shouting is DeWHAT.
-  assert.equal(`${TEXT.brand} ${TEXT.slogan.join(' ')}`, 'DeWHAT Sometimes you gotta DeWhat you wanna do™.');
-  const everything = JSON.stringify([TEXT.opening, TEXT.lines, TEXT.sign, TEXT.brand, TEXT.slogan]);
-  assert.ok(!/DeWh?at\?|DeWHAT\?/i.test(everything), 'no question mark after DeWHAT or DeWhat');
-  assert.ok(!/DEWHAT/.test(everything), 'always DeWHAT, never DEWHAT');
+  // The logo is DeWHAT? (only the e lowercase, with its question mark); talking is DeWhat, shouting is DeWHAT.
+  assert.equal(`${TEXT.brand} ${TEXT.slogan.join(' ')}`, 'DeWHAT? Sometimes you gotta DeWhat you wanna do™.');
+  assert.equal(TEXT.brand, 'DeWHAT?');
+  assert.deepEqual(TEXT.sign, ['DeWHAT?', 'EMERGENCY POWER ANNEX']);
+  // The spoken and shouted lines carry no question mark after the name, and are never DEWHAT.
+  const spoken = JSON.stringify([TEXT.opening, TEXT.lines, TEXT.slogan]);
+  assert.ok(!/DeWh?at\?/i.test(spoken), 'no question mark after a spoken or shouted DeWhat / DeWHAT');
+  assert.ok(!/DEWHAT/.test(JSON.stringify(TEXT)), 'always DeWHAT, never DEWHAT');
   const text = shown((await loadFilm('commercial-dewhat')).build().markup);
-  for (const s of ['DeWhat.', 'No, DeWHAT!', 'WHAT DO WE DO?!', 'DeWHAT!', 'DeWHAT', 'EMERGENCY POWER ANNEX', 'DeWhat you wanna do™.']) assert.ok(text.includes(s), s);
+  for (const s of ['DeWhat.', 'No, DeWHAT!', 'WHAT DO WE DO?!', 'DeWHAT!', 'DeWHAT?', 'EMERGENCY POWER ANNEX', 'DeWhat you wanna do™.']) assert.ok(text.includes(s), s);
 });
 
 test('"Visit Skatboll!" pans the approved art in the approved order and ends on the approved lines', async () => {
@@ -100,5 +103,7 @@ test('"FedHex" keeps its beats, its one-off ending and the real logo', async () 
   // The ident uses the owner's real logo file, not a redraw.
   const cfg = await import('../src/films/commercial-fedhex/config.js');
   assert.equal(cfg.ART.logo.src, '/branding/fedhex-logo.webp');
+  // ...and its hexagonal e is the real one, cropped from that logo.
+  assert.equal(cfg.ART.emblem.src, '/branding/fedhex-e.webp');
   assert.ok(readFileSync(join(dir('commercial-fedhex'), 'scenes/ident.js'), 'utf8').includes('ART.logo.src'));
 });

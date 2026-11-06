@@ -22,7 +22,7 @@ export default defineFilm({
   posterAt: 14400, // the ident, fully revealed
   defs: WORLD_DEFS,
   // The art the host should have decoded before the spot starts.
-  assets: [ART.hub.src, ART.logo.src],
+  assets: [ART.hub.src, ART.logo.src, ART.emblem.src],
   chapters: [
     { id: 'counter', label: 'The counter', scene: 's-counter' },
     { id: 'boxes', label: 'The boxes', scene: 's-boxes' },

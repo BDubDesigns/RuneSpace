@@ -880,7 +880,7 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
 });
 
 for (const [name, draw] of [
-  ["DeWHAT", DRAW.dewhat],
+  ["DeWHAT?", DRAW.dewhat],
   ["Visit Skatboll!", DRAW.skatboll],
   ["FedHex", DRAW.fedhex],
 ] as const) {

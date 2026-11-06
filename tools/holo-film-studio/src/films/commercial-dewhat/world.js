@@ -1,5 +1,5 @@
 /**
- * "DeWHAT" commercial - the workshop, the window sign and the speech balloons.
+ * "DeWHAT?" commercial - the workshop, the window sign and the speech balloons.
  * Static art only; characters are added per scene.
  */
 import { FX_DEFS } from '../../fx/effects.js';
@@ -89,22 +89,22 @@ export function speech(cues, id, lines, { x, y: yIn, bottom, tailX = 0, size = 5
 }
 
 /**
- * The DeWHAT logo: a parody of a famous power-tool maker's. A yellow field with a heavy black bar
- * above and below and chunky black capitals, "DeWHAT" with only the e lowercase, and no question
- * mark. Centred on its own origin; `w` x `h` is the whole plate.
+ * The DeWHAT? logo: a parody of a famous power-tool maker's. A yellow field with a heavy black bar
+ * above and below and chunky black capitals, "DeWHAT?" with only the e lowercase. Centred on its own
+ * origin; `w` x `h` is the whole plate.
  */
 export function dewhatLogo(w = 800, h = 220) {
   const bar = h * 0.18;
-  const size = Math.min(h * 0.6, (w * 0.9) / 4.5);
+  const size = Math.min(h * 0.6, (w * 0.9) / 5.3);
   return `<g>
     <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" fill="#febd17" stroke="${INK}" stroke-width="7"/>
     <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${bar}" fill="${INK}"/>
     <rect x="${-w / 2}" y="${h / 2 - bar}" width="${w}" height="${bar}" fill="${INK}"/>
-    <text y="${size * 0.35}" font-size="${size}" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${SANS}" letter-spacing="-2">DeWHAT</text>
+    <text y="${size * 0.35}" font-size="${size}" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${SANS}" letter-spacing="-2">DeWHAT?</text>
   </g>`;
 }
 
-/** The bright emergency sign seen through the window: the DeWHAT logo over "EMERGENCY POWER ANNEX". */
+/** The bright emergency sign seen through the window: the DeWHAT? logo over "EMERGENCY POWER ANNEX". */
 export function annexSign(id) {
   const bulbs = [];
   for (let i = 0; i < 12; i++) bulbs.push([-250 + i * 45.5, -112], [-250 + i * 45.5, 112]);

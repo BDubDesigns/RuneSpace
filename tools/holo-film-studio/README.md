@@ -14,7 +14,7 @@ panel (or any webview) without rewriting anything.
 |---|---|---|
 | **That Mines Mine!** (`that-mines-mine`) | 1:43, black-and-white, 16:9 | complete, approved (reference commit `e90a091`, formerly git tag `film1-approved`) |
 | **Rare or Weld Done?** (`rare-or-weld-done`) | 3:01, black-and-white, 16:9 | complete, approved by the owner on November 5, 2026 (reference: RuneSpace import commit `62d2d04`; no tag) |
-| **DeWHAT**, **Visit Skatboll!**, **FedHex** (`commercial-*`) | exactly 0:15 each, silent, 16:9 | the Holo Drive-In's three pre-roll commercials (issue #491); each needs the owner's individual approval |
+| **DeWHAT?**, **Visit Skatboll!**, **FedHex** (`commercial-*`) | exactly 0:15 each, silent, 16:9 | the Holo Drive-In's three pre-roll commercials (issue #491); each needs the owner's individual approval |
 
 **Watching the films** (after `npm run dev`):
 

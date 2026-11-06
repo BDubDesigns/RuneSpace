@@ -18,6 +18,9 @@
 export const ART = {
   hub: { src: '/location-scenes/fedhex-parcel-hub.webp', w: 1536, h: 384 },
   logo: { src: '/branding/fedhex-logo.webp', w: 2172, h: 724 },
+  // The hexagonal e, cropped from that same logo (its "e" in Fed) and made black and white to suit the film's
+  // black-and-white scenes (the packages, stamps, freighter and station); used wherever the film shows the emblem.
+  emblem: { src: '/branding/fedhex-e.webp', w: 317, h: 362 },
 };
 
 export const TEXT = {

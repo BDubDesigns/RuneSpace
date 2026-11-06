@@ -159,7 +159,7 @@ export type TheatrePreRollSlot = {
 };
 
 export const THEATRE_PRE_ROLL_SLOTS: readonly TheatrePreRollSlot[] = [
-  { id: THEATRE_PRE_ROLL_AD_IDS.deWhat, title: "DeWHAT", filmId: "commercial-dewhat" },
+  { id: THEATRE_PRE_ROLL_AD_IDS.deWhat, title: "DeWHAT?", filmId: "commercial-dewhat" },
   {
     id: THEATRE_PRE_ROLL_AD_IDS.visitSkatboll,
     title: "Visit Skatboll!",

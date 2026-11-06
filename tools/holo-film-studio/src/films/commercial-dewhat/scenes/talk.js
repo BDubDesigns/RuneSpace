@@ -9,7 +9,7 @@ import { workshop, speech, GROUND_Y } from '../world.js';
 
 // When each of the six lines is spoken (scene-relative ms), and its lettering size.
 const WHEN = [0, 1050, 2250, 3350, 4400, 5500];
-const SIZE = [54, 52, 56, 58, 70, 56];
+const SIZE = [54, 46, 56, 58, 70, 56];
 
 export function talk(ctx) {
   const { cues, at, id } = ctx;
@@ -30,7 +30,7 @@ export function talk(ctx) {
     const pipSide = l.who === 1;
     return speech(cues, `${id}.b${i}`, l.lines, {
       x: pipSide ? 400 : 950,
-      bottom: pipSide ? 350 : 236,
+      bottom: pipSide ? 266 : 196,
       tailX: pipSide ? -90 : 20,
       size: SIZE[i],
       tilt: pipSide ? -2 : 2,
