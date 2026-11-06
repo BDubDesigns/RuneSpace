@@ -1,5 +1,5 @@
 // Checks specific to the three 15-second pre-roll commercials for the Holo Drive-In (issue #491, Stage D):
-// "DeWhat?", "Visit Skatboll!" and "FedHex". Structural checks for every film (cues in range, captions,
+// "DeWHAT", "Visit Skatboll!" and "FedHex". Structural checks for every film (cues in range, captions,
 // determinism, no overlapping cues) are in films.test.mjs and cover them automatically.
 //
 // These keep each spot on its owner-approved script and its exact length. Whether a gag is funny or legible is
@@ -24,7 +24,7 @@ test('the three commercials are registered, by id, as commercials', () => {
   assert.deepEqual(
     COMMERCIALS.map((f) => [f.id, f.title]),
     [
-      ['commercial-dewhat', 'DeWhat?'],
+      ['commercial-dewhat', 'DeWHAT'],
       ['commercial-visit-skatboll', 'Visit Skatboll!'],
       ['commercial-fedhex', 'FedHex'],
     ]
@@ -49,7 +49,7 @@ for (const entry of COMMERCIALS) {
   });
 }
 
-test('"DeWhat?" keeps the approved argument and slogan word for word', async () => {
+test('"DeWHAT" keeps the approved argument, its consistent capitals and its slogan', async () => {
   const { TEXT } = await import('../src/films/commercial-dewhat/config.js');
   assert.equal(TEXT.opening.join(' '), "Power's out! What do we do?!");
   assert.deepEqual(
@@ -59,13 +59,17 @@ test('"DeWhat?" keeps the approved argument and slogan word for word', async () 
       [1, "That's what I'm asking! Do what?!"],
       [2, 'No, DeWHAT!'],
       [1, 'WHAT DO WE DO?!'],
-      [2, 'DEWHAT!'],
+      [2, 'DeWHAT!'],
       [1, "I DON'T KNOW WHAT!"],
     ]
   );
-  assert.equal(`${TEXT.brand} ${TEXT.slogan.join(' ')}`, 'DeWhat? Sometimes you gotta DeWhat you wanna do™.');
+  // The logo is DeWHAT (only the e lowercase, no question mark); talking is DeWhat, shouting is DeWHAT.
+  assert.equal(`${TEXT.brand} ${TEXT.slogan.join(' ')}`, 'DeWHAT Sometimes you gotta DeWhat you wanna do™.');
+  const everything = JSON.stringify([TEXT.opening, TEXT.lines, TEXT.sign, TEXT.brand, TEXT.slogan]);
+  assert.ok(!/DeWh?at\?|DeWHAT\?/i.test(everything), 'no question mark after DeWHAT or DeWhat');
+  assert.ok(!/DEWHAT/.test(everything), 'always DeWHAT, never DEWHAT');
   const text = shown((await loadFilm('commercial-dewhat')).build().markup);
-  for (const s of ['DeWhat.', 'No, DeWHAT!', 'WHAT DO WE DO?!', 'DEWHAT!', 'EMERGENCY POWER ANNEX', 'DeWhat you wanna do™.']) assert.ok(text.includes(s), s);
+  for (const s of ['DeWhat.', 'No, DeWHAT!', 'WHAT DO WE DO?!', 'DeWHAT!', 'DeWHAT', 'EMERGENCY POWER ANNEX', 'DeWhat you wanna do™.']) assert.ok(text.includes(s), s);
 });
 
 test('"Visit Skatboll!" pans the approved art in the approved order and ends on the approved lines', async () => {
@@ -82,7 +86,7 @@ test('"Visit Skatboll!" pans the approved art in the approved order and ends on 
   assert.equal(TEXT.stamp, 'MOSTLY WORK.');
 });
 
-test('"FedHex" keeps its beats, its one-off ending and the approved wordmark colours', async () => {
+test('"FedHex" keeps its beats, its one-off ending and the real logo', async () => {
   const { TEXT, TIMING } = await import('../src/films/commercial-fedhex/config.js');
   assert.equal(TEXT.matters, 'EVERY PARCEL MATTERS.');
   assert.equal(`${TEXT.brand.join('')}. ${TEXT.line.join(' ')}`, 'FedHex. We take the little things seriously.');
@@ -92,5 +96,9 @@ test('"FedHex" keeps its beats, its one-off ending and the approved wordmark col
   assert.equal(t.counter + t.boxes + t.load + t.fly + t.arrive, 11000);
   assert.equal(t.counter + t.boxes + t.load + t.fly + t.arrive + t.unwrap, 13000);
   const world = readFileSync(join(dir('commercial-fedhex'), 'world.js'), 'utf8');
-  assert.ok(world.includes("PURPLE = '#4d148c'") && world.includes("ORANGE = '#ff6200'"));
+  assert.ok(world.includes("PURPLE = '#3d087f'") && world.includes("ORANGE = '#fc5b00'"));
+  // The ident uses the owner's real logo file, not a redraw.
+  const cfg = await import('../src/films/commercial-fedhex/config.js');
+  assert.equal(cfg.ART.logo.src, '/branding/fedhex-logo.webp');
+  assert.ok(readFileSync(join(dir('commercial-fedhex'), 'scenes/ident.js'), 'utf8').includes('ART.logo.src'));
 });

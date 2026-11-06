@@ -1,5 +1,5 @@
 /**
- * "DeWhat?" commercial - the workshop, the window sign and the speech balloons.
+ * "DeWHAT" commercial - the workshop, the window sign and the speech balloons.
  * Static art only; characters are added per scene.
  */
 import { FX_DEFS } from '../../fx/effects.js';
@@ -88,7 +88,23 @@ export function speech(cues, id, lines, { x, y: yIn, bottom, tailX = 0, size = 5
   return api;
 }
 
-/** The bright emergency sign seen through the window: "DeWhat?" over "EMERGENCY POWER ANNEX". */
+/**
+ * The DeWHAT logo: a parody of a famous power-tool maker's. A yellow field with a heavy black bar
+ * above and below and chunky black capitals, "DeWHAT" with only the e lowercase, and no question
+ * mark. Centred on its own origin; `w` x `h` is the whole plate.
+ */
+export function dewhatLogo(w = 800, h = 220) {
+  const bar = h * 0.18;
+  const size = Math.min(h * 0.6, (w * 0.9) / 4.5);
+  return `<g>
+    <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" fill="#febd17" stroke="${INK}" stroke-width="7"/>
+    <rect x="${-w / 2}" y="${-h / 2}" width="${w}" height="${bar}" fill="${INK}"/>
+    <rect x="${-w / 2}" y="${h / 2 - bar}" width="${w}" height="${bar}" fill="${INK}"/>
+    <text y="${size * 0.35}" font-size="${size}" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${SANS}" letter-spacing="-2">DeWHAT</text>
+  </g>`;
+}
+
+/** The bright emergency sign seen through the window: the DeWHAT logo over "EMERGENCY POWER ANNEX". */
 export function annexSign(id) {
   const bulbs = [];
   for (let i = 0; i < 12; i++) bulbs.push([-250 + i * 45.5, -112], [-250 + i * 45.5, 112]);
@@ -97,10 +113,9 @@ export function annexSign(id) {
     <ellipse data-t="${id}.glow" cx="0" cy="0" rx="470" ry="270" fill="url(#dw-glow)" style="opacity:0"/>
     <g data-t="${id}.board" style="opacity:0">
       <rect x="-290" y="-132" width="580" height="264" rx="22" fill="#111" stroke="#fff" stroke-width="8"/>
-      <rect x="-268" y="-110" width="536" height="220" rx="12" fill="none" stroke="#fff" stroke-width="3"/>
-      <text y="18" font-size="104" font-weight="900" text-anchor="middle" fill="#fff" font-family="${SANS}">DeWhat?</text>
-      <path d="M-230 48 L230 48" stroke="#fff" stroke-width="4"/>
-      <text y="92" font-size="31" font-weight="900" text-anchor="middle" fill="#fff" font-family="${SANS}" letter-spacing="1">EMERGENCY POWER ANNEX</text>
+      <g transform="translate(0 -30)">${dewhatLogo(470, 128)}</g>
+      <path d="M-230 56 L230 56" stroke="#fff" stroke-width="4"/>
+      <text y="96" font-size="31" font-weight="900" text-anchor="middle" fill="#fff" font-family="${SANS}" letter-spacing="1">EMERGENCY POWER ANNEX</text>
       ${bulbs.map(([bx, by]) => `<circle cx="${bx.toFixed(0)}" cy="${by}" r="9" fill="#fff" stroke="#111" stroke-width="3"/>`).join('')}
     </g>
   </g>`;

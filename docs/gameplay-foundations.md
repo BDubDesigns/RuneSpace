@@ -1227,14 +1227,14 @@ no rule, price, schedule or eligibility decision lives in a component.
   the Holo Film Studio, and only its `src/` module (`createMoviePlayer`, `loadFilm` and the three
   stylesheets). The viewer is a dynamic, client-only import, so the engine and each film are
   separate chunks that load only when a player opens a film (`docs/holo-film-studio.md`).
-- **The three commercials** (issue #491, Stage D). Each pre-roll slot (DeWhat?, Visit Skatboll!, FedHex,
+- **The three commercials** (issue #491, Stage D). Each pre-roll slot (DeWHAT, Visit Skatboll!, FedHex,
   `THEATRE_PRE_ROLL_SLOTS`) names a 15-second, silent Holo Film Studio film (`commercial-dewhat`,
   `commercial-visit-skatboll`, `commercial-fedhex`), built from the owner-approved scripts and creative
   direction, with the exact wording pinned by `tests/unit/theatre-commercials.test.ts` and the studio's
-  `test/commercials.test.mjs`. DeWhat? is the two-worker misunderstanding ending on the approved slogan;
+  `test/commercials.test.mjs`. DeWHAT (the yellow-and-black parody logo, only the e lowercase, no question mark; spoken "DeWhat", shouted "DeWHAT") is the two-worker misunderstanding ending on the approved slogan;
   Visit Skatboll! pans real approved 4:1 location art with tourism-board lettering and ends "It's not all
   work" with the small "Mostly work." stamp; FedHex is the overpackaged bolt ending on the approved
-  one-off line, with the real FedHex hub art and the approved Fed purple and Hex orange wordmark. Each
+  one-off line, with the real FedHex hub art and the owner's real FedHex logo (`public/branding/fedhex-logo.webp`). Each
   needs the owner's individual creative approval before the stack that adds it merges. With all three
   present `theatreViewerReady()` is true and the Play state's `viewer.available` is true; a slot without a
   film would hide the viewer rather than play something unapproved.

@@ -111,7 +111,7 @@ describe("the pre-roll slots and their commercials", () => {
       it("keeps its art to approved RuneSpace assets that exist", async () => {
         const film = await loadStudioFilm(slot.filmId!);
         for (const asset of film.assets) {
-          expect(asset).toMatch(/^\/location-scenes\/[a-z0-9-]+\.webp$/);
+          expect(asset).toMatch(/^\/(location-scenes|branding)\/[a-z0-9-]+\.webp$/);
           expect(existsSync(join(ROOT, "public", asset)), asset).toBe(true);
         }
         // Every image the markup draws is one it declares for preloading.
@@ -122,7 +122,7 @@ describe("the pre-roll slots and their commercials", () => {
   }
 });
 
-describe("DeWhat?: the approved script, word for word", () => {
+describe("DeWHAT: the approved script, with consistent capitals", () => {
   it("has the six-line escalating argument in the approved order, with its capitals", async () => {
     const { TEXT } = await loadConfig("commercial-dewhat");
     expect(TEXT.opening.join(" ")).toBe("Power's out! What do we do?!");
@@ -133,7 +133,7 @@ describe("DeWhat?: the approved script, word for word", () => {
       [1, "That's what I'm asking! Do what?!"],
       [2, "No, DeWHAT!"],
       [1, "WHAT DO WE DO?!"],
-      [2, "DEWHAT!"],
+      [2, "DeWHAT!"],
       [1, "I DON'T KNOW WHAT!"],
     ]);
   });
@@ -141,16 +141,27 @@ describe("DeWhat?: the approved script, word for word", () => {
   it("ends on the exact approved slogan and the sign, and puts every line on screen", async () => {
     const { TEXT } = await loadConfig("commercial-dewhat");
     expect(`${TEXT.brand} ${TEXT.slogan.join(" ")}`).toBe(
-      "DeWhat? Sometimes you gotta DeWhat you wanna do™.",
+      "DeWHAT Sometimes you gotta DeWhat you wanna do™.",
     );
-    expect(TEXT.sign).toEqual(["DeWhat?", "EMERGENCY POWER ANNEX"]);
+    expect(TEXT.sign).toEqual(["DeWHAT", "EMERGENCY POWER ANNEX"]);
+    // The logo is DeWHAT (only the e lowercase, no question mark); spoken DeWhat, shouted DeWHAT.
+    const everything = JSON.stringify([
+      TEXT.opening,
+      TEXT.lines,
+      TEXT.sign,
+      TEXT.brand,
+      TEXT.slogan,
+    ]);
+    expect(everything).not.toMatch(/DeWh?at\?|DeWHAT\?/i);
+    expect(everything).not.toMatch(/DEWHAT/);
     const shown = text((await loadStudioFilm("commercial-dewhat")).build().markup);
     for (const line of [
       "Power's out!",
       "DeWhat.",
       "No, DeWHAT!",
       "WHAT DO WE DO?!",
-      "DEWHAT!",
+      "DeWHAT!",
+      "DeWHAT",
       "EMERGENCY POWER ANNEX",
       "Sometimes you gotta",
       "DeWhat you wanna do™.",
@@ -159,7 +170,7 @@ describe("DeWhat?: the approved script, word for word", () => {
     }
   });
 
-  it("invents no product, policy or guarantee for DeWhat?", async () => {
+  it("invents no product, policy or guarantee for DeWHAT", async () => {
     const built = (await loadStudioFilm("commercial-dewhat")).build();
     const everything = `${text(built.markup)} ${built.scenes.map((scene) => scene.caption).join(" ")}`;
     expect(everything).not.toMatch(
@@ -220,8 +231,17 @@ describe("FedHex: the approved nested-box story and one-off ending", () => {
       "FedHex. We take the little things seriously.",
     );
     const world = readFileSync(join(STUDIO, "films/commercial-fedhex/world.js"), "utf8");
-    expect(world).toContain("PURPLE = '#4d148c'");
-    expect(world).toContain("ORANGE = '#ff6200'");
+    expect(world).toContain("PURPLE = '#3d087f'");
+    expect(world).toContain("ORANGE = '#fc5b00'");
+  });
+
+  it("closes on the real FedHex logo file, not a redraw", async () => {
+    const { ART } = await loadConfig("commercial-fedhex");
+    expect(ART.logo).toEqual({ src: "/branding/fedhex-logo.webp", w: 2172, h: 724 });
+    expect(existsSync(join(ROOT, "public/branding/fedhex-logo.webp"))).toBe(true);
+    const film = await loadStudioFilm("commercial-fedhex");
+    expect(film.assets).toContain(ART.logo.src);
+    expect(film.build().markup).toContain(`href="${ART.logo.src}"`);
   });
 
   it("follows the approved beats in order: counter, boxes, delivery montage, unwrapping, ident", async () => {

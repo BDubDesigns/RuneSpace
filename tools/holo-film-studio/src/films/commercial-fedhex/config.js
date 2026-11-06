@@ -11,8 +11,14 @@
  * TIMING  scene durations in ms (they sum to exactly 15000)
  * CAPTION the scene description for each scene (not closed captions: the film is silent)
  */
-/** The approved FedHex art the closing ident sits on (served by the host at /location-scenes/). */
-export const ART = { hub: { src: '/location-scenes/fedhex-parcel-hub.webp', w: 1536, h: 384 } };
+/**
+ * The approved FedHex art the closing ident uses, served by the host: the parcel hub scene it sits
+ * on, and the real FedHex logo (the owner's own file, transparent, in public/branding/).
+ */
+export const ART = {
+  hub: { src: '/location-scenes/fedhex-parcel-hub.webp', w: 1536, h: 384 },
+  logo: { src: '/branding/fedhex-logo.webp', w: 2172, h: 724 },
+};
 
 export const TEXT = {
   matters: 'EVERY PARCEL MATTERS.',
@@ -37,5 +43,5 @@ export const CAPTION = {
   fly: 'The freighter streaks through space past a moon.',
   arrive: 'The freighter lands at a FedHex delivery station on another planet.',
   unwrap: 'The recipient opens the crate and quickly unwraps the nested boxes to find the single bolt, safely intact.',
-  ident: 'The FedHex wordmark, in Fed purple and Hex orange: FedHex. We take the little things seriously.',
+  ident: 'The real FedHex logo, Fed in purple and Hex in orange, on the FedHex parcel hub: FedHex. We take the little things seriously.',
 };

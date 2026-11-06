@@ -15,7 +15,7 @@ export const FILMS = [
   { id: 'rare-or-weld-done', title: 'Rare or Weld Done?', load: () => import('./rare-or-weld-done/index.js') },
   // The three pre-roll commercials the Holo Drive-In plays before a film (issue #491). They are
   // 15-second spots, not features, so the demo page's film picker lists them last.
-  { id: 'commercial-dewhat', title: 'DeWhat?', kind: 'commercial', load: () => import('./commercial-dewhat/index.js') },
+  { id: 'commercial-dewhat', title: 'DeWHAT', kind: 'commercial', load: () => import('./commercial-dewhat/index.js') },
   { id: 'commercial-visit-skatboll', title: 'Visit Skatboll!', kind: 'commercial', load: () => import('./commercial-visit-skatboll/index.js') },
   { id: 'commercial-fedhex', title: 'FedHex', kind: 'commercial', load: () => import('./commercial-fedhex/index.js') },
   { id: 'template', title: 'Template Film', hidden: true, load: () => import('./_template/index.js') },

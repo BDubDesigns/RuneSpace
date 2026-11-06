@@ -74,6 +74,9 @@ function showingNow() {
 
 /** Wait out the last 90 seconds of the hour so a test never straddles a changeover. */
 async function awayFromHourBoundary() {
+  // Only a test that starts in the last 90 seconds of an hour has anything to wait for, and it
+  // may wait up to 90 s, which is longer than a test's own timeout, so extend that first.
+  if (HOUR - (Date.now() % HOUR) <= 90_000) test.setTimeout(test.info().timeout + 120_000);
   await expect
     .poll(() => HOUR - (Date.now() % HOUR), {
       message: "waiting out the end of the hour",
@@ -877,7 +880,7 @@ test("ends on Replay and Close, and Replay asks again, draws a fresh pre-roll an
 });
 
 for (const [name, draw] of [
-  ["DeWhat?", DRAW.dewhat],
+  ["DeWHAT", DRAW.dewhat],
   ["Visit Skatboll!", DRAW.skatboll],
   ["FedHex", DRAW.fedhex],
 ] as const) {

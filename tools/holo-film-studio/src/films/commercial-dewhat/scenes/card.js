@@ -7,6 +7,7 @@ import { Track } from '../../../acting.js';
 import { sparkle } from '../../../fx/effects.js';
 import { INK } from '../../../art/props.js';
 import { TEXT } from '../config.js';
+import { dewhatLogo } from '../world.js';
 
 const SANS = "'Arial Black','Trebuchet MS',Impact,'DejaVu Sans',sans-serif";
 
@@ -41,7 +42,7 @@ export function card(ctx) {
     .map(([x, y, g, s], i) => {
       const n = new Track(cues, `${id}.note${i}`, { x, y, sy: 0.2, sx: 0.2 });
       n.keys(at(300 + i * 130), 380, [{ o: 0.6, sx: 1.2, sy: 1.2, y: y - 30, ease: 'ease-out' }, { o: 1, sx: 1, sy: 1, y: y - 20 }], { ease: 'linear', reduce: 'snap' });
-      return `<g data-t="${id}.note${i}" style="${n.css}"><text font-size="${s}" font-weight="900" text-anchor="middle" fill="#e2231a" stroke="${INK}" stroke-width="6" paint-order="stroke" font-family="${SANS}">${g}</text></g>`;
+      return `<g data-t="${id}.note${i}" style="${n.css}"><text font-size="${s}" font-weight="900" text-anchor="middle" fill="#1d4fd7" stroke="${INK}" stroke-width="6" paint-order="stroke" font-family="${SANS}">${g}</text></g>`;
     })
     .join('');
   const stars = [
@@ -55,17 +56,14 @@ export function card(ctx) {
 
   const fx = sparkle({ x: 360, y: 150, at: at(700), dur: 800, r: 30 }) + sparkle({ x: 930, y: 270, at: at(900), dur: 800, r: 26 });
   const [s1, s2] = TEXT.slogan;
-  return `<rect width="1280" height="720" fill="#ffd21f"/>
-    <g data-t="${id}.rays" style="${rays.css}"><path d="${burst()}" fill="#ffb800"/></g>
+  return `<rect width="1280" height="720" fill="#bfe6ff"/>
+    <g data-t="${id}.rays" style="${rays.css}"><path d="${burst()}" fill="#7cc7ff"/></g>
     <rect x="22" y="22" width="1236" height="676" fill="none" stroke="#e2231a" stroke-width="16"/>
     <rect x="44" y="44" width="1192" height="632" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="26 14"/>
     ${stars}${noteHtml}
-    <g data-t="${id}.logo" style="${logo.css}">
-      <text y="70" font-size="190" font-weight="900" text-anchor="middle" fill="${INK}" font-family="${SANS}" transform="translate(7 8)">${TEXT.brand}</text>
-      <text y="70" font-size="190" font-weight="900" text-anchor="middle" fill="#e2231a" stroke="#fff" stroke-width="12" paint-order="stroke" font-family="${SANS}">${TEXT.brand}</text>
-    </g>
+    <g data-t="${id}.logo" style="${logo.css}">${dewhatLogo(860, 240)}</g>
     <g data-t="${id}.ribbon" style="opacity:0;${ribbon.css}">
-      <path d="M-540 -92 L540 -92 L560 0 L540 92 L-540 92 L-560 0Z" fill="#1d4fd7" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
+      <path d="M-540 -92 L540 -92 L560 0 L540 92 L-540 92 L-560 0Z" fill="#e2231a" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>
       <path d="M-510 -66 L510 -66 M-510 66 L510 66" stroke="#fff" stroke-width="3" stroke-dasharray="14 10"/>
       <text y="-6" font-size="62" font-weight="900" text-anchor="middle" fill="#fff" font-family="${SANS}">${s1}</text>
       <text y="58" font-size="62" font-weight="900" text-anchor="middle" fill="#ffe36a" font-family="${SANS}">${s2}</text>

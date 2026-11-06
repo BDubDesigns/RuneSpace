@@ -1,6 +1,6 @@
 /**
  * 10-12.4 s. Worker 2 gives up explaining, takes Worker 1 by the head and turns it toward the
- * brightly lit DeWhat? Emergency Power Annex sign in the window.
+ * brightly lit DeWHAT Emergency Power Annex sign in the window.
  */
 import { prospector } from '../../../art/prospector.js';
 import { tween } from '../../../acting.js';

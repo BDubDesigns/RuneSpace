@@ -6,8 +6,9 @@
 import { FX_DEFS } from '../../fx/effects.js';
 import { INK } from '../../art/props.js';
 
-export const PURPLE = '#4d148c';
-export const ORANGE = '#ff6200';
+/** The colours of the real FedHex logo (sampled from it). */
+export const PURPLE = '#3d087f';
+export const ORANGE = '#fc5b00';
 const SANS = "'Arial Black','Trebuchet MS',Impact,'DejaVu Sans',sans-serif";
 const SERIF = "'Playfair Display','Bodoni MT',Didot,Georgia,'Times New Roman',serif";
 const S = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
@@ -114,14 +115,6 @@ export function station() {
     <rect x="40" y="-130" width="130" height="62" fill="#fff" ${S} stroke-width="5"/>
     <g transform="translate(0 -250)"><path d="M0 62 L0 36" ${S} stroke-width="6"/>${hexE(64, { color: false, line: 6 })}</g>
     <path d="M170 -190 L170 -250 M170 -250 Q214 -280 232 -236 Q198 -226 170 -250Z" fill="#cfcfcf" ${S} stroke-width="5"/>
-  </g>`;
-}
-
-/** The FedHex wordmark in the approved colours: Fed purple, Hex orange, with the hexagonal e. */
-export function wordmark(size = 190) {
-  return `<g font-family="${SANS}" font-weight="900" font-style="italic">
-    <text x="-8" y="0" font-size="${size}" text-anchor="end" fill="${PURPLE}" stroke="#fff" stroke-width="2">Fed</text>
-    <text x="-8" y="0" font-size="${size}" text-anchor="start" fill="${ORANGE}" stroke="#fff" stroke-width="2">Hex</text>
   </g>`;
 }
 
