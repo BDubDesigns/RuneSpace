@@ -9,6 +9,32 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #503 — a focused playtest balance adjustment; repair and Work Order XP are unchanged.
+    slug: "practice-welding-pays-better",
+    title: "Practice Welding Pays Better",
+    publishedAt: "2026-11-07T02:00:00-08:00",
+    summary:
+      "Practice Welding now awards 20 Welding XP per section instead of 10. A ten-section practice weld earns 200 base XP for the same two Scrap Metal.",
+    body: [
+      [
+        "A little more reward for time at the bench. ",
+        { text: "Practice Welding", articleSlug: "practice-welding" },
+        " now pays 20 base Welding XP for each completed section, up from 10. A full ten-section practice weld earns 200 base XP instead of 100.",
+      ],
+      "The cost is unchanged: two Scrap Metal for each practice weld, with ten sections at the same pace and up to two Slag back. Ordinary repair sections still pay 50 XP and Work Orders still pay 20 XP per section.",
+      "If you have Welding bonus attempts from Rare or Weld Done?, they now turn a 20-XP practice section into 22 XP. This is a training reward adjustment only; no other repair, material, travel or fuel rules have changed.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Practice Welding: 20 base Welding XP per completed section (previously 10), or 200 per ten-section weld.",
+          "Welding ticket bonus on Practice Welding: 22 XP per buffed section (previously 11). Scrap and timing are unchanged.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #491 — announce the Holo Drive-In theatre: Tamsyn Suzara, the two original films, the
     // three commercials, hourly showings, tickets and the Mining and Welding bonuses. Publishes with
     // the deployment that carries the theatre (merge to main); no separate news post.
