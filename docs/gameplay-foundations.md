@@ -1157,7 +1157,7 @@ charges after buying a ticket (slice 4). The magnitudes live in
   chance, yield and speed are untouched.
 - **Welding: Rare or Weld Done?** (`resolveWelding`, `resolvePracticeWelding`, the Work Order
   resolver and `claimCleanPass`). Every completed section that pays XP spends one charge and pays
-  `ceil(xp * 1.10)`: a repair or Work Order section's 50 becomes 55 and Practice's 10 becomes 11
+  `ceil(xp * 1.10)`: a repair or Work Order section's 50 becomes 55 and Practice's 20 becomes 22
   (a Work Order pays its own authored section share). A successfully claimed Clean Pass section
   is a real section: the claim spends exactly one more charge and pays the bonus (the claim
   reconciles due sections first, so the balance it reads is the one they left). A missed, expired,
@@ -1356,7 +1356,7 @@ number of welds at a time.
 | --- | --- | --- |
 | Input per weld | 2 Scrap Metal, consumed when the weld begins | `balance.practiceWelding` |
 | Sections per weld | 10 | `balance.practiceWelding` |
-| XP per section | authored share of the global Welding XP (20% → 10, so 100 per weld) | `practiceSectionXp()` |
+| XP per section | authored share of the global Welding XP (40% → 20, so 200 per weld) | `practiceSectionXp()` |
 | Output per weld | up to 2 Slag, at completion time | `balance.practiceWelding` |
 | Scrap Metal | `stackLimit: 3` (#230); consuming it frees a slot only when a stack empties | `balance.items.scrapMetal` |
 | Where, and what opens it | Rusk Recovery; accepting 10,000 Hours | `game/content/rusk-recovery` |
