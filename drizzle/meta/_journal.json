@@ -428,6 +428,13 @@
       "when": 1794026867559,
       "tag": "0060_rivet_long_range_tank",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794035250327,
+      "tag": "0061_mission_completion_system_notice",
+      "breakpoints": true
     }
   ]
 }

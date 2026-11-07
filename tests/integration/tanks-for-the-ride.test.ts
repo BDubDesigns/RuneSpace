@@ -17,6 +17,7 @@ import {
   SKILL_IDS,
   type LocationId,
 } from "@/game/config/foundations";
+import type { RealtimeEnvelope } from "@/game/schemas/realtime";
 import {
   cleanupTestUser,
   createCharacterForUser,
@@ -47,6 +48,10 @@ suite("issue #501 Tanks for the Ride (real PostgreSQL)", () => {
   let missions: typeof import("@/server/missions");
   let repairs: typeof import("@/server/repair-commands");
   let ship: typeof import("@/server/ship-commands");
+  let resolution: typeof import("@/server/action-resolution");
+  let systemNotices: typeof import("@/server/system-notices");
+  let repairCompletion: typeof import("@/server/repair-completion");
+  let realtime: typeof import("@/server/realtime");
   const createdUsers: string[] = [];
   const now = new Date("2026-11-07T12:00:00.000Z");
   const balance = getEffectiveGameBalance();
@@ -69,6 +74,10 @@ suite("issue #501 Tanks for the Ride (real PostgreSQL)", () => {
     missions = await import("@/server/missions");
     repairs = await import("@/server/repair-commands");
     ship = await import("@/server/ship-commands");
+    resolution = await import("@/server/action-resolution");
+    systemNotices = await import("@/server/system-notices");
+    repairCompletion = await import("@/server/repair-completion");
+    realtime = await import("@/server/realtime");
   });
 
   afterEach(async () => {
@@ -618,6 +627,207 @@ suite("issue #501 Tanks for the Ride (real PostgreSQL)", () => {
       expect((await shipRow(characterId)).fuelUnits).toBe(LONG);
       // A smaller capacity can never strand more fuel than it holds.
       await expect(set({ tankCapacityFuelUnits: BASE })).rejects.toThrow();
+    });
+  });
+
+  describe("the durable System notice (Chat → Whispers → System)", () => {
+    const TITLE = "Tanks for the Ride — Complete!";
+    const BODY =
+      "Your Rivet's long-range tank installation is complete. Maximum fuel capacity increased from 300 to 750 FU. Current fuel unchanged.";
+
+    async function noticeRows(characterId: string) {
+      return db
+        .select()
+        .from(rune.recipeUnlockNotices)
+        .where(eq(rune.recipeUnlockNotices.characterId, characterId))
+        .orderBy(rune.recipeUnlockNotices.seq);
+    }
+
+    function listen(character: { id: string }) {
+      const received: RealtimeEnvelope[] = [];
+      return db
+        .select({ playerAccountId: rune.characters.playerAccountId })
+        .from(rune.characters)
+        .where(eq(rune.characters.id, character.id))
+        .then(([row]) => {
+          const unsubscribe = realtime.getRealtimeFanout().subscribe({
+            scope: { playerAccountId: row!.playerAccountId, characterId: character.id },
+            deliver: (envelope) => received.push(envelope),
+            close: () => undefined,
+          });
+          return { received, unsubscribe };
+        });
+    }
+
+    it("writes nothing on sections 1–31, then exactly one unread notice on the 32nd", async () => {
+      const { userId, characterId } = await readyToWeld({ fuel: 120 });
+      await startWelding(userId, characterId);
+      await stateAt(userId, characterId, tick(now, 31 * WELD_TICKS));
+      expect(await noticeRows(characterId)).toEqual([]);
+      expect((await systemNotices.readSystemNotices(userId, characterId)).unread).toBe(0);
+
+      const xpBefore = await weldingXp(characterId);
+      await stateAt(userId, characterId, tick(now, 32 * WELD_TICKS));
+      const rows = await noticeRows(characterId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        kind: "mission_completion",
+        missionId: MISSION,
+        skillId: null,
+        recipeActionIds: null,
+        readAt: null,
+      });
+      const inbox = await systemNotices.readSystemNotices(userId, characterId);
+      expect(inbox.unread).toBe(1);
+      expect(inbox.notices).toEqual([
+        {
+          id: rows[0]!.id,
+          seq: rows[0]!.seq,
+          body: `${TITLE}\n${BODY}`,
+          sentAt: rows[0]!.createdAt.toISOString(),
+        },
+      ]);
+      // Nothing else is granted: XP is only the 32nd section's own, fuel and capacity as designed.
+      expect((await weldingXp(characterId)) - xpBefore).toBe(balance.welding.xpPerIncrement);
+      expect(await shipRow(characterId)).toMatchObject({
+        tankCapacityFuelUnits: LONG,
+        fuelUnits: 120,
+      });
+      expect((await missionRow(characterId))?.completedAt).not.toBeNull();
+    });
+
+    it("is not duplicated by repeated or concurrent resolution", async () => {
+      const { userId, characterId } = await readyToWeld();
+      await startWelding(userId, characterId);
+      const at = tick(now, 32 * WELD_TICKS);
+      await Promise.all([stateAt(userId, characterId, at), stateAt(userId, characterId, at)]);
+      await stateAt(userId, characterId, tick(at, 600));
+      await stateAt(userId, characterId, tick(at, 6000));
+      expect(await noticeRows(characterId)).toHaveLength(1);
+      expect((await systemNotices.readSystemNotices(userId, characterId)).unread).toBe(1);
+    });
+
+    it("cannot be written twice for one Mission, even by a direct replay", async () => {
+      const { userId, characterId } = await readyToWeld();
+      await startWelding(userId, characterId);
+      await stateAt(userId, characterId, tick(now, 32 * WELD_TICKS));
+      // The Mission is already complete, so a replayed completion stamps and writes nothing.
+      await db.transaction((transaction) =>
+        repairCompletion.commitRepairCompletion(transaction, {
+          characterId,
+          targetId: TARGET,
+          completedAt: tick(now, 40 * WELD_TICKS),
+        }),
+      );
+      expect(await noticeRows(characterId)).toHaveLength(1);
+      // And the database itself refuses a second completion row for the same Mission.
+      await expect(
+        db.insert(rune.recipeUnlockNotices).values({
+          characterId,
+          kind: "mission_completion",
+          missionId: MISSION,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("rolls back with the final weld: no notice, no capacity, no Mission", async () => {
+      const { userId, characterId } = await readyToWeld();
+      await seedRepairTarget(db, rune, characterId, TARGET, {
+        materials: fullBill,
+        weldingProgress: tank.repairIncrements - 1,
+        updatedAt: now,
+      });
+      const stream = await listen({ id: characterId });
+      try {
+        await expect(
+          resolution.withLockedOwnedCharacter(userId, characterId, async (transaction) => {
+            await repairCompletion.commitRepairCompletion(transaction, {
+              characterId,
+              targetId: TARGET,
+              completedAt: now,
+            });
+            throw new Error("rollback");
+          }),
+        ).rejects.toThrow("rollback");
+        expect(await noticeRows(characterId)).toEqual([]);
+        expect((await shipRow(characterId)).tankCapacityFuelUnits).toBe(BASE);
+        expect((await missionRow(characterId))?.completedAt).toBeNull();
+        expect(stream.received.filter((envelope) => envelope.type === "system.notice")).toEqual([]);
+      } finally {
+        stream.unsubscribe();
+      }
+    });
+
+    it("waits unread for a player who was away, and prompts open tabs once committed", async () => {
+      const { userId, characterId } = await readyToWeld();
+      await startWelding(userId, characterId);
+      const stream = await listen({ id: characterId });
+      try {
+        // Nobody is connected until long after the 32nd weld landed.
+        await stateAt(userId, characterId, tick(now, 20 * 32 * WELD_TICKS));
+        expect(
+          stream.received.filter((envelope) => envelope.type === "system.notice"),
+        ).toHaveLength(1);
+      } finally {
+        stream.unsubscribe();
+      }
+      const inbox = await systemNotices.readSystemNotices(userId, characterId);
+      expect(inbox.unread).toBe(1);
+      expect(inbox.notices.at(-1)?.body).toContain(TITLE);
+    });
+
+    it("coexists with recipe notices: one seq order, correct unread counts and read receipts", async () => {
+      const { userId, characterId } = await readyToWeld();
+      const refiningLevel5 = thresholds.find((threshold) => threshold.level === 5)!.totalXp;
+      const award = (xp: number) =>
+        resolution.withLockedOwnedCharacter(userId, characterId, (transaction) =>
+          progression.grantCharacterSkillXp(transaction, {
+            characterId,
+            skillId: SKILL_IDS.refining,
+            awardedXp: xp,
+            thresholds,
+          }),
+        );
+      await award(refiningLevel5); // a recipe notice first
+      await startWelding(userId, characterId);
+      await stateAt(userId, characterId, tick(now, 32 * WELD_TICKS)); // then the tank notice
+      const rows = await noticeRows(characterId);
+      expect(rows.map((row) => row.kind)).toEqual(["recipe_unlock", "mission_completion"]);
+      expect(rows[0]!.seq).toBeLessThan(rows[1]!.seq);
+      expect(rows[0]).toMatchObject({ skillId: SKILL_IDS.refining, level: 5 });
+
+      let inbox = await systemNotices.readSystemNotices(userId, characterId);
+      expect(inbox.unread).toBe(2);
+      expect(inbox.notices.map((notice) => notice.seq)).toEqual(rows.map((row) => row.seq));
+      expect(inbox.notices[0]!.body).toContain("Refining Level 5 reached.");
+      expect(inbox.notices[1]!.body).toContain(TITLE);
+
+      // Reading through the recipe notice leaves the newer tank notice unread.
+      await systemNotices.markSystemNoticesRead(userId, characterId, { throughSeq: rows[0]!.seq });
+      inbox = await systemNotices.readSystemNotices(userId, characterId);
+      expect(inbox.unread).toBe(1);
+      await systemNotices.markSystemNoticesRead(userId, characterId, { throughSeq: rows[1]!.seq });
+      expect((await systemNotices.readSystemNotices(userId, characterId)).unread).toBe(0);
+      // Read state is durable; a later recipe notice sorts after the tank notice.
+      await award(thresholds.find((threshold) => threshold.level === 8)!.totalXp - refiningLevel5);
+      const after = await noticeRows(characterId);
+      expect(after.map((row) => row.kind)).toEqual([
+        "recipe_unlock",
+        "mission_completion",
+        "recipe_unlock",
+      ]);
+      expect((await systemNotices.readSystemNotices(userId, characterId)).unread).toBe(1);
+    });
+
+    it("is private to the character whose ship was upgraded", async () => {
+      const mine = await readyToWeld();
+      const other = await makeCharacter();
+      await startWelding(mine.userId, mine.characterId);
+      await stateAt(mine.userId, mine.characterId, tick(now, 32 * WELD_TICKS));
+      expect(await noticeRows(other.characterId)).toEqual([]);
+      expect((await systemNotices.readSystemNotices(other.userId, other.characterId)).unread).toBe(
+        0,
+      );
     });
   });
 

@@ -762,6 +762,15 @@ export type MissionDefinition = {
   /** Completed by a gameplay outcome instead of a turn-in (#358). */
   autoCompletion?: MissionAutoCompletion;
   /**
+   * The System notice (Chat → Whispers → System, #274) written in the very
+   * transaction that completes this Mission by `autoCompletion` (#501), so a
+   * player who was away still finds it unread. Authored copy only: the row stores
+   * the Mission ID and this text is rendered on read. Only a Mission that
+   * authors `autoCompletion` may carry one, since a turn-in already has its own
+   * completion scene.
+   */
+  completionSystemNotice?: { title: string; body: string };
+  /**
    * At most one authored completion reward. Absent when the mission's real
    * outcome is world/social state rather than a grant: Keep the Change pays its
    * budget up front at acceptance and deliberately adds no completion payout.
@@ -1736,6 +1745,12 @@ export const TANKS_FOR_THE_RIDE: MissionDefinition = {
   autoCompletion: {
     kind: "repair_target_complete",
     targetId: REPAIR_TARGET_IDS.rivetLongRangeTank,
+  },
+  // Durable and additional to the in-game moment: waits unread for a player who was
+  // away when the 32nd weld landed. Grants nothing.
+  completionSystemNotice: {
+    title: "Tanks for the Ride — Complete!",
+    body: "Your Rivet's long-range tank installation is complete. Maximum fuel capacity increased from 300 to 750 FU. Current fuel unchanged.",
   },
   dialogue: {},
   completedNpcDialogue: [

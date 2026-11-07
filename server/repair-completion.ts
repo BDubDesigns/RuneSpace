@@ -1,10 +1,11 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
-import { characterMissions, characterShips } from "@/db/rune-space";
+import { characterMissions, characterShips, recipeUnlockNotices } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import type { RepairTargetId } from "@/game/config/foundations";
 import { MISSIONS } from "@/game/content/missions";
 import { getRepairTarget } from "@/game/content/repair-targets";
-import type { DatabaseTransaction } from "@/server/action-resolution";
+import { afterCharacterCommandCommits, type DatabaseTransaction } from "@/server/action-resolution";
+import { publishRealtimeEvent } from "@/server/realtime";
 import { ensureShipRow } from "@/server/ship-state";
 
 /**
@@ -58,7 +59,34 @@ export async function commitRepairCompletion(
         ),
       )
       .returning({ missionId: characterMissions.missionId });
-    if (stamped.length > 0) completedMissionId ??= mission.id;
+    if (stamped.length > 0) {
+      completedMissionId ??= mission.id;
+      // The durable System notice rides the same stamp (#501): written only by the
+      // transaction that actually completed the Mission, and the partial unique
+      // index makes a second write impossible even if this ever ran twice. The
+      // character's open tabs are prompted only once the transaction commits.
+      if (mission.completionSystemNotice) {
+        const written = await transaction
+          .insert(recipeUnlockNotices)
+          .values({
+            characterId: input.characterId,
+            kind: "mission_completion",
+            missionId: mission.id,
+            createdAt: input.completedAt,
+          })
+          .onConflictDoNothing()
+          .returning({ id: recipeUnlockNotices.id });
+        if (written.length > 0) {
+          afterCharacterCommandCommits(transaction, () => {
+            publishRealtimeEvent(
+              { kind: "character", characterId: input.characterId },
+              "system.notice",
+              {},
+            );
+          });
+        }
+      }
+    }
   }
   return completedMissionId ? { completedMissionId } : {};
 }

@@ -2087,6 +2087,16 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       assertLifecycleCoverage(definition);
       continue;
     }
+    if (definition.completionSystemNotice && !definition.autoCompletion) {
+      throw new Error(`${where} authors a completion System notice without an auto-completion.`);
+    }
+    if (
+      definition.completionSystemNotice &&
+      (!definition.completionSystemNotice.title.trim() ||
+        !definition.completionSystemNotice.body.trim())
+    ) {
+      throw new Error(`${where} authors an empty completion System notice.`);
+    }
     if (definition.autoCompletion) {
       // The one other way to finish (#358): a gameplay outcome, never an NPC.
       // A Mission that completes itself has nobody to hand in to and nothing to

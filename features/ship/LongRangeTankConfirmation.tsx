@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { usePlay } from "@/features/play/PlayContext";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { getMission } from "@/game/content/missions";
@@ -15,8 +14,10 @@ import { getRepairTarget } from "@/game/content/repair-targets";
  * transition (`justCompleted`, derived by the Ship system shell from the repair
  * projection) and states the capacity from the ship projection, so there is no
  * UI-only upgrade flag. Reusing the existing success treatment keeps it to the
- * established motion, which reduced-motion settings already calm. A reload or a
- * later visit shows the finished system's ordinary status line instead.
+ * established motion, which reduced-motion settings already calm. It clears after the shared Ship
+ * system interval (`justCompleted`), like every other restoration beat; the durable
+ * record is the System notice written with the final weld, and the finished
+ * system's ordinary status line remains.
  */
 export function LongRangeTankConfirmation({
   targetId,
@@ -27,13 +28,7 @@ export function LongRangeTankConfirmation({
   justCompleted: boolean;
 }) {
   const { state } = usePlay();
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    if (justCompleted) setShown(true);
-  }, [justCompleted]);
-
-  if (!shown) return null;
+  if (!justCompleted) return null;
   const authorization = getRepairTarget(targetId)?.authorization;
   const title =
     (authorization?.kind === "mission" ? getMission(authorization.missionId)?.title : undefined) ??

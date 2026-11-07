@@ -162,6 +162,16 @@ describe("public Updates content boundary", () => {
     expect(text).not.toContain("Survey Line to");
   });
 
+  it("dates Tanks for the Ride at or before now, after the Drive-In Update (#501)", () => {
+    const update = getPublicUpdate("tanks-for-the-ride")!;
+    // The Updates system does not delay future-dated posts, so it must not be one.
+    expect(Date.parse(update.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(Date.parse(update.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("a-night-at-the-drive-in-theatre")!.publishedAt),
+    );
+    expect(getPublishedUpdates()[0]).toEqual(update);
+  });
+
   it("publishes the Legendary Miner gear upgrade with both item figures (#484)", () => {
     const update = getPublicUpdate("legendary-miner-gear-upgrade")!;
     expect(update.title).toBe("Legendary Miner Gear: Worth the Hunt");

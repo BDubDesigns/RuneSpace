@@ -1439,6 +1439,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
   repair projection flips to complete; the Mission Log carries the ordinary
   completed card for anyone who was away. No busy line is authored because Wade is
   not a turn-in NPC.
+- **Durable System notice:** the Mission authors `completionSystemNotice` ("Tanks for the Ride — Complete!" and the 300 → 750 FU line), written to the Chat → Whispers → System conversation in the final-weld transaction (`docs/architecture.md`, System notices), so a player who was away finds it unread. It is additional to the Ship panel moment, which clears after the shared Ship-system interval, and grants nothing.
 - **Not a travel permission.** Neither the Mission nor the repair appears in any
   route's requirements.
 

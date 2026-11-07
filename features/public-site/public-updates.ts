@@ -13,7 +13,7 @@ const authoredUpdates = [
     // any destination: it adds capacity, not routes.
     slug: "tanks-for-the-ride",
     title: "Tanks for the Ride",
-    publishedAt: "2026-11-07T12:00:00-08:00",
+    publishedAt: "2026-11-06T20:00:00-08:00",
     summary:
       "Wade Rusk has a retrofit for your Rivet: weld a long-range tank on wherever it is parked and its tank grows from 300 to 750 Fuel Units. A new Mission for Welding 16.",
     body: [

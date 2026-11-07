@@ -1,0 +1,10 @@
+ALTER TABLE "recipe_unlock_notices" DROP CONSTRAINT "recipe_unlock_notices_levels_check";--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" DROP CONSTRAINT "recipe_unlock_notices_recipes_check";--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ALTER COLUMN "skill_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ALTER COLUMN "previous_level" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ALTER COLUMN "level" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ALTER COLUMN "recipe_action_ids" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ADD COLUMN "kind" text DEFAULT 'recipe_unlock' NOT NULL;--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ADD COLUMN "mission_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "recipe_unlock_notices_mission_once_idx" ON "recipe_unlock_notices" USING btree ("character_id","mission_id") WHERE "recipe_unlock_notices"."kind" = 'mission_completion';--> statement-breakpoint
+ALTER TABLE "recipe_unlock_notices" ADD CONSTRAINT "recipe_unlock_notices_shape_check" CHECK (("recipe_unlock_notices"."kind" = 'recipe_unlock' AND "recipe_unlock_notices"."skill_id" IS NOT NULL AND "recipe_unlock_notices"."previous_level" >= 1 AND "recipe_unlock_notices"."level" > "recipe_unlock_notices"."previous_level" AND cardinality("recipe_unlock_notices"."recipe_action_ids") >= 1 AND "recipe_unlock_notices"."mission_id" IS NULL) OR ("recipe_unlock_notices"."kind" = 'mission_completion' AND "recipe_unlock_notices"."mission_id" IS NOT NULL AND "recipe_unlock_notices"."skill_id" IS NULL AND "recipe_unlock_notices"."previous_level" IS NULL AND "recipe_unlock_notices"."level" IS NULL AND "recipe_unlock_notices"."recipe_action_ids" IS NULL));

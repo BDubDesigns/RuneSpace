@@ -129,6 +129,43 @@ describe("the Mission's shape", () => {
   });
 });
 
+describe("the completion System notice", () => {
+  it("is the owner-approved copy, and its capacities match the balance", () => {
+    expect(TANKS_FOR_THE_RIDE.completionSystemNotice).toEqual({
+      title: "Tanks for the Ride — Complete!",
+      body: "Your Rivet's long-range tank installation is complete. Maximum fuel capacity increased from 300 to 750 FU. Current fuel unchanged.",
+    });
+    expect(TANKS_FOR_THE_RIDE.completionSystemNotice!.body).toContain(
+      `from ${balance.ship.tankCapacityFuelUnits} to ${balance.ship.longRangeTankCapacityFuelUnits} FU`,
+    );
+  });
+
+  it("is authored by no other Mission, and only beside an auto-completion", () => {
+    expect(
+      MISSIONS.filter((mission) => mission.completionSystemNotice).map((mission) => mission.id),
+    ).toEqual([MISSION_IDS.tanksForTheRide]);
+    expect(() =>
+      validateMissionDefinitions([
+        {
+          ...THRUST_ISSUES,
+          prerequisiteMissionId: undefined,
+          continuationMissionId: undefined,
+          completionSystemNotice: { title: "x", body: "y" },
+        },
+      ]),
+    ).toThrow(/without an auto-completion/);
+    expect(() =>
+      validateMissionDefinitions([
+        {
+          ...TANKS_FOR_THE_RIDE,
+          prerequisiteMissionId: undefined,
+          completionSystemNotice: { title: " ", body: "y" },
+        },
+      ]),
+    ).toThrow(/empty completion System notice/);
+  });
+});
+
 describe("registry validation of a repair auto-completion", () => {
   const withOverrides = (overrides: Partial<MissionDefinition>) =>
     ({

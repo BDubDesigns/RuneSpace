@@ -1,6 +1,7 @@
 import { and, count, desc, eq, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { recipeUnlockNotices, type RecipeUnlockNotice } from "@/db/rune-space";
+import { getMission } from "@/game/content/missions";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { CHAT_POLICY } from "@/game/domain/chat";
@@ -15,9 +16,11 @@ import { publishRealtimeEvent } from "@/server/realtime";
 
 /**
  * The read side of the Chat/Social System conversation (issue #274): the
- * active character's recipe-unlock notices and their durable read state.
+ * active character's recipe-unlock notices (and, #501, a completed Mission's
+ * authored notice) and their durable read state.
  *
- * Notices are written only by `grantCharacterSkillXp` (`server/progression.ts`).
+ * Notices are written only by `grantCharacterSkillXp` (`server/progression.ts`) and,
+ * for an automatically completed Mission, `commitRepairCompletion`.
  * Every entry here re-runs `requirePlayableOwnedCharacter`, so a character only
  * ever reads its own notices. A notice stores which recipes unlocked; their
  * names are rendered here from current item presentation, never stored.
@@ -28,8 +31,22 @@ function itemName(itemId: string): string {
 }
 
 function toView(row: RecipeUnlockNotice): SystemNoticeView {
-  const recipes = skillRecipes(row.skillId);
-  const recipeNames = row.recipeActionIds.flatMap((actionId) => {
+  if (row.kind === "mission_completion") {
+    // Authored beside the Mission (#501); only its ID is stored. A row whose Mission
+    // no longer authors a notice reads as its title alone rather than disappearing,
+    // so the unread count and the list can never disagree.
+    const mission = row.missionId ? getMission(row.missionId) : undefined;
+    const notice = mission?.completionSystemNotice;
+    return {
+      id: row.id,
+      seq: row.seq,
+      body: notice ? `${notice.title}\n${notice.body}` : (mission?.title ?? "Mission complete"),
+      sentAt: row.createdAt.toISOString(),
+    };
+  }
+  const skillId = row.skillId ?? "";
+  const recipes = skillRecipes(skillId);
+  const recipeNames = (row.recipeActionIds ?? []).flatMap((actionId) => {
     const recipe = recipes.find((candidate) => candidate.actionId === actionId);
     return recipe ? [recipeUnlockName(recipe, recipes, itemName)] : [];
   });
@@ -37,8 +54,8 @@ function toView(row: RecipeUnlockNotice): SystemNoticeView {
     id: row.id,
     seq: row.seq,
     body: recipeUnlockNoticeBody({
-      skillName: getSkillPresentation(row.skillId)?.displayName ?? row.skillId,
-      level: row.level,
+      skillName: getSkillPresentation(skillId)?.displayName ?? skillId,
+      level: row.level ?? 0,
       recipeNames,
     }),
     sentAt: row.createdAt.toISOString(),
