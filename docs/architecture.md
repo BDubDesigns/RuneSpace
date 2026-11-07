@@ -539,6 +539,18 @@ and nothing to reply to, Block, Report, or open a profile for.
   boundary: no sent flag, no per-recipe ledger, and the character row lock
   serializes awards, so a crossing is written exactly once. The operator's SET
   TOTAL XP repair never calls the grant, so it writes no notice.
+- **Mission-completion kind (#501):** `recipe_unlock_notices.kind` is a closed set,
+  `recipe_unlock` or `mission_completion`, enforced by a shape CHECK (a recipe row
+  carries its skill, levels and recipe IDs; a Mission row carries only `mission_id`).
+  A Mission that authors `completionSystemNotice` and `autoCompletion` (Tanks for the
+  Ride) gets exactly one such row, written by `commitRepairCompletion`
+  (`server/repair-completion.ts`) in the same transaction as the final weld, only
+  when that transaction actually stamped the Mission complete; a partial unique index
+  on `(character_id, mission_id)` makes a duplicate impossible. The text is authored
+  on the Mission and rendered on read (only the ID is stored). Both kinds share
+  `seq`, so ordering, unread counts, read receipts and the `"system.notice"` /
+  `"system.read"` prompts are unchanged. It is not a general messaging system: a new
+  kind needs a schema change, a shape CHECK arm and a typed renderer.
 - **After commit:** the grant queues its `"system.notice"` prompt with
   `afterCharacterCommandCommits` (`server/action-resolution.ts`). The shared
   character command boundaries run queued effects only once their transaction

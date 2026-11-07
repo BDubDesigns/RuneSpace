@@ -474,6 +474,7 @@ describe("the Crew Stop as a place and as a repair target", () => {
       REPAIR_TARGET_IDS.siteStashProcessingYard,
       REPAIR_TARGET_IDS.siteStashDeepJag,
       REPAIR_TARGET_IDS.curlyStashMount,
+      REPAIR_TARGET_IDS.rivetLongRangeTank,
     ]);
   });
 

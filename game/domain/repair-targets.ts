@@ -18,13 +18,21 @@ export function validateRepairTargets(
 ): void {
   for (const target of targets) {
     const where = `Repair target "${target.id}"`;
-    if (!getLocation(target.locationId)) {
-      throw new Error(`${where} references unknown location "${target.locationId}".`);
-    }
-    if (target.localPlaceId && !getLocalPlaceInLocation(target.locationId, target.localPlaceId)) {
-      throw new Error(
-        `${where} references Local Place "${target.localPlaceId}", which does not belong to "${target.locationId}".`,
-      );
+    if (target.atShipBerth) {
+      // A ship-berth target (#501) is placed by the ship row, never by a fixed
+      // location, so authoring either would silently be ignored.
+      if (target.locationId !== undefined || target.localPlaceId !== undefined) {
+        throw new Error(`${where} is berth-relative and cannot also author a fixed place.`);
+      }
+    } else {
+      if (!getLocation(target.locationId)) {
+        throw new Error(`${where} references unknown location "${target.locationId}".`);
+      }
+      if (target.localPlaceId && !getLocalPlaceInLocation(target.locationId, target.localPlaceId)) {
+        throw new Error(
+          `${where} references Local Place "${target.localPlaceId}", which does not belong to "${target.locationId}".`,
+        );
+      }
     }
     const { authorization } = target;
     if (authorization.kind === "mission") {

@@ -48,6 +48,7 @@ const toBraceYourself = link("Brace Yourself", "mission-brace-yourself");
 const toWheelBeRightBack = link("Wheel Be Right Back", "mission-wheel-be-right-back");
 const toThrustIssues = link("Thrust Issues", "mission-thrust-issues");
 const toMoveAlong = link("Move Along", "mission-move-along");
+const toTanksForTheRide = link("Tanks for the Ride", "mission-tanks-for-the-ride");
 const toACutAbove = link("A Cut Above", "mission-a-cut-above");
 const toOutOfTheWeather = link("Out of the Weather", "mission-out-of-the-weather");
 const toCuttingCosts = link("Cutting Costs", "mission-cutting-costs");
@@ -948,6 +949,62 @@ export const missionGuideArticles = [
           "If you leave the game during the flight it still lands: the next time you load your character it has arrived, however long you were away.",
           "Walking to Holo Hollow Landing, clicking Launch or watching the countdown run out does not complete the Mission. Only the ship landing does.",
           "The Cargo Hold goes where the ship goes, and can only be opened while you are standing at the ship.",
+        ],
+      },
+      { paragraphs: [["Back to all ", missions, "."]] },
+    ],
+  },
+  {
+    slug: "mission-tanks-for-the-ride",
+    title: "Tanks for the Ride",
+    category: "getting-started",
+    showInIndex: false,
+    summary:
+      "Wade Rusk's long-range tank job: at Welding 16, bring his parts to your Rivet and weld thirty-two sections to raise its tank from 300 to 750 Fuel Units. The last weld finishes it, and you never have to report back.",
+    sections: [
+      {
+        paragraphs: [["Wade's second ship job, after ", toMoveAlong, "."]],
+      },
+      {
+        heading: "Where it begins",
+        paragraphs: [
+          [
+            "Speak to ",
+            wade,
+            " at Rusk Recovery once you have finished Move Along (your Rivet has actually flown and landed; accepting or launching the flight is not enough) and you are at Welding level 16. There is no Stillreach visit to make first, and no Mining, Runeworking, Resonance Rig, Fabrication or Refining level is asked for. Take the job with Take the Job.",
+          ],
+        ],
+      },
+      {
+        heading: "What you need",
+        list: [
+          "Three Empty Small Fuel Canisters. Empty ones only: a Full canister does not count.",
+          "Four Mounting Brackets, four Galvaferrite, one Galvanic Wire Spool and two Power Cells.",
+          "Every part is an ordinary item. Make it, buy it or trade for it; nothing asks where it came from.",
+        ],
+      },
+      {
+        heading: "Walkthrough",
+        list: [
+          "The work happens on your own Rivet, wherever it is parked: Holo Hollow Landing, Stillreach Landing Station or anywhere else it has flown to, not at Wade's yard. Stand at the ship with nothing else going on, and use the Long-Range Tank section of the Ship panel.",
+          "Install the parts as you find them. You do not have to carry everything at once: each install takes only what is still needed, and what is in stays in.",
+          "Once every part is in, weld. It takes thirty-two sections, each five ticks of ordinary Welding, paying the usual 50 base Welding XP (1,600 in all) with the usual Clean Pass chances. You can stop at any time; finished sections, installed parts and any Clean Pass you have already lined up are all kept.",
+          "On the thirty-second section the Mission completes, the tank is replaced, and the panel shows Tanks for the Ride — Mission Complete: Long-range tanks installed. Rivet fuel capacity: 300 → 750 FU. Current fuel unchanged.",
+        ],
+      },
+      {
+        heading: "What you get",
+        list: [
+          "A permanent 750 Fuel Unit tank on your own Rivet. It is capacity, not fuel: the fuel you already had stays exactly as it was, and you fill the new room with ordinary Full Small Fuel Canisters, never above 750. No free fuel, Credits, item or extra Welding XP comes with it, and you do not report back to Wade. If you stop by, he has a short line about it.",
+          "Ships that have not had the job done stay at 300, and every existing route works exactly as before.",
+        ],
+      },
+      {
+        heading: "Good to know",
+        list: [
+          "Until the last weld holds, your Rivet still flies on its original 300 Fuel Unit tank. You can fly between working sessions, and your parts and finished sections travel with the job. You cannot fly in the middle of a weld.",
+          "You cannot work on the tank while the ship is in the air, while you are away from it, or while you are busy. The job is not tied to a place: if your ship has moved since you started, find it and carry on.",
+          "This does not open any new destination. It makes room in the tank, nothing more.",
         ],
       },
       { paragraphs: [["Back to all ", missions, "."]] },

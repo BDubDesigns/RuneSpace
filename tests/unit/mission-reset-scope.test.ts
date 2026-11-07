@@ -63,6 +63,8 @@ describe("missionChainResetScope", () => {
       "thrust_issues",
       // Move Along follows Thrust Issues (#358).
       "move_along",
+      // Tanks for the Ride follows Move Along (#501).
+      "tanks_for_the_ride",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -93,6 +95,8 @@ describe("missionChainResetScope", () => {
       "thrust_issues",
       // Move Along follows Thrust Issues (#358).
       "move_along",
+      // Tanks for the Ride follows Move Along (#501).
+      "tanks_for_the_ride",
       // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
       "a_cut_above",
       "cutting_costs",
@@ -113,6 +117,8 @@ describe("missionChainResetScope", () => {
       // Thrust Issues continues Wheel Be Right Back's chain (#330).
       "thrust_issues",
       "move_along",
+      // Tanks for the Ride follows Move Along (#501).
+      "tanks_for_the_ride",
       "a_cut_above",
       "cutting_costs",
       "curly_must_stash",

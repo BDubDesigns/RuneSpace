@@ -4,6 +4,7 @@ import { SKILL_IDS, type RepairTargetId } from "@/game/config/foundations";
 import { MISSIONS, type MissionDefinition, type MissionRequirement } from "@/game/content/missions";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { INITIAL_SHIP_BERTH_LOCATION_ID } from "@/game/domain/ship";
 import {
   deriveMissionGuidanceTargets,
   projectMission,
@@ -56,7 +57,7 @@ const repairMissions: readonly RepairMission[] = MISSIONS.flatMap((mission) =>
         requirement,
         targetId: requirement.targetId,
         displayName: definition.displayName,
-        locationId: definition.locationId,
+        locationId: definition.locationId ?? INITIAL_SHIP_BERTH_LOCATION_ID,
         recipe: getRepairTargetBalance(requirement.targetId, balance),
       };
     }),
@@ -249,25 +250,29 @@ describe.each(repairMissions)(
       expect(projection.guidance).toMatchObject({ repairTargetId: entry.targetId });
     });
 
-    it("hands off to its own turn-in NPC when the repair completes", () => {
-      // Projected where the Mission is turned in, which is not always where the
-      // work was: Brace Yourself is welded at Deep Jag and reported to Tansy
-      // back at The Jag (#209).
-      const projection = project(
-        entry,
-        observe(entry.targetId, { complete: true }),
-        entry.mission.turnIn!.locationId,
-      );
-      expect(projection.state).toBe("ready_for_completion");
-      expect(projection.guidance).toMatchObject({
-        npcId: entry.mission.turnIn!.npcId,
-        turnIn: true,
-      });
-      expect(projection.guidance?.repairTargetId).toBeUndefined();
-      expect(repairRequirement(projection, entry.targetId)?.satisfied).toBe(true);
-      expect(repairRequirement(projection, entry.targetId)?.objective).toBe(
-        entry.requirement.objective,
-      );
-    });
+    // A Mission completed by its own repair (#501) has no turn-in to hand off to.
+    it.skipIf(entry.mission.turnIn === undefined)(
+      "hands off to its own turn-in NPC when the repair completes",
+      () => {
+        // Projected where the Mission is turned in, which is not always where the
+        // work was: Brace Yourself is welded at Deep Jag and reported to Tansy
+        // back at The Jag (#209).
+        const projection = project(
+          entry,
+          observe(entry.targetId, { complete: true }),
+          entry.mission.turnIn!.locationId,
+        );
+        expect(projection.state).toBe("ready_for_completion");
+        expect(projection.guidance).toMatchObject({
+          npcId: entry.mission.turnIn!.npcId,
+          turnIn: true,
+        });
+        expect(projection.guidance?.repairTargetId).toBeUndefined();
+        expect(repairRequirement(projection, entry.targetId)?.satisfied).toBe(true);
+        expect(repairRequirement(projection, entry.targetId)?.objective).toBe(
+          entry.requirement.objective,
+        );
+      },
+    );
   },
 );

@@ -34,6 +34,7 @@ import { validateTheatreContent } from "@/game/domain/theatre";
 import { DIALOGUE_SEQUENCES } from "@/game/content/dialogue";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import { LOCATIONS } from "@/game/content/locations";
+import { INITIAL_SHIP_BERTH_LOCATION_ID } from "@/game/domain/ship";
 import { validateLocationStateVariants } from "@/game/domain/location-state";
 import {
   missionRequiredSkillLevel,
@@ -165,7 +166,11 @@ export async function loadMissionProjections(
     // The live tank and any flight under way, the authority `ship_fuel` reads.
     // No row is the untouched ship, with the balance's starting tank.
     transaction
-      .select({ fuelUnits: characterShips.fuelUnits, flightRouteId: characterShips.flightRouteId })
+      .select({
+        fuelUnits: characterShips.fuelUnits,
+        flightRouteId: characterShips.flightRouteId,
+        berthLocationId: characterShips.berthLocationId,
+      })
       .from(characterShips)
       .where(eq(characterShips.characterId, characterId)),
   ]);
@@ -189,6 +194,7 @@ export async function loadMissionProjections(
     shipRows[0] ?? {
       fuelUnits: getEffectiveGameBalance().ship.startingFuelUnits,
       flightRouteId: null,
+      berthLocationId: INITIAL_SHIP_BERTH_LOCATION_ID,
     },
     completedMissionIds,
   );
@@ -332,7 +338,7 @@ function buildObservation(
   stackRows: readonly { itemId: string; quantity: number }[],
   repairStates: ReadonlyMap<string, RepairTargetState>,
   skillLevels: ReadonlyMap<string, number>,
-  ship: { fuelUnits: number; flightRouteId: string | null },
+  ship: { fuelUnits: number; flightRouteId: string | null; berthLocationId: string },
   completedMissionIds: ReadonlySet<string>,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
@@ -386,7 +392,11 @@ function buildObservation(
     itemNames,
     repairTargets,
     skillLevels,
-    ship: { fuelUnits: ship.fuelUnits, flightRouteId: ship.flightRouteId ?? undefined },
+    ship: {
+      fuelUnits: ship.fuelUnits,
+      flightRouteId: ship.flightRouteId ?? undefined,
+      berthLocationId: ship.berthLocationId,
+    },
     completedMissionIds,
   };
 }

@@ -2264,6 +2264,60 @@ const dialogue = {
       wadeAtYard(EXPRESSION_IDS.scowl, "Nobody's asked me to tow it back yet. Good."),
     ],
   },
+  // Tanks for the Ride (#501). Every line below is the owner-approved script
+  // (November 6, 2026), verbatim, in Wade's own register. The final weld completes
+  // the Mission, so there is no turn-in and no completion scene; the post-completion
+  // reaction is optional and never required.
+  [DIALOGUE_IDS.wadeTanksForTheRideOffer]: {
+    id: DIALOGUE_IDS.wadeTanksForTheRideOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. The Rivet flew. So much for my salvage claim."),
+      wadeAtYard(
+        EXPRESSION_IDS.concerned,
+        "Engine'll take you farther. Tank won't. Three hundred fuel units only gets you so far.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "I've got a retrofit in mind. Three Empty Small Fuel Canisters. Four Mounting Brackets. Four Galvaferrite. One Galvanic Wire Spool. Two Power Cells.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Thirty-two welds. Your torch. I'm not doing it for you."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTanksForTheRideAccepted]: {
+    id: DIALOGUE_IDS.wadeTanksForTheRideAccepted,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Fit the parts to the Rivet wherever you've got her parked. Bring them in batches. She'll still fly between jobs, but the bigger tank doesn't count until the last weld holds.",
+      ),
+    ],
+  },
+  // The offer NPC's reminder while the Mission is open (`MissionOffer.activeDialogueId`):
+  // with no turn-in, nothing else would present it.
+  [DIALOGUE_IDS.wadeTanksForTheRideActive]: {
+    id: DIALOGUE_IDS.wadeTanksForTheRideActive,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Three empty canisters. Four brackets. Four Galvaferrite. One wire spool. Two Power Cells. Install them where you've parked the ship. Not here.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostTanksForTheRide]: {
+    id: DIALOGUE_IDS.wadePostTanksForTheRide,
+    npcId: NPC_IDS.wadeRusk,
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Heard you finished the tank job. Seven hundred and fifty fuel units. Good.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Capacity. Not fuel. Don't get those confused."),
+    ],
+  },
   // Return the Favor (#232) — the locked offer scene from the Fabrication
   // design. Tansy teaches the station; Wade supplies the shop's shorthand.
   [DIALOGUE_IDS.tansyReturnTheFavorOffer]: {

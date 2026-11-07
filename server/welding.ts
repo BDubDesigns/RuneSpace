@@ -24,6 +24,7 @@ import {
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { commitRepairCompletion } from "@/server/repair-completion";
 import { consumeTheatreBuffCharges, loadTheatreBuffCharges } from "@/server/theatre";
 
 export type WeldingSnapshot = {
@@ -296,13 +297,12 @@ export function createWeldingResolver(
       const repair = await loadRepairTargetRow(transaction, outcome.characterId, outcome.targetId);
       if (!repair) throw new Error("Repair state must exist before Welding persistence");
       if (outcome.completedIncrements > 0 || outcome.completed) {
+        const completedAt = outcome.completed ? (repair.completedAt ?? new Date()) : null;
         await transaction
           .update(characterRepairTargets)
           .set({
             weldingProgress: outcome.weldingProgress,
-            completedAt: outcome.completed
-              ? (repair.completedAt ?? new Date())
-              : repair.completedAt,
+            completedAt: completedAt ?? repair.completedAt,
             updatedAt: new Date(),
           })
           .where(
@@ -311,6 +311,17 @@ export function createWeldingResolver(
               eq(characterRepairTargets.targetId, outcome.targetId),
             ),
           );
+        // The ONE resolution that moves this repair from incomplete to complete
+        // also commits whatever the target authors on its final weld (the ship's
+        // tank capacity, its Mission's completion), in this same transaction, so a
+        // partial result can never be stored and a replay finds nothing to redo (#501).
+        if (completedAt && repair.completedAt === null) {
+          await commitRepairCompletion(transaction, {
+            characterId: outcome.characterId,
+            targetId: outcome.targetId,
+            completedAt,
+          });
+        }
       }
       onOutcome?.(outcome);
     },

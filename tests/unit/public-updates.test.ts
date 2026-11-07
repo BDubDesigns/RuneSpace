@@ -136,7 +136,8 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("a-night-at-the-drive-in-theatre");
+    // Later Updates (#491, #501) are newer; this one is unchanged.
+    expect(getLatestPublishedUpdate().slug).toBe("tanks-for-the-ride");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );
@@ -161,12 +162,22 @@ describe("public Updates content boundary", () => {
     expect(text).not.toContain("Survey Line to");
   });
 
+  it("dates Tanks for the Ride at or before now, after the Drive-In Update (#501)", () => {
+    const update = getPublicUpdate("tanks-for-the-ride")!;
+    // The Updates system does not delay future-dated posts, so it must not be one.
+    expect(Date.parse(update.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(Date.parse(update.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("a-night-at-the-drive-in-theatre")!.publishedAt),
+    );
+    expect(getPublishedUpdates()[0]).toEqual(update);
+  });
+
   it("publishes the Legendary Miner gear upgrade with both item figures (#484)", () => {
     const update = getPublicUpdate("legendary-miner-gear-upgrade")!;
     expect(update.title).toBe("Legendary Miner Gear: Worth the Hunt");
     expect(update.publishedAt).toBe("2026-11-02T05:29:00-08:00");
-    // The Drive-In Update (#491) is newer; this one is unchanged and now second.
-    expect(getPublishedUpdates()[1]).toEqual(update);
+    // The Drive-In (#491) and Tanks for the Ride (#501) Updates are newer; this one is unchanged.
+    expect(getPublishedUpdates()[2]).toEqual(update);
     expect(update.hero).toBeUndefined();
 
     const figures = update.body.filter(
@@ -206,7 +217,7 @@ describe("public Updates content boundary", () => {
     expect(update.title).toBe("Route To Is Here");
     expect(update.publishedAt).toBe("2026-11-01T22:37:00-08:00");
     expect(getPublishedUpdates()).toContainEqual(update);
-    expect(getPublishedUpdates().indexOf(update)).toBe(2);
+    expect(getPublishedUpdates().indexOf(update)).toBe(3);
     expect(update.hero).toBeUndefined();
 
     const text = JSON.stringify(update);
@@ -743,17 +754,16 @@ describe("public Updates content boundary", () => {
     expect(links).toContainEqual({ text: "Safety & Privacy", articleSlug: "safety-and-privacy" });
   });
 
-  it("publishes A Night At The (Drive-In) Theatre as the newest Update (#491)", () => {
+  it("publishes A Night At The (Drive-In) Theatre as the Update before Tanks for the Ride (#491)", () => {
     const update = getPublicUpdate("a-night-at-the-drive-in-theatre")!;
     expect(update.title).toBe("A Night At The (Drive-In) Theatre");
     expect(update.publishedAt).toBe("2026-11-06T13:00:00-08:00");
     expect(Date.parse(update.publishedAt)).toBeLessThanOrEqual(Date.now());
-    expect(getLatestPublishedUpdate()).toEqual(update);
-    expect(getPublishedUpdates()[0]).toEqual(update);
+    expect(getPublishedUpdates()[1]).toEqual(update);
     // Its instant is unique across every Update and newer than the one before it.
     const instants = getPublishedUpdates().map((entry) => Date.parse(entry.publishedAt));
     expect(new Set(instants).size).toBe(instants.length);
-    expect(instants[0]).toBeGreaterThan(instants[1]!);
+    expect(instants[1]).toBeGreaterThan(instants[2]!);
 
     // The approved Drive-In exterior, at its real size, with the location's own description.
     expect(update.hero).toMatchObject({

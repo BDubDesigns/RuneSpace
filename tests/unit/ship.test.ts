@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { SHIP_TANK_CAPACITY_FUEL_UNITS } from "@/db/rune-space";
+import {
+  SHIP_LONG_RANGE_TANK_CAPACITY_FUEL_UNITS,
+  SHIP_TANK_CAPACITY_FUEL_UNITS,
+} from "@/db/rune-space";
 import { getEffectiveGameBalance, getShipFlightBalance } from "@/game/config/balance";
 import {
   ACTION_IDS,
@@ -34,6 +37,13 @@ describe("approved ship numbers (#358)", () => {
     expect(balance.ship.startingFuelUnits).toBe(0);
     expect(SHIP_TANK_CAPACITY_FUEL_UNITS).toBe(balance.ship.tankCapacityFuelUnits);
     expect(balance.ship.actionId).toBe(ACTION_IDS.shipFlight);
+  });
+
+  it("has a 750 FU long-range tank, mirrored by the database CHECK (#501)", () => {
+    expect(balance.ship.longRangeTankCapacityFuelUnits).toBe(750);
+    expect(SHIP_LONG_RANGE_TANK_CAPACITY_FUEL_UNITS).toBe(
+      balance.ship.longRangeTankCapacityFuelUnits,
+    );
   });
 
   it("makes the first flight 10 FU and 15 real seconds", () => {

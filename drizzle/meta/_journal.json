@@ -421,6 +421,20 @@
       "when": 1793950532841,
       "tag": "0059_holo_drive_in_theatre",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1794026867559,
+      "tag": "0060_rivet_long_range_tank",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794035250327,
+      "tag": "0061_mission_completion_system_notice",
+      "breakpoints": true
     }
   ]
 }

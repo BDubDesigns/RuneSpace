@@ -52,11 +52,19 @@ export const SLOT_MAX = 3;
 export const STARTING_CREDITS = 10;
 
 /**
- * The Rivet's tank capacity in Fuel Units, written into the ship table's CHECK.
+ * The Rivet's base tank capacity in Fuel Units, the ship table's column default.
  * The authoritative value is `ship.tankCapacityFuelUnits` in game/config/balance;
  * a unit test asserts the two never drift apart.
  */
 export const SHIP_TANK_CAPACITY_FUEL_UNITS = 300;
+
+/**
+ * The capacity of a ship that has had its long-range tank installed (#501), the
+ * only other value the ship table's capacity column may hold. Authoritative value:
+ * `ship.longRangeTankCapacityFuelUnits` in game/config/balance, kept in step by the
+ * same unit test.
+ */
+export const SHIP_LONG_RANGE_TANK_CAPACITY_FUEL_UNITS = 750;
 
 export const playerAccounts = pgTable(
   "player_accounts",
@@ -491,10 +499,15 @@ export const characterShips = pgTable(
       .primaryKey()
       .references(() => characters.id, { onDelete: "restrict" }),
     berthLocationId: text("berth_location_id").notNull().default("crash_site"),
-    // Mirrors `ship.tankCapacityFuelUnits` in game/config/balance, as
-    // `STARTING_CREDITS` mirrors the Credits balance: this layer imports no game
-    // content, and a unit test keeps the two from drifting apart.
     fuelUnits: integer("fuel_units").notNull().default(0),
+    // This ship's own tank capacity (#501): the base 300 until the character's
+    // final long-range-tank weld raises it to 750, in the same transaction. Both
+    // values mirror `ship.tankCapacityFuelUnits` / `longRangeTankCapacityFuelUnits`
+    // in game/config/balance, as `STARTING_CREDITS` mirrors the Credits balance:
+    // this layer imports no game content, and a unit test keeps them from drifting.
+    tankCapacityFuelUnits: integer("tank_capacity_fuel_units")
+      .notNull()
+      .default(SHIP_TANK_CAPACITY_FUEL_UNITS),
     flightRouteId: text("flight_route_id"),
     flightOriginLocationId: text("flight_origin_location_id"),
     flightDestinationLocationId: text("flight_destination_location_id"),
@@ -504,9 +517,15 @@ export const characterShips = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // The tank holds its own character's capacity and never more, so a ship that
+    // was never upgraded cannot be stored holding above 300 whatever the code does.
     check(
       "character_ships_fuel_in_tank",
-      sql`${table.fuelUnits} >= 0 AND ${table.fuelUnits} <= ${sql.raw(String(SHIP_TANK_CAPACITY_FUEL_UNITS))}`,
+      sql`${table.fuelUnits} >= 0 AND ${table.fuelUnits} <= ${table.tankCapacityFuelUnits}`,
+    ),
+    check(
+      "character_ships_tank_capacity",
+      sql`${table.tankCapacityFuelUnits} IN (${sql.raw(String(SHIP_TANK_CAPACITY_FUEL_UNITS))}, ${sql.raw(String(SHIP_LONG_RANGE_TANK_CAPACITY_FUEL_UNITS))})`,
     ),
     // A flight is all-or-nothing: a half-recorded flight could neither be
     // resolved nor refused, so the database refuses to store one.
@@ -2127,8 +2146,8 @@ export const chatMessageMentions = pgTable(
  * sender account, sender character, conversation pair, Block, or Report here,
  * and no fake identity is ever created to fit the Whisper tables.
  *
- * - Written only by `grantCharacterSkillXp`, in the transaction that commits
- *   the XP, so the XP and its notice commit or roll back together. The level
+ * - Recipe notices are written only by `grantCharacterSkillXp`, in the transaction
+ *   that commits the XP, so the XP and its notice commit or roll back together. The level
  *   crossing is the only state boundary: there is no sent flag or per-recipe
  *   ledger, and a later award starts above the crossed level.
  * - One row per progression event, however many recipes it unlocked. It
@@ -2138,6 +2157,13 @@ export const chatMessageMentions = pgTable(
  *   character first reads the notice, so it never lights the launcher again.
  * - Not on the chat retention sweep: these are the character's own
  *   progression notices, bounded by how many recipe levels a skill has.
+ * - `kind` (#501) is a closed set, not a message bus. `recipe_unlock` is the
+ *   original notice above. `mission_completion` names one completed Mission
+ *   (`mission_id`); its text is authored beside the Mission and rendered on read,
+ *   never stored, and a partial unique index makes it exactly-once per character
+ *   and Mission. Both kinds share `seq`, so ordering, unread counts and read
+ *   receipts are unchanged. The table keeps its original name: renaming it would
+ *   add risk for no behavior.
  */
 export const recipeUnlockNotices = pgTable(
   "recipe_unlock_notices",
@@ -2149,20 +2175,26 @@ export const recipeUnlockNotices = pgTable(
     characterId: text("character_id")
       .notNull()
       .references(() => characters.id, { onDelete: "restrict" }),
-    skillId: text("skill_id").notNull(),
-    previousLevel: integer("previous_level").notNull(),
-    level: integer("level").notNull(),
-    recipeActionIds: text("recipe_action_ids").array().notNull(),
+    kind: text("kind").notNull().default("recipe_unlock"),
+    // Present exactly for `recipe_unlock` (see the shape CHECKs below).
+    skillId: text("skill_id"),
+    previousLevel: integer("previous_level"),
+    level: integer("level"),
+    recipeActionIds: text("recipe_action_ids").array(),
+    // Present exactly for `mission_completion` (#501).
+    missionId: text("mission_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     readAt: timestamp("read_at", { withTimezone: true }),
   },
   (table) => [
     check(
-      "recipe_unlock_notices_levels_check",
-      sql`${table.previousLevel} >= 1 and ${table.level} > ${table.previousLevel}`,
+      "recipe_unlock_notices_shape_check",
+      sql`(${table.kind} = 'recipe_unlock' AND ${table.skillId} IS NOT NULL AND ${table.previousLevel} >= 1 AND ${table.level} > ${table.previousLevel} AND cardinality(${table.recipeActionIds}) >= 1 AND ${table.missionId} IS NULL) OR (${table.kind} = 'mission_completion' AND ${table.missionId} IS NOT NULL AND ${table.skillId} IS NULL AND ${table.previousLevel} IS NULL AND ${table.level} IS NULL AND ${table.recipeActionIds} IS NULL)`,
     ),
-    check("recipe_unlock_notices_recipes_check", sql`cardinality(${table.recipeActionIds}) >= 1`),
     index("recipe_unlock_notices_character_seq_idx").on(table.characterId, table.seq),
+    uniqueIndex("recipe_unlock_notices_mission_once_idx")
+      .on(table.characterId, table.missionId)
+      .where(sql`${table.kind} = 'mission_completion'`),
   ],
 );
 

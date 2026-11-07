@@ -52,14 +52,47 @@ export type RepairAuthorization =
  * of Mission state, which is why a player who repaired the Cargo Hold keeps
  * its storage forever.
  */
-export type RepairTargetDefinition = {
+export type RepairTargetPlacement =
+  | {
+      /** The World Location the character must genuinely be at to do the work. */
+      locationId: LocationId;
+      /** The Local Place hosting the work, when the target lives inside one. */
+      localPlaceId?: LocalPlaceId;
+      atShipBerth?: undefined;
+    }
+  | {
+      /**
+       * The work is done on the character's own Rivet, wherever it is physically
+       * berthed (#501). The authoritative place is the ship row's berth, read by
+       * the one repair preflight, so a fixed `locationId` could never be right once
+       * the ship has flown. Such a target lives on the ship, never inside a Local
+       * Place, and cannot be worked in flight or while away from the ship.
+       */
+      atShipBerth: true;
+      locationId?: undefined;
+      localPlaceId?: undefined;
+    };
+
+/** What finishing a repair target does besides marking it complete (#501). */
+export type RepairCompletionEffect = {
+  /**
+   * Raise the character's own ship tank to the long-range capacity
+   * (`ship.longRangeTankCapacityFuelUnits` in game/config/balance, the one home of
+   * the number), written to that ship's row in the transaction that commits the
+   * final weld. The current fuel is never touched.
+   */
+  kind: "ship_long_range_tank";
+};
+
+type RepairTargetBase = {
   id: RepairTargetId;
   displayName: string;
-  /** The World Location the character must genuinely be at to do the work. */
-  locationId: LocationId;
-  /** The Local Place hosting the work, when the target lives inside one. */
-  localPlaceId?: LocalPlaceId;
   authorization: RepairAuthorization;
+  /**
+   * What the final weld additionally commits, in that same transaction. Absent
+   * for every target that only reports its own completion.
+   */
+  completionEffect?: RepairCompletionEffect;
   /**
    * Optional authored flavour for one material row, keyed by item ID (#209).
    *
@@ -93,6 +126,8 @@ export type RepairTargetDefinition = {
    */
   offlineStatus?: string;
 };
+
+export type RepairTargetDefinition = RepairTargetBase & RepairTargetPlacement;
 
 export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
   {
@@ -233,6 +268,32 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     locationId: LOCATION_IDS.holoHollow,
     localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     authorization: { kind: "mission", missionId: MISSION_IDS.curlyMustStash },
+  },
+  {
+    // The Rivet's long-range tank (#501). It is built on the character's own ship
+    // wherever it is physically berthed (`atShipBerth`), so Move Along and any
+    // later flight never strand the work. A Mission authorizes it and personal
+    // Welding 16 is that Mission's own offer gate, read from it by the one
+    // repair-access predicate. Its final weld is the only thing that raises the
+    // ship's tank to 750 FU, in the same transaction; the current fuel is
+    // untouched and nothing is granted.
+    id: REPAIR_TARGET_IDS.rivetLongRangeTank,
+    displayName: "Long-Range Tank",
+    atShipBerth: true,
+    authorization: {
+      kind: "mission",
+      missionId: MISSION_IDS.tanksForTheRide,
+      requiresMissionWeldingLevel: true,
+    },
+    completionEffect: { kind: "ship_long_range_tank" },
+    materialNotes: {
+      [ITEM_IDS.emptySmallFuelCanister]: "the shells of the new tank",
+      [ITEM_IDS.mountingBracket]: "tank-to-hull mounting hardware",
+      [ITEM_IDS.galvaferrite]: "the tank frame and baffles",
+      [ITEM_IDS.galvanicWireSpool]: "gauge and feed wiring",
+      [ITEM_IDS.powerCell]: "charge for the feed pumps",
+    },
+    completedStatus: "Long-range tanks installed. Rivet fuel capacity: 750 FU.",
   },
 ] as const satisfies readonly RepairTargetDefinition[];
 

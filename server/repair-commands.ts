@@ -26,6 +26,7 @@ import {
   type PlayGameplayState,
 } from "@/server/play";
 import { loadRepairAccess } from "@/server/repair-access";
+import { loadShipBerthLocationId } from "@/server/ship-state";
 import {
   ensureRepairCleanPassRoll,
   ensureRepairTargetState,
@@ -132,7 +133,14 @@ async function repairPreflight(
     .where(eq(characters.id, characterId))
     .limit(1);
   const currentLocationId = rows[0]?.currentLocationId;
-  if (currentLocationId !== definition.locationId) {
+  // A berth-relative target (#501) lives on the character's own Rivet, so the
+  // authoritative place is the ship row's berth, read here under the same
+  // character lock as everything else. A fixed `locationId` could not be right
+  // once the ship has flown. Flight and busy states were refused above.
+  const targetLocationId = definition.atShipBerth
+    ? await loadShipBerthLocationId(transaction, characterId)
+    : definition.locationId;
+  if (currentLocationId !== targetLocationId) {
     return {
       status: "refused",
       reason: "wrong_location",
