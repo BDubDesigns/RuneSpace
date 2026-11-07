@@ -33,6 +33,33 @@ test.describe("public Updates", () => {
     await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
 
+    // It is no longer the newest Update (Tanks for the Ride, #501, is), so the homepage's
+    // Latest Update is asserted by that Update's own test below; the feed still lists it.
+    const response = await page.request.get("/feed.xml");
+    expect(response.ok()).toBe(true);
+    const feed = await response.text();
+    expect(feed).toContain(`<title>${title}</title>`);
+    expect(feed).toContain(`/updates/${slug}`);
+
+    // The guide the Update links to is live and covers the theatre.
+    await page.goto("/wiki/holo-drive-in");
+    await expect(page.getByRole("heading", { name: "Holo Drive-In", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tickets", level: 2 })).toBeVisible();
+  });
+
+  test("announces Tanks for the Ride on Updates, homepage and RSS (#501)", async ({ page }) => {
+    const title = "Tanks for the Ride";
+    const slug = "tanks-for-the-ride";
+
+    await page.goto("/updates");
+    const link = page.getByRole("link", { name: title, exact: true });
+    await expect(link).toHaveAttribute("href", `/updates/${slug}`);
+    await link.click();
+    await expect(page).toHaveURL(`/updates/${slug}`);
+    await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
+    await expect(page.getByText(/It is capacity, not fuel/)).toBeVisible();
+    await expect(page.locator('a[href="/wiki/mission-tanks-for-the-ride"]').first()).toBeVisible();
+
     await page.goto("/");
     await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Read update", exact: true })).toHaveAttribute(
@@ -45,11 +72,6 @@ test.describe("public Updates", () => {
     const feed = await response.text();
     expect(feed).toContain(`<title>${title}</title>`);
     expect(feed).toContain(`/updates/${slug}`);
-
-    // The guide the Update links to is live and covers the theatre.
-    await page.goto("/wiki/holo-drive-in");
-    await expect(page.getByRole("heading", { name: "Holo Drive-In", level: 1 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Tickets", level: 2 })).toBeVisible();
   });
 
   test("announces Legendary Miner gear on Updates and RSS (#484)", async ({ page }) => {
