@@ -296,10 +296,19 @@ landing — rather than a conversation. This is a deliberately narrow capability
 not an event bus and not "every satisfied requirement completes itself".
 
 ```ts
-type MissionAutoCompletion = { kind: "ship_flight"; routeId: ShipRouteId };
+type MissionAutoCompletion =
+  | { kind: "ship_flight"; routeId: ShipRouteId }
+  | { kind: "repair_target_complete"; targetId: RepairTargetId }; // #501
 ```
 
-- **One closed kind.** The flight's landing (`commitShipArrival` in
+- **Two closed kinds.** The second, `repair_target_complete` (#501, Tanks for the
+  Ride), stamps the Mission inside the Welding transaction that completes the named
+  repair target's final section (`commitRepairCompletion`, `server/repair-completion.ts`),
+  under the same exactly-once guard. Validation requires the target to exist, to be
+  authorized by this very Mission, and to be observed by one of its
+  `repair_target_complete` requirements; the Mission has no turn-in, reward or
+  lifecycle dialogue, exactly as for a flight. No other satisfied requirement ever
+  completes anything. The first kind: the flight's landing (`commitShipArrival` in
   `server/ship-state.ts`) stamps `completed_at` on each Mission whose
   `autoCompletion` names that exact route, if and only if the character has
   accepted it and it is not already complete. The stamp is the same exactly-once
@@ -1405,6 +1414,33 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Gating the first flight.** The route authors `requiredAcceptedMissionId: move_along`, so the first Crash Site launch is refused until the ordinary accepted record exists, even with the ship repaired and fuel loaded; the Ship panel says "Report Thrust Issues to Wade at Rusk Recovery to start Move Along." Once the Mission is complete this gates nothing.
 - **Dialogue (locked copy, verbatim):** the approved send-off is the last three beats of Wade's Thrust Issues completion scene ("Hm. Still here?" … "Fly it over. Land it. And for once, don't make me come look at it."; there is no separate offer), a one-beat reminder ("Crash Site to Holo Hollow Landing. Ten fuel units. Fuel the Rivet, fly it over, land it. In that order.") and a two-beat idle line once the Rivet has landed ("Heard the Rivet made the Landing." / "Nobody's asked me to tow it back yet. Good."). The idle line replaces the post-Thrust Issues one only once Move Along is actually complete (the hub scans completed Missions newest-first). Wade's Thrust Issues completion lines are unchanged; only the offer's closing jab, which wrongly put the wreck on his front lawn, now says "Fix it, and you're on your own. I'm done holding your hand."
 - **Reset.** Resetting a chain from an operator console clears the Mission records (Move Along follows Thrust Issues in the reset scope) but not the ship row: where the ship is berthed is physical state, not Mission state.
+
+### Tanks for the Ride — Wade's long-range tank job, completed by its final weld (#501)
+
+- **Offer:** Wade Rusk at Rusk Recovery, `prerequisiteMissionId: moveAlong` (its
+  completion proves the first real flight landed; ancestry already proves the
+  Cargo Hold, Landing Gear, Propulsion System and Thrust Issues) and
+  `prerequisiteSkillLevels: welding 16`. No Stillreach, Mining, Runeworking,
+  Resonance Rig, Fabrication or Refining gate. Wade's reminder is the offer's
+  `activeDialogueId` (he is the offer NPC, so `activeNpcDialogue` is not allowed),
+  his post-completion line is `completedNpcDialogue`.
+- **One requirement:** `repair_target_complete` on `rivet_long_range_tank`, whose
+  repair is `atShipBerth` (`docs/gameplay-foundations.md`, "Long-range tank").
+  The target reads this Mission's Welding 16 through `requiresMissionWeldingLevel`.
+- **Completion:** `autoCompletion: { kind: "repair_target_complete", ... }`, the
+  32nd committed section. No turn-in, no required return, no reward: the sections
+  pay their own 1,600 base Welding XP, and nothing is granted. The same transaction
+  raises that ship's tank to 750 FU and leaves current fuel as it was.
+- **Dialogue:** the owner-approved lines (offer, accepted continuation, active
+  reminder, optional post-completion). The final-weld confirmation ("Tanks for the
+  Ride — Mission Complete" / "Long-range tanks installed. Rivet fuel capacity:
+  300 → 750 FU. Current fuel unchanged.") is Ship panel UI
+  (`features/ship/LongRangeTankConfirmation.tsx`), shown in the session where the
+  repair projection flips to complete; the Mission Log carries the ordinary
+  completed card for anyone who was away. No busy line is authored because Wade is
+  not a turn-in NPC.
+- **Not a travel permission.** Neither the Mission nor the repair appears in any
+  route's requirements.
 
 ## 16. Linear persistent stages (#431)
 

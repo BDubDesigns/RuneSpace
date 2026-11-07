@@ -29,6 +29,7 @@ import {
 } from "@/game/content/locations";
 import { getNpc, resolveNpcPlacement } from "@/game/content/npcs";
 import { getRepairTarget } from "@/game/content/repair-targets";
+import { INITIAL_SHIP_BERTH_LOCATION_ID } from "@/game/domain/ship";
 import { getShipRoute } from "@/game/content/ship-routes";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
@@ -133,7 +134,7 @@ export type MissionObservation = {
    * tank, and the route of a flight already under way. Absent means no ship
    * information, which reads as an empty tank, never as fuelled.
    */
-  ship?: { fuelUnits: number; flightRouteId?: string };
+  ship?: { fuelUnits: number; flightRouteId?: string; berthLocationId?: string };
   /**
    * The Missions this character has completed (#369). Read only to resolve
    * where a lead NPC stands for THIS character, because an authored relocation
@@ -878,8 +879,13 @@ function repairTargetGuidance(
   ) {
     return {};
   }
-  if (target.locationId !== currentLocationId) {
-    return { repairTargetId: targetId, locationId: target.locationId };
+  // A berth-relative target (#501) is wherever the character's own ship is parked
+  // right now, from the same ship row the repair preflight reads.
+  const targetLocationId = target.atShipBerth
+    ? (observation?.ship?.berthLocationId ?? INITIAL_SHIP_BERTH_LOCATION_ID)
+    : target.locationId;
+  if (targetLocationId !== currentLocationId) {
+    return { repairTargetId: targetId, locationId: targetLocationId };
   }
   const place = target.localPlaceId
     ? getLocalPlaceInLocation(currentLocationId, target.localPlaceId)
@@ -2091,19 +2097,48 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       if (definition.reward) {
         throw new Error(`${where} completes automatically and cannot author a reward.`);
       }
-      if (!getShipRoute(definition.autoCompletion.routeId)) {
-        throw new Error(
-          `${where} auto-completes on unknown ship route "${definition.autoCompletion.routeId}".`,
-        );
-      }
-      if (
-        !authoredRequirements.some(
-          (requirement) =>
-            requirement.kind === "ship_flight" &&
-            requirement.routeId === definition.autoCompletion?.routeId,
-        )
-      ) {
-        throw new Error(`${where} auto-completes on a flight it does not require.`);
+      const { autoCompletion } = definition;
+      if (autoCompletion.kind === "ship_flight") {
+        if (!getShipRoute(autoCompletion.routeId)) {
+          throw new Error(
+            `${where} auto-completes on unknown ship route "${autoCompletion.routeId}".`,
+          );
+        }
+        if (
+          !authoredRequirements.some(
+            (requirement) =>
+              requirement.kind === "ship_flight" && requirement.routeId === autoCompletion.routeId,
+          )
+        ) {
+          throw new Error(`${where} auto-completes on a flight it does not require.`);
+        }
+      } else {
+        // The repair kind (#501) is as narrow as the flight kind: it names one
+        // target, that target must be authorized by this very Mission (so no
+        // other Mission's repair can finish it), and the Mission must observe it.
+        const repair = getRepairTarget(autoCompletion.targetId);
+        if (!repair) {
+          throw new Error(
+            `${where} auto-completes on unknown repair target "${autoCompletion.targetId}".`,
+          );
+        }
+        if (
+          repair.authorization.kind !== "mission" ||
+          repair.authorization.missionId !== definition.id
+        ) {
+          throw new Error(
+            `${where} auto-completes on repair target "${autoCompletion.targetId}", which it does not authorize.`,
+          );
+        }
+        if (
+          !authoredRequirements.some(
+            (requirement) =>
+              requirement.kind === "repair_target_complete" &&
+              requirement.targetId === autoCompletion.targetId,
+          )
+        ) {
+          throw new Error(`${where} auto-completes on a repair it does not require.`);
+        }
       }
       assertLifecycleCoverage(definition);
       continue;

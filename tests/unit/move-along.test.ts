@@ -115,14 +115,18 @@ describe("the Mission's shape", () => {
     expect(MOVE_ALONG.dialogue).toEqual({});
   });
 
-  it("is the only Mission that completes itself: every other one still hands in", () => {
+  it("is one of only two Missions that complete themselves: every other one still hands in", () => {
     const automatic = MISSIONS.filter((mission) => mission.autoCompletion !== undefined);
-    expect(automatic.map((mission) => mission.id)).toEqual([MISSION_IDS.moveAlong]);
+    // Tanks for the Ride (#501) is the second, completed by its repair's final weld.
+    expect(automatic.map((mission) => mission.id)).toEqual([
+      MISSION_IDS.moveAlong,
+      MISSION_IDS.tanksForTheRide,
+    ]);
     // Every other Mission hands in, except the one deliberately unfinished stage
     // (#369), which can neither hand in nor complete itself until a later slice.
     for (const mission of MISSIONS.filter(
       (candidate) =>
-        candidate.id !== MISSION_IDS.moveAlong &&
+        candidate.autoCompletion === undefined &&
         !candidate.requirements.some((requirement) => requirement.kind === "deferred_stage"),
     )) {
       expect(mission.turnIn, mission.id).toBeDefined();

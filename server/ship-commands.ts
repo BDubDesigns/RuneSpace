@@ -186,7 +186,8 @@ export async function refuelShip(
           : await countCarriedCanisters(transaction, context.character.id);
       const plan = planRefuel({
         fuelUnits: ship.fuelUnits,
-        tankCapacityFuelUnits: balance.ship.tankCapacityFuelUnits,
+        // This ship's own capacity (#501): 300 until its long-range tank is installed.
+        tankCapacityFuelUnits: ship.tankCapacityFuelUnits,
         canisterFuelUnits,
         canistersAvailable: available,
       });

@@ -735,7 +735,9 @@ Each character owns one Rivet Utility Shuttle. It is not a separate object: it
 is the ship already repaired through the repair rows, plus the little that
 nothing else could record — where it is berthed, how much fuel is in the tank,
 and the one flight that may be under way. That is one row, `character_ships`
-(`db/rune-space.ts`): `berth_location_id`, `fuel_units` (CHECK 0–300) and an
+(`db/rune-space.ts`): `berth_location_id`, `fuel_units`, the ship's own
+`tank_capacity_fuel_units` (300, or 750 once Tanks for the Ride is done, #501;
+CHECK `0 <= fuel_units <= tank_capacity_fuel_units`) and an
 all-or-nothing set of flight columns (route, origin, destination, start and
 arrival instants). **No row means an untouched ship at the Crash Site with an
 empty tank**, so no character is backfilled; the row is created the first time
@@ -743,7 +745,9 @@ the tank is filled or the ship launches. The berth moves only when a flight's
 landing commits — never when the character walks, so walking to Holo Hollow
 Landing neither moves the ship nor completes a Mission.
 
-**Numbers** (`game/config/balance.ts`, `ship`): 300 FU tank, starting at 0. Each
+**Numbers** (`game/config/balance.ts`, `ship`): 300 FU tank (750 for a ship whose
+character has installed the long-range tank, `longRangeTankCapacityFuelUnits`,
+#501, below), starting at 0. Each
 route's cost and duration is balance, its duration in real seconds
 (`durationSeconds`) because a flight is scheduled by its recorded absolute arrival
 instant, not by counting ticks. The first route, `crash_site_to_holo_hollow_landing`
@@ -774,6 +778,45 @@ abort, refund or second launch, and an operator force-idle fails closed rather
 than orphan the flight (`server/play-interrupt.ts`). Move Along gates only the
 route that completes it (`requiredAcceptedMissionId`): once it is complete it
 gates nothing.
+
+**Long-range tank — Tanks for the Ride (issue #501).** Wade's second ship job
+raises one character's Rivet from 300 to 750 FU. It is an ordinary repair target,
+`rivet_long_range_tank` ("Long-Range Tank"), with these specifics:
+
+- **Berth-relative placement.** The target authors `atShipBerth: true` instead of a
+  fixed `locationId` (`RepairTargetPlacement`, `game/content/repair-targets.ts`).
+  `repairPreflight` (`server/repair-commands.ts`) resolves the place from the ship
+  row's berth under the character lock, so the same bill and the same 32 welds work
+  at Holo Hollow Landing, Stillreach Landing Station or wherever the ship is
+  parked, and moving the ship never loses progress; the wrong berth, flight or any
+  other active action refuses exactly like every other repair. Mission guidance
+  reads the same berth (`MissionObservation.ship.berthLocationId`). The Ship panel
+  shows the Long-Range Tank section only once the Mission is accepted.
+- **Recipe** (`repairTargets.rivetLongRangeTank`): 3 Empty Small Fuel Canisters, 4
+  Mounting Brackets, 4 Galvaferrite, 1 Galvanic Wire Spool and 2 Power Cells, then
+  32 ordinary Welding sections (5 ticks, 50 base XP each: 1,600 base XP), with the
+  standard Clean Pass cadence derived from the 32. Items are taken by item ID from
+  Inventory, so a Full canister, a Cargo Hold item or a spent stack cannot satisfy
+  the bill. The ship still flies on the 300 FU tank between sessions; it cannot
+  depart mid-weld.
+- **The final weld is one transaction.** `createWeldingResolver` commits the 32nd
+  persisted section, and only that, through `commitRepairCompletion`
+  (`server/repair-completion.ts`): the target's `completionEffect`
+  (`ship_long_range_tank`) sets `character_ships.tank_capacity_fuel_units` to the
+  balance's 750 (creating the ship row at its defaults if somehow absent; a
+  monotonic maximum), and a Mission whose `autoCompletion` is
+  `{ kind: "repair_target_complete", targetId }` is stamped complete under the
+  `completed_at IS NULL` guard. It runs only on the resolution that moves the
+  repair from incomplete to complete, so a replay, a late read or a concurrent
+  state read cannot double it. Current fuel, items, Credits and extra XP are never
+  touched.
+- **Capacity everywhere.** `projectShip` and `refuelShip` read the ship row's own
+  capacity, never the global balance; the column's CHECKs (`IN (300, 750)` and
+  fuel within capacity) mean the database and the domain agree. A character
+  without a ship row keeps the untouched 300 FU defaults.
+- **No route gating.** Nothing in `game/content/ship-routes.ts` reads this repair or
+  the Mission. A later route is gated only by real distance, fuel and the ordinary
+  berth and flight checks.
 
 **In flight** the character is in one authoritative state. A default-deny gate
 in the shared owned-character boundaries (`server/action-resolution.ts`,

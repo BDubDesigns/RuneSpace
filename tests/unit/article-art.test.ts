@@ -155,7 +155,8 @@ describe("canonical article art", () => {
       /<section aria-labelledby="latest-update-heading"[^>]*>[\s\S]*?<\/section>/,
     )?.[0];
     expect(latestUpdateSection).toBeDefined();
-    expect(latestUpdateSection).toContain("A Night At The (Drive-In) Theatre");
+    expect(latestUpdateSection).toContain("Tanks for the Ride");
+    expect(latestUpdateSection).not.toContain("A Night At The (Drive-In) Theatre");
     expect(latestUpdateSection).not.toContain("Legendary Miner Gear: Worth the Hunt");
     expect(latestUpdateSection).not.toContain("A Resonance Rig of Your Own");
     expect(latestUpdateSection).not.toContain("Lapidary: Cut Topaz and Cut Sapphire");

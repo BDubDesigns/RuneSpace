@@ -172,6 +172,10 @@ const missionIds = {
   // Wade's first-flight job (#358): fly the repaired Rivet from the Crash Site to
   // Holo Hollow Landing. Accepted by hand, completed by the flight's own landing.
   moveAlong: asContentId("move_along"),
+  // Wade's long-range tank job (#501): 32 Welding sections on the player's own berthed
+  // Rivet raise that ship's tank from 300 to 750 FU. Accepted by hand; the final
+  // weld completes it.
+  tanksForTheRide: asContentId("tanks_for_the_ride"),
   // The first item-originated Mission (#369): a carried Rune Fragment is
   // inspected, offers the mystery, and leads through three Skatboll contacts to
   // Toll's lead about a researcher on Stillreach. Intentionally unfinished.
@@ -368,6 +372,13 @@ const dialogueIds = {
   // is no completion scene of its own; touchdown completes it.
   wadeMoveAlongActive: asContentId("wade_rusk_move_along_active"),
   wadePostMoveAlong: asContentId("wade_rusk_post_move_along"),
+  // Tanks for the Ride (#501): the offer, the continuation once it is taken, the
+  // reminder while the tank is unfinished, and the optional follow-up afterwards.
+  // The final weld completes it, so there is no turn-in and no completion scene.
+  wadeTanksForTheRideOffer: asContentId("wade_rusk_tanks_for_the_ride_offer"),
+  wadeTanksForTheRideAccepted: asContentId("wade_rusk_tanks_for_the_ride_accepted"),
+  wadeTanksForTheRideActive: asContentId("wade_rusk_tanks_for_the_ride_active"),
+  wadePostTanksForTheRide: asContentId("wade_rusk_post_tanks_for_the_ride"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -674,6 +685,8 @@ export const ACTION_IDS = {
   propulsionWelding: asContentId("propulsion_welding"),
   // Welding the character's personal Resonance Rig at the Crash Site (#441).
   resonanceRigWelding: asContentId("resonance_rig_welding"),
+  // Welding the Rivet's long-range tank onto the ship, wherever it is berthed (#501).
+  rivetLongRangeTankWelding: asContentId("rivet_long_range_tank_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -918,6 +931,11 @@ export const REPAIR_TARGET_IDS = {
   // completion is the one fact that the site is theirs: the Resonance Site name,
   // scene, Enby's visit and the Skatboll TP Rune recipe all read it.
   resonanceRig: asContentId("resonance_rig"),
+  // The Rivet's long-range tank (#501), built wherever the player's own ship is
+  // berthed. Its completion is the one fact that the ship's tank holds 750 FU:
+  // the ship row's capacity is written in the same transaction as the final weld,
+  // and no UI flag stands beside either.
+  rivetLongRangeTank: asContentId("rivet_long_range_tank"),
 } as const satisfies Record<string, ContentId>;
 
 /**

@@ -167,7 +167,8 @@ function missionLink(missionId: string): string | { text: string; href: string }
 function repairTargetLabel(repairTargetId: string): string {
   const target = getRepairTarget(repairTargetId);
   if (!target) return repairTargetId;
-  const where = getLocation(target.locationId)?.displayName;
+  // A berth-relative target (#501) is built wherever the player's own Rivet is parked.
+  const where = target.atShipBerth ? "your Rivet" : getLocation(target.locationId)?.displayName;
   return where ? `${target.displayName} (${where})` : target.displayName;
 }
 

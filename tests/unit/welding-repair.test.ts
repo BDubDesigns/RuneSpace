@@ -94,6 +94,7 @@ describe("welding rules are global; recipes belong to the repair target (#172)",
       ACTION_IDS.landingGearWelding,
       ACTION_IDS.propulsionWelding,
       ACTION_IDS.resonanceRigWelding,
+      ACTION_IDS.rivetLongRangeTankWelding,
     ]);
   });
 });

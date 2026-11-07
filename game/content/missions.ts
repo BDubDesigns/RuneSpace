@@ -557,7 +557,15 @@ export type MissionTurnIn = {
  * authors this, on a route that lands, completes this way. Such a Mission has
  * no turn-in, no completion scene and no reward.
  */
-export type MissionAutoCompletion = { kind: "ship_flight"; routeId: ShipRouteId };
+export type MissionAutoCompletion =
+  | { kind: "ship_flight"; routeId: ShipRouteId }
+  /**
+   * The named repair target's final weld stamps the Mission complete inside the
+   * Welding transaction that completes the repair (#501). Closed and explicit: it
+   * names one target, which must be authorized by this very Mission, so no other
+   * satisfied requirement can ever complete anything.
+   */
+  | { kind: "repair_target_complete"; targetId: RepairTargetId };
 
 /**
  * A turn-in-NPC lifecycle moment that has its own authored sequence slot
@@ -1677,6 +1685,65 @@ export const MOVE_ALONG: MissionDefinition = {
 };
 
 /**
+ * Tanks for the Ride — Wade's long-range tank job (#501).
+ *
+ * Offered by hand by Wade at Rusk Recovery once Move Along is complete and the
+ * player has personal Welding 16. Move Along's completion is the proof that the
+ * first real Rivet flight landed (a flight merely accepted or launched is not),
+ * and its ancestry already proves the Cargo Hold, Landing Gear, Propulsion System
+ * and Thrust Issues, so none of them is restated. There is no Stillreach visit
+ * prerequisite and no Mining, Runeworking, Resonance Rig or personal Fabrication
+ * or Refining gate: every material is an ordinary item that may be made, bought or
+ * traded for.
+ *
+ * The requirement observes the Rivet's long-range tank repair target and nothing
+ * else. That repair is built on the player's own ship wherever it is berthed
+ * (`atShipBerth`), over 32 ordinary Welding sections that pay their own 1,600 base
+ * Welding XP: the Mission adds no XP, Credits or item and hands over no fuel. The
+ * 32nd committed section is the whole payoff and the only thing that finishes the
+ * Mission: `autoCompletion` stamps it in the very transaction that completes the
+ * repair and raises that ship's tank to 750 FU. There is no turn-in and no
+ * required return to Wade; he only has an optional line for it afterwards.
+ *
+ * Nothing here unlocks a route, a planet or an explicit travel permission. A later
+ * route is gated only by its own distance and the fuel it costs.
+ */
+export const TANKS_FOR_THE_RIDE: MissionDefinition = {
+  id: MISSION_IDS.tanksForTheRide,
+  title: "Tanks for the Ride",
+  summary:
+    "Fit a long-range tank to your Rivet wherever it is parked: bring Wade's parts and weld them in, thirty-two welds in all.",
+  prerequisiteMissionId: MISSION_IDS.moveAlong,
+  prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 16 }],
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.wadeTanksForTheRideOffer,
+      actionLabel: "TAKE THE JOB",
+      declineLabel: "Not Now",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wadeTanksForTheRideAccepted },
+      activeDialogueId: DIALOGUE_IDS.wadeTanksForTheRideActive,
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.rivetLongRangeTank,
+      objective: "Install the long-range tank on your Rivet",
+    },
+  ],
+  autoCompletion: {
+    kind: "repair_target_complete",
+    targetId: REPAIR_TARGET_IDS.rivetLongRangeTank,
+  },
+  dialogue: {},
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostTanksForTheRide },
+  ],
+};
+
+/**
  * A Cut Above — Tansy's Fabrication 5 lesson at The Jag (#233).
  *
  * What it teaches is a rule, not a recipe: new recipes unlock as Fabrication
@@ -2412,6 +2479,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Wade's first-flight job (#358): after Thrust Issues, accepted by hand, and
   // completed by the Rivet's own landing rather than by any conversation.
   MOVE_ALONG,
+  // Wade's long-range tank job (#501): after Move Along, offered by hand at Welding
+  // 16, and completed by its own final weld rather than by any conversation.
+  TANKS_FOR_THE_RIDE,
   // Tansy's Fabrication 5 lesson (#233): after Brace Yourself, at Fabrication 5.
   A_CUT_ABOVE,
   // The optional branch sits after the main chain: it is never a prerequisite

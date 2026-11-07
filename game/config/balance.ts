@@ -597,6 +597,26 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(24),
     }),
+    /**
+     * The Rivet's long-range tank (#501), welded onto the character's own ship
+     * wherever it is berthed. Every material is an ordinary existing item taken by
+     * item ID: the three canisters must be EMPTY Small Fuel Canisters (the tank
+     * is built from the shells, never from fuel), and nothing is a separately
+     * Fabricated tank item. The 32 sections pay 1,600 base Welding XP at the
+     * global 50 per section, and the Mission adds no XP of its own.
+     */
+    rivetLongRangeTank: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.rivetLongRangeTank),
+      actionId: z.literal(ACTION_IDS.rivetLongRangeTankWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.emptySmallFuelCanister), quantity: z.literal(3) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(4) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(4) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+        z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(2) }),
+      ]),
+      repairIncrements: z.literal(32),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -1082,7 +1102,8 @@ const balanceSchema = z.object({
     }),
   }),
   /**
-   * The Rivet Utility Shuttle (#358). The tank holds 300 Fuel Units and every
+   * The Rivet Utility Shuttle (#358). The tank holds 300 Fuel Units (750 once the
+   * character has installed the long-range tank, #501) and every
    * character's ship starts empty. Which routes exist is content
    * (`game/content/ship-routes`); what each costs and how long it takes is here.
    * A flight's duration is authored in real seconds (#375): the approved 260-second
@@ -1093,6 +1114,10 @@ const balanceSchema = z.object({
   ship: z.object({
     actionId: z.literal(ACTION_IDS.shipFlight),
     tankCapacityFuelUnits: z.literal(300),
+    // The capacity a ship holds once its character has finished Tanks for the
+    // Ride (#501). Per-character: it is written to that ship's row by the final
+    // weld and never replaces the global 300.
+    longRangeTankCapacityFuelUnits: z.literal(750),
     startingFuelUnits: z.literal(0),
     flights: z.object({
       [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: z.object({
@@ -1882,6 +1907,18 @@ const defaults = balanceSchema.parse({
       ],
       repairIncrements: 24,
     },
+    rivetLongRangeTank: {
+      targetId: REPAIR_TARGET_IDS.rivetLongRangeTank,
+      actionId: ACTION_IDS.rivetLongRangeTankWelding,
+      materials: [
+        { itemId: ITEM_IDS.emptySmallFuelCanister, quantity: 3 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 4 },
+        { itemId: ITEM_IDS.galvaferrite, quantity: 4 },
+        { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+        { itemId: ITEM_IDS.powerCell, quantity: 2 },
+      ],
+      repairIncrements: 32,
+    },
   },
   cargoHold: {
     capacitySlots: 32,
@@ -2179,6 +2216,7 @@ const defaults = balanceSchema.parse({
   ship: {
     actionId: ACTION_IDS.shipFlight,
     tankCapacityFuelUnits: 300,
+    longRangeTankCapacityFuelUnits: 750,
     startingFuelUnits: 0,
     flights: {
       [SHIP_ROUTE_IDS.crashSiteToHoloHollowLanding]: {

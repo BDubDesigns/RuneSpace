@@ -992,7 +992,9 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
         const recipe = getRepairTargetBalance(target.id, balance);
         await db
           .update(rune.characters)
-          .set({ currentLocationId: target.locationId })
+          // A ship-berth target (#501) is worked beside the Rivet, which an untouched ship
+          // keeps at the Crash Site.
+          .set({ currentLocationId: target.locationId ?? LOCATION_IDS.crashSite })
           .where(eq(rune.characters.id, character.id));
         // Its authorization satisfied and its recipe already in, which is all
         // a repair needs before the Welding itself can start.

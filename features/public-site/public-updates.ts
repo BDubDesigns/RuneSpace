@@ -9,6 +9,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #501 — Tanks for the Ride: the long-range tank upgrade. Deliberately says nothing about
+    // any destination: it adds capacity, not routes.
+    slug: "tanks-for-the-ride",
+    title: "Tanks for the Ride",
+    publishedAt: "2026-11-07T12:00:00-08:00",
+    summary:
+      "Wade Rusk has a retrofit for your Rivet: weld a long-range tank on wherever it is parked and its tank grows from 300 to 750 Fuel Units. A new Mission for Welding 16.",
+    body: [
+      {
+        kind: "figure",
+        art: { kind: "npc", npcId: NPC_IDS.wadeRusk, expressionId: "concerned" },
+        side: "right",
+      },
+      [
+        "Once your Rivet has flown and you are a Welding 16 hand, Wade Rusk has a new job for you: ",
+        { text: "Tanks for the Ride", articleSlug: "mission-tanks-for-the-ride" },
+        ". The engine will take you farther than the tank will, and he has a retrofit in mind. He is not doing it for you.",
+      ],
+      "Bring three Empty Small Fuel Canisters, four Mounting Brackets, four Galvaferrite, one Galvanic Wire Spool and two Power Cells, then weld thirty-two sections. The work happens on your own Rivet, wherever it is parked, so it does not matter whether the ship is at Holo Hollow Landing or Stillreach Landing Station. Bring the parts in batches. Your finished welds, your installed parts and any Clean Pass you have lined up are all kept if you stop, fly, reload or log out, and until the last weld holds your Rivet still flies on its original 300 Fuel Unit tank.",
+      "The thirty-second section is the payoff. It finishes the Mission and raises that ship's tank to 750 Fuel Units in one go, with a Mission Complete notice and the new gauge. It is capacity, not fuel: the fuel you already have stays exactly as it was, and you fill the extra room with ordinary Full Small Fuel Canisters. The thirty-two sections pay their usual Welding XP, 1,600 base in all, and nothing else is handed over, so there is no one to report back to. Ships that have not had the job done keep their 300 Fuel Unit tank, and every flight you can make today works as before.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Tanks for the Ride, a Mission offered by Wade Rusk at Rusk Recovery after Move Along, for characters at Welding 16.",
+          "A Long-Range Tank section in the Ship panel wherever your Rivet is parked, for installing the parts and welding, with a Mission Complete notice when the thirty-second weld lands.",
+          "A permanent 750 Fuel Unit tank for the Rivet of any character who finishes the job. Current fuel does not change.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #491 — announce the Holo Drive-In theatre: Tamsyn Suzara, the two original films, the
     // three commercials, hourly showings, tickets and the Mining and Welding bonuses. Publishes with
     // the deployment that carries the theatre (merge to main); no separate news post.

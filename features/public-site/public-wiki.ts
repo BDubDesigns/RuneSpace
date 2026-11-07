@@ -203,6 +203,11 @@ const authoredWikiArticles = [
           ],
           "The Flight Controls open on a star chart: the world your ship is on, marked You are here, and the world you can fly to, with the route between them. Tap a planet to choose it; with only one place to fly, it is already chosen. Choosing does nothing until you press LAUNCH. If the flight is not possible yet, for example with too little fuel, the planet is dimmed, marked Unavailable, and the reason is shown.",
           "Before you launch, the Flight Controls show the cost, your fuel now and your fuel after landing. If you would land with less than the 120 FU the flight back needs, they warn you. You can still go: nothing refuels the ship for free on the other side and there is no automatic return, so plan to load fuel you have bought, traded or made before you fly home.",
+          [
+            "Every Rivet's tank holds 300 Fuel Units, but you can raise yours to 750 by finishing ",
+            { text: "Tanks for the Ride", articleSlug: "mission-tanks-for-the-ride" },
+            ". The bigger tank is yours alone and only adds room: your current fuel stays as it was, and you fill it with ordinary canisters. It opens no new route.",
+          ],
           "Once launched, the flight cannot be cancelled and the fuel is spent. You watch the Rivet lift off, cross a chart from Skatboll to Stillreach for most of the trip, and touch down. You can minimize the flight and still browse your Inventory, Equipment and Missions, but you cannot walk, mine, refine, trade or move anything until you land. The flight keeps going if you close the game; come back early and it picks up where it is, come back late and you have already landed.",
           "You, the ship and everything in its Cargo Hold arrive together. Stillreach has its own map of nine locations, walked exactly like Skatboll's; you cannot walk from one planet to the other. Walking away from the Landing Station leaves the Rivet parked in the mushroom ring, and its Cargo Hold is only open beside it. Flying back lands you at Holo Hollow Landing, never the Crash Site.",
           "Flying the Rivet is not the only way across. Milky Waymo, a fully automated passenger shuttle, runs between Holo Hollow Landing and Stillreach Landing Station once you have flown your own Rivet to Stillreach for the first time. See Riding Milky Waymo below.",
@@ -1382,6 +1387,10 @@ const authoredWikiArticles = [
             { text: "Move Along", articleSlug: "mission-move-along" },
             " — fly your repaired ship from the Crash Site to Holo Hollow Landing. Take it from Wade after Thrust Issues.",
           ],
+          [
+            { text: "Tanks for the Ride", articleSlug: "mission-tanks-for-the-ride" },
+            " — weld a long-range tank onto your Rivet and raise its tank from 300 to 750 Fuel Units. Take it from Wade after Move Along, at Welding 16.",
+          ],
         ],
       },
       {
@@ -1876,6 +1885,11 @@ const authoredWikiArticles = [
             "When the drive is fixed and you have reported it, he has one more thing for you to take on: ",
             { text: "Move Along", articleSlug: "mission-move-along" },
             ", flying the ship over to Holo Hollow Landing. You take it from him yourself; it does not start on its own. Once the ship has landed he has a short line about it, and then he is done.",
+          ],
+          [
+            "Once the Rivet has flown and you have reached Welding 16, he has one more ship job: ",
+            { text: "Tanks for the Ride", articleSlug: "mission-tanks-for-the-ride" },
+            ", a long-range tank welded on wherever the ship is parked. You never have to report back; when the job is done he only has a short line about it.",
           ],
           [
             "Get good enough and that changes. Once you can weld at a real level, Wade puts you on his ",

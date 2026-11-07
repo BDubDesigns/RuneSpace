@@ -370,7 +370,7 @@ export async function projectShip(
     berthLocationId,
     berthName: getLocation(berthLocationId)?.displayName ?? berthLocationId,
     fuelUnits,
-    tankCapacityFuelUnits: balance.ship.tankCapacityFuelUnits,
+    tankCapacityFuelUnits: ship?.tankCapacityFuelUnits ?? balance.ship.tankCapacityFuelUnits,
     canisterFuelUnits: balance.items.fullSmallFuelCanister.fuelUnits,
     canisters: { inventory: input.carriedFullCanisters, cargoHold: input.cargoFullCanisters },
     ...(inFlight && ship?.flightArrivesAt && ship.flightStartedAt && flightRoute

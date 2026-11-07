@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { CargoHoldStorage } from "@/features/cargo/CargoHoldPanel";
 import { usePlay } from "@/features/play/PlayContext";
+import { LongRangeTankConfirmation } from "@/features/ship/LongRangeTankConfirmation";
 import { ShipFlightControls } from "@/features/ship/ShipFlightControls";
 import { ShipRefuelControls } from "@/features/ship/ShipRefuelControls";
 import { deriveShipSystemState, ShipSystemSection } from "@/features/ship/ShipSystemPanel";
@@ -43,6 +44,9 @@ export function ShipPanel() {
     deriveShipSystemState(state.repairs[REPAIR_TARGET_IDS.propulsionSystem]) === "complete";
   const landingGearReady =
     deriveShipSystemState(state.repairs[REPAIR_TARGET_IDS.landingGear]) === "complete";
+  const tankSystemState = deriveShipSystemState(
+    state.repairs[REPAIR_TARGET_IDS.rivetLongRangeTank],
+  );
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
   // The finished systems, each in its authored words, as one tiny line.
   const restoredLines = [
@@ -97,6 +101,24 @@ export function ShipPanel() {
           targetId={REPAIR_TARGET_IDS.propulsionSystem}
           weldingPrompt="Mounts seated, frame braced. What is left is welding the drive back into the ship."
         />
+      ) : null}
+      {/* Tanks for the Ride (#501): the section exists wherever the ship is parked once
+          Wade has put the player on the job, and stays (as one status line) after it,
+          because it hosts the final-weld confirmation. Before the job it is absent: a
+          system nobody has asked for is not advertised. */}
+      {tankSystemState !== "offline" ? (
+        <ShipSystemSection
+          materialsPrompt="Hand over what you are carrying and bring the rest when you come back. The Rivet still flies on its original tank until the last weld holds."
+          targetId={REPAIR_TARGET_IDS.rivetLongRangeTank}
+          weldingPrompt="Parts fitted. What is left is thirty-two welds, in as many sittings as you like."
+        >
+          {({ justCompleted }) => (
+            <LongRangeTankConfirmation
+              justCompleted={justCompleted}
+              targetId={REPAIR_TARGET_IDS.rivetLongRangeTank}
+            />
+          )}
+        </ShipSystemSection>
       ) : null}
       {restoredLines.length > 0 ? (
         <p
