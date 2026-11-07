@@ -1017,10 +1017,10 @@ const balanceSchema = z.object({
     /** Distinct jobs the board posts at once. */
     postedSlots: z.literal(3),
     /**
-     * A customer job pays 40% of the global Welding XP per section — twice
-     * Practice's share because something real is being repaired, and well under
-     * an authored story repair's full rate because a repeatable shop job should
-     * not out-earn the authored work. Derived, never a second frozen constant.
+     * A customer job pays 40% of the global Welding XP per section — now
+     * equal to Practice's training share, but with job materials, a customer
+     * commitment and a Credits payout. Both are well under an authored story
+     * repair's full XP rate. Derived, never a second frozen constant.
      */
     xpShareBps: z.literal(4_000),
     /**
