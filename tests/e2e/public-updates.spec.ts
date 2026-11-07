@@ -57,7 +57,9 @@ test.describe("public Updates", () => {
     await link.click();
     await expect(page).toHaveURL(`/updates/${slug}`);
     await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible();
-    await expect(page.getByText(/a full ten-section practice weld earns 200 base XP/i)).toBeVisible();
+    await expect(
+      page.getByText(/a full ten-section practice weld earns 200 base XP/i),
+    ).toBeVisible();
     await expect(page.getByRole("link", { name: "Practice Welding", exact: true })).toHaveAttribute(
       "href",
       "/wiki/practice-welding",
