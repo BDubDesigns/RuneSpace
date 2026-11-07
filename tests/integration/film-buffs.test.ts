@@ -713,15 +713,15 @@ suite("issue #491 film buff effects (real PostgreSQL)", () => {
       expect((await repairRow(character.id))?.weldingProgress).toBe(5);
     });
 
-    it("pays 11 per completed Practice section, in the weld's own record and the character's XP", async () => {
+    it("pays 22 per completed Practice section, in the weld's own record and the character's XP", async () => {
       const { userId, character } = await apprentice({ scrap: 2 });
       await grantBuff(character.id, WELDING, 20);
       await startPractice(userId, character.id);
       await refresh(userId, character.id, sectionMs * 4 + sectionMs - 1);
       expect(await skillXp(character.id, WELDING)).toBe(4 * bonus(practiceXp));
-      expect(bonus(practiceXp)).toBe(11);
+      expect(bonus(practiceXp)).toBe(22);
       expect(await buff(character.id, WELDING)).toBe(16);
-      expect((await practiceRow(character.id))?.runXpGained).toBe(44);
+      expect((await practiceRow(character.id))?.runXpGained).toBe(88);
     });
 
     it("runs out mid-weld in Practice, with the finished weld's XP showing exactly what it paid", async () => {
