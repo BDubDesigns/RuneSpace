@@ -219,9 +219,9 @@ describe("Work Order XP is a derived share of the global Welding XP (#207)", () 
     expect(workOrderSectionXp(balance)).toBe(20);
   });
 
-  it("keeps Practice at 10 XP per section — 20% of the same 50 — for comparison", () => {
-    expect(balance.practiceWelding.xpShareBps).toBe(2_000);
-    expect(practiceSectionXp(balance)).toBe(10);
+  it("keeps Practice at 20 XP per section — 40% of the same 50 — for comparison", () => {
+    expect(balance.practiceWelding.xpShareBps).toBe(4_000);
+    expect(practiceSectionXp(balance)).toBe(20);
   });
 
   it("derives both shares from welding.xpPerIncrement rather than freezing them as second constants", () => {
