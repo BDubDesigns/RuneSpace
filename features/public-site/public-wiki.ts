@@ -945,12 +945,12 @@ const authoredWikiArticles = [
         list: [
           "Each fresh weld takes 2 Scrap Metal, spent the moment it starts.",
           "A weld is ten sections, each about three seconds, the same cadence as any other welding.",
-          "Each finished section pays 10 Welding XP — a fraction of what a repair section pays, because nothing is actually being repaired — so a whole weld is worth 100.",
+          "Each finished section pays 20 Welding XP — 40% of what a repair section pays, because nothing is actually being repaired — so a whole weld is worth 200.",
           "Finishing a weld produces up to 2 Slag.",
           [
             "With Welding bonus attempts from a ticket to Rare or Weld Done? (see the ",
             { text: "Holo Drive-In", articleSlug: "holo-drive-in" },
-            "), each finished section pays 11 XP instead of 10 and spends one.",
+            "), each finished section pays 22 XP instead of 20 and spends one.",
           ],
         ],
       },
@@ -1700,7 +1700,7 @@ const authoredWikiArticles = [
         heading: "Welding bonus (Rare or Weld Done?)",
         list: [
           [
-            "Every finished welding section spends one bonus attempt and pays 10% more Welding XP, rounded up per section: a 50 XP section pays 55, and a 10 XP practice section pays 11. This covers ",
+            "Every finished welding section spends one bonus attempt and pays 10% more Welding XP, rounded up per section: a 50 XP section pays 55, and a 20 XP practice section pays 22. This covers ",
             { text: "repairs", articleSlug: "cargo-hold-and-welding" },
             ", ",
             { text: "practice welds", articleSlug: "practice-welding" },
