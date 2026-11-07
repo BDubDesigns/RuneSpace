@@ -603,21 +603,21 @@ describe("Welding: Practice", () => {
       balance,
     });
 
-  it("pays 11 instead of 10 per completed Practice section and spends one charge each", () => {
-    expect(sectionXp).toBe(10);
+  it("pays 22 instead of 20 per completed Practice section and spends one charge each", () => {
+    expect(sectionXp).toBe(20);
     expect(practice(4, { filmBuffCharges: 20 })).toMatchObject({
       sectionsResolved: 4,
-      awardedXp: 44,
+      awardedXp: 88,
       filmChargesConsumed: 4,
     });
-    expect(practice(4)).toMatchObject({ awardedXp: 40, filmChargesConsumed: 0 });
+    expect(practice(4)).toMatchObject({ awardedXp: 80, filmChargesConsumed: 0 });
   });
 
   it("runs out mid-weld, and the weld's own XP record shows exactly what it paid", () => {
     const sections = practiceWelding.sectionsPerWeld;
     const result = practice(sections, { filmBuffCharges: 4 });
     expect(result.completedWelds).toBe(1);
-    expect(result.awardedXp).toBe(4 * 11 + (sections - 4) * 10);
+    expect(result.awardedXp).toBe(4 * 22 + (sections - 4) * 20);
     expect(result.filmChargesConsumed).toBe(4);
     expect(result.resolvedWelds[0]!.xpGained).toBe(result.awardedXp);
   });
@@ -628,9 +628,9 @@ describe("Welding: Practice", () => {
     expect(result.completedWelds).toBe(3);
     expect(result.filmChargesConsumed).toBe(sections + 5);
     expect(result.resolvedWelds.map((weld) => weld.xpGained)).toEqual([
-      sections * 11,
-      5 * 11 + (sections - 5) * 10,
-      sections * 10,
+      sections * 22,
+      5 * 22 + (sections - 5) * 20,
+      sections * 20,
     ]);
     expect(result.resolvedWelds.reduce((sum, weld) => sum + weld.xpGained, 0)).toBe(
       result.awardedXp,
