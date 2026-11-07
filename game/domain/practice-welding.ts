@@ -21,7 +21,7 @@ import { weldingSectionAward } from "@/game/domain/theatre";
  *
  * It is genuine Welding, not a tutorial simulation: the same skill, the same
  * five-tick section cadence, and the same Clean Pass opportunities as an
- * authored repair, at half the XP because nothing is actually being fixed. Two
+ * authored repair, at 40% of the XP because nothing is actually being fixed. Two
  * Scrap Metal go in at the start of every fresh weld and up to two Slag come
  * out at the end of it.
  *
@@ -98,7 +98,7 @@ export type PracticeSnapshot = {
   /**
    * The character's remaining Rare or Weld Done? film buff charges (#491), read under the
    * character lock. Each COMPLETED section spends one while any remain and pays +10%
-   * Welding XP (a Practice section's 10 becomes 11); sections after the last charge pay
+   * Welding XP (a Practice section's 20 becomes 22); sections after the last charge pay
    * ordinary XP, mid-weld or mid-batch. Scrap, timing and Slag are untouched. Absent means none.
    */
   filmBuffCharges?: number;

@@ -98,7 +98,7 @@ shared offline/Stop/Travel contract Work Orders reuse rather than reimplement).
   following the same "material follows the fiction" rule as the original
   eight.
 - Real Work Orders use genuine Welding and pay **40% of the global Welding
-  XP per section** — double Practice's share, well under an authored story
+  XP per section** — matching Practice's current XP share, well under an authored story
   repair's full rate. See "Welding XP" below.
 - Payout exceeds the direct-sale value of the material a job consumes by a
   fixed labor premium, and every authored payout is validated against the rule
@@ -180,7 +180,7 @@ every Welding work unit; each activity pays an authored share of it
 
 | Activity | Share | XP per section |
 | --- | --- | --- |
-| Practice Welding | 20% | 10 |
+| Practice Welding | 40% | 20 |
 | Work Order | 40% | 20 |
 | Authored repair (Cargo Hold, Crew Stop) | 100% | 50 |
 

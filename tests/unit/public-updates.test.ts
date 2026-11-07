@@ -22,6 +22,18 @@ const baseUpdate = {
 };
 
 describe("public Updates content boundary", () => {
+  it("publishes the Practice Welding rebalance after the Drive-In update (#503)", () => {
+    const practice = getPublicUpdate("practice-welding-pays-better")!;
+    expect(getLatestPublishedUpdate().slug).toBe(practice.slug);
+    expect(Date.parse(practice.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("a-night-at-the-drive-in-theatre")!.publishedAt),
+    );
+    expect(Date.parse(practice.publishedAt)).toBeLessThanOrEqual(Date.now());
+    expect(JSON.stringify(practice)).toContain("20 Welding XP");
+    expect(JSON.stringify(practice)).toContain("200 base XP");
+    expect(getWikiArticle("practice-welding")?.title).toBe("Practice Welding");
+  });
+
   it("sorts validated Updates newest-first by publishedAt", () => {
     const updates = validatePublicUpdates([
       baseUpdate,
@@ -136,7 +148,7 @@ describe("public Updates content boundary", () => {
   it("keeps the published Werner's Lab Update unchanged (#429)", () => {
     // Later Updates do not alter Werner's original article.
     const latest = getPublicUpdate("werners-lab")!;
-    expect(getLatestPublishedUpdate().slug).toBe("a-night-at-the-drive-in-theatre");
+    expect(getLatestPublishedUpdate().slug).toBe("practice-welding-pays-better");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("high-scores")!.publishedAt),
     );

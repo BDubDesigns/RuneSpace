@@ -241,12 +241,12 @@ describe("one Practice weld", () => {
     expect(sectionXp).toBe(
       Math.floor((welding.xpPerIncrement * practiceWelding.xpShareBps) / 10_000),
     );
-    // The approved playtest value (#191): 10 of the global 50 per section, so a
-    // whole ten-section weld is worth 100 Welding XP.
-    expect(sectionXp).toBe(10);
+    // The adjusted playtest value (#503): 20 of the global 50 per section, so a
+    // whole ten-section weld is worth 200 Welding XP.
+    expect(sectionXp).toBe(20);
     const resolved = resolve(practiceWelding.sectionsPerWeld * sectionTicks);
     expect(resolved.awardedXp).toBe(practiceWelding.sectionsPerWeld * sectionXp);
-    expect(resolved.awardedXp).toBe(100);
+    expect(resolved.awardedXp).toBe(200);
   });
 
   it("consumes its two Scrap when it begins, not when it finishes", () => {

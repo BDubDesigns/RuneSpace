@@ -444,7 +444,7 @@ const balanceSchema = z.object({
     sectionsPerWeld: z.literal(10),
     scrapPerWeld: z.literal(2),
     slagPerWeld: z.literal(2),
-    xpShareBps: z.literal(2_000),
+    xpShareBps: z.literal(4_000),
   }),
   /**
    * Per-repair-target recipes. Each target owns its own material requirement
@@ -1017,10 +1017,10 @@ const balanceSchema = z.object({
     /** Distinct jobs the board posts at once. */
     postedSlots: z.literal(3),
     /**
-     * A customer job pays 40% of the global Welding XP per section — twice
-     * Practice's share because something real is being repaired, and well under
-     * an authored story repair's full rate because a repeatable shop job should
-     * not out-earn the authored work. Derived, never a second frozen constant.
+     * A customer job pays 40% of the global Welding XP per section — now
+     * equal to Practice's training share, but with job materials, a customer
+     * commitment and a Credits payout. Both are well under an authored story
+     * repair's full XP rate. Derived, never a second frozen constant.
      */
     xpShareBps: z.literal(4_000),
     /**
@@ -1776,7 +1776,7 @@ const defaults = balanceSchema.parse({
     sectionsPerWeld: 10,
     scrapPerWeld: 2,
     slagPerWeld: 2,
-    xpShareBps: 2_000,
+    xpShareBps: 4_000,
   },
   repairTargets: {
     cargoHold: {
@@ -2653,9 +2653,9 @@ export function repairTargetForActionId(
  * balance rule stays a share of normal rather than a second frozen constant
  * that could silently drift from the Welding value it is a share of (#190).
  *
- * The share is 20% — 10 XP of the global 50 — after the #191 playtest pass.
- * Practice is the only thing it reduces: authored repairs, and the Work Orders
- * to come, pay full Welding XP per increment.
+ * The share is 40% — 20 XP of the global 50 — after the #503 practice balance change.
+ * Practice and Work Orders now both pay 20 XP per section; authored repairs
+ * remain at the full 50 XP per section.
  */
 export function practiceSectionXp(balance = getEffectiveGameBalance()): number {
   return Math.floor((balance.welding.xpPerIncrement * balance.practiceWelding.xpShareBps) / 10_000);

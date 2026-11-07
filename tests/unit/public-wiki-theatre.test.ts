@@ -70,7 +70,7 @@ describe("Holo Drive-In Wiki guide (#491)", () => {
     // The worked examples in the guide are what the rule produces.
     expect(applyFilmXpBonus(50, WELDING_FILM_BUFF.xpBonusBps)).toBe(55);
     expect(applyFilmXpBonus(10, WELDING_FILM_BUFF.xpBonusBps)).toBe(11);
-    expect(guide).toContain("a 50 XP section pays 55, and a 10 XP practice section pays 11");
+    expect(guide).toContain("a 50 XP section pays 55, and a 20 XP practice section pays 22");
   });
 
   it("states the top-up example the rules give", () => {
